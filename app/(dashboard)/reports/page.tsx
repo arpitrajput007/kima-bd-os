@@ -16,13 +16,15 @@ export default function ReportsPage() {
   const [approvingRule, setApprovingRule] = useState<string | null>(null)
 
   const loadReports = async () => {
-    setLoading(true)
     const { data } = await supabase.from('learning_reports').select('*').order('created_at', { ascending: false })
     setReports(data || [])
     setLoading(false)
   }
 
-  useEffect(() => { loadReports() }, [])
+  useEffect(() => { 
+    loadReports()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const generateReport = async () => {
     setGenerating(true)

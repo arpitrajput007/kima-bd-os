@@ -27,6 +27,24 @@ interface GeneratedMessages {
   meeting_agenda?: string
 }
 
+const MessageBlock = ({ label, value, copyFn }: { label: string; value?: string; copyFn: (t?: string) => void }) => (
+  value ? (
+    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+      <div className="flex items-center justify-between px-4 py-2.5"
+        style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <span className="text-xs font-semibold" style={{ color: 'rgb(160,160,180)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</span>
+        <button onClick={() => copyFn(value)} className="btn btn-ghost" style={{ padding: '2px 6px', fontSize: '11px' }}>
+          <Copy size={10} /> Copy
+        </button>
+      </div>
+      <pre className="p-4 text-sm leading-relaxed whitespace-pre-wrap"
+        style={{ color: 'rgb(210,210,230)', fontFamily: 'Inter, sans-serif', background: 'rgba(22,22,34,0.5)' }}>
+        {value}
+      </pre>
+    </div>
+  ) : null
+)
+
 function OutreachStudioContent() {
   const searchParams = useSearchParams()
   const preselectedLeadId = searchParams.get('lead')
@@ -144,23 +162,6 @@ function OutreachStudioContent() {
   const inputClass = 'input-dark'
   const selStyle = { fontSize: '13px' }
 
-  const MessageBlock = ({ label, value }: { label: string; value?: string }) => (
-    value ? (
-      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
-        <div className="flex items-center justify-between px-4 py-2.5"
-          style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <span className="text-xs font-semibold" style={{ color: 'rgb(160,160,180)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</span>
-          <button onClick={() => copy(value)} className="btn btn-ghost" style={{ padding: '2px 6px', fontSize: '11px' }}>
-            <Copy size={10} /> Copy
-          </button>
-        </div>
-        <pre className="p-4 text-sm leading-relaxed whitespace-pre-wrap"
-          style={{ color: 'rgb(210,210,230)', fontFamily: 'Inter, sans-serif', background: 'rgba(22,22,34,0.5)' }}>
-          {value}
-        </pre>
-      </div>
-    ) : null
-  )
 
   return (
     <div className="fade-in page-container">
@@ -301,12 +302,12 @@ function OutreachStudioContent() {
                 </div>
               )}
 
-              <MessageBlock label="First Message" value={generated.message} />
-              <MessageBlock label="Follow-up 1 (after 5-7 days)" value={generated.followup_1} />
-              <MessageBlock label="Follow-up 2" value={generated.followup_2} />
-              <MessageBlock label="Objection Reply" value={generated.objection_reply} />
-              <MessageBlock label="Call Opening Line" value={generated.call_opening} />
-              <MessageBlock label="Meeting Agenda" value={generated.meeting_agenda} />
+              <MessageBlock label="First Message" value={generated.message} copyFn={copy} />
+              <MessageBlock label="Follow-up 1 (after 5-7 days)" value={generated.followup_1} copyFn={copy} />
+              <MessageBlock label="Follow-up 2" value={generated.followup_2} copyFn={copy} />
+              <MessageBlock label="Objection Reply" value={generated.objection_reply} copyFn={copy} />
+              <MessageBlock label="Call Opening Line" value={generated.call_opening} copyFn={copy} />
+              <MessageBlock label="Meeting Agenda" value={generated.meeting_agenda} copyFn={copy} />
             </div>
           )}
         </div>

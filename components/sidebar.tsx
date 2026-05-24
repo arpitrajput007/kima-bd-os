@@ -11,9 +11,9 @@ import {
   Brain,
   BarChart3,
   Settings,
-  Zap,
   ChevronLeft,
   ChevronRight,
+  Briefcase
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -57,42 +57,34 @@ export function Sidebar() {
     <aside
       className={cn(
         'flex flex-col h-screen sticky top-0 transition-all duration-300 flex-shrink-0',
-        collapsed ? 'w-[72px]' : 'w-[260px]'
+        collapsed ? 'w-[68px]' : 'w-[240px]'
       )}
       style={{
-        background: 'rgba(11, 11, 16, 0.4)', // Translucent sidebar
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderRight: '1px solid rgba(255, 255, 255, 0.05)',
+        background: 'var(--bg-secondary)',
+        borderRight: '1px solid var(--border-subtle)',
       }}
     >
       {/* Logo */}
       <div className={cn(
-        'flex items-center gap-3 p-6 border-b',
+        'flex items-center gap-3 p-5',
         collapsed && 'justify-center p-4'
-      )}
-        style={{ borderColor: '#1A1A24', minHeight: '80px' }}>
-        <div
-          className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg"
-          style={{ background: 'linear-gradient(135deg, #7C3AED, #4F46E5)', boxShadow: '0 4px 12px rgba(124,58,237,0.3)' }}
-        >
-          <Zap size={16} color="white" fill="white" />
+      )} style={{ height: '72px' }}>
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-[var(--text-primary)]">
+          <Briefcase size={14} color="var(--bg-primary)" />
         </div>
         {!collapsed && (
           <div className="overflow-hidden">
-            <div className="text-[#F4F4F5] font-bold text-sm tracking-wide leading-none whitespace-nowrap">Kima BD OS</div>
-            <div className="text-[#71717A] text-[11px] font-medium mt-1 whitespace-nowrap tracking-wider uppercase">Business Engine</div>
+            <div className="text-[var(--text-primary)] font-semibold text-[13px] tracking-tight leading-none whitespace-nowrap">Kima BD OS</div>
           </div>
         )}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
         {navGroups.map((group, idx) => (
-          <div key={idx} className="space-y-1.5">
+          <div key={idx} className="space-y-1">
             {!collapsed && (
-              <div className="text-[11px] font-bold px-3 mb-2"
-                style={{ color: '#52525B', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              <div className="text-[11px] font-medium px-3 mb-1.5 text-[var(--text-muted)]">
                 {group.label}
               </div>
             )}
@@ -103,14 +95,16 @@ export function Sidebar() {
                   key={href}
                   href={href}
                   className={cn(
-                    'nav-item',
-                    isActive && 'active',
-                    collapsed && 'justify-center px-0'
+                    'flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium transition-colors',
+                    isActive 
+                      ? 'bg-[rgba(255,255,255,0.06)] text-[var(--text-primary)]' 
+                      : 'text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[var(--text-primary)]',
+                    collapsed && 'justify-center px-0 py-2.5 mx-1'
                   )}
                   title={collapsed ? label : undefined}
                 >
-                  <Icon size={16} className={cn("flex-shrink-0", isActive ? "text-[#8B5CF6]" : "text-[#71717A]")} />
-                  {!collapsed && <span className={cn("font-medium", isActive ? "text-[#F4F4F5]" : "text-[#A1A1AA]")}>{label}</span>}
+                  <Icon size={16} className={cn("flex-shrink-0", isActive ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]")} />
+                  {!collapsed && <span className="truncate">{label}</span>}
                 </Link>
               )
             })}
@@ -119,13 +113,15 @@ export function Sidebar() {
       </nav>
 
       {/* Bottom */}
-      <div className="p-4 border-t" style={{ borderColor: '#1A1A24' }}>
+      <div className="p-3 border-t border-[var(--border-subtle)]">
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className={cn('btn btn-ghost w-full text-xs justify-start', collapsed && 'justify-center px-0')}
-          style={{ padding: '10px 14px', gap: '10px' }}
+          className={cn(
+            'flex items-center w-full rounded-md text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[var(--text-primary)] transition-colors',
+            collapsed ? 'justify-center p-2.5' : 'px-3 py-2 gap-2'
+          )}
         >
-          {collapsed ? <ChevronRight size={16} /> : <><ChevronLeft size={16} /><span className="text-[#A1A1AA] font-medium">Collapse Sidebar</span></>}
+          {collapsed ? <ChevronRight size={14} /> : <><ChevronLeft size={14} /><span className="truncate">Collapse</span></>}
         </button>
       </div>
     </aside>

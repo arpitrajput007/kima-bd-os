@@ -2,17 +2,11 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Save, Eye, EyeOff, Key, ExternalLink } from 'lucide-react'
+import { Eye, EyeOff, Key, ExternalLink } from 'lucide-react'
 
 export default function SettingsPage() {
   const [showKey, setShowKey] = useState(false)
   const [openaiKey, setOpenaiKey] = useState('')
-  const [saved, setSaved] = useState(false)
-
-  const handleSave = () => {
-    toast.info('To update API keys, edit the .env.local file in your project root and restart the dev server.')
-    setSaved(true)
-  }
 
   return (
     <div className="fade-in page-container">

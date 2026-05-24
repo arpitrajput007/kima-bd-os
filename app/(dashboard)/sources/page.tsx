@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Plus, Edit, Trash2, Loader2, Save, X, Database, Play, Pause } from 'lucide-react'
+import { Plus, Edit, Trash2, Loader2, Save, X, Play, Pause } from 'lucide-react'
 import type { Source } from '@/lib/types'
-import { cn, formatDate } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 const SOURCE_TYPES = [
   'website', 'google_search', 'twitter_profile', 'linkedin_company',
@@ -38,13 +38,15 @@ export default function SourcesPage() {
   const [search, setSearch] = useState('')
 
   const loadSources = async () => {
-    setLoading(true)
     const { data } = await supabase.from('sources').select('*').order('status').order('created_at', { ascending: false })
     setSources(data || [])
     setLoading(false)
   }
 
-  useEffect(() => { loadSources() }, [])
+  useEffect(() => { 
+    loadSources()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
