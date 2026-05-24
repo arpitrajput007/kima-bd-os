@@ -13,7 +13,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Briefcase
+  Sparkles
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -56,35 +56,36 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'flex flex-col h-screen sticky top-0 transition-all duration-300 flex-shrink-0',
-        collapsed ? 'w-[68px]' : 'w-[240px]'
+        'flex h-screen flex-shrink-0 flex-col sticky top-0 transition-all duration-300',
+        collapsed ? 'w-[72px]' : 'w-[264px]'
       )}
       style={{
-        background: 'var(--bg-secondary)',
+        background: 'linear-gradient(180deg, rgba(26,27,32,0.96), rgba(19,20,24,0.96))',
         borderRight: '1px solid var(--border-subtle)',
       }}
     >
       {/* Logo */}
       <div className={cn(
-        'flex items-center gap-3 p-5',
-        collapsed && 'justify-center p-4'
-      )} style={{ height: '72px' }}>
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-[var(--text-primary)]">
-          <Briefcase size={14} color="var(--bg-primary)" />
+        'flex items-center gap-3 px-5 pb-5 pt-6',
+        collapsed && 'justify-center px-3'
+      )}>
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-[var(--text-primary)] text-[var(--bg-primary)] shadow-[0_16px_42px_rgba(0,0,0,0.22)]">
+          <Sparkles size={17} />
         </div>
         {!collapsed && (
-          <div className="overflow-hidden">
-            <div className="text-[var(--text-primary)] font-semibold text-[13px] tracking-tight leading-none whitespace-nowrap">Kima BD OS</div>
+          <div className="min-w-0 overflow-hidden">
+            <div className="whitespace-nowrap text-[14px] font-semibold tracking-tight text-[var(--text-primary)]">Kima BD OS</div>
+            <div className="mt-1 truncate text-[12px] text-[var(--text-muted)]">AI business development</div>
           </div>
         )}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
+      <nav className="flex-1 space-y-7 overflow-y-auto px-3 py-4">
         {navGroups.map((group, idx) => (
-          <div key={idx} className="space-y-1">
+          <div key={idx} className="space-y-2">
             {!collapsed && (
-              <div className="text-[11px] font-medium px-3 mb-1.5 text-[var(--text-muted)]">
+              <div className="px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]">
                 {group.label}
               </div>
             )}
@@ -95,15 +96,15 @@ export function Sidebar() {
                   key={href}
                   href={href}
                   className={cn(
-                    'flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium transition-colors',
+                    'group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[13px] font-medium transition-all',
                     isActive 
-                      ? 'bg-[rgba(255,255,255,0.06)] text-[var(--text-primary)]' 
-                      : 'text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[var(--text-primary)]',
-                    collapsed && 'justify-center px-0 py-2.5 mx-1'
+                      ? 'bg-white/[0.065] text-[var(--text-primary)] shadow-[0_10px_30px_rgba(0,0,0,0.16)] ring-1 ring-white/[0.055]' 
+                      : 'text-[var(--text-secondary)] hover:bg-white/[0.04] hover:text-[var(--text-primary)]',
+                    collapsed && 'mx-1 justify-center px-0 py-3'
                   )}
                   title={collapsed ? label : undefined}
                 >
-                  <Icon size={16} className={cn("flex-shrink-0", isActive ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]")} />
+                  <Icon size={16} className={cn("flex-shrink-0 transition-colors", isActive ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]")} />
                   {!collapsed && <span className="truncate">{label}</span>}
                 </Link>
               )
@@ -113,12 +114,12 @@ export function Sidebar() {
       </nav>
 
       {/* Bottom */}
-      <div className="p-3 border-t border-[var(--border-subtle)]">
+      <div className="border-t border-[var(--border-subtle)] p-3">
         <button
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            'flex items-center w-full rounded-md text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[var(--text-primary)] transition-colors',
-            collapsed ? 'justify-center p-2.5' : 'px-3 py-2 gap-2'
+            'flex w-full items-center rounded-2xl text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-white/[0.04] hover:text-[var(--text-primary)]',
+            collapsed ? 'justify-center p-3' : 'gap-2 px-3 py-2.5'
           )}
         >
           {collapsed ? <ChevronRight size={14} /> : <><ChevronLeft size={14} /><span className="truncate">Collapse</span></>}
