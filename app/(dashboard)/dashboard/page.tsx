@@ -1,14 +1,31 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import {
-  TrendingUp, Star, CheckCircle, XCircle, Mail, MessageCircle,
-  Calendar, Inbox, Clock, AlertCircle, Users, Target, Zap,
-  RefreshCw, Plus, ArrowRight, BrainCircuit, Database, ChevronRight
-} from 'lucide-react'
-import { cn, getScoreBg, formatDate } from '@/lib/utils'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import {
+  ArrowRight,
+  BarChart3,
+  BrainCircuit,
+  Calendar,
+  CheckCircle,
+  ChevronRight,
+  Clock,
+  Database,
+  FileText,
+  Inbox,
+  Mail,
+  MessageCircle,
+  Plus,
+  RefreshCw,
+  Sparkles,
+  Star,
+  Target,
+  TrendingUp,
+  XCircle,
+  Zap,
+} from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { cn, formatDate, getScoreBg } from '@/lib/utils'
 import type { Lead } from '@/lib/types'
 
 interface DashboardStats {
@@ -30,6 +47,20 @@ interface CategoryStat {
   category: string
   count: number
 }
+
+const primaryMetrics = [
+  { key: 'new_leads', label: 'New Leads Today', icon: Inbox, tone: 'text-[var(--info)]' },
+  { key: 'qualified', label: 'Qualified Pipeline', icon: TrendingUp, tone: 'text-[var(--success)]' },
+  { key: 'approved', label: 'Approved for Outreach', icon: CheckCircle, tone: 'text-[var(--accent-primary)]' },
+  { key: 'meetings', label: 'Meetings Booked', icon: Calendar, tone: 'text-[var(--warning)]' },
+] as const
+
+const secondaryMetrics = [
+  { key: 'excellent', label: 'Excellent Leads', icon: Star },
+  { key: 'contacted', label: 'Contacted', icon: Mail },
+  { key: 'replied', label: 'Replied', icon: MessageCircle },
+  { key: 'rejected', label: 'Rejected', icon: XCircle },
+] as const
 
 export default function DashboardPage() {
   const supabase = createClient()
@@ -102,185 +133,205 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const topCategory = categoryStats[0]?.category || 'No category signal yet'
+  const topProduct = productStats[0]?.category || 'No product angle yet'
+  const pipelineReadiness = stats?.total ? Math.round(((stats.high_score + stats.approved + stats.meetings) / (stats.total * 3)) * 100) : 0
+
+  const recommendedFocus = useMemo(() => {
+    if (!stats?.total) return 'Start by adding one source and one manually qualified lead so the agent has a clean seed pattern.'
+    if ((stats.needs_review || 0) > (stats.approved || 0)) return 'Review new and researching leads first; approvals will sharpen the agent faster than adding more volume.'
+    if ((stats.approved || 0) > (stats.contacted || 0)) return 'Move approved accounts into outreach while the qualification context is still fresh.'
+    return 'Study replies and meetings to identify the source and product angles worth doubling down on next week.'
+  }, [stats])
 
   return (
     <div className="page-container">
-      {/* HEADER */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-semibold text-[var(--text-primary)] tracking-tight">BD Command Center</h1>
-          <p className="text-[13px] text-[var(--text-secondary)] mt-1">
-            AI-powered lead intelligence for Kima/Aeredium
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full text-[12px] font-medium bg-[var(--success-subtle)] text-[var(--success)] border border-[rgba(52,211,153,0.15)]">
-            <div className="status-dot active" />
+      <header className="mb-12 flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+        <div className="max-w-3xl">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-white/[0.025] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)]">
+            <span className="status-dot active" />
             Agent Active
           </div>
+          <h1 className="text-[34px] font-semibold tracking-tight text-[var(--text-primary)] md:text-[42px]">
+            BD Command Center
+          </h1>
+          <p className="mt-3 max-w-2xl text-[15px] leading-7 text-[var(--text-secondary)]">
+            AI-powered lead intelligence for Kima/Aeredium, organized for daily pipeline review, source learning, and operator decisions.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
           <button onClick={loadData} className="btn btn-secondary">
             <RefreshCw size={14} className={loading ? 'animate-spin text-[var(--text-muted)]' : 'text-[var(--text-muted)]'} />
-            <span className="hidden sm:inline">Refresh</span>
+            Refresh
           </button>
+          <Link href="/sources" className="btn btn-secondary">
+            <Database size={14} />
+            Add Source
+          </Link>
           <Link href="/leads/new" className="btn btn-primary">
             <Plus size={14} />
             Add Lead
           </Link>
         </div>
-      </div>
+      </header>
 
-      {/* SECTION 1: PIPELINE SNAPSHOT */}
-      <div className="mb-8">
-        <h2 className="text-xs-bold mb-4">Pipeline Snapshot</h2>
-        
-        {/* Primary KPIs */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-          <div className="surface-panel p-5">
-            <div className="text-[13px] font-medium text-[var(--text-secondary)] mb-2 flex items-center gap-2">
-              <Inbox size={14} className="text-[var(--info)]" /> New Leads Today
-            </div>
-            <div className="text-3xl font-semibold text-[var(--text-primary)] tracking-tight">
-              {loading ? '—' : (stats?.new_leads ?? 0)}
-            </div>
+      <section className="surface-elevated mb-12 p-6 md:p-7">
+        <div className="mb-7 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-xs-bold mb-3">Pipeline Snapshot</p>
+            <h2 className="text-[22px] font-semibold tracking-tight text-[var(--text-primary)]">Today&apos;s operating picture</h2>
           </div>
-          <div className="surface-panel p-5">
-            <div className="text-[13px] font-medium text-[var(--text-secondary)] mb-2 flex items-center gap-2">
-              <TrendingUp size={14} className="text-[var(--success)]" /> Qualified Pipeline
-            </div>
-            <div className="text-3xl font-semibold text-[var(--text-primary)] tracking-tight">
-              {loading ? '—' : (stats?.qualified ?? 0)}
-            </div>
-          </div>
-          <div className="surface-panel p-5">
-            <div className="text-[13px] font-medium text-[var(--text-secondary)] mb-2 flex items-center gap-2">
-              <CheckCircle size={14} className="text-[var(--accent-primary)]" /> Approved for Outreach
-            </div>
-            <div className="text-3xl font-semibold text-[var(--text-primary)] tracking-tight">
-              {loading ? '—' : (stats?.approved ?? 0)}
-            </div>
-          </div>
-          <div className="surface-panel p-5">
-            <div className="text-[13px] font-medium text-[var(--text-secondary)] mb-2 flex items-center gap-2">
-              <Calendar size={14} className="text-[var(--warning)]" /> Meetings Booked
-            </div>
-            <div className="text-3xl font-semibold text-[var(--text-primary)] tracking-tight">
-              {loading ? '—' : (stats?.meetings ?? 0)}
-            </div>
+          <div className="w-max rounded-full bg-[var(--accent-primary-subtle)] px-3 py-1.5 text-[12px] font-medium text-[var(--accent-primary)]">
+            {loading ? 'Syncing' : `${stats?.total ?? 0} total leads`}
           </div>
         </div>
 
-        {/* Secondary KPIs */}
-        <div className="flex flex-wrap gap-2">
-          <div className="badge badge-neutral gap-2 py-1.5 px-3">
-            <Star size={12} className="text-[var(--warning)]" />
-            <span>Excellent: <strong className="text-[var(--text-primary)] ml-1">{loading ? '-' : (stats?.excellent ?? 0)}</strong></span>
+        <div className="grid gap-5 xl:grid-cols-[310px_minmax(0,1fr)]">
+          <div className="surface-flat p-5">
+            <div className="mb-5 text-[13px] leading-6 text-[var(--text-secondary)]">
+              A compact read on pipeline health before moving into lead review.
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <div className="text-[26px] font-semibold tabular-nums text-[var(--text-primary)]">{loading ? '-' : stats?.needs_review ?? 0}</div>
+                <div className="mt-1 text-[12px] text-[var(--text-muted)]">Needs review</div>
+              </div>
+              <div>
+                <div className="text-[26px] font-semibold tabular-nums text-[var(--text-primary)]">{loading ? '-' : stats?.high_score ?? 0}</div>
+                <div className="mt-1 text-[12px] text-[var(--text-muted)]">Score 70+</div>
+              </div>
+              <div>
+                <div className="text-[26px] font-semibold tabular-nums text-[var(--text-primary)]">{loading ? '-' : `${pipelineReadiness}%`}</div>
+                <div className="mt-1 text-[12px] text-[var(--text-muted)]">Readiness</div>
+              </div>
+            </div>
           </div>
-          <div className="badge badge-neutral gap-2 py-1.5 px-3">
-            <Mail size={12} className="text-[var(--info)]" />
-            <span>Contacted: <strong className="text-[var(--text-primary)] ml-1">{loading ? '-' : (stats?.contacted ?? 0)}</strong></span>
-          </div>
-          <div className="badge badge-neutral gap-2 py-1.5 px-3">
-            <MessageCircle size={12} className="text-[var(--success)]" />
-            <span>Replied: <strong className="text-[var(--text-primary)] ml-1">{loading ? '-' : (stats?.replied ?? 0)}</strong></span>
-          </div>
-          <div className="badge badge-neutral gap-2 py-1.5 px-3">
-            <XCircle size={12} className="text-[var(--danger)]" />
-            <span>Rejected: <strong className="text-[var(--text-primary)] ml-1">{loading ? '-' : (stats?.rejected ?? 0)}</strong></span>
+
+          <div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {primaryMetrics.map(({ key, label, icon: Icon, tone }) => (
+                <div key={key} className="rounded-2xl bg-white/[0.025] p-5">
+                  <Icon size={16} className={tone} />
+                  <div className="mt-6 text-[34px] font-semibold tracking-tight tabular-nums text-[var(--text-primary)]">
+                    {loading ? '-' : stats?.[key] ?? 0}
+                  </div>
+                  <div className="mt-2 text-[12px] leading-5 text-[var(--text-secondary)]">{label}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--border-subtle)] pt-4">
+              {secondaryMetrics.map(({ key, label, icon: Icon }) => (
+                <div key={key} className="inline-flex items-center gap-2 rounded-full bg-white/[0.025] px-3.5 py-2 text-[12px] text-[var(--text-secondary)]">
+                  <Icon size={13} className="text-[var(--text-muted)]" />
+                  <span>{label}</span>
+                  <strong className="font-semibold tabular-nums text-[var(--text-primary)]">{loading ? '-' : stats?.[key] ?? 0}</strong>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* SECTION 2: MAIN WORKSPACE */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Left Column: Recent Leads */}
-        <div className="lg:col-span-2 flex flex-col min-h-[500px]">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xs-bold">Recent High-Quality Leads</h2>
-            <Link href="/leads" className="text-[13px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-1 transition-colors">
-              View pipeline <ChevronRight size={14} />
+      <section className="mb-12 grid grid-cols-1 gap-7 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-h-[620px]">
+          <div className="mb-5 flex items-end justify-between gap-4">
+            <div>
+              <p className="text-xs-bold mb-2">Main Workspace</p>
+              <h2 className="text-[22px] font-semibold tracking-tight text-[var(--text-primary)]">Recent High-Quality Leads</h2>
+            </div>
+            <Link href="/leads" className="group inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]">
+              View pipeline
+              <ChevronRight size={14} className="transition-transform group-hover:translate-x-0.5" />
             </Link>
           </div>
-          
-          <div className="surface-panel flex-1 flex flex-col overflow-hidden">
+
+          <div className="surface-elevated min-h-[560px] overflow-hidden">
             {loading ? (
-              <div className="flex-1 flex items-center justify-center p-12 text-[13px] text-[var(--text-muted)]">
+              <div className="flex min-h-[560px] items-center justify-center text-[13px] text-[var(--text-muted)]">
                 Syncing pipeline data...
               </div>
             ) : recentLeads.length === 0 ? (
-              /* PREMIUM EMPTY STATE */
-              <div className="flex-1 flex flex-col items-center justify-center p-12 text-center max-w-md mx-auto">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-[var(--bg-tertiary)] border border-[var(--border-strong)] mb-5">
-                  <Database size={20} className="text-[var(--text-secondary)]" />
-                </div>
-                <h3 className="text-[16px] font-semibold text-[var(--text-primary)] mb-2">No leads discovered yet</h3>
-                <p className="text-[13px] text-[var(--text-secondary)] mb-8 leading-relaxed">
-                  Connect your first source or manually add a lead to start building your BD pipeline.
-                </p>
-                
-                <div className="w-full surface-flat p-5 text-left mb-8 border border-[var(--border-subtle)]">
-                  <div className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-4">Setup Checklist</div>
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-3">
-                      <div className="w-5 h-5 rounded-full border border-[var(--border-strong)] flex items-center justify-center shrink-0 mt-0.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] opacity-50" />
-                      </div>
-                      <span className="text-[13px] text-[var(--text-primary)] font-medium">Add your first target source</span>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="w-5 h-5 rounded-full border border-[var(--border-strong)] flex items-center justify-center shrink-0 mt-0.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] opacity-50" />
-                      </div>
-                      <span className="text-[13px] text-[var(--text-secondary)]">Import or add your first lead</span>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="w-5 h-5 rounded-full border border-[var(--border-strong)] flex items-center justify-center shrink-0 mt-0.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] opacity-50" />
-                      </div>
-                      <span className="text-[13px] text-[var(--text-secondary)]">Approve leads to train the agent</span>
-                    </div>
+              <div className="grid min-h-[560px] place-items-center px-6 py-14">
+                <div className="w-full max-w-2xl text-center">
+                  <div className="mx-auto mb-7 flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--border-subtle)] bg-white/[0.035]">
+                    <Sparkles size={24} className="text-[var(--accent-primary)]" />
                   </div>
-                </div>
+                  <h3 className="text-[24px] font-semibold tracking-tight text-[var(--text-primary)]">No leads discovered yet</h3>
+                  <p className="mx-auto mt-3 max-w-md text-[14px] leading-6 text-[var(--text-secondary)]">
+                    Connect your first source or manually add a lead to start building your BD pipeline.
+                  </p>
 
-                <div className="flex items-center justify-center gap-3 w-full">
-                  <Link href="/sources" className="btn btn-secondary flex-1 justify-center">
-                    Add Source
-                  </Link>
-                  <Link href="/leads/new" className="btn btn-primary flex-1 justify-center">
-                    Add Lead
-                  </Link>
+                  <div className="mx-auto mt-9 grid max-w-xl gap-3 text-left sm:grid-cols-2">
+                    {[
+                      'Add your first source',
+                      'Import or add your first lead',
+                      'Generate outreach',
+                      'Approve/reject leads to train the agent',
+                    ].map((item, index) => (
+                      <div key={item} className="flex min-h-[72px] items-start gap-3 rounded-xl bg-white/[0.035] p-4">
+                        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--bg-soft)] text-[11px] font-semibold text-[var(--text-secondary)]">
+                          {index + 1}
+                        </div>
+                        <span className="text-[13px] leading-5 text-[var(--text-secondary)]">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
+                    <Link href="/sources" className="btn btn-secondary justify-center px-5">
+                      <Database size={14} />
+                      Add Source
+                    </Link>
+                    <Link href="/leads/new" className="btn btn-primary justify-center px-5">
+                      <Plus size={14} />
+                      Add Lead Manually
+                    </Link>
+                  </div>
                 </div>
               </div>
             ) : (
-              <div className="divide-y divide-[var(--border-subtle)]">
-                {recentLeads.map(lead => (
+              <div className="p-3">
+                {recentLeads.map((lead, index) => (
                   <Link
                     key={lead.id}
                     href={`/leads/${lead.id}`}
-                    className="flex items-center gap-4 p-4 hover:bg-[rgba(255,255,255,0.02)] transition-colors group"
+                    className="group grid gap-4 rounded-2xl px-4 py-4 transition-colors hover:bg-white/[0.035] md:grid-cols-[minmax(0,1fr)_auto]"
                   >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[14px] font-medium text-[var(--text-primary)] truncate">{lead.company_name}</span>
+                    <div className="min-w-0">
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <span className="text-[15px] font-medium text-[var(--text-primary)]">{lead.company_name}</span>
                         {lead.priority === 'excellent' && (
-                          <Star size={12} className="text-[var(--warning)] fill-[var(--warning)] shrink-0" />
+                          <span className="badge badge-warning">
+                            <Star size={11} />
+                            Excellent
+                          </span>
                         )}
-                        {lead.status === 'new' && (
-                          <span className="badge badge-info px-1.5 py-0 text-[10px]">New</span>
-                        )}
+                        {lead.status === 'new' && <span className="badge badge-info">New</span>}
                       </div>
-                      <div className="text-[13px] text-[var(--text-secondary)] truncate">
-                        {lead.industry_category || 'Uncategorized'} <span className="text-[var(--text-muted)] mx-1.5">•</span> {lead.product_to_sell || 'No product set'}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-[var(--text-secondary)]">
+                        <span>{lead.industry_category || 'Uncategorized'}</span>
+                        <span className="text-[var(--text-muted)]">/</span>
+                        <span>{lead.product_to_sell || 'Product angle not set'}</span>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-4 shrink-0">
-                      {lead.lead_score != null && (
-                        <div className="text-[13px] font-medium text-[var(--text-primary)] tabular-nums">
-                          {lead.lead_score}/100
-                        </div>
+                      {(lead.pain_point || lead.trigger_reason) && (
+                        <p className="mt-3 line-clamp-2 max-w-2xl text-[13px] leading-6 text-[var(--text-muted)]">
+                          {lead.pain_point || lead.trigger_reason}
+                        </p>
                       )}
-                      <ChevronRight size={16} className="text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors" />
+                    </div>
+                    <div className="flex items-center justify-between gap-5 md:justify-end">
+                      <div className="text-right">
+                        <div className={cn('inline-flex rounded-full border px-2.5 py-1 text-[12px] font-medium tabular-nums', getScoreBg(lead.lead_score || 0))}>
+                          {lead.lead_score ?? '-'} / 100
+                        </div>
+                        <div className="mt-2 text-[12px] text-[var(--text-muted)]">{index === 0 ? 'Latest' : formatDate(lead.created_at)}</div>
+                      </div>
+                      <ChevronRight size={16} className="text-[var(--text-muted)] transition-colors group-hover:text-[var(--text-primary)]" />
                     </div>
                   </Link>
                 ))}
@@ -289,74 +340,152 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Right Column: Intelligence Rail */}
-        <div className="space-y-6">
-          <h2 className="text-xs-bold mb-4">Intelligence</h2>
-          
-          {/* Agent Module */}
+        <aside className="space-y-5">
+          <div>
+            <p className="text-xs-bold mb-2">Intelligence Rail</p>
+            <h2 className="text-[18px] font-semibold tracking-tight text-[var(--text-primary)]">Agent briefing</h2>
+          </div>
+
           <div className="surface-panel p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <BrainCircuit size={16} className="text-[var(--accent-primary)]" />
-              <span className="text-[13px] font-medium text-[var(--text-primary)]">Agent Status</span>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <BrainCircuit size={16} className="text-[var(--accent-primary)]" />
+                <span className="text-[14px] font-medium text-[var(--text-primary)]">Agent Intelligence</span>
+              </div>
+              <span className="badge badge-success">Live</span>
             </div>
-            <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed mb-4">
-              Monitoring active sources. Cross-referencing firmographic data against ideal customer profiles.
+            <p className="text-[13px] leading-6 text-[var(--text-secondary)]">
+              Monitoring active sources and comparing new accounts against Kima/Aeredium fit signals.
             </p>
-            <Link href="/reports" className="text-[13px] font-medium text-[var(--text-primary)] hover:underline flex items-center gap-1 w-max">
-              View learning report <ArrowRight size={12} className="text-[var(--text-muted)]" />
+            <div className="mt-5 rounded-xl bg-white/[0.025] p-4">
+              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">Latest insight</div>
+              <p className="text-[13px] leading-5 text-[var(--text-secondary)]">{recommendedFocus}</p>
+            </div>
+            <Link href="/reports" className="mt-5 inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--text-primary)]">
+              Weekly learning report <ArrowRight size={13} className="text-[var(--text-muted)]" />
             </Link>
           </div>
 
-          {/* Breakdown Module */}
           <div className="surface-panel p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <Target size={16} className="text-[var(--text-muted)]" />
-              <span className="text-[13px] font-medium text-[var(--text-primary)]">Product Angles</span>
+            <div className="mb-5 flex items-center gap-2">
+              <BarChart3 size={16} className="text-[var(--text-muted)]" />
+              <span className="text-[14px] font-medium text-[var(--text-primary)]">Pipeline Breakdown</span>
             </div>
-            <div className="space-y-3">
-              {productStats.length === 0 ? (
-                <div className="text-[13px] text-[var(--text-muted)]">No pipeline data yet.</div>
-              ) : productStats.map(({ category, count }) => {
-                const max = productStats[0]?.count || 1
-                return (
-                  <div key={category}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[13px] text-[var(--text-secondary)] truncate mr-3">{category}</span>
-                      <span className="text-[13px] font-medium text-[var(--text-primary)] tabular-nums">{count}</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-[var(--bg-tertiary)] overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-[var(--text-secondary)]"
-                        style={{ width: `${(count / max) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+            <BreakdownList title="Sales categories" items={categoryStats.slice(0, 4)} empty="No sales category data yet." />
+            <div className="my-5 h-px bg-[var(--border-subtle)]" />
+            <BreakdownList title="Product angles" items={productStats.slice(0, 4)} empty="No product angle data yet." />
           </div>
 
-          {/* Quick Actions Module */}
           <div className="surface-panel p-5">
-            <div className="flex items-center gap-2 mb-4">
+            <div className="mb-4 flex items-center gap-2">
               <Zap size={16} className="text-[var(--text-muted)]" />
-              <span className="text-[13px] font-medium text-[var(--text-primary)]">Quick Actions</span>
+              <span className="text-[14px] font-medium text-[var(--text-primary)]">Quick Actions</span>
             </div>
-            <div className="space-y-2">
-              <Link href="/leads/new" className="flex items-center gap-2 p-2 -mx-2 rounded-md hover:bg-[rgba(255,255,255,0.03)] text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-                <Plus size={14} className="text-[var(--text-muted)]" /> Inject Lead
-              </Link>
-              <Link href="/outreach" className="flex items-center gap-2 p-2 -mx-2 rounded-md hover:bg-[rgba(255,255,255,0.03)] text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-                <MessageCircle size={14} className="text-[var(--text-muted)]" /> Generate Outreach
-              </Link>
-              <Link href="/settings" className="flex items-center gap-2 p-2 -mx-2 rounded-md hover:bg-[rgba(255,255,255,0.03)] text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-                <Users size={14} className="text-[var(--text-muted)]" /> Manage Sources
-              </Link>
+            <div className="grid gap-2">
+              <QuickAction href="/leads/new" icon={Plus} label="Add Lead" />
+              <QuickAction href="/sources" icon={Database} label="Add Source" />
+              <QuickAction href="/outreach" icon={MessageCircle} label="Generate Outreach" />
+              <QuickAction href="/reports" icon={FileText} label="View Report" />
             </div>
           </div>
+        </aside>
+      </section>
 
-        </div>
+      <section className="grid gap-5 lg:grid-cols-3">
+        <LearningCard
+          icon={BrainCircuit}
+          label="Weekly Learning Preview"
+          title="Agent memory is shaped by approvals"
+          body={`${stats?.approved ?? 0} approved, ${stats?.rejected ?? 0} rejected, and ${stats?.replied ?? 0} replied leads are currently informing future recommendations.`}
+          href="/feedback"
+          cta="Review memory"
+        />
+        <LearningCard
+          icon={Target}
+          label="Best Sources"
+          title={topCategory}
+          body="Use the category signal as a source quality proxy until the weekly report has enough data to rank specific channels."
+          href="/sources"
+          cta="Manage sources"
+        />
+        <LearningCard
+          icon={Clock}
+          label="Recommended Focus"
+          title={topProduct}
+          body={recommendedFocus}
+          href="/reports"
+          cta="Open report"
+        />
+      </section>
+    </div>
+  )
+}
+
+function BreakdownList({ title, items, empty }: { title: string; items: CategoryStat[]; empty: string }) {
+  const max = items[0]?.count || 1
+
+  return (
+    <div>
+      <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">{title}</div>
+      <div className="space-y-3">
+        {items.length === 0 ? (
+          <div className="text-[13px] text-[var(--text-muted)]">{empty}</div>
+        ) : items.map(({ category, count }) => (
+          <div key={category}>
+            <div className="mb-1.5 flex items-center justify-between gap-3">
+              <span className="truncate text-[13px] text-[var(--text-secondary)]">{category}</span>
+              <span className="text-[12px] font-medium tabular-nums text-[var(--text-primary)]">{count}</span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.04]">
+              <div className="h-full rounded-full bg-[var(--text-secondary)]" style={{ width: `${(count / max) * 100}%` }} />
+            </div>
+          </div>
+        ))}
       </div>
+    </div>
+  )
+}
+
+function QuickAction({ href, icon: Icon, label }: { href: string; icon: React.ElementType; label: string }) {
+  return (
+    <Link href={href} className="group flex items-center justify-between rounded-xl bg-white/[0.025] px-3 py-3 text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-white/[0.045] hover:text-[var(--text-primary)]">
+      <span className="flex items-center gap-2">
+        <Icon size={14} className="text-[var(--text-muted)]" />
+        {label}
+      </span>
+      <ChevronRight size={14} className="text-[var(--text-muted)] transition-transform group-hover:translate-x-0.5" />
+    </Link>
+  )
+}
+
+function LearningCard({
+  icon: Icon,
+  label,
+  title,
+  body,
+  href,
+  cta,
+}: {
+  icon: React.ElementType
+  label: string
+  title: string
+  body: string
+  href: string
+  cta: string
+}) {
+  return (
+    <div className="surface-panel p-6">
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.035]">
+          <Icon size={16} className="text-[var(--text-secondary)]" />
+        </div>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">{label}</span>
+      </div>
+      <h3 className="text-[15px] font-semibold leading-6 text-[var(--text-primary)]">{title}</h3>
+      <p className="mt-3 min-h-[68px] text-[13px] leading-6 text-[var(--text-secondary)]">{body}</p>
+      <Link href={href} className="mt-5 inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--text-primary)]">
+        {cta} <ArrowRight size={13} className="text-[var(--text-muted)]" />
+      </Link>
     </div>
   )
 }
