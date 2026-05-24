@@ -56,8 +56,8 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'flex flex-col h-screen sticky top-0 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] flex-shrink-0',
-        collapsed ? 'w-[72px]' : 'w-[260px]'
+        'flex flex-col h-screen sticky top-0 transition-all duration-300 flex-shrink-0',
+        collapsed ? 'w-[68px]' : 'w-[240px]'
       )}
       style={{
         background: 'var(--bg-secondary)',
@@ -69,8 +69,8 @@ export function Sidebar() {
         'flex items-center gap-3 p-5',
         collapsed && 'justify-center p-4'
       )} style={{ height: '72px' }}>
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 bg-[var(--text-primary)] shadow-[0_0_20px_rgba(255,255,255,0.15)]">
-          <Briefcase size={16} strokeWidth={2} color="var(--bg-primary)" />
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-[var(--text-primary)]">
+          <Briefcase size={14} color="var(--bg-primary)" />
         </div>
         {!collapsed && (
           <div className="overflow-hidden">
@@ -84,7 +84,7 @@ export function Sidebar() {
         {navGroups.map((group, idx) => (
           <div key={idx} className="space-y-1">
             {!collapsed && (
-              <div className="text-eyebrow px-4 mb-2 mt-4 text-[var(--text-muted)]">
+              <div className="text-[11px] font-medium px-3 mb-1.5 text-[var(--text-muted)]">
                 {group.label}
               </div>
             )}
@@ -95,15 +95,15 @@ export function Sidebar() {
                   key={href}
                   href={href}
                   className={cn(
-                    'flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.97]',
+                    'flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium transition-colors',
                     isActive 
-                      ? 'bg-[rgba(255,255,255,0.06)] text-[var(--text-primary)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]' 
+                      ? 'bg-[rgba(255,255,255,0.06)] text-[var(--text-primary)]' 
                       : 'text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[var(--text-primary)]',
-                    collapsed && 'justify-center px-0 py-3 mx-2'
+                    collapsed && 'justify-center px-0 py-2.5 mx-1'
                   )}
                   title={collapsed ? label : undefined}
                 >
-                  <Icon size={18} strokeWidth={1.5} className={cn("flex-shrink-0 transition-transform duration-300", isActive ? "text-[var(--text-primary)] scale-110" : "text-[var(--text-muted)] group-hover:scale-110")} />
+                  <Icon size={16} className={cn("flex-shrink-0", isActive ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]")} />
                   {!collapsed && <span className="truncate">{label}</span>}
                 </Link>
               )
@@ -117,11 +117,11 @@ export function Sidebar() {
         <button
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            'flex items-center w-full rounded-xl text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[var(--text-primary)] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.97]',
-            collapsed ? 'justify-center p-3' : 'px-4 py-3 gap-2'
+            'flex items-center w-full rounded-md text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[var(--text-primary)] transition-colors',
+            collapsed ? 'justify-center p-2.5' : 'px-3 py-2 gap-2'
           )}
         >
-          {collapsed ? <ChevronRight size={16} strokeWidth={1.5} /> : <><ChevronLeft size={16} strokeWidth={1.5} /><span className="truncate">Collapse Menu</span></>}
+          {collapsed ? <ChevronRight size={14} /> : <><ChevronLeft size={14} /><span className="truncate">Collapse</span></>}
         </button>
       </div>
     </aside>
