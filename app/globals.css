@@ -2,21 +2,21 @@
 @import "tailwindcss";
 
 :root {
-  --background: 12 12 18;
-  --surface: 18 18 26;
-  --surface-2: 24 24 36;
-  --surface-3: 32 32 46;
-  --border: 255 255 255 / 0.06;
-  --border-strong: 255 255 255 / 0.12;
-  --text-primary: 250 250 252;
-  --text-secondary: 170 170 190;
-  --text-muted: 110 110 130;
-  --accent-violet: 139 92 246;
-  --accent-emerald: 52 211 153;
-  --accent-amber: 251 191 36;
-  --accent-rose: 251 113 133;
-  --accent-cyan: 34 211 238;
-  --accent-blue: 96 165 250;
+  --background: 9 9 11;
+  --surface: 17 17 26;
+  --surface-2: 23 23 36;
+  --surface-3: 39 39 56;
+  --border: 39 39 56;
+  --border-strong: 63 63 80;
+  --text-primary: 244 244 245;
+  --text-secondary: 161 161 170;
+  --text-muted: 113 113 122;
+  --accent-violet: 124 58 237;
+  --accent-emerald: 16 185 129;
+  --accent-amber: 245 158 11;
+  --accent-rose: 239 68 68;
+  --accent-cyan: 6 182 212;
+  --accent-blue: 59 130 246;
 }
 
 * {
@@ -31,8 +31,8 @@ html {
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: rgb(12, 12, 18);
-  color: rgb(250, 250, 252);
+  background: #09090B;
+  color: #F4F4F5;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -66,14 +66,12 @@ body {
   outline-offset: 2px;
 }
 
-/* Glass card */
+/* Glass card / Elevated Surface */
 .glass {
-  background: rgba(24, 24, 36, 0.6);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: #11111A;
+  border: 1px solid #272738;
   border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 /* Gradient text */
@@ -146,24 +144,23 @@ body {
 
 /* Custom table styles */
 .data-table th {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgb(100, 100, 120);
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 12px;
+  font-weight: 500;
+  color: #A1A1AA;
+  padding: 14px 24px;
+  border-bottom: 1px solid #272738;
   white-space: nowrap;
+  text-align: left;
 }
 
 .data-table td {
-  padding: 16px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  padding: 16px 24px;
+  border-bottom: 1px solid #1A1A24;
   vertical-align: middle;
 }
 
 .data-table tr:hover td {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 /* Badge base */
@@ -187,21 +184,21 @@ body {
 
 /* Card hover */
 .card-hover {
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .card-hover:hover {
-  border-color: rgba(255, 255, 255, 0.12);
-  transform: translateY(-1px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border-color: #3F3F50;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 
 /* Input styles */
 .input-dark {
-  background: rgba(24, 24, 36, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  color: rgb(250, 250, 252);
-  border-radius: 10px;
+  background: #11111A;
+  border: 1px solid #272738;
+  color: #F4F4F5;
+  border-radius: 12px;
   padding: 12px 16px;
   font-size: 14px;
   transition: all 0.2s;
@@ -210,11 +207,12 @@ body {
 
 .input-dark:focus {
   outline: none;
-  border-color: rgba(139, 92, 246, 0.5);
+  border-color: #8B5CF6;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
 }
 
 .input-dark::placeholder {
-  color: rgb(100, 100, 120);
+  color: #71717A;
 }
 
 /* Button base */
@@ -222,46 +220,49 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 18px;
-  border-radius: 10px;
+  padding: 10px 16px;
+  border-radius: 12px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease-out;
-  border: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid transparent;
   white-space: nowrap;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  background: #7C3AED;
   color: white;
+  border: 1px solid #8B5CF6;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.2);
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  background: #6D28D9;
+  border-color: #7C3AED;
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3);
+  box-shadow: 0 6px 16px rgba(124, 58, 237, 0.3);
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.06);
-  color: rgb(200, 200, 220);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #11111A;
+  color: #F4F4F5;
+  border: 1px solid #272738;
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: #171724;
+  border-color: #3F3F50;
 }
 
 .btn-ghost {
   background: transparent;
-  color: rgb(160, 160, 180);
+  color: #A1A1AA;
 }
 
 .btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: rgb(240, 240, 248);
+  background: rgba(255, 255, 255, 0.04);
+  color: #F4F4F5;
 }
 
 .btn-danger {
@@ -322,35 +323,36 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
+  padding: 8px 12px;
   border-radius: 10px;
   font-size: 13px;
   font-weight: 500;
-  color: rgb(150, 150, 170);
+  color: #A1A1AA;
   cursor: pointer;
   transition: all 0.2s ease-out;
   text-decoration: none;
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.04);
-  color: rgb(230, 230, 250);
+  background: #171724;
+  color: #F4F4F5;
 }
 
 .nav-item.active {
-  background: rgba(139, 92, 246, 0.15);
-  color: rgb(167, 139, 250);
-  border: 1px solid rgba(139, 92, 246, 0.2);
+  background: rgba(124, 58, 237, 0.12);
+  color: #A78BFA;
 }
 
 /* Page header */
 .page-header {
-  padding: 32px 48px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  background: rgba(12, 12, 18, 0.85);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  position: sticky;
-  top: 0;
+  padding: 32px 0 24px 0;
+  background: transparent;
   z-index: 10;
+}
+
+/* Page container */
+.page-container {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 32px 32px 32px;
 }

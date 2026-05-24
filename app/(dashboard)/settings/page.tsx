@@ -15,13 +15,13 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="fade-in">
+    <div className="fade-in page-container">
       <div className="page-header">
         <h1 className="text-xl font-bold text-white">Settings</h1>
         <p className="text-xs mt-0.5" style={{ color: 'rgb(100,100,120)' }}>Configure your Kima BD OS</p>
       </div>
 
-      <div className="p-8 max-w-2xl space-y-8">
+      <div className="max-w-2xl space-y-8 mt-6">
         {/* API Keys */}
         <div className="rounded-xl p-5" style={{ background: 'rgba(22,22,34,0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex items-center gap-2 mb-4">

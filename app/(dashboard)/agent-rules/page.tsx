@@ -79,7 +79,7 @@ export default function AgentRulesPage() {
   }, {} as Record<string, AgentRule[]>)
 
   return (
-    <div className="fade-in">
+    <div className="fade-in page-container">
       <div className="page-header flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white">Agent Rules</h1>
@@ -93,7 +93,7 @@ export default function AgentRulesPage() {
         </button>
       </div>
 
-      <div className="p-8 space-y-6">
+      <div className="space-y-6 mt-6">
         {/* Add/Edit Form */}
         {showForm && (
           <div className="rounded-xl p-5" style={{ background: 'rgba(22,22,34,0.9)', border: '1px solid rgba(139,92,246,0.2)' }}>

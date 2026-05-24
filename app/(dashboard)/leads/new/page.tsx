@@ -100,7 +100,7 @@ export default function NewLeadPage() {
   const sectionStyle = { background: 'rgba(22,22,34,0.8)', border: '1px solid rgba(255,255,255,0.06)' }
 
   return (
-    <div className="fade-in">
+    <div className="fade-in page-container">
       <div className="page-header flex items-center gap-4">
         <Link href="/leads" className="btn btn-ghost" style={{ padding: '6px' }}>
           <ArrowLeft size={16} />
@@ -113,7 +113,7 @@ export default function NewLeadPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-8 space-y-8 max-w-4xl">
+      <form onSubmit={handleSubmit} className="space-y-8 max-w-4xl mt-6">
         {/* Company Basics */}
         <div className={sectionClass} style={sectionStyle}>
           <h2 className="text-sm font-semibold text-white mb-4">Company Information</h2>

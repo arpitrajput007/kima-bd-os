@@ -6,7 +6,8 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import {
   Plus, Search, Filter, Star, ExternalLink, ChevronDown,
-  CheckCircle, XCircle, Eye, MessageSquare, Loader2, RefreshCw
+  CheckCircle, XCircle, Eye, MessageSquare, Loader2, RefreshCw,
+  LayoutList
 } from 'lucide-react'
 import {
   cn, getScoreBg, getStatusColor, getStatusLabel, formatDate, truncate
@@ -90,66 +91,71 @@ export default function LeadsPage() {
   const hasFilters = Object.values(filters).some(v => v) || search
 
   return (
-    <div className="fade-in">
+    <div className="fade-in page-container">
       {/* Header */}
-      <div className="page-header">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-xl font-bold text-white">Lead Inbox</h1>
-            <p className="text-xs mt-0.5" style={{ color: 'rgb(100,100,120)' }}>
-              {loading ? 'Loading...' : `${filteredLeads.length} leads`}
-              {hasFilters && ' (filtered)'}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={loadLeads} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '12px' }}>
-              <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-            </button>
-            <Link href="/leads/new" className="btn btn-primary" style={{ padding: '7px 14px', fontSize: '13px' }}>
-              <Plus size={14} />
-              Add Lead
-            </Link>
-          </div>
+      <div className="page-header flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[#F4F4F5] tracking-tight">Lead Pipeline</h1>
+          <p className="text-[13px] font-medium text-[#A1A1AA] mt-1">
+            {loading ? 'Loading...' : `${filteredLeads.length} leads in view`}
+            {hasFilters && ' (filtered)'}
+          </p>
         </div>
-
-        {/* Search + Filters */}
         <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-sm">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'rgb(100,100,120)' }} />
+          <button onClick={loadLeads} className="btn btn-secondary px-3">
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <span className="hidden sm:inline">Sync</span>
+          </button>
+          <Link href="/leads/new" className="btn btn-primary">
+            <Plus size={14} />
+            Add Lead
+          </Link>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        {/* Search & Filter Bar */}
+        <div className="glass p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="relative flex-1 max-w-lg">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#71717A]" />
             <input
               type="text"
-              placeholder="Search leads..."
+              placeholder="Search by company name, industry, or pain point..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="input-dark"
-              style={{ paddingLeft: '34px' }}
+              className="input-dark w-full pl-10"
             />
           </div>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={cn('btn btn-secondary', showFilters && 'border-violet-500/40 text-violet-300')}
-            style={{ padding: '7px 12px', fontSize: '12px' }}
-          >
-            <Filter size={13} />
-            Filters
-            {hasFilters && <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />}
-            <ChevronDown size={12} className={showFilters ? 'rotate-180' : ''} />
-          </button>
-          {hasFilters && (
-            <button onClick={clearFilters} className="btn btn-ghost text-xs" style={{ padding: '7px 10px', color: 'rgb(251,113,133)' }}>
-              Clear
+          
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={cn(
+                'btn btn-secondary transition-colors',
+                showFilters && 'bg-[#1A1A24] border-[#3F3F50] text-[#F4F4F5]',
+                hasFilters && !showFilters && 'border-[#7C3AED] text-[#A78BFA]'
+              )}
+            >
+              <Filter size={14} />
+              Filters
+              {hasFilters && <div className="w-1.5 h-1.5 rounded-full bg-[#8B5CF6]" />}
+              <ChevronDown size={14} className={cn("transition-transform", showFilters && "rotate-180")} />
             </button>
-          )}
+            {hasFilters && (
+              <button onClick={clearFilters} className="btn btn-ghost text-[#EF4444] hover:bg-[#EF4444]/10 hover:text-[#EF4444]">
+                Clear
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Filter Row */}
+        {/* Filter Dropdown Row */}
         {showFilters && (
-          <div className="flex flex-wrap gap-2 mt-3">
+          <div className="glass p-4 flex flex-wrap gap-3 animate-in slide-in-from-top-2">
             <select
               value={filters.status}
               onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}
-              className="input-dark"
-              style={{ width: 'auto', fontSize: '12px', padding: '5px 8px' }}
+              className="input-dark w-auto text-[13px] py-2 bg-[#171724]"
             >
               <option value="">All Statuses</option>
               {STATUS_OPTIONS.map(s => <option key={s} value={s}>{getStatusLabel(s as Lead['status'])}</option>)}
@@ -158,8 +164,7 @@ export default function LeadsPage() {
             <select
               value={filters.priority}
               onChange={e => setFilters(f => ({ ...f, priority: e.target.value }))}
-              className="input-dark"
-              style={{ width: 'auto', fontSize: '12px', padding: '5px 8px' }}
+              className="input-dark w-auto text-[13px] py-2 bg-[#171724]"
             >
               <option value="">All Priorities</option>
               <option value="excellent">Excellent (85+)</option>
@@ -171,8 +176,7 @@ export default function LeadsPage() {
             <select
               value={filters.customer_category}
               onChange={e => setFilters(f => ({ ...f, customer_category: e.target.value }))}
-              className="input-dark"
-              style={{ width: 'auto', fontSize: '12px', padding: '5px 8px' }}
+              className="input-dark w-auto text-[13px] py-2 bg-[#171724]"
             >
               <option value="">All Sales Categories</option>
               {CUSTOMER_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -181,8 +185,7 @@ export default function LeadsPage() {
             <select
               value={filters.industry_category}
               onChange={e => setFilters(f => ({ ...f, industry_category: e.target.value }))}
-              className="input-dark"
-              style={{ width: 'auto', fontSize: '12px', padding: '5px 8px' }}
+              className="input-dark w-auto text-[13px] py-2 bg-[#171724]"
             >
               <option value="">All Industries</option>
               {INDUSTRY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -191,8 +194,7 @@ export default function LeadsPage() {
             <select
               value={filters.product_to_sell}
               onChange={e => setFilters(f => ({ ...f, product_to_sell: e.target.value }))}
-              className="input-dark"
-              style={{ width: 'auto', fontSize: '12px', padding: '5px 8px' }}
+              className="input-dark w-auto text-[13px] py-2 bg-[#171724]"
             >
               <option value="">All Products</option>
               {PRODUCTS_TO_SELL.map(p => <option key={p} value={p}>{p}</option>)}
@@ -201,8 +203,7 @@ export default function LeadsPage() {
             <select
               value={filters.min_score}
               onChange={e => setFilters(f => ({ ...f, min_score: e.target.value }))}
-              className="input-dark"
-              style={{ width: 'auto', fontSize: '12px', padding: '5px 8px' }}
+              className="input-dark w-auto text-[13px] py-2 bg-[#171724]"
             >
               <option value="">Any Score</option>
               <option value="85">Score 85+</option>
@@ -211,154 +212,160 @@ export default function LeadsPage() {
             </select>
           </div>
         )}
-      </div>
 
-      {/* Table */}
-      <div className="p-8">
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 size={24} className="animate-spin" style={{ color: 'rgb(139, 92, 246)' }} />
-          </div>
-        ) : filteredLeads.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="text-sm font-medium text-white mb-2">No leads found</div>
-            <div className="text-xs mb-4" style={{ color: 'rgb(100,100,120)' }}>
-              {hasFilters ? 'Try adjusting your filters' : 'Add your first lead to get started'}
+        {/* Data View */}
+        <div>
+          {loading ? (
+            <div className="glass p-20 flex flex-col items-center justify-center">
+              <Loader2 size={32} className="animate-spin text-[#8B5CF6] mb-4" />
+              <div className="text-[#A1A1AA] text-sm">Syncing pipeline data...</div>
             </div>
-            {!hasFilters && (
-              <Link href="/leads/new" className="btn btn-primary" style={{ fontSize: '13px' }}>
-                <Plus size={14} /> Add First Lead
-              </Link>
-            )}
-          </div>
-        ) : (
-          <div className="rounded-xl overflow-hidden"
-            style={{ background: 'rgba(22, 22, 34, 0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="overflow-x-auto">
-              <table className="w-full data-table">
-                <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
-                    <th className="text-left">Company</th>
-                    <th className="text-left">Sales Cat.</th>
-                    <th className="text-left">Industry</th>
-                    <th className="text-left">Product</th>
-                    <th className="text-left">Pain Point</th>
-                    <th className="text-left">Score</th>
-                    <th className="text-left">Status</th>
-                    <th className="text-left">Date</th>
-                    <th className="text-left">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredLeads.map(lead => (
-                    <tr key={lead.id}>
-                      <td>
-                        <div className="flex items-center gap-2">
-                          {lead.priority === 'excellent' && <Star size={11} style={{ color: '#a78bfa', flexShrink: 0 }} />}
-                          <div>
-                            <Link
-                              href={`/leads/${lead.id}`}
-                              className="text-sm font-medium text-white hover:text-violet-300 transition-colors"
-                            >
-                              {lead.company_name}
-                            </Link>
-                            {lead.website && (
-                              <a href={lead.website} target="_blank" rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-xs mt-0.5"
-                                style={{ color: 'rgb(100,100,120)' }}
-                                onClick={e => e.stopPropagation()}>
-                                {lead.website.replace(/^https?:\/\//, '').slice(0, 25)}
-                                <ExternalLink size={9} />
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <div className="flex flex-wrap gap-1">
-                          {(lead.customer_category || []).slice(0, 2).map(cat => (
-                            <span key={cat} className="badge text-xs"
-                              style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', borderColor: 'rgba(139,92,246,0.2)', fontSize: '10px', padding: '1px 6px' }}>
-                              {cat.replace(' Customer', '').replace('Needs ', '').replace(' Settlement Customer', '')}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td>
-                        <span className="text-xs" style={{ color: 'rgb(160,160,180)' }}>
-                          {lead.industry_category ? truncate(lead.industry_category, 24) : '—'}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="text-xs" style={{ color: 'rgb(160,160,180)' }}>
-                          {lead.product_to_sell ? truncate(lead.product_to_sell, 22) : '—'}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="text-xs" style={{ color: 'rgb(140,140,160)' }}>
-                          {lead.pain_point ? truncate(lead.pain_point, 40) : '—'}
-                        </span>
-                      </td>
-                      <td>
-                        {lead.lead_score != null ? (
-                          <span className={cn('badge', getScoreBg(lead.lead_score))}>
-                            {lead.lead_score}
-                          </span>
-                        ) : '—'}
-                      </td>
-                      <td>
-                        <span className={cn('badge', getStatusColor(lead.status))}>
-                          {getStatusLabel(lead.status)}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="text-xs" style={{ color: 'rgb(100,100,120)' }}>
-                          {formatDate(lead.created_at)}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-1">
-                          <Link href={`/leads/${lead.id}`}
-                            className="btn btn-ghost p-1.5" title="View"
-                            style={{ padding: '5px' }}>
-                            <Eye size={13} />
-                          </Link>
-                          {lead.status !== 'approved' && (
-                            <button
-                              onClick={() => updateLeadStatus(lead.id, 'approved')}
-                              disabled={actionLoading === lead.id + 'approved'}
-                              className="btn btn-ghost p-1.5" title="Approve"
-                              style={{ padding: '5px', color: '#34d399' }}>
-                              {actionLoading === lead.id + 'approved'
-                                ? <Loader2 size={13} className="animate-spin" />
-                                : <CheckCircle size={13} />}
-                            </button>
-                          )}
-                          {lead.status !== 'rejected' && (
-                            <button
-                              onClick={() => updateLeadStatus(lead.id, 'rejected')}
-                              disabled={actionLoading === lead.id + 'rejected'}
-                              className="btn btn-ghost p-1.5" title="Reject"
-                              style={{ padding: '5px', color: '#f87171' }}>
-                              {actionLoading === lead.id + 'rejected'
-                                ? <Loader2 size={13} className="animate-spin" />
-                                : <XCircle size={13} />}
-                            </button>
-                          )}
-                          <Link href={`/outreach?lead=${lead.id}`}
-                            className="btn btn-ghost p-1.5" title="Generate outreach"
-                            style={{ padding: '5px', color: '#a78bfa' }}>
-                            <MessageSquare size={13} />
-                          </Link>
-                        </div>
-                      </td>
+          ) : filteredLeads.length === 0 ? (
+            <div className="glass p-20 text-center max-w-2xl mx-auto mt-8">
+              <div className="w-20 h-20 bg-[#171724] border border-[#272738] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl">
+                <LayoutList size={32} className="text-[#71717A]" />
+              </div>
+              <h3 className="text-xl font-bold text-[#F4F4F5] mb-2 tracking-tight">No leads found</h3>
+              <p className="text-[#A1A1AA] mb-8 leading-relaxed max-w-md mx-auto">
+                {hasFilters 
+                  ? "We couldn't find any leads matching your current filters. Try relaxing your search criteria." 
+                  : "Your pipeline is currently empty. Start by manually injecting a lead or connecting a data source."}
+              </p>
+              
+              <div className="flex justify-center gap-3">
+                {hasFilters ? (
+                  <button onClick={clearFilters} className="btn btn-secondary">
+                    Clear Filters
+                  </button>
+                ) : (
+                  <Link href="/leads/new" className="btn btn-primary">
+                    <Plus size={14} /> Add First Lead
+                  </Link>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="glass overflow-hidden shadow-2xl">
+              <div className="overflow-x-auto">
+                <table className="w-full data-table">
+                  <thead>
+                    <tr className="bg-[#171724]">
+                      <th>Company</th>
+                      <th>Sales Category</th>
+                      <th>Industry</th>
+                      <th>Product Focus</th>
+                      <th>Pain Point</th>
+                      <th>Score</th>
+                      <th>Status</th>
+                      <th>Date</th>
+                      <th>Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-[#1A1A24]">
+                    {filteredLeads.map(lead => (
+                      <tr key={lead.id} className="hover:bg-[#1A1A24] transition-colors group">
+                        <td>
+                          <div className="flex items-center gap-2">
+                            {lead.priority === 'excellent' && <Star size={14} className="text-[#A78BFA] fill-[#A78BFA] shrink-0" />}
+                            <div>
+                              <Link
+                                href={`/leads/${lead.id}`}
+                                className="text-[14px] font-semibold text-[#F4F4F5] hover:text-[#A78BFA] transition-colors tracking-tight"
+                              >
+                                {lead.company_name}
+                              </Link>
+                              {lead.website && (
+                                <a href={lead.website} target="_blank" rel="noopener noreferrer"
+                                  className="flex items-center gap-1.5 text-[12px] text-[#A1A1AA] hover:text-[#D4D4D8] mt-0.5 w-max"
+                                  onClick={e => e.stopPropagation()}>
+                                  {lead.website.replace(/^https?:\/\//, '').slice(0, 25)}
+                                  <ExternalLink size={10} />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="flex flex-wrap gap-1.5">
+                            {(lead.customer_category || []).slice(0, 2).map(cat => (
+                              <span key={cat} className="badge bg-[rgba(124,58,237,0.1)] text-[#A78BFA] border-[rgba(124,58,237,0.2)]">
+                                {cat.replace(' Customer', '').replace('Needs ', '').replace(' Settlement Customer', '')}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td>
+                          <span className="text-[13px] text-[#A1A1AA]">
+                            {lead.industry_category ? truncate(lead.industry_category, 24) : '—'}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="text-[13px] text-[#A1A1AA] font-medium">
+                            {lead.product_to_sell ? truncate(lead.product_to_sell, 22) : '—'}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="text-[13px] text-[#A1A1AA]" title={lead.pain_point || ''}>
+                            {lead.pain_point ? truncate(lead.pain_point, 40) : '—'}
+                          </span>
+                        </td>
+                        <td>
+                          {lead.lead_score != null ? (
+                            <span className={cn('badge shadow-sm', getScoreBg(lead.lead_score))}>
+                              {lead.lead_score}
+                            </span>
+                          ) : <span className="text-[#71717A]">—</span>}
+                        </td>
+                        <td>
+                          <span className={cn('badge', getStatusColor(lead.status))}>
+                            {getStatusLabel(lead.status)}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="text-[12px] text-[#A1A1AA] font-medium">
+                            {formatDate(lead.created_at)}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Link href={`/leads/${lead.id}`}
+                              className="btn btn-ghost p-2" title="View Details">
+                              <Eye size={15} />
+                            </Link>
+                            {lead.status !== 'approved' && (
+                              <button
+                                onClick={() => updateLeadStatus(lead.id, 'approved')}
+                                disabled={actionLoading === lead.id + 'approved'}
+                                className="btn btn-ghost p-2 text-[#34D399] hover:bg-[#34D399]/10" title="Approve for Outreach">
+                                {actionLoading === lead.id + 'approved'
+                                  ? <Loader2 size={15} className="animate-spin" />
+                                  : <CheckCircle size={15} />}
+                              </button>
+                            )}
+                            {lead.status !== 'rejected' && (
+                              <button
+                                onClick={() => updateLeadStatus(lead.id, 'rejected')}
+                                disabled={actionLoading === lead.id + 'rejected'}
+                                className="btn btn-ghost p-2 text-[#EF4444] hover:bg-[#EF4444]/10" title="Reject Lead">
+                                {actionLoading === lead.id + 'rejected'
+                                  ? <Loader2 size={15} className="animate-spin" />
+                                  : <XCircle size={15} />}
+                              </button>
+                            )}
+                            <Link href={`/outreach?lead=${lead.id}`}
+                              className="btn btn-ghost p-2 text-[#A78BFA] hover:bg-[#A78BFA]/10" title="Generate Outreach Email">
+                              <MessageSquare size={15} />
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )

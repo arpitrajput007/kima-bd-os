@@ -72,7 +72,7 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="fade-in">
+    <div className="fade-in page-container">
       <div className="page-header flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white">Weekly Learning Reports</h1>
@@ -85,7 +85,7 @@ export default function ReportsPage() {
         </button>
       </div>
 
-      <div className="p-8 space-y-6">
+      <div className="space-y-6 mt-6">
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin" style={{ color: '#a78bfa' }} /></div>
         ) : reports.length === 0 ? (

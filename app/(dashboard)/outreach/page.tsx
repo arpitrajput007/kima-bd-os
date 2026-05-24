@@ -163,7 +163,7 @@ function OutreachStudioContent() {
   )
 
   return (
-    <div className="fade-in">
+    <div className="fade-in page-container">
       <div className="page-header">
         <div className="flex items-center justify-between">
           <div>
@@ -175,7 +175,7 @@ function OutreachStudioContent() {
         </div>
       </div>
 
-      <div className="p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-6">
         {/* Left: Config */}
         <div className="space-y-4">
           <div className="rounded-xl p-5" style={{ background: 'rgba(22,22,34,0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
