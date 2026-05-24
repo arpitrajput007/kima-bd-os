@@ -5,9 +5,9 @@ import { createClient } from '@/lib/supabase/client'
 import {
   TrendingUp, Star, CheckCircle, XCircle, Mail, MessageCircle,
   Calendar, Inbox, Clock, AlertCircle, Users, Target, Zap,
-  ArrowUpRight, RefreshCw
+  ArrowUpRight, RefreshCw, Plus
 } from 'lucide-react'
-import { cn, getScoreBg, formatDate } from '@/lib/utils'
+import { cn, getScoreBg } from '@/lib/utils'
 import Link from 'next/link'
 import type { Lead } from '@/lib/types'
 
@@ -42,7 +42,6 @@ export default function DashboardPage() {
   const loadData = async () => {
     setLoading(true)
 
-    // Fetch all leads for stats
     const { data: leads } = await supabase
       .from('leads')
       .select('*')
@@ -71,7 +70,6 @@ export default function DashboardPage() {
 
       setRecentLeads(leads.slice(0, 8))
 
-      // Category stats
       const catMap: Record<string, number> = {}
       leads.forEach(l => {
         const cats = l.customer_category || []
@@ -85,7 +83,6 @@ export default function DashboardPage() {
           .sort((a, b) => b.count - a.count)
       )
 
-      // Product stats
       const prodMap: Record<string, number> = {}
       leads.forEach(l => {
         if (l.product_to_sell) {
@@ -105,210 +102,239 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const statCards = [
-    { label: 'New Today', value: stats?.new_leads ?? 0, icon: Inbox, color: '#60a5fa', bg: 'rgba(96, 165, 250, 0.08)' },
-    { label: 'Excellent Leads', value: stats?.excellent ?? 0, icon: Star, color: '#a78bfa', bg: 'rgba(167, 139, 250, 0.08)' },
-    { label: 'Qualified', value: stats?.qualified ?? 0, icon: TrendingUp, color: '#34d399', bg: 'rgba(52, 211, 153, 0.08)' },
-    { label: 'Approved', value: stats?.approved ?? 0, icon: CheckCircle, color: '#34d399', bg: 'rgba(52, 211, 153, 0.08)' },
-    { label: 'Rejected', value: stats?.rejected ?? 0, icon: XCircle, color: '#f87171', bg: 'rgba(248, 113, 113, 0.08)' },
-    { label: 'Contacted', value: stats?.contacted ?? 0, icon: Mail, color: '#22d3ee', bg: 'rgba(34, 211, 238, 0.08)' },
-    { label: 'Replied', value: stats?.replied ?? 0, icon: MessageCircle, color: '#34d399', bg: 'rgba(52, 211, 153, 0.08)' },
-    { label: 'Meetings', value: stats?.meetings ?? 0, icon: Calendar, color: '#fbbf24', bg: 'rgba(251, 191, 36, 0.08)' },
+    { label: 'New Today',      value: stats?.new_leads  ?? 0, icon: Inbox,       color: '#60a5fa', bg: 'rgba(96,165,250,0.08)',   border: 'rgba(96,165,250,0.14)'  },
+    { label: 'Excellent',      value: stats?.excellent  ?? 0, icon: Star,        color: '#a78bfa', bg: 'rgba(167,139,250,0.08)',  border: 'rgba(167,139,250,0.14)' },
+    { label: 'Qualified',      value: stats?.qualified  ?? 0, icon: TrendingUp,  color: '#34d399', bg: 'rgba(52,211,153,0.08)',   border: 'rgba(52,211,153,0.14)'  },
+    { label: 'Approved',       value: stats?.approved   ?? 0, icon: CheckCircle, color: '#34d399', bg: 'rgba(52,211,153,0.08)',   border: 'rgba(52,211,153,0.14)'  },
+    { label: 'Rejected',       value: stats?.rejected   ?? 0, icon: XCircle,     color: '#f87171', bg: 'rgba(248,113,113,0.08)',  border: 'rgba(248,113,113,0.14)' },
+    { label: 'Contacted',      value: stats?.contacted  ?? 0, icon: Mail,        color: '#22d3ee', bg: 'rgba(34,211,238,0.08)',   border: 'rgba(34,211,238,0.14)'  },
+    { label: 'Replied',        value: stats?.replied    ?? 0, icon: MessageCircle,color:'#34d399', bg: 'rgba(52,211,153,0.08)',   border: 'rgba(52,211,153,0.14)'  },
+    { label: 'Meetings',       value: stats?.meetings   ?? 0, icon: Calendar,    color: '#fbbf24', bg: 'rgba(251,191,36,0.08)',   border: 'rgba(251,191,36,0.14)'  },
   ]
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'new': return '#60a5fa'
+      case 'new':       return '#60a5fa'
       case 'qualified': return '#34d399'
-      case 'approved': return '#a78bfa'
+      case 'approved':  return '#a78bfa'
       case 'contacted': return '#22d3ee'
-      default: return '#6b7280'
+      default:          return '#4b5563'
     }
+  }
+
+  const getStatusLabel = (status: string) => {
+    return status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
   }
 
   return (
     <div className="fade-in">
-      {/* Header */}
+
+      {/* ── Header ───────────────────────────────────────────── */}
       <div className="page-header flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white">BD Command Center</h1>
-          <p className="text-xs mt-0.5" style={{ color: 'rgb(100, 100, 120)' }}>
+          <h1 className="text-xl font-bold text-white tracking-tight">BD Command Center</h1>
+          <p className="text-xs mt-1" style={{ color: 'rgb(100,100,120)' }}>
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs"
-            style={{ background: 'rgba(52, 211, 153, 0.1)', border: '1px solid rgba(52, 211, 153, 0.2)', color: '#34d399' }}>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.18)', color: '#34d399' }}>
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 status-pulse" />
             Agent Active
           </div>
-          <button onClick={loadData} className="btn btn-secondary" style={{ padding: '6px 10px', gap: '5px', fontSize: '12px' }}>
-            <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+          <button onClick={loadData} className="btn btn-secondary" style={{ padding: '7px 13px', gap: '6px', fontSize: '12px' }}>
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
             Refresh
           </button>
-          <Link href="/leads/new" className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '12px' }}>
-            <Target size={12} />
+          <Link href="/leads/new" className="btn btn-primary" style={{ padding: '7px 14px', fontSize: '12px' }}>
+            <Plus size={13} />
             Add Lead
           </Link>
         </div>
       </div>
 
-      <div className="p-8 space-y-8">
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {statCards.map(({ label, value, icon: Icon, color, bg }) => (
-            <div
-              key={label}
-              className="rounded-xl p-4 card-hover"
-              style={{
-                background: 'rgba(22, 22, 34, 0.8)',
-                border: '1px solid rgba(255,255,255,0.06)',
-              }}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{ background: bg, border: `1px solid ${color}22` }}>
-                  <Icon size={15} color={color} />
-                </div>
-                {label === 'New Today' && value > 0 && (
-                  <div className="flex items-center gap-1 text-xs" style={{ color: '#34d399' }}>
-                    <ArrowUpRight size={10} />
-                    New
-                  </div>
-                )}
-              </div>
-              <div className="text-2xl font-bold text-white mb-0.5"
-                style={loading ? { opacity: 0.3 } : {}}>
-                {loading ? '—' : value}
-              </div>
-              <div className="text-xs" style={{ color: 'rgb(100, 100, 120)' }}>{label}</div>
-            </div>
-          ))}
-        </div>
+      {/* ── Body ─────────────────────────────────────────────── */}
+      <div style={{ padding: '32px 40px', display: 'flex', flexDirection: 'column', gap: '28px' }}>
 
-        {/* Alert Row */}
+        {/* ── Alerts ───────────────────────────────────────── */}
         {stats && (stats.needs_review > 0 || stats.high_score > 0) && (
           <div className="flex gap-3 flex-wrap">
             {stats.needs_review > 0 && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
-                style={{ background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.15)', color: '#fbbf24' }}>
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium"
+                style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.18)', color: '#fbbf24' }}>
                 <AlertCircle size={13} />
-                <span><strong>{stats.needs_review}</strong> leads awaiting your review</span>
-                <Link href="/leads?status=new" className="underline ml-1">Review →</Link>
+                <span><strong>{stats.needs_review}</strong> leads awaiting review</span>
+                <Link href="/leads?status=new" className="underline underline-offset-2 ml-1 opacity-80 hover:opacity-100">Review →</Link>
               </div>
             )}
             {stats.high_score > 0 && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
-                style={{ background: 'rgba(139, 92, 246, 0.08)', border: '1px solid rgba(139, 92, 246, 0.15)', color: '#a78bfa' }}>
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium"
+                style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.18)', color: '#a78bfa' }}>
                 <Zap size={13} />
                 <span><strong>{stats.high_score}</strong> leads scored 70+</span>
-                <Link href="/leads?min_score=70" className="underline ml-1">View →</Link>
+                <Link href="/leads?min_score=70" className="underline underline-offset-2 ml-1 opacity-80 hover:opacity-100">View →</Link>
               </div>
             )}
           </div>
         )}
 
+        {/* ── Stat Cards ───────────────────────────────────── */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {statCards.map(({ label, value, icon: Icon, color, bg, border }) => (
+            <div
+              key={label}
+              className="rounded-2xl card-hover"
+              style={{
+                background: 'rgba(20, 20, 30, 0.85)',
+                border: `1px solid rgba(255,255,255,0.07)`,
+                padding: '20px 22px',
+              }}
+            >
+              {/* icon row */}
+              <div className="flex items-center justify-between mb-5">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: bg, border: `1px solid ${border}` }}>
+                  <Icon size={16} color={color} />
+                </div>
+                {label === 'New Today' && value > 0 && (
+                  <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#34d399' }}>
+                    <ArrowUpRight size={11} />
+                    New
+                  </div>
+                )}
+              </div>
+              {/* number */}
+              <div className="text-3xl font-bold text-white mb-1 tabular-nums"
+                style={loading ? { opacity: 0.25 } : {}}>
+                {loading ? '—' : value}
+              </div>
+              {/* label */}
+              <div className="text-xs font-medium tracking-wide" style={{ color: 'rgb(110,110,135)' }}>
+                {label}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Main Grid ────────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recent Leads */}
-          <div className="lg:col-span-2 rounded-xl overflow-hidden"
-            style={{ background: 'rgba(22, 22, 34, 0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="flex items-center justify-between px-5 py-4"
+
+          {/* Recent Leads — 2/3 width */}
+          <div className="lg:col-span-2 rounded-2xl overflow-hidden flex flex-col"
+            style={{ background: 'rgba(20,20,30,0.85)', border: '1px solid rgba(255,255,255,0.07)' }}>
+
+            {/* panel header */}
+            <div className="flex items-center justify-between px-6 py-4"
               style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="flex items-center gap-2">
-                <Clock size={14} style={{ color: 'rgb(140, 140, 160)' }} />
+              <div className="flex items-center gap-2.5">
+                <Clock size={15} style={{ color: 'rgb(130,130,155)' }} />
                 <span className="text-sm font-semibold text-white">Recent Leads</span>
-                <span className="badge" style={{ background: 'rgba(96,165,250,0.1)', color: '#60a5fa', borderColor: 'rgba(96,165,250,0.2)', fontSize: '10px' }}>
+                <span className="badge" style={{
+                  background: 'rgba(96,165,250,0.1)', color: '#60a5fa',
+                  borderColor: 'rgba(96,165,250,0.2)', fontSize: '10px', padding: '2px 8px'
+                }}>
                   {recentLeads.length}
                 </span>
               </div>
-              <Link href="/leads" className="text-xs" style={{ color: 'rgb(139, 92, 246)' }}>
+              <Link href="/leads" className="text-xs font-medium hover:underline underline-offset-2"
+                style={{ color: 'rgb(139,92,246)' }}>
                 View all →
               </Link>
             </div>
-            <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+
+            {/* panel body */}
+            <div className="flex-1">
               {loading ? (
-                <div className="p-8 text-center text-sm" style={{ color: 'rgb(100, 100, 120)' }}>
-                  Loading leads...
+                <div className="p-10 text-center text-sm" style={{ color: 'rgb(100,100,120)' }}>
+                  Loading leads…
                 </div>
               ) : recentLeads.length === 0 ? (
-                <div className="p-8 text-center">
-                  <Inbox size={32} className="mx-auto mb-3 opacity-30" style={{ color: 'rgb(140, 140, 160)' }} />
-                  <div className="text-sm font-medium text-white mb-1">No leads yet</div>
-                  <div className="text-xs mb-3" style={{ color: 'rgb(100, 100, 120)' }}>
+                <div className="p-12 text-center">
+                  <Inbox size={36} className="mx-auto mb-4 opacity-20" style={{ color: 'rgb(140,140,160)' }} />
+                  <div className="text-sm font-semibold text-white mb-2">No leads yet</div>
+                  <div className="text-xs mb-5" style={{ color: 'rgb(100,100,120)', lineHeight: '1.6' }}>
                     Add your first lead or use the AI agent to discover leads
                   </div>
-                  <Link href="/leads/new" className="btn btn-primary" style={{ fontSize: '12px', padding: '6px 12px' }}>
+                  <Link href="/leads/new" className="btn btn-primary" style={{ fontSize: '12px', padding: '8px 16px' }}>
                     Add First Lead
                   </Link>
                 </div>
               ) : (
-                recentLeads.map(lead => (
-                  <Link
-                    key={lead.id}
-                    href={`/leads/${lead.id}`}
-                    className="flex items-center gap-4 px-5 py-3 hover:bg-white/[0.02] transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-sm font-medium text-white truncate">{lead.company_name}</span>
-                        {lead.priority === 'excellent' && (
-                          <Star size={11} style={{ color: '#a78bfa', flexShrink: 0 }} />
-                        )}
-                      </div>
-                      <div className="text-xs truncate" style={{ color: 'rgb(100, 100, 120)' }}>
-                        {lead.industry_category || 'Unknown category'} · {lead.product_to_sell || 'TBD'}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      {lead.lead_score != null && (
-                        <div className={cn('badge', getScoreBg(lead.lead_score))}>
-                          {lead.lead_score}
+                <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+                  {recentLeads.map(lead => (
+                    <Link
+                      key={lead.id}
+                      href={`/leads/${lead.id}`}
+                      className="flex items-center gap-5 px-6 py-4 hover:bg-white/[0.025] transition-colors group"
+                    >
+                      {/* left: name + meta */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-semibold text-white truncate group-hover:text-violet-300 transition-colors">
+                            {lead.company_name}
+                          </span>
+                          {lead.priority === 'excellent' && (
+                            <Star size={12} style={{ color: '#a78bfa', flexShrink: 0 }} />
+                          )}
                         </div>
-                      )}
-                      <div
-                        className="w-1.5 h-1.5 rounded-full"
-                        style={{ background: getStatusColor(lead.status) }}
-                      />
-                    </div>
-                  </Link>
-                ))
+                        <div className="text-xs truncate" style={{ color: 'rgb(110,110,135)' }}>
+                          {lead.industry_category || 'Unknown category'}
+                          <span className="mx-1.5 opacity-40">·</span>
+                          {lead.product_to_sell || 'TBD'}
+                        </div>
+                      </div>
+
+                      {/* right: score + status */}
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        {lead.lead_score != null && (
+                          <div className={cn('badge', getScoreBg(lead.lead_score))} style={{ fontSize: '11px' }}>
+                            {lead.lead_score}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full" style={{ background: getStatusColor(lead.status) }} />
+                          <span className="text-xs" style={{ color: 'rgb(110,110,135)' }}>
+                            {getStatusLabel(lead.status)}
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
               )}
             </div>
           </div>
 
-          {/* Right Column */}
-          <div className="space-y-4">
-            {/* Customer Categories */}
-            <div className="rounded-xl overflow-hidden"
-              style={{ background: 'rgba(22, 22, 34, 0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="flex items-center gap-2 px-4 py-3"
+          {/* Right Column — 1/3 width */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+            {/* By Sales Category */}
+            <div className="rounded-2xl overflow-hidden"
+              style={{ background: 'rgba(20,20,30,0.85)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="flex items-center gap-2.5 px-5 py-3.5"
                 style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <Users size={13} style={{ color: 'rgb(140, 140, 160)' }} />
+                <Users size={14} style={{ color: 'rgb(130,130,155)' }} />
                 <span className="text-sm font-semibold text-white">By Sales Category</span>
               </div>
-              <div className="p-4 space-y-3">
+              <div className="p-5" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {categoryStats.length === 0 ? (
-                  <div className="text-xs text-center py-3" style={{ color: 'rgb(100, 100, 120)' }}>
-                    No data yet
-                  </div>
+                  <div className="text-xs text-center py-4" style={{ color: 'rgb(100,100,120)' }}>No data yet</div>
                 ) : categoryStats.slice(0, 5).map(({ category, count }) => {
                   const max = categoryStats[0]?.count || 1
                   return (
                     <div key={category}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs" style={{ color: 'rgb(160, 160, 180)' }}>{category}</span>
-                        <span className="text-xs font-medium text-white">{count}</span>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium truncate mr-3" style={{ color: 'rgb(170,170,190)' }}>{category}</span>
+                        <span className="text-xs font-bold text-white tabular-nums flex-shrink-0">{count}</span>
                       </div>
-                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${(count / max) * 100}%`,
-                            background: 'linear-gradient(90deg, #7c3aed, #8b5cf6)'
-                          }}
-                        />
+                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                        <div className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${(count / max) * 100}%`, background: 'linear-gradient(90deg, #7c3aed, #8b5cf6)' }} />
                       </div>
                     </div>
                   )
@@ -316,35 +342,28 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Product Distribution */}
-            <div className="rounded-xl overflow-hidden"
-              style={{ background: 'rgba(22, 22, 34, 0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="flex items-center gap-2 px-4 py-3"
+            {/* By Product */}
+            <div className="rounded-2xl overflow-hidden"
+              style={{ background: 'rgba(20,20,30,0.85)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="flex items-center gap-2.5 px-5 py-3.5"
                 style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <Target size={13} style={{ color: 'rgb(140, 140, 160)' }} />
+                <Target size={14} style={{ color: 'rgb(130,130,155)' }} />
                 <span className="text-sm font-semibold text-white">By Product</span>
               </div>
-              <div className="p-4 space-y-3">
+              <div className="p-5" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {productStats.length === 0 ? (
-                  <div className="text-xs text-center py-3" style={{ color: 'rgb(100, 100, 120)' }}>
-                    No data yet
-                  </div>
+                  <div className="text-xs text-center py-4" style={{ color: 'rgb(100,100,120)' }}>No data yet</div>
                 ) : productStats.map(({ category, count }) => {
                   const max = productStats[0]?.count || 1
                   return (
                     <div key={category}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs truncate mr-2" style={{ color: 'rgb(160, 160, 180)' }}>{category}</span>
-                        <span className="text-xs font-medium text-white flex-shrink-0">{count}</span>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium truncate mr-3" style={{ color: 'rgb(170,170,190)' }}>{category}</span>
+                        <span className="text-xs font-bold text-white tabular-nums flex-shrink-0">{count}</span>
                       </div>
-                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${(count / max) * 100}%`,
-                            background: 'linear-gradient(90deg, #0d9488, #34d399)'
-                          }}
-                        />
+                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                        <div className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${(count / max) * 100}%`, background: 'linear-gradient(90deg, #0d9488, #34d399)' }} />
                       </div>
                     </div>
                   )
@@ -353,27 +372,28 @@ export default function DashboardPage() {
             </div>
 
             {/* Quick Actions */}
-            <div className="rounded-xl p-4"
-              style={{ background: 'rgba(139, 92, 246, 0.06)', border: '1px solid rgba(139, 92, 246, 0.12)' }}>
-              <div className="flex items-center gap-2 mb-3">
-                <Zap size={13} style={{ color: '#a78bfa' }} />
+            <div className="rounded-2xl p-5"
+              style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.13)' }}>
+              <div className="flex items-center gap-2 mb-4">
+                <Zap size={14} style={{ color: '#a78bfa' }} />
                 <span className="text-sm font-semibold" style={{ color: '#a78bfa' }}>Quick Actions</span>
               </div>
-              <div className="space-y-2">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <Link href="/leads/new" className="btn btn-secondary w-full justify-start text-xs"
-                  style={{ padding: '7px 10px' }}>
-                  <Target size={12} /> Add new lead manually
+                  style={{ padding: '9px 12px', borderRadius: '10px' }}>
+                  <Target size={13} /> Add new lead manually
                 </Link>
                 <Link href="/outreach" className="btn btn-secondary w-full justify-start text-xs"
-                  style={{ padding: '7px 10px' }}>
-                  <MessageCircle size={12} /> Generate outreach
+                  style={{ padding: '9px 12px', borderRadius: '10px' }}>
+                  <MessageCircle size={13} /> Generate outreach
                 </Link>
                 <Link href="/reports" className="btn btn-secondary w-full justify-start text-xs"
-                  style={{ padding: '7px 10px' }}>
-                  <TrendingUp size={12} /> View weekly report
+                  style={{ padding: '9px 12px', borderRadius: '10px' }}>
+                  <TrendingUp size={13} /> View weekly report
                 </Link>
               </div>
             </div>
+
           </div>
         </div>
       </div>
