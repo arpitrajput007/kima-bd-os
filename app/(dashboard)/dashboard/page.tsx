@@ -11,6 +11,15 @@ import { cn, getScoreBg } from '@/lib/utils'
 import Link from 'next/link'
 import type { Lead } from '@/lib/types'
 
+const CUSTOMER_CATEGORIES = [
+  { label: 'LayerZero Customer',              color: '#60a5fa', bg: 'rgba(96,165,250,0.12)'  },
+  { label: 'Hacked Protocol',                 color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
+  { label: 'Needs On/Off Ramp',              color: '#34d399', bg: 'rgba(52,211,153,0.12)'  },
+  { label: 'Fireblocks Customer',             color: '#a78bfa', bg: 'rgba(167,139,250,0.12)' },
+  { label: 'Web2 Stablecoin Settlement Customer', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' },
+]
+const CATEGORY_CAP = 3
+
 interface DashboardStats {
   new_leads: number
   qualified: number
@@ -37,6 +46,7 @@ export default function DashboardPage() {
   const [recentLeads, setRecentLeads] = useState<Lead[]>([])
   const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([])
   const [productStats, setProductStats] = useState<CategoryStat[]>([])
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
 
   const loadData = async () => {
@@ -69,6 +79,19 @@ export default function DashboardPage() {
       })
 
       setRecentLeads(leads.slice(0, 8))
+
+      // Category quota counts (non-rejected, non-archived)
+      const counts: Record<string, number> = {}
+      CUSTOMER_CATEGORIES.forEach(c => { counts[c.label] = 0 })
+      leads
+        .filter(l => l.status !== 'rejected' && l.status !== 'archived')
+        .forEach(l => {
+          const cats = l.customer_category || []
+          cats.forEach((cat: string) => {
+            if (counts[cat] !== undefined) counts[cat]++
+          })
+        })
+      setCategoryCounts(counts)
 
       const catMap: Record<string, number> = {}
       leads.forEach(l => {
@@ -160,6 +183,50 @@ export default function DashboardPage() {
 
       {/* ── Body ─────────────────────────────────────────────── */}
       <div style={{ padding: '32px 40px', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+
+        {/* ── Category Quotas ──────────────────────────────── */}
+        <div className="rounded-2xl overflow-hidden"
+          style={{ background: 'rgba(20,20,30,0.85)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="flex items-center justify-between px-6 py-4"
+            style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="flex items-center gap-2.5">
+              <Zap size={15} style={{ color: '#a78bfa' }} />
+              <span className="text-sm font-semibold text-white">Lead Queue Quotas</span>
+              <span className="text-xs" style={{ color: 'rgb(110,110,135)' }}>— 3 per category max during review</span>
+            </div>
+            <Link href="/sources" className="text-xs font-medium hover:underline underline-offset-2" style={{ color: 'rgb(139,92,246)' }}>
+              Manage sources →
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-5 divide-x" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+            {CUSTOMER_CATEGORIES.map(({ label, color, bg }) => {
+              const count = categoryCounts[label] || 0
+              const pct = Math.min((count / CATEGORY_CAP) * 100, 100)
+              const full = count >= CATEGORY_CAP
+              return (
+                <div key={label} className="px-5 py-4">
+                  <div className="text-xs font-medium mb-3 leading-snug" style={{ color: 'rgb(160,160,180)' }}>{label}</div>
+                  <div className="flex items-end gap-2 mb-2">
+                    <span className="text-xl font-bold tabular-nums" style={{ color: full ? '#f87171' : 'white' }}>{count}</span>
+                    <span className="text-xs mb-0.5" style={{ color: 'rgb(110,110,135)' }}>/ {CATEGORY_CAP}</span>
+                    {full && (
+                      <span className="text-xs font-semibold mb-0.5" style={{ color: '#f87171' }}>FULL</span>
+                    )}
+                  </div>
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${pct}%`,
+                        background: full ? '#f87171' : color,
+                      }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
 
         {/* ── Alerts ───────────────────────────────────────── */}
         {stats && (stats.needs_review > 0 || stats.high_score > 0) && (
