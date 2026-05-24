@@ -60,8 +60,10 @@ export function Sidebar() {
         collapsed ? 'w-[72px]' : 'w-[260px]'
       )}
       style={{
-        background: '#0B0B10', // Darker sidebar
-        borderRight: '1px solid #1A1A24',
+        background: 'rgba(11, 11, 16, 0.4)', // Translucent sidebar
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderRight: '1px solid rgba(255, 255, 255, 0.05)',
       }}
     >
       {/* Logo */}
