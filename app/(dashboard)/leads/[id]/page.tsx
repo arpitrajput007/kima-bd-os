@@ -238,7 +238,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const inputStyle = { fontSize: '13px', padding: '7px 10px' }
 
   return (
-    <div className="fade-in page-container">
+    <div className="fade-in">
       {/* Header */}
       <div className="page-header">
         <div className="flex items-start justify-between">
@@ -359,7 +359,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       </div>
 
       {/* Content */}
-      <div className="space-y-6 max-w-5xl mt-6">
+      <div className="p-8 space-y-6 max-w-5xl">
 
         {/* Company Overview */}
         <Section id="overview" title="Company Overview" icon={Globe} color="#60a5fa">

@@ -16,15 +16,13 @@ export default function ReportsPage() {
   const [approvingRule, setApprovingRule] = useState<string | null>(null)
 
   const loadReports = async () => {
+    setLoading(true)
     const { data } = await supabase.from('learning_reports').select('*').order('created_at', { ascending: false })
     setReports(data || [])
     setLoading(false)
   }
 
-  useEffect(() => { 
-    loadReports()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  useEffect(() => { loadReports() }, [])
 
   const generateReport = async () => {
     setGenerating(true)
@@ -74,7 +72,7 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="fade-in page-container">
+    <div className="fade-in">
       <div className="page-header flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white">Weekly Learning Reports</h1>
@@ -87,7 +85,7 @@ export default function ReportsPage() {
         </button>
       </div>
 
-      <div className="space-y-6 mt-6">
+      <div className="p-8 space-y-6">
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin" style={{ color: '#a78bfa' }} /></div>
         ) : reports.length === 0 ? (

@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Plus, Edit, Trash2, Loader2, Save, X, Play, Pause } from 'lucide-react'
+import { Plus, Edit, Trash2, Loader2, Save, X, Database, Play, Pause } from 'lucide-react'
 import type { Source } from '@/lib/types'
-import { cn } from '@/lib/utils'
+import { cn, formatDate } from '@/lib/utils'
 
 const SOURCE_TYPES = [
   'website', 'google_search', 'twitter_profile', 'linkedin_company',
@@ -38,15 +38,13 @@ export default function SourcesPage() {
   const [search, setSearch] = useState('')
 
   const loadSources = async () => {
+    setLoading(true)
     const { data } = await supabase.from('sources').select('*').order('status').order('created_at', { ascending: false })
     setSources(data || [])
     setLoading(false)
   }
 
-  useEffect(() => { 
-    loadSources()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  useEffect(() => { loadSources() }, [])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -97,7 +95,7 @@ export default function SourcesPage() {
   const selStyle = { fontSize: '13px' }
 
   return (
-    <div className="fade-in page-container">
+    <div className="fade-in">
       <div className="page-header flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white">Source Manager</h1>
@@ -111,7 +109,7 @@ export default function SourcesPage() {
         </button>
       </div>
 
-      <div className="space-y-6 mt-6">
+      <div className="p-8 space-y-6">
         {/* Add/Edit Form */}
         {showForm && (
           <div className="rounded-xl p-5" style={{ background: 'rgba(22,22,34,0.9)', border: '1px solid rgba(139,92,246,0.2)' }}>

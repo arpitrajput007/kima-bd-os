@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { toast } from 'sonner'
 import {
   LayoutDashboard,
   Inbox,
@@ -11,42 +12,22 @@ import {
   Brain,
   BarChart3,
   Settings,
+  Zap,
   ChevronLeft,
   ChevronRight,
-  Sparkles
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
-const navGroups = [
-  {
-    label: 'Command Center',
-    items: [
-      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    ]
-  },
-  {
-    label: 'Lead Operations',
-    items: [
-      { href: '/leads', label: 'Lead Inbox', icon: Inbox },
-      { href: '/sources', label: 'Sources', icon: Database },
-      { href: '/outreach', label: 'Outreach Studio', icon: MessageSquare },
-    ]
-  },
-  {
-    label: 'Intelligence',
-    items: [
-      { href: '/agent-rules', label: 'Agent Rules', icon: Settings2 },
-      { href: '/feedback', label: 'Feedback Memory', icon: Brain },
-      { href: '/reports', label: 'Weekly Reports', icon: BarChart3 },
-    ]
-  },
-  {
-    label: 'System',
-    items: [
-      { href: '/settings', label: 'Settings', icon: Settings },
-    ]
-  }
+const navItems = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/leads', label: 'Lead Inbox', icon: Inbox },
+  { href: '/sources', label: 'Sources', icon: Database },
+  { href: '/outreach', label: 'Outreach Studio', icon: MessageSquare },
+  { href: '/agent-rules', label: 'Agent Rules', icon: Settings2 },
+  { href: '/feedback', label: 'Feedback Memory', icon: Brain },
+  { href: '/reports', label: 'Weekly Reports', icon: BarChart3 },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
 export function Sidebar() {
@@ -56,73 +37,72 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'flex h-screen flex-shrink-0 flex-col sticky top-0 transition-all duration-300',
-        collapsed ? 'w-[72px]' : 'w-[264px]'
+        'flex flex-col h-screen sticky top-0 transition-all duration-300 flex-shrink-0',
+        collapsed ? 'w-[72px]' : 'w-[260px]'
       )}
       style={{
-        background: 'linear-gradient(180deg, rgba(26,27,32,0.96), rgba(19,20,24,0.96))',
-        borderRight: '1px solid var(--border-subtle)',
+        background: 'rgba(14, 14, 22, 0.95)',
+        borderRight: '1px solid rgba(255,255,255,0.04)',
+        backdropFilter: 'blur(24px)',
       }}
     >
       {/* Logo */}
       <div className={cn(
-        'flex items-center gap-3 px-5 pb-5 pt-6',
-        collapsed && 'justify-center px-3'
-      )}>
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-[var(--text-primary)] text-[var(--bg-primary)] shadow-[0_16px_42px_rgba(0,0,0,0.22)]">
-          <Sparkles size={17} />
+        'flex items-center gap-3 p-5 border-b',
+        collapsed && 'justify-center'
+      )}
+        style={{ borderColor: 'rgba(255,255,255,0.04)', minHeight: '80px' }}>
+        <div
+          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)' }}
+        >
+          <Zap size={16} color="white" fill="white" />
         </div>
         {!collapsed && (
-          <div className="min-w-0 overflow-hidden">
-            <div className="whitespace-nowrap text-[14px] font-semibold tracking-tight text-[var(--text-primary)]">Kima BD OS</div>
-            <div className="mt-1 truncate text-[12px] text-[var(--text-muted)]">AI business development</div>
+          <div className="overflow-hidden">
+            <div className="text-white font-bold text-sm leading-none whitespace-nowrap">Kima BD OS</div>
+            <div className="text-xs whitespace-nowrap" style={{ color: 'rgb(80,80,100)' }}>AI BD Engine</div>
           </div>
         )}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 space-y-7 overflow-y-auto px-3 py-4">
-        {navGroups.map((group, idx) => (
-          <div key={idx} className="space-y-2">
-            {!collapsed && (
-              <div className="px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                {group.label}
-              </div>
-            )}
-            {group.items.map(({ href, label, icon: Icon }) => {
-              const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={cn(
-                    'group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[13px] font-medium transition-all',
-                    isActive 
-                      ? 'bg-white/[0.065] text-[var(--text-primary)] shadow-[0_10px_30px_rgba(0,0,0,0.16)] ring-1 ring-white/[0.055]' 
-                      : 'text-[var(--text-secondary)] hover:bg-white/[0.04] hover:text-[var(--text-primary)]',
-                    collapsed && 'mx-1 justify-center px-0 py-3'
-                  )}
-                  title={collapsed ? label : undefined}
-                >
-                  <Icon size={16} className={cn("flex-shrink-0 transition-colors", isActive ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]")} />
-                  {!collapsed && <span className="truncate">{label}</span>}
-                </Link>
-              )
-            })}
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        {!collapsed && (
+          <div className="text-xs font-semibold mb-3 px-2"
+            style={{ color: 'rgb(70, 70, 90)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            Navigation
           </div>
-        ))}
+        )}
+        {navItems.map(({ href, label, icon: Icon }) => {
+          const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                'nav-item',
+                isActive && 'active',
+                collapsed && 'justify-center px-0'
+              )}
+              title={collapsed ? label : undefined}
+            >
+              <Icon size={16} className="flex-shrink-0" />
+              {!collapsed && <span>{label}</span>}
+            </Link>
+          )
+        })}
       </nav>
 
       {/* Bottom */}
-      <div className="border-t border-[var(--border-subtle)] p-3">
+      <div className="p-4 space-y-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+        {/* Collapse toggle */}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className={cn(
-            'flex w-full items-center rounded-2xl text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-white/[0.04] hover:text-[var(--text-primary)]',
-            collapsed ? 'justify-center p-3' : 'gap-2 px-3 py-2.5'
-          )}
+          className={cn('btn btn-ghost w-full text-xs', collapsed && 'justify-center px-0')}
+          style={{ padding: '10px', gap: '8px' }}
         >
-          {collapsed ? <ChevronRight size={14} /> : <><ChevronLeft size={14} /><span className="truncate">Collapse</span></>}
+          {collapsed ? <ChevronRight size={16} /> : <><ChevronLeft size={16} /><span>Collapse Sidebar</span></>}
         </button>
       </div>
     </aside>

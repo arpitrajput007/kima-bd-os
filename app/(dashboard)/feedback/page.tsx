@@ -58,7 +58,7 @@ export default function FeedbackPage() {
   }
 
   return (
-    <div className="fade-in page-container">
+    <div className="fade-in">
       <div className="page-header">
         <div className="flex items-center justify-between mb-2">
           <div>
@@ -88,7 +88,7 @@ export default function FeedbackPage() {
         </div>
       </div>
 
-      <div className="space-y-6 mt-6">
+      <div className="p-8 space-y-6">
         {/* Filter */}
         <div className="flex gap-2 flex-wrap">
           <button onClick={() => setFilter('')}
