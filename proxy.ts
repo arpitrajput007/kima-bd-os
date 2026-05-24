@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 // No authentication — this is a private local tool
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Redirect root to dashboard
   if (request.nextUrl.pathname === '/') {
     const url = request.nextUrl.clone()
