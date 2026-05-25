@@ -197,31 +197,33 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const Section = ({ id: sectionId, title, icon: Icon, color = '#a78bfa', children, badge }: {
     id: string; title: string; icon: React.ComponentType<{ size?: number; color?: string }>; color?: string; children: React.ReactNode; badge?: string
   }) => (
-    <div className="rounded-xl overflow-hidden"
-      style={{ background: 'rgba(22,22,34,0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div className="rounded-2xl overflow-hidden"
+      style={{ background: 'rgba(20,20,30,0.5)', border: '1px solid rgba(255,255,255,0.05)' }}>
       <button
         onClick={() => toggleSection(sectionId)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors"
-        style={{ borderBottom: expandedSections[sectionId] ? '1px solid rgba(255,255,255,0.06)' : 'none' }}
+        className="w-full flex items-center justify-between px-6 py-5 hover:bg-white/[0.02] transition-colors"
+        style={{ borderBottom: expandedSections[sectionId] ? '1px solid rgba(255,255,255,0.05)' : 'none' }}
       >
-        <div className="flex items-center gap-2">
-          <Icon size={15} color={color} />
-          <span className="text-sm font-semibold text-white">{title}</span>
+        <div className="flex items-center gap-3">
+          <div className="p-1.5 rounded-lg" style={{ background: `${color}15` }}>
+            <Icon size={16} color={color} />
+          </div>
+          <span className="text-[15px] font-medium text-white">{title}</span>
           {badge && (
-            <span className="badge text-xs" style={{ background: `${color}15`, color, borderColor: `${color}30`, fontSize: '10px', padding: '1px 6px' }}>{badge}</span>
+            <span className="badge text-xs font-bold" style={{ background: `${color}15`, color, borderColor: `${color}30`, padding: '2px 8px' }}>{badge}</span>
           )}
         </div>
-        {expandedSections[sectionId] ? <ChevronUp size={14} style={{ color: 'rgb(100,100,120)' }} /> : <ChevronDown size={14} style={{ color: 'rgb(100,100,120)' }} />}
+        {expandedSections[sectionId] ? <ChevronUp size={16} style={{ color: 'rgb(100,100,120)' }} /> : <ChevronDown size={16} style={{ color: 'rgb(100,100,120)' }} />}
       </button>
-      {expandedSections[sectionId] && <div className="p-5">{children}</div>}
+      {expandedSections[sectionId] && <div className="p-6 md:p-8">{children}</div>}
     </div>
   )
 
   const Field = ({ label, value, className = '' }: { label: string; value?: string | null; className?: string }) => (
     value ? (
       <div className={className}>
-        <div className="text-xs font-medium mb-1" style={{ color: 'rgb(100,100,120)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-        <div className="text-sm" style={{ color: 'rgb(200,200,220)', lineHeight: '1.6' }}>{value}</div>
+        <div className="text-[11px] font-semibold mb-2" style={{ color: 'rgb(140,140,160)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
+        <div className="text-[15px]" style={{ color: 'rgb(220,220,230)', lineHeight: '1.7' }}>{value}</div>
       </div>
     ) : null
   )
@@ -359,7 +361,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       </div>
 
       {/* Content */}
-      <div className="p-8 space-y-6 max-w-5xl">
+      <div className="p-6 md:p-8 w-full max-w-[1400px] mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* Left Column (Overview, Findings, Fits) */}
+          <div className="lg:col-span-2 space-y-6">
 
         {/* Company Overview */}
         <Section id="overview" title="Company Overview" icon={Globe} color="#60a5fa">
@@ -442,7 +448,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   </span>
                 )}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-8 mt-2">
                 <Field label="Product to Sell" value={lead.product_to_sell} />
                 <Field label="Suggested Use Case" value={lead.suggested_use_case} />
                 <Field label="Business Model" value={lead.business_model} />
@@ -634,6 +640,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           )}
         </Section>
+        </div>
+
+        {/* Right Column (Contacts, Outreach, Feedback) */}
+        <div className="space-y-6">
 
         {/* Contacts */}
         <Section id="contacts" title="Contacts" icon={Users} color="#22d3ee"
@@ -760,6 +770,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         <Section id="feedback" title="Log Outcome / Feedback" icon={ThumbsUp} color="#34d399">
           <FeedbackForm leadId={lead.id} onSaved={loadLead} />
         </Section>
+          </div>
+        </div>
       </div>
     </div>
   )
