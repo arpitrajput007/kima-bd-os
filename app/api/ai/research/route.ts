@@ -3,6 +3,25 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
+async function getHunterContacts(website: string): Promise<string> {
+  if (!process.env.HUNTER_API_KEY || !website) return ''
+  try {
+    const domain = website.replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+    const res = await fetch(`https://api.hunter.io/v2/domain-search?domain=${domain}&api_key=${process.env.HUNTER_API_KEY}&limit=10`)
+    const data = await res.json()
+    if (!data?.data?.emails?.length) return ''
+    return JSON.stringify(data.data.emails.map((e: any) => ({
+      email: e.value,
+      name: `${e.first_name || ''} ${e.last_name || ''}`.trim(),
+      position: e.position,
+      department: e.department,
+      confidence: e.confidence
+    })))
+  } catch (e) {
+    return ''
+  }
+}
+
 export async function POST(req: NextRequest) {
   if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your_openai_api_key_here') {
     return NextResponse.json({ error: 'OpenAI API key not configured. Please add OPENAI_API_KEY to your .env.local file.' }, { status: 400 })
@@ -143,16 +162,20 @@ Return JSON:
 }`
 
     } else if (action === 'contacts') {
+      const hunterData = await getHunterContacts(website)
+      const hunterContext = hunterData ? `\nVerified emails from Hunter.io database:\n${hunterData}\nSelect the most relevant BD contacts from this list if any, otherwise guess patterns.` : ''
+      
       userPrompt = `Find the ideal contacts at this company for Kima/Aeredium BD outreach:
 Company: ${company_name}
 Website: ${website || 'unknown'}
-Description: ${description || 'unknown'}
+Description: ${description || 'unknown'}${hunterContext}
 
 Return JSON:
 {
   "suggested_contacts": [
     {
       "name": "Name if known or null",
+      "email_pattern": "Their verified email from Hunter, or an educated guess if none exist",
       "role": "Ideal role to contact",
       "why_this_person": "Why this person is the right contact",
       "linkedin_hint": "LinkedIn search query to find them",

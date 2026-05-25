@@ -4,6 +4,25 @@ import { createClient } from '@supabase/supabase-js'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
+async function getHunterContacts(website: string): Promise<string> {
+  if (!process.env.HUNTER_API_KEY || !website) return ''
+  try {
+    const domain = website.replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+    const res = await fetch(`https://api.hunter.io/v2/domain-search?domain=${domain}&api_key=${process.env.HUNTER_API_KEY}&limit=10`)
+    const data = await res.json()
+    if (!data?.data?.emails?.length) return ''
+    return JSON.stringify(data.data.emails.map((e: any) => ({
+      email: e.value,
+      name: `${e.first_name || ''} ${e.last_name || ''}`.trim(),
+      position: e.position,
+      department: e.department,
+      confidence: e.confidence
+    })))
+  } catch (e) {
+    return ''
+  }
+}
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -118,6 +137,9 @@ async function deepResearch(company: {
     .trim()
 
   try {
+    const hunterData = await getHunterContacts(company.website)
+    const hunterContext = hunterData ? `\nVerified emails from Hunter.io database:\n${hunterData}\nSelect the most relevant BD contacts from this list if any, otherwise guess patterns.` : ''
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
@@ -150,7 +172,7 @@ Return ONLY valid JSON. No markdown.`,
 
 Company: ${company.name}
 Website: ${company.website || 'unknown'}
-Description: ${company.description}
+Description: ${company.description}${hunterContext}
 
 Return this exact JSON:
 {
