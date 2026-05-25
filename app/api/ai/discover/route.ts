@@ -35,6 +35,30 @@ async function readUrl(url: string): Promise<string> {
   }
 }
 
+// Search web using Tavily API
+async function searchWeb(query: string): Promise<string> {
+  if (!process.env.TAVILY_API_KEY) return ''
+  try {
+    const res = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: process.env.TAVILY_API_KEY,
+        query,
+        search_depth: 'advanced',
+        include_raw_content: false,
+        max_results: 10
+      })
+    })
+    const data = await res.json()
+    if (!data.results) return ''
+    return data.results.map((r: any) => `Title: ${r.title}\nURL: ${r.url}\nContent: ${r.content}`).join('\n\n')
+  } catch (e) {
+    console.error('[searchWeb]', e)
+    return ''
+  }
+}
+
 // Extract company mentions from raw page content
 async function extractCompanies(
   content: string,
@@ -228,11 +252,22 @@ export async function POST(req: NextRequest) {
         .filter(Boolean)
     )
 
-    // 4. Read the source URL
-    const content = await readUrl(source.source_url_or_query)
+    // 4. Get content via URL or Search
+    const sourceQuery = source.source_url_or_query.trim()
+    let content = ''
+    
+    if (sourceQuery.startsWith('http://') || sourceQuery.startsWith('https://')) {
+      content = await readUrl(sourceQuery)
+    } else {
+      if (!process.env.TAVILY_API_KEY) {
+        return NextResponse.json({ error: 'Tavily API key required for search queries. Add it to .env.local' }, { status: 400 })
+      }
+      content = await searchWeb(sourceQuery)
+    }
+
     if (!content || content.length < 100) {
       return NextResponse.json(
-        { error: 'Could not read source URL or content too short' },
+        { error: 'Could not fetch content or content too short (try a different URL or search query)' },
         { status: 400 }
       )
     }
