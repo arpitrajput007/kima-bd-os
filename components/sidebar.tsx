@@ -15,17 +15,23 @@ import {
   ChevronLeft,
   ChevronRight,
   Activity,
+  BookOpen,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
-const navGroups = [
+const navGroups: {
+  label: string
+  items: { href: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; glow?: boolean }[]
+}[] = [
+
   {
     label: 'Intelligence',
     items: [
       { href: '/dashboard',    label: 'BD Command Center', icon: LayoutDashboard },
       { href: '/leads',        label: 'Lead Inbox',         icon: Inbox },
       { href: '/reports',      label: 'Weekly Reports',     icon: BarChart3 },
+      { href: '/learn',        label: 'Make Agent Learn',   icon: BookOpen, glow: true },
     ],
   },
   {
@@ -98,7 +104,7 @@ export function Sidebar() {
             {collapsed && gi > 0 && (
               <div className="my-2 mx-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }} />
             )}
-            {group.items.map(({ href, label, icon: Icon }) => {
+            {group.items.map(({ href, label, icon: Icon, glow }) => {
               const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
               return (
                 <Link
@@ -106,15 +112,27 @@ export function Sidebar() {
                   href={href}
                   className={cn('nav-item', isActive && 'active', collapsed && 'justify-center px-0')}
                   title={collapsed ? label : undefined}
+                  style={glow && !isActive ? {
+                    background: 'rgba(124,58,237,0.08)',
+                    borderColor: 'rgba(124,58,237,0.25)',
+                    color: 'rgba(167,139,250,0.9)',
+                  } : undefined}
                 >
                   <Icon size={15} className="flex-shrink-0" />
                   {!collapsed && <span>{label}</span>}
+                  {!collapsed && glow && !isActive && (
+                    <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded"
+                      style={{ background: 'rgba(124,58,237,0.2)', color: '#a78bfa' }}>
+                      AI
+                    </span>
+                  )}
                   {!collapsed && isActive && (
                     <div className="ml-auto w-1 h-1 rounded-full" style={{ background: 'rgb(167,139,250)' }} />
                   )}
                 </Link>
               )
             })}
+
           </div>
         ))}
       </nav>

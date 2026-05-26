@@ -5,8 +5,9 @@ import { createClient } from '@/lib/supabase/client'
 import {
   TrendingUp, Star, CheckCircle, XCircle, Mail, MessageCircle,
   Calendar, Inbox, Clock, AlertCircle, Users, Target, Zap,
-  ArrowUpRight, RefreshCw, Plus, Activity, Database
+  ArrowUpRight, RefreshCw, Plus, Activity, Database, BookOpen
 } from 'lucide-react'
+
 import { cn, getScoreBg } from '@/lib/utils'
 import Link from 'next/link'
 import type { Lead } from '@/lib/types'
@@ -398,7 +399,14 @@ export default function DashboardPage() {
                 <Link href="/reports" className="btn btn-secondary w-full justify-start text-[12px]" style={{ padding: '9px 12px' }}>
                   <TrendingUp size={13} /> Weekly report
                 </Link>
+                <Link href="/learn"
+                  className="w-full justify-start text-[12px] flex items-center gap-2 rounded-lg font-semibold transition-all duration-200"
+                  style={{ padding: '9px 12px', background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.3)', color: '#a78bfa' }}>
+                  <BookOpen size={13} /> Feed Intelligence
+                  <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(124,58,237,0.2)', color: '#a78bfa' }}>AI</span>
+                </Link>
               </div>
+
             </div>
 
           </div>

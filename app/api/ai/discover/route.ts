@@ -125,12 +125,35 @@ Extract up to 15 companies mentioned. Return JSON:
   }
 }
 
+// Fetch all active agent_knowledge for injection into prompts
+async function getLearnedIntelligence(): Promise<string> {
+  try {
+    const { data } = await supabase
+      .from('agent_knowledge')
+      .select('title, content, knowledge_type, created_at')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(30)
+    if (!data || data.length === 0) return ''
+    const lines = data.map(
+      (k: { title: string; content: string; knowledge_type: string; created_at: string }) =>
+        `[${new Date(k.created_at).toISOString().split('T')[0]}][${k.knowledge_type}] ${k.title}:\n${k.content}`
+    )
+    return `\n\nLEARNED INTELLIGENCE (from your training sessions — use this to score and analyze leads more precisely):\n${lines.join('\n\n---\n')}`
+  } catch {
+    return ''
+  }
+}
+
 // Full deep-dive research on a single company
-async function deepResearch(company: {
+async function deepResearch(
+  company: {
   name: string
   website: string
   description: string
-}): Promise<Record<string, unknown> | null> {
+},
+  learnedIntelligence?: string
+): Promise<Record<string, unknown> | null> {
   const domain = (company.website || '')
     .replace(/https?:\/\//, '')
     .replace(/\/.*/, '')
@@ -164,7 +187,7 @@ High score (70+): clear pain point, active product, matches a target category, d
 Medium (40-69): possible fit but unclear pain point or no direct match
 Low (<40): no clear use case for Kima/Aeredium
 
-Return ONLY valid JSON. No markdown.`,
+Return ONLY valid JSON. No markdown.${learnedIntelligence || ''}`,
         },
         {
           role: 'user',
@@ -300,6 +323,9 @@ export async function POST(req: NextRequest) {
       `${source.source_name} (${source.source_type})`
     )
 
+    // 5b. Load learned intelligence to inject into all deepResearch calls
+    const learnedIntelligence = await getLearnedIntelligence()
+
     const results = {
       found: companies.length,
       saved: 0,
@@ -318,8 +344,8 @@ export async function POST(req: NextRequest) {
       if (existingNames.has(nameKey)) { results.skipped_duplicate++; continue }
       if (websiteKey && existingWebsites.has(websiteKey)) { results.skipped_duplicate++; continue }
 
-      // Full research
-      const research = await deepResearch(company)
+      // Full research — inject learned intelligence
+      const research = await deepResearch(company, learnedIntelligence)
       if (!research) continue
 
       // Skip low-quality leads

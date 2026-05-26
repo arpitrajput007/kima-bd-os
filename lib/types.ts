@@ -266,6 +266,20 @@ export interface LearningReport {
   created_at: string
 }
 
+export interface AgentKnowledge {
+  id: string
+  title: string
+  content: string
+  source_type?: 'file' | 'url' | 'text' | 'image' | 'screenshot'
+  source_name?: string
+  tags?: string[]
+  rules_created?: number
+  sources_created?: number
+  knowledge_type?: string
+  status: 'active' | 'archived'
+  created_at: string
+}
+
 // Scoring system
 export interface ScoreBreakdown {
   pain_point_score: number

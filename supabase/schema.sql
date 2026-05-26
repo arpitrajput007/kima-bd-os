@@ -163,6 +163,24 @@ create table if not exists learning_reports (
 );
 
 -- ============================================================
+-- AGENT KNOWLEDGE TABLE (Long-Term Memory from Learning Sessions)
+-- ============================================================
+create table if not exists agent_knowledge (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  content text not null,
+  source_type text check (source_type in ('file', 'url', 'text', 'image', 'screenshot')),
+  source_name text,
+  tags text[] default '{}',
+  knowledge_type text default 'general',
+  rules_created int default 0,
+  sources_created int default 0,
+  status text default 'active' check (status in ('active', 'archived')),
+  created_at timestamptz default now()
+);
+
+
+-- ============================================================
 -- UPDATED_AT TRIGGER
 -- ============================================================
 create or replace function update_updated_at_column()
@@ -195,6 +213,8 @@ alter table sources enable row level security;
 alter table feedback_memory enable row level security;
 alter table agent_rules enable row level security;
 alter table learning_reports enable row level security;
+alter table agent_knowledge enable row level security;
+
 
 -- Allow anon and authenticated users full access (no login required — private local tool)
 create policy "anon_full_access_leads" on leads for all to anon, authenticated using (true) with check (true);
@@ -204,6 +224,8 @@ create policy "anon_full_access_sources" on sources for all to anon, authenticat
 create policy "anon_full_access_feedback" on feedback_memory for all to anon, authenticated using (true) with check (true);
 create policy "anon_full_access_rules" on agent_rules for all to anon, authenticated using (true) with check (true);
 create policy "anon_full_access_reports" on learning_reports for all to anon, authenticated using (true) with check (true);
+create policy "anon_full_access_knowledge" on agent_knowledge for all to anon, authenticated using (true) with check (true);
+
 
 -- ============================================================
 -- SEED: DEFAULT AGENT RULES
