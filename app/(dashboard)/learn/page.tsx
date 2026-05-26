@@ -25,6 +25,7 @@ interface LearnResult {
   sources_created: number
   created_rules: string[]
   created_sources: string[]
+  doc_meta?: string | null
   error?: string
 }
 
@@ -62,7 +63,7 @@ const MODE_CONFIG: {
 }[] = [
   { key: 'url',   label: 'URL',        icon: Globe,          hint: 'Paste any link — article, competitor page, news, LinkedIn post' },
   { key: 'text',  label: 'Text',       icon: MessageSquare,  hint: 'Paste raw notes, meeting transcripts, product docs, reports' },
-  { key: 'file',  label: 'File',       icon: FileUp,         hint: 'Upload PDF, TXT, MD, or CSV files' },
+  { key: 'file',  label: 'File',       icon: FileUp,         hint: 'Upload PDF, DOCX, DOC, TXT, MD, CSV — full content extracted' },
   { key: 'image', label: 'Screenshot', icon: ImageIcon,      hint: 'Drop any image — GPT-4o Vision reads and extracts all text' },
 ]
 
@@ -313,8 +314,8 @@ export default function LearnPage() {
                   const isImg = mode === 'image'
                   const currentFile = isImg ? imageFile : file
                   const ref = isImg ? imageInputRef : fileInputRef
-                  const accept = isImg ? 'image/*' : '.pdf,.txt,.md,.csv,.doc,.docx'
-                  const acceptLabel = isImg ? '.png · .jpg · .jpeg · .webp' : '.pdf · .txt · .md · .csv'
+                  const accept = isImg ? 'image/*' : '.pdf,.docx,.doc,.txt,.md,.csv'
+                  const acceptLabel = isImg ? '.png · .jpg · .jpeg · .webp' : '.pdf · .docx · .doc · .txt · .md · .csv'
                   const Icon = isImg ? ImageIcon : FileUp
                   return (
                     <div
@@ -463,6 +464,12 @@ export default function LearnPage() {
 
                       {/* Mini stat row */}
                       <div className="flex gap-3 flex-wrap">
+                        {result.doc_meta && (
+                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold"
+                            style={{ background: 'rgba(34,211,238,0.08)', color: '#22d3ee', border: '1px solid rgba(34,211,238,0.2)' }}>
+                            <FileUp size={11} />{result.doc_meta}
+                          </div>
+                        )}
                         {(result.insights?.length || 0) > 0 && (
                           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold"
                             style={{ background: 'rgba(167,139,250,0.1)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.2)' }}>
@@ -582,11 +589,12 @@ export default function LearnPage() {
               </div>
               <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
                 {[
-                  { icon: Globe,        label: 'Competitor websites',     sub: 'Ripple, Fireblocks, Transak...',    color: '#f87171' },
-                  { icon: FileText,     label: 'News & funding articles', sub: 'TechCrunch, DeFi Pulse, Decrypt', color: '#60a5fa' },
-                  { icon: MessageSquare,label: 'Meeting notes',           sub: 'Call transcripts, notes, CRM',    color: '#34d399' },
-                  { icon: ImageIcon,    label: 'Screenshots',             sub: 'Whitepapers, dashboards, slides', color: '#fbbf24' },
-                  { icon: Upload,       label: 'CSV / lists',             sub: 'Company lists, prospect data',    color: '#a78bfa' },
+                  { icon: Globe,        label: 'Competitor websites',       sub: 'Ripple, Fireblocks, Transak...',   color: '#f87171' },
+                  { icon: FileText,     label: 'News & funding articles',   sub: 'TechCrunch, DeFi Pulse, Decrypt', color: '#60a5fa' },
+                  { icon: MessageSquare,label: 'Meeting notes',             sub: 'Call transcripts, notes, CRM',    color: '#34d399' },
+                  { icon: FileUp,       label: 'PDF / DOCX / DOC files',   sub: 'Reports, whitepapers, proposals', color: '#22d3ee' },
+                  { icon: ImageIcon,    label: 'Screenshots',               sub: 'Dashboards, slides, charts',      color: '#fbbf24' },
+                  { icon: Upload,       label: 'CSV / prospect lists',      sub: 'Company lists, target accounts',  color: '#a78bfa' },
                 ].map(({ icon: Icon, label, sub, color }) => (
                   <div key={label} className="flex items-center gap-3 px-5 py-3">
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
@@ -778,7 +786,7 @@ export default function LearnPage() {
       </div>
 
       {/* Hidden file inputs */}
-      <input ref={fileInputRef}  type="file" accept=".pdf,.txt,.md,.csv,.doc,.docx" className="hidden"
+      <input ref={fileInputRef}  type="file" accept=".pdf,.docx,.doc,.txt,.md,.csv" className="hidden"
         onChange={e => { if (e.target.files?.[0]) setFile(e.target.files[0]) }} />
       <input ref={imageInputRef} type="file" accept="image/*" className="hidden"
         onChange={e => { if (e.target.files?.[0]) setImageFile(e.target.files[0]) }} />
