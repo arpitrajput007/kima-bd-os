@@ -390,10 +390,9 @@ export default function VoicePage() {
         .mic-active { animation: listeningRing 1s ease-out infinite; }
       `}</style>
 
-      <div className="fade-in flex flex-col" style={{ height: '100vh', overflow: 'hidden' }}>
-
+      <div className="fade-in">
         {/* ── Page Header ───────────────────────────────────── */}
-        <div className="page-header flex items-center justify-between" style={{ flexShrink: 0 }}>
+        <div className="page-header flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div>
               <h1 className="text-[18px] font-bold text-white tracking-tight flex items-center gap-2.5">
@@ -407,7 +406,7 @@ export default function VoicePage() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             {/* Mute toggle */}
             <button
               onClick={() => { stopSpeaking(); setIsMuted(m => !m) }}
@@ -471,376 +470,401 @@ export default function VoicePage() {
           </div>
         </div>
 
-        {/* ── Main body: 2-column layout ─────────────────── */}
-        <div className="flex flex-1 overflow-hidden" style={{ minHeight: 0 }}>
-
-          {/* ── Left: Conversation ───────────────────────── */}
-          <div className="flex flex-col flex-1 overflow-hidden" style={{ minWidth: 0 }}>
-
-            {/* Messages area */}
-            <div
-              className="flex-1 overflow-y-auto"
-              style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '20px' }}
-            >
-              {/* Empty state */}
-              {!hasMessages && (
-                <div className="flex-1 flex flex-col items-center justify-center py-16 text-center">
-                  <div
-                    className="w-20 h-20 rounded-2xl flex items-center justify-center mb-6 mx-auto"
-                    style={{
-                      background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(79,70,229,0.15))',
-                      border: '1px solid rgba(124,58,237,0.3)',
-                      boxShadow: '0 0 40px rgba(124,58,237,0.1)',
-                    }}
-                  >
-                    <Brain size={32} color="#a78bfa" />
+        {/* ── Body ──────────────────────────────────────────── */}
+        <div style={{ padding: '28px 36px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6" style={{ height: 'calc(100vh - 150px)', minHeight: '600px' }}>
+            
+            {/* ── Left: Conversation Panel (3/5) ───────────── */}
+            <div className="lg:col-span-3 flex flex-col section-card overflow-hidden" style={{ borderColor: 'rgba(124,58,237,0.2)' }}>
+              
+              {/* Card Header */}
+              <div className="section-card-header" style={{ background: 'rgba(124,58,237,0.04)' }}>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                    style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.4), rgba(79,70,229,0.3))', border: '1px solid rgba(124,58,237,0.4)' }}>
+                    <Brain size={14} color="#a78bfa" />
                   </div>
-                  <div className="text-[18px] font-bold text-white mb-2">Ready to talk</div>
-                  <div className="text-[13px] max-w-md leading-relaxed" style={{ color: 'rgb(100,106,135)' }}>
-                    Tap the mic and start speaking, or type below.
-                    Discuss BD strategy, analyse companies, brainstorm outreach — the agent knows your full context.
-                  </div>
-                  <div className="mt-8 grid grid-cols-2 gap-3 max-w-sm w-full">
-                    {[
-                      'Which leads should I prioritize today?',
-                      'What\'s our best outreach angle for DeFi protocols?',
-                      'Tell me about our competitive advantage vs Ripple',
-                      'Review our ICP — are we missing any verticals?',
-                    ].map(prompt => (
-                      <button
-                        key={prompt}
-                        onClick={() => sendMessage(prompt)}
-                        className="text-left px-3 py-2.5 rounded-xl text-[11px] font-medium transition-all duration-150 hover:scale-[1.02]"
-                        style={{
-                          background: 'rgba(255,255,255,0.04)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          color: 'rgb(160,165,195)',
-                        }}
-                      >
-                        {prompt}
-                      </button>
-                    ))}
+                  <div>
+                    <div className="text-[13px] font-semibold text-white">Live Conversation</div>
+                    <div className="text-[11px]" style={{ color: 'rgb(100,106,135)' }}>
+                      Agent has full context of your rules and knowledge
+                    </div>
                   </div>
                 </div>
-              )}
+                {/* Voice Status Badge */}
+                <div className="flex items-center gap-2 px-2.5 py-1 rounded-md text-[11px] font-semibold"
+                  style={{ background: 'rgba(52,211,153,0.07)', border: '1px solid rgba(52,211,153,0.18)', color: '#34d399' }}>
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 status-pulse" />
+                  Voice Active
+                </div>
+              </div>
 
-              {/* Message bubbles */}
-              {messages.map((msg, idx) => {
-                const isUser = msg.role === 'user'
-                const isLast = idx === messages.length - 1
-                return (
-                  <div key={msg.id} className={cn('flex gap-3', isUser ? 'justify-end' : 'justify-start')}>
-                    {!isUser && <AgentAvatar speaking={isSpeaking && isLast} />}
+              {/* Messages area */}
+              <div
+                className="flex-1 overflow-y-auto"
+                style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '20px' }}
+              >
+                {/* Empty state */}
+                {!hasMessages && (
+                  <div className="flex-1 flex flex-col items-center justify-center py-10 text-center">
                     <div
-                      className={cn('max-w-[70%] rounded-2xl px-4 py-3 text-[13px] leading-relaxed')}
-                      style={isUser ? {
-                        background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(79,70,229,0.25))',
+                      className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 mx-auto"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(79,70,229,0.15))',
                         border: '1px solid rgba(124,58,237,0.3)',
-                        color: 'rgb(220,225,255)',
-                        borderBottomRightRadius: '6px',
-                      } : {
-                        background: 'rgba(20,22,33,0.95)',
-                        border: '1px solid rgba(255,255,255,0.07)',
-                        color: 'rgb(200,205,230)',
-                        borderBottomLeftRadius: '6px',
+                        boxShadow: '0 0 40px rgba(124,58,237,0.1)',
                       }}
                     >
-                      {!isUser && isSpeaking && isLast && (
-                        <div className="flex items-center gap-2 mb-2">
-                          <WaveformBars active color="#a78bfa" />
-                          <span className="text-[10px] font-semibold" style={{ color: '#a78bfa' }}>Speaking...</span>
-                        </div>
-                      )}
-                      {msg.content}
-                      <div className="text-[10px] mt-1.5" style={{ color: 'rgba(160,165,195,0.4)' }}>
-                        {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        {isUser && <span className="ml-1.5 inline-flex items-center gap-1"><Mic size={9} /></span>}
-                      </div>
+                      <Brain size={28} color="#a78bfa" />
                     </div>
-                    {isUser && (
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)' }}>
-                        <span className="text-[14px]">👤</span>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-
-              {/* Thinking state */}
-              {isThinking && (
-                <div className="flex gap-3">
-                  <AgentAvatar speaking={false} />
-                  <div className="flex items-center gap-2 px-4 py-3 rounded-2xl rounded-bl-md"
-                    style={{ background: 'rgba(20,22,33,0.95)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                    <div className="flex gap-1">
-                      {[0, 1, 2].map(i => (
-                        <div key={i} className="w-1.5 h-1.5 rounded-full"
+                    <div className="text-[16px] font-bold text-white mb-2">Ready to talk</div>
+                    <div className="text-[12px] max-w-sm leading-relaxed" style={{ color: 'rgb(100,106,135)' }}>
+                      Tap the mic and start speaking, or type below.
+                      Discuss BD strategy, analyse companies, brainstorm outreach.
+                    </div>
+                    <div className="mt-6 flex flex-col gap-2.5 max-w-sm w-full">
+                      {[
+                        'Which leads should I prioritize today?',
+                        'What\'s our best outreach angle for DeFi protocols?',
+                        'Tell me about our competitive advantage vs Ripple',
+                      ].map(prompt => (
+                        <button
+                          key={prompt}
+                          onClick={() => sendMessage(prompt)}
+                          className="text-left px-4 py-2.5 rounded-xl text-[11px] font-medium transition-all duration-150 hover:bg-white/5"
                           style={{
-                            background: '#a78bfa',
-                            animation: `waveBar 0.8s ease-in-out ${i * 0.15}s infinite alternate`,
-                          }} />
+                            background: 'rgba(255,255,255,0.03)',
+                            border: '1px solid rgba(255,255,255,0.06)',
+                            color: 'rgb(160,165,195)',
+                          }}
+                        >
+                          {prompt}
+                        </button>
                       ))}
                     </div>
-                    <span className="text-[11px]" style={{ color: 'rgb(100,106,135)' }}>Thinking...</span>
+                  </div>
+                )}
+
+                {/* Message bubbles */}
+                {messages.map((msg, idx) => {
+                  const isUser = msg.role === 'user'
+                  const isLast = idx === messages.length - 1
+                  return (
+                    <div key={msg.id} className={cn('flex gap-3', isUser ? 'justify-end' : 'justify-start')}>
+                      {!isUser && <AgentAvatar speaking={isSpeaking && isLast} />}
+                      <div
+                        className={cn('max-w-[70%] rounded-2xl px-4 py-3 text-[13px] leading-relaxed')}
+                        style={isUser ? {
+                          background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(79,70,229,0.25))',
+                          border: '1px solid rgba(124,58,237,0.3)',
+                          color: 'rgb(220,225,255)',
+                          borderBottomRightRadius: '6px',
+                        } : {
+                          background: 'rgba(20,22,33,0.95)',
+                          border: '1px solid rgba(255,255,255,0.07)',
+                          color: 'rgb(200,205,230)',
+                          borderBottomLeftRadius: '6px',
+                        }}
+                      >
+                        {!isUser && isSpeaking && isLast && (
+                          <div className="flex items-center gap-2 mb-2">
+                            <WaveformBars active color="#a78bfa" />
+                            <span className="text-[10px] font-semibold" style={{ color: '#a78bfa' }}>Speaking...</span>
+                          </div>
+                        )}
+                        {msg.content}
+                        <div className="text-[10px] mt-1.5" style={{ color: 'rgba(160,165,195,0.4)' }}>
+                          {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {isUser && <span className="ml-1.5 inline-flex items-center gap-1"><Mic size={9} /></span>}
+                        </div>
+                      </div>
+                      {isUser && (
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)' }}>
+                          <span className="text-[14px]">👤</span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+
+                {/* Thinking state */}
+                {isThinking && (
+                  <div className="flex gap-3">
+                    <AgentAvatar speaking={false} />
+                    <div className="flex items-center gap-2 px-4 py-3 rounded-2xl rounded-bl-md"
+                      style={{ background: 'rgba(20,22,33,0.95)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                      <div className="flex gap-1">
+                        {[0, 1, 2].map(i => (
+                          <div key={i} className="w-1.5 h-1.5 rounded-full"
+                            style={{
+                              background: '#a78bfa',
+                              animation: `waveBar 0.8s ease-in-out ${i * 0.15}s infinite alternate`,
+                            }} />
+                        ))}
+                      </div>
+                      <span className="text-[11px]" style={{ color: 'rgb(100,106,135)' }}>Thinking...</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Live interim transcript */}
+                {isListening && transcript && (
+                  <div className="flex gap-3 justify-end">
+                    <div className="max-w-[70%] px-4 py-3 rounded-2xl rounded-br-md text-[13px] italic"
+                      style={{
+                        background: 'rgba(124,58,237,0.1)',
+                        border: '1px dashed rgba(124,58,237,0.3)',
+                        color: 'rgba(167,139,250,0.7)',
+                      }}>
+                      {transcript}
+                    </div>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Bottom Controls */}
+              <div style={{
+                padding: '16px 24px',
+                background: 'rgba(0,0,0,0.2)',
+                borderTop: '1px solid rgba(255,255,255,0.05)',
+              }}>
+                <div className="flex items-center gap-3">
+                  {/* Mic button */}
+                  {speechSupported && (
+                    <button
+                      onClick={toggleListening}
+                      disabled={isThinking}
+                      className="flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200"
+                      style={{
+                        background: isListening
+                          ? 'linear-gradient(135deg, #dc2626, #b91c1c)'
+                          : 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(79,70,229,0.25))',
+                        border: `1px solid ${isListening ? 'rgba(220,38,38,0.5)' : 'rgba(124,58,237,0.4)'}`,
+                      }}
+                      title={isListening ? 'Stop listening' : 'Tap to speak'}
+                    >
+                      {isListening
+                        ? <Square size={15} color="white" />
+                        : <Mic size={17} color="#a78bfa" />
+                      }
+                    </button>
+                  )}
+
+                  {/* Listening indicator */}
+                  {isListening && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                      style={{ background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.2)' }}>
+                      <div className="w-2 h-2 rounded-full bg-red-500 status-pulse" />
+                      <WaveformBars active color="#ef4444" />
+                      <span className="text-[11px] font-semibold" style={{ color: '#ef4444' }}>Listening...</span>
+                    </div>
+                  )}
+
+                  {/* Text input */}
+                  {!isListening && (
+                    <>
+                      <div className="flex-1 relative">
+                        <input
+                          ref={inputRef}
+                          className="input-dark w-full"
+                          style={{ fontSize: '13px', paddingRight: '44px', paddingLeft: '14px', borderRadius: '10px' }}
+                          placeholder={speechSupported ? 'Type or tap mic to speak...' : 'Type your message...'}
+                          value={inputText}
+                          onChange={e => setInputText(e.target.value)}
+                          onKeyDown={handleKeyDown}
+                          disabled={isThinking}
+                        />
+                      </div>
+                      <button
+                        onClick={() => sendMessage(inputText)}
+                        disabled={!inputText.trim() || isThinking}
+                        className="btn btn-primary flex-shrink-0"
+                        style={{ padding: '10px 16px', borderRadius: '10px' }}
+                      >
+                        {isThinking
+                          ? <Loader2 size={15} className="animate-spin" />
+                          : <Send size={15} />
+                        }
+                      </button>
+                    </>
+                  )}
+
+                  {/* Stop speaking */}
+                  {isSpeaking && (
+                    <button
+                      onClick={stopSpeaking}
+                      className="flex-shrink-0 btn btn-secondary"
+                      style={{ padding: '10px 12px', borderRadius: '10px' }}
+                      title="Stop speaking"
+                    >
+                      <Square size={13} style={{ color: '#a78bfa' }} />
+                    </button>
+                  )}
+                </div>
+                
+                {/* Footer hint */}
+                <div className="flex items-center justify-between mt-2.5 px-1">
+                  <div className="text-[10px]" style={{ color: 'rgb(70,75,95)' }}>
+                    {speechSupported
+                      ? 'Tap mic → speak → tap again to send  ·  or type and press Enter'
+                      : 'Type your message and press Enter'}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px]" style={{ color: 'rgb(70,75,95)' }}>
+                    <Sparkles size={9} style={{ color: '#a78bfa' }} />
+                    GPT-4o · Nova voice
                   </div>
                 </div>
-              )}
-
-              {/* Live interim transcript */}
-              {isListening && transcript && (
-                <div className="flex gap-3 justify-end">
-                  <div className="max-w-[70%] px-4 py-3 rounded-2xl rounded-br-md text-[13px] italic"
-                    style={{
-                      background: 'rgba(124,58,237,0.1)',
-                      border: '1px dashed rgba(124,58,237,0.3)',
-                      color: 'rgba(167,139,250,0.7)',
-                    }}>
-                    {transcript}
-                  </div>
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
+              </div>
             </div>
 
-            {/* ── Bottom Controls ──────────────────────────── */}
-            <div style={{
-              padding: '16px 32px 20px',
-              background: 'rgba(10,11,16,0.95)',
-              borderTop: '1px solid rgba(255,255,255,0.055)',
-              flexShrink: 0,
-            }}>
-              {/* Extraction result banner */}
+            {/* ── Right: Context Panel (2/5) ───────────────── */}
+            <div className="lg:col-span-2 flex flex-col gap-5 overflow-y-auto pr-1">
+              
+              {/* Extract Insights Alert (if extracted) */}
               {extractResult && !extractResult.error && (
                 <div
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl mb-4"
+                  className="flex items-start gap-3 p-4 rounded-xl"
                   style={{ background: 'rgba(52,211,153,0.07)', border: '1px solid rgba(52,211,153,0.2)' }}
                 >
-                  <CheckCircle size={14} style={{ color: '#34d399', flexShrink: 0 }} />
+                  <CheckCircle size={15} style={{ color: '#34d399', flexShrink: 0, marginTop: 2 }} />
                   <div className="flex-1 min-w-0">
-                    <span className="text-[12px] font-semibold" style={{ color: '#34d399' }}>
-                      Insights extracted — {extractResult.rules_created} rules · {extractResult.sources_created} sources
-                    </span>
-                    {extractResult.knowledge_title && (
-                      <span className="text-[11px] ml-2" style={{ color: 'rgb(100,106,135)' }}>
-                        → {extractResult.knowledge_title}
-                      </span>
-                    )}
+                    <div className="text-[12px] font-semibold mb-1" style={{ color: '#34d399' }}>
+                      Insights extracted
+                    </div>
+                    <div className="text-[11px]" style={{ color: 'rgb(140,145,175)' }}>
+                      Created {extractResult.rules_created} rules & {extractResult.sources_created} sources.
+                      {extractResult.knowledge_title && <span className="block mt-0.5" style={{ color: 'rgb(100,106,135)' }}>→ {extractResult.knowledge_title}</span>}
+                    </div>
                   </div>
-                  <button onClick={() => setExtractResult(null)}>
+                  <button onClick={() => setExtractResult(null)} className="p-1 hover:bg-white/10 rounded">
                     <X size={13} style={{ color: 'rgb(100,106,135)' }} />
                   </button>
                 </div>
               )}
 
-              <div className="flex items-center gap-3">
-
-                {/* Mic button */}
-                {speechSupported && (
-                  <button
-                    onClick={toggleListening}
-                    disabled={isThinking}
-                    className="flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-200"
-                    style={{
-                      background: isListening
-                        ? 'linear-gradient(135deg, #dc2626, #b91c1c)'
-                        : 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(79,70,229,0.25))',
-                      border: `1px solid ${isListening ? 'rgba(220,38,38,0.5)' : 'rgba(124,58,237,0.4)'}`,
-                    }}
-                    title={isListening ? 'Stop listening' : 'Tap to speak'}
-                  >
-                    {isListening
-                      ? <Square size={16} color="white" />
-                      : <Mic size={18} color="#a78bfa" />
-                    }
-                  </button>
-                )}
-
-                {/* Listening indicator */}
-                {isListening && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
-                    style={{ background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.2)' }}>
-                    <div className="w-2 h-2 rounded-full bg-red-500 status-pulse" />
-                    <WaveformBars active color="#ef4444" />
-                    <span className="text-[11px] font-semibold" style={{ color: '#ef4444' }}>Listening...</span>
+              {/* Current Session */}
+              <div className="section-card">
+                <div className="section-card-header">
+                  <div className="flex items-center gap-2">
+                    <History size={14} style={{ color: 'rgb(130,135,165)' }} />
+                    <span className="text-[13px] font-semibold text-white">Current Session</span>
                   </div>
-                )}
-
-                {/* Text input */}
-                {!isListening && (
-                  <>
-                    <div className="flex-1 relative">
-                      <input
-                        ref={inputRef}
-                        className="input-dark w-full"
-                        style={{ fontSize: '13px', paddingRight: '44px', paddingLeft: '14px' }}
-                        placeholder={speechSupported ? 'Type or tap mic to speak...' : 'Type your message...'}
-                        value={inputText}
-                        onChange={e => setInputText(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        disabled={isThinking}
-                      />
+                </div>
+                
+                <div className="p-5">
+                  {currentSession ? (
+                    <div className="mb-4">
+                      <div className="text-[13px] font-semibold text-white mb-1.5">{currentSession.title}</div>
+                      <div className="text-[11px] flex items-center gap-2" style={{ color: 'rgb(100,106,135)' }}>
+                        <MessageSquare size={10} />{messages.length} messages
+                        <Clock size={10} />{formatDate(currentSession.created_at)}
+                      </div>
+                      {currentSession.knowledge_extracted && (
+                        <div className="mt-2.5 flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: '#34d399' }}>
+                          <CheckCircle size={11} /> Insights already extracted
+                        </div>
+                      )}
                     </div>
-                    <button
-                      onClick={() => sendMessage(inputText)}
-                      disabled={!inputText.trim() || isThinking}
-                      className="btn btn-primary flex-shrink-0"
-                      style={{ padding: '11px 16px' }}
-                    >
-                      {isThinking
-                        ? <Loader2 size={15} className="animate-spin" />
-                        : <Send size={15} />
-                      }
-                    </button>
-                  </>
-                )}
-
-                {/* Stop speaking */}
-                {isSpeaking && (
-                  <button
-                    onClick={stopSpeaking}
-                    className="flex-shrink-0 btn btn-secondary"
-                    style={{ padding: '11px 12px' }}
-                    title="Stop speaking"
-                  >
-                    <Square size={13} style={{ color: '#a78bfa' }} />
-                  </button>
-                )}
-              </div>
-
-              {/* Footer hint */}
-              <div className="flex items-center justify-between mt-2.5">
-                <div className="text-[11px]" style={{ color: 'rgb(70,75,95)' }}>
-                  {speechSupported
-                    ? 'Tap mic → speak → tap again to send  ·  or type and press Enter'
-                    : 'Type your message and press Enter'}
-                </div>
-                <div className="flex items-center gap-1.5 text-[11px]" style={{ color: 'rgb(70,75,95)' }}>
-                  <Sparkles size={10} style={{ color: '#a78bfa' }} />
-                  GPT-4o · Nova voice
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Right: Session Context Panel ─────────────── */}
-          <div
-            style={{
-              width: '280px',
-              flexShrink: 0,
-              borderLeft: '1px solid rgba(255,255,255,0.055)',
-              background: 'rgba(15,16,24,0.8)',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            {/* Session info */}
-            <div className="p-5 border-b" style={{ borderColor: 'rgba(255,255,255,0.055)' }}>
-              <div className="text-[11px] font-bold tracking-widest uppercase mb-3" style={{ color: 'rgb(100,106,135)' }}>
-                Current Session
-              </div>
-              {currentSession ? (
-                <div>
-                  <div className="text-[13px] font-semibold text-white mb-1">{currentSession.title}</div>
-                  <div className="text-[11px] flex items-center gap-2" style={{ color: 'rgb(100,106,135)' }}>
-                    <MessageSquare size={10} />{messages.length} messages
-                    <Clock size={10} />{formatDate(currentSession.created_at)}
-                  </div>
-                  {currentSession.knowledge_extracted && (
-                    <div className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: '#34d399' }}>
-                      <CheckCircle size={11} /> Insights already extracted
+                  ) : (
+                    <div className="text-[12px] mb-4" style={{ color: 'rgb(100,106,135)' }}>
+                      No session yet — start talking to begin
                     </div>
                   )}
+
+                  {/* Extract Button */}
+                  <button
+                    onClick={extractInsights}
+                    disabled={isExtracting || !currentSession || messages.length < 2}
+                    className="btn w-full justify-center"
+                    style={{
+                      padding: '10px 14px',
+                      fontSize: '12px',
+                      background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(52,211,153,0.1))',
+                      border: '1px solid rgba(124,58,237,0.3)',
+                      color: '#a78bfa',
+                      opacity: (!currentSession || messages.length < 2) ? 0.4 : 1,
+                    }}
+                  >
+                    {isExtracting
+                      ? <><Loader2 size={13} className="animate-spin" />Extracting...</>
+                      : <><Download size={13} />Extract Insights from Chat</>
+                    }
+                  </button>
+                  <div className="text-[10px] mt-2 text-center" style={{ color: 'rgb(90,95,115)' }}>
+                    Summarizes conversation and creates persistent memory rules
+                  </div>
                 </div>
-              ) : (
-                <div className="text-[12px]" style={{ color: 'rgb(100,106,135)' }}>
-                  No session yet — start talking to begin
+              </div>
+
+              {/* Extracted Details */}
+              {extractResult && !extractResult.error && (
+                <div className="section-card">
+                  <div className="p-5">
+                    <div className="text-[11px] font-bold tracking-widest uppercase mb-2.5" style={{ color: 'rgb(100,106,135)' }}>
+                      Extraction Details
+                    </div>
+                    <div className="text-[12px] leading-relaxed mb-3" style={{ color: 'rgb(140,145,175)' }}>
+                      {extractResult.summary}
+                    </div>
+                    {extractResult.feedback_points?.length > 0 && (
+                      <div className="space-y-1.5">
+                        {extractResult.feedback_points.map((p, i) => (
+                          <div key={i} className="flex items-start gap-2 text-[11px]" style={{ color: 'rgb(120,125,155)' }}>
+                            <span className="mt-0.5" style={{ color: '#34d399' }}>›</span>{p}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
-            </div>
 
-            {/* Extract insights CTA */}
-            <div className="p-4 border-b" style={{ borderColor: 'rgba(255,255,255,0.055)' }}>
-              <button
-                onClick={extractInsights}
-                disabled={isExtracting || !currentSession || messages.length < 2}
-                className="btn w-full justify-center"
-                style={{
-                  padding: '10px 14px',
-                  fontSize: '12px',
-                  background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(52,211,153,0.1))',
-                  border: '1px solid rgba(124,58,237,0.3)',
-                  color: '#a78bfa',
-                  opacity: (!currentSession || messages.length < 2) ? 0.4 : 1,
-                }}
-              >
-                {isExtracting
-                  ? <><Loader2 size={13} className="animate-spin" />Extracting...</>
-                  : <><Download size={13} />Extract Insights</>
-                }
-              </button>
-              <div className="text-[10px] mt-1.5 text-center" style={{ color: 'rgb(70,75,95)' }}>
-                Saves session to agent memory & creates rules
-              </div>
-            </div>
-
-            {/* Extraction result */}
-            {extractResult && !extractResult.error && (
-              <div className="p-4 border-b" style={{ borderColor: 'rgba(255,255,255,0.055)' }}>
-                <div className="text-[11px] font-bold tracking-widest uppercase mb-2" style={{ color: 'rgb(100,106,135)' }}>
-                  Extracted
-                </div>
-                <div className="text-[12px] leading-relaxed mb-2" style={{ color: 'rgb(140,145,175)' }}>
-                  {extractResult.summary?.slice(0, 180)}
-                </div>
-                {extractResult.feedback_points?.slice(0, 3).map((p, i) => (
-                  <div key={i} className="flex items-start gap-1.5 text-[11px] mb-1" style={{ color: 'rgb(120,125,155)' }}>
-                    <span style={{ color: '#34d399' }}>›</span>{p}
+              {/* Agent Context Stats */}
+              <div className="section-card">
+                <div className="section-card-header">
+                  <div className="flex items-center gap-2">
+                    <Brain size={14} style={{ color: 'rgb(130,135,165)' }} />
+                    <span className="text-[13px] font-semibold text-white">Agent Context</span>
                   </div>
-                ))}
-              </div>
-            )}
-
-            {/* Stats */}
-            <div className="p-4 space-y-3">
-              <div className="text-[11px] font-bold tracking-widest uppercase" style={{ color: 'rgb(100,106,135)' }}>
-                Agent Context
-              </div>
-              {[
-                { icon: Brain,    label: 'Knowledge entries',  color: '#a78bfa' },
-                { icon: Zap,      label: 'Active rules',       color: '#34d399' },
-                { icon: BookOpen, label: 'Past sessions',      color: '#60a5fa' },
-              ].map(({ icon: Icon, label, color }, i) => (
-                <div key={i} className="flex items-center gap-2.5">
-                  <Icon size={13} style={{ color, flexShrink: 0 }} />
-                  <span className="text-[12px]" style={{ color: 'rgb(140,145,175)' }}>{label}</span>
-                  <span className="ml-auto text-[12px] font-bold tabular-nums" style={{ color }}>
-                    {i === 0 ? '—' : i === 1 ? '—' : sessions.length}
-                  </span>
                 </div>
-              ))}
+                <div className="p-5 space-y-3.5">
+                  {[
+                    { icon: BookOpen, label: 'Past sessions',      color: '#60a5fa', val: sessions.length },
+                    { icon: Brain,    label: 'Knowledge entries',  color: '#a78bfa', val: 'Full access' },
+                    { icon: Zap,      label: 'Active rules',       color: '#34d399', val: 'Loaded' },
+                  ].map(({ icon: Icon, label, color, val }, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: `rgba(255,255,255,0.03)` }}>
+                        <Icon size={12} style={{ color }} />
+                      </div>
+                      <span className="text-[12px]" style={{ color: 'rgb(140,145,175)' }}>{label}</span>
+                      <span className="ml-auto text-[12px] font-semibold" style={{ color }}>{val}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="p-4 bg-white/5 border-t border-white/5">
+                  <div className="text-[11px] font-bold tracking-widest uppercase mb-2" style={{ color: 'rgb(100,106,135)' }}>
+                    Tips
+                  </div>
+                  {[
+                    'Correct the agent when it\'s wrong — it learns',
+                    'Extract insights at the end of each session',
+                    'Resume any past session to continue context',
+                  ].map((tip, i) => (
+                    <div key={i} className="flex items-start gap-1.5 text-[11px] mb-1.5" style={{ color: 'rgb(90,95,115)' }}>
+                      <span style={{ color: 'rgb(90,95,115)', flexShrink: 0 }}>·</span>{tip}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
             </div>
 
-            {/* How to use tips */}
-            <div className="p-4 mt-auto border-t" style={{ borderColor: 'rgba(255,255,255,0.055)' }}>
-              <div className="text-[11px] font-bold tracking-widest uppercase mb-3" style={{ color: 'rgb(100,106,135)' }}>
-                Tips
-              </div>
-              {[
-                'Correct the agent when it\'s wrong — it learns',
-                'Discuss a lead in detail before extracting',
-                'Extract insights at the end of each session',
-                'Resume any past session to continue context',
-              ].map((tip, i) => (
-                <div key={i} className="flex items-start gap-1.5 text-[11px] mb-2" style={{ color: 'rgb(90,95,115)' }}>
-                  <span style={{ color: 'rgb(90,95,115)', flexShrink: 0 }}>·</span>{tip}
-                </div>
-              ))}
-            </div>
           </div>
-
         </div>
       </div>
     </>
