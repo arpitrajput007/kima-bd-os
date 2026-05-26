@@ -16,13 +16,14 @@ import {
   ChevronRight,
   Activity,
   BookOpen,
+  Mic,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
 const navGroups: {
   label: string
-  items: { href: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; glow?: boolean }[]
+  items: { href: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; glow?: boolean; voice?: boolean }[]
 }[] = [
 
   {
@@ -32,6 +33,7 @@ const navGroups: {
       { href: '/leads',        label: 'Lead Inbox',         icon: Inbox },
       { href: '/reports',      label: 'Weekly Reports',     icon: BarChart3 },
       { href: '/learn',        label: 'Make Agent Learn',   icon: BookOpen, glow: true },
+      { href: '/voice',        label: 'Voice Chat',         icon: Mic, voice: true },
     ],
   },
   {
@@ -104,7 +106,7 @@ export function Sidebar() {
             {collapsed && gi > 0 && (
               <div className="my-2 mx-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }} />
             )}
-            {group.items.map(({ href, label, icon: Icon, glow }) => {
+            {group.items.map(({ href, label, icon: Icon, glow, voice }) => {
               const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
               return (
                 <Link
@@ -116,6 +118,10 @@ export function Sidebar() {
                     background: 'rgba(124,58,237,0.08)',
                     borderColor: 'rgba(124,58,237,0.25)',
                     color: 'rgba(167,139,250,0.9)',
+                  } : voice && !isActive ? {
+                    background: 'rgba(52,211,153,0.06)',
+                    borderColor: 'rgba(52,211,153,0.2)',
+                    color: 'rgba(52,211,153,0.85)',
                   } : undefined}
                 >
                   <Icon size={15} className="flex-shrink-0" />
@@ -125,6 +131,9 @@ export function Sidebar() {
                       style={{ background: 'rgba(124,58,237,0.2)', color: '#a78bfa' }}>
                       AI
                     </span>
+                  )}
+                  {!collapsed && voice && !isActive && (
+                    <div className="ml-auto w-2 h-2 rounded-full status-pulse" style={{ background: '#34d399' }} />
                   )}
                   {!collapsed && isActive && (
                     <div className="ml-auto w-1 h-1 rounded-full" style={{ background: 'rgb(167,139,250)' }} />

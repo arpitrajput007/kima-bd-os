@@ -179,6 +179,26 @@ create table if not exists agent_knowledge (
   created_at timestamptz default now()
 );
 
+-- ============================================================
+-- VOICE CHAT TABLES (Voice conversations + memory)
+-- ============================================================
+create table if not exists voice_sessions (
+  id uuid primary key default gen_random_uuid(),
+  title text default 'New Conversation',
+  summary text,
+  message_count int default 0,
+  knowledge_extracted boolean default false,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists voice_messages (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid references voice_sessions(id) on delete cascade,
+  role text check (role in ('user', 'assistant')) not null,
+  content text not null,
+  created_at timestamptz default now()
+);
 
 -- ============================================================
 -- UPDATED_AT TRIGGER
@@ -214,6 +234,8 @@ alter table feedback_memory enable row level security;
 alter table agent_rules enable row level security;
 alter table learning_reports enable row level security;
 alter table agent_knowledge enable row level security;
+alter table voice_sessions enable row level security;
+alter table voice_messages enable row level security;
 
 
 -- Allow anon and authenticated users full access (no login required — private local tool)
@@ -225,6 +247,9 @@ create policy "anon_full_access_feedback" on feedback_memory for all to anon, au
 create policy "anon_full_access_rules" on agent_rules for all to anon, authenticated using (true) with check (true);
 create policy "anon_full_access_reports" on learning_reports for all to anon, authenticated using (true) with check (true);
 create policy "anon_full_access_knowledge" on agent_knowledge for all to anon, authenticated using (true) with check (true);
+create policy "anon_full_access_voice_sessions" on voice_sessions for all to anon, authenticated using (true) with check (true);
+create policy "anon_full_access_voice_messages" on voice_messages for all to anon, authenticated using (true) with check (true);
+
 
 
 -- ============================================================
