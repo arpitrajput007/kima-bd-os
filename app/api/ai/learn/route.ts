@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { FULL_BRAIN } from '@/lib/kima-knowledge'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -10,33 +11,7 @@ const supabase = createClient(
 )
 
 // Kima/Aeredium context for the AI synthesis
-const KIMA_CONTEXT = `
-KIMA: Universal settlement layer. Moves value across crypto and TradFi without bridges, wrapped assets, or smart contracts.
-Use cases: cross-chain deposits, fiat-to-crypto onboarding, stablecoin payments, cross-border settlement, treasury rebalancing, RWA delivery-versus-payment. Single API, free and instant.
-
-AEREDIUM: TEE-attested blockchain infra. MEV resistance, execution accountability, compliance-ready. Institutional-grade settlement.
-
-TARGET CUSTOMER CATEGORIES:
-1. LayerZero Customer — using LayerZero or similar cross-chain messaging
-2. Hacked Protocol — affected by bridge/smart contract/oracle exploits
-3. Needs On/Off Ramp — needing fiat<->crypto conversion
-4. Fireblocks Customer — using Fireblocks or similar custody infra
-5. Web2 Stablecoin Settlement Customer — traditional companies needing stablecoin rails
-
-OUR ICP:
-- PSPs and payment gateways needing stablecoin settlement
-- Cross-border fintechs (remittance, payroll, B2B payments)
-- DEXs/wallets looking for cross-chain settlement or on/off-ramp
-- Recently hacked protocols (bridge/oracle/relayer exploits)
-- RWA platforms needing delivery-versus-payment settlement
-- iGaming platforms with high cross-border payment volume
-- Web2 companies with SWIFT/wire transfer friction (exporters, neobanks)
-- Companies in UAE-India, EU-India, US-India payment corridors
-
-WE SELL:
-- Cross-chain settlement, Stablecoin settlement, Fiat on/off-ramp, Treasury movement
-- DvP settlement, iGaming payments, RWA settlement, PSP settlement
-- Wallet onboarding, Launchpad participation, Payment orchestration
+const KIMA_CONTEXT = `${FULL_BRAIN}
 
 RULE TYPES WE USE:
 - prioritize: Companies/signals that should be prioritized

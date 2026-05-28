@@ -17,6 +17,7 @@ import {
   Activity,
   BookOpen,
   Mic,
+  Sun,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -29,6 +30,7 @@ const navGroups: {
   {
     label: 'Intelligence',
     items: [
+      { href: '/today',        label: "Today's Plan",       icon: Sun },
       { href: '/dashboard',    label: 'BD Command Center', icon: LayoutDashboard },
       { href: '/leads',        label: 'Lead Inbox',         icon: Inbox },
       { href: '/reports',      label: 'Weekly Reports',     icon: BarChart3 },

@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { PRODUCT_BRAIN } from '@/lib/kima-knowledge'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -26,7 +27,9 @@ export async function POST(req: NextRequest) {
 
   const reportPeriod = body.period || 'last_7_days'
 
-  const systemPrompt = `You are analyzing BD performance data for Kima/Aeredium and generating a learning report. Be specific and actionable.`
+  const systemPrompt = `You are analyzing BD performance data for Kima/Aeredium and generating a learning report. Be specific and actionable.
+
+${PRODUCT_BRAIN}`
 
   const userPrompt = `Generate a weekly BD learning report based on this data:
 

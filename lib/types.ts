@@ -84,6 +84,7 @@ export const INDUSTRY_CATEGORIES = [
 ] as const
 
 export const CUSTOMER_CATEGORIES = [
+  'Agentic Payments Customer',
   'LayerZero Customer',
   'Hacked Protocol',
   'Needs On/Off Ramp',
@@ -93,6 +94,7 @@ export const CUSTOMER_CATEGORIES = [
 ] as const
 
 export const PRODUCTS_TO_SELL = [
+  'Agentic payment rails',
   'Cross-chain settlement',
   'Stablecoin settlement',
   'Fiat on/off-ramp',

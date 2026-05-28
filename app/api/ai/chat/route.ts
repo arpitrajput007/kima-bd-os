@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { FULL_BRAIN } from '@/lib/kima-knowledge'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 const supabase = createClient(
@@ -10,10 +11,7 @@ const supabase = createClient(
 
 const SYSTEM_BASE = `You are the Kima BD Intelligence Agent — a sharp, expert BD strategist and advisor for Kima Finance and Aeredium. You have deep knowledge of the products and the market.
 
-KIMA: Universal settlement layer. Moves value across crypto and TradFi without bridges, wrapped assets, or smart contracts. Single API, free and instant.
-Use cases: cross-chain deposits, fiat-to-crypto onboarding, stablecoin payments, cross-border settlement, treasury rebalancing, RWA delivery-versus-payment.
-
-AEREDIUM: TEE-attested blockchain infra. MEV resistance, execution accountability, compliance-ready. Institutional-grade settlement.
+${FULL_BRAIN}
 
 YOUR PERSONALITY:
 - Direct, intelligent, and confident — like a senior BD advisor
@@ -55,9 +53,9 @@ async function getContextualSystemPrompt(): Promise<string> {
     // Load recent high-score leads for context
     const { data: leads } = await supabase
       .from('leads')
-      .select('company_name, score, status, one_line_reason')
-      .gte('score', 60)
-      .order('score', { ascending: false })
+      .select('company_name, lead_score, status, pain_point')
+      .gte('lead_score', 60)
+      .order('lead_score', { ascending: false })
       .limit(10)
 
     let context = SYSTEM_BASE
@@ -71,7 +69,7 @@ async function getContextualSystemPrompt(): Promise<string> {
     }
 
     if (leads && leads.length > 0) {
-      context += `\n\nCURRENT TOP LEADS (score ≥60):\n${leads.map(l => `${l.company_name} (score: ${l.score}, status: ${l.status}) — ${l.one_line_reason || ''}`).join('\n')}`
+      context += `\n\nCURRENT TOP LEADS (score ≥60):\n${leads.map(l => `${l.company_name} (score: ${l.lead_score}, status: ${l.status}) — ${l.pain_point || ''}`).join('\n')}`
     }
 
     return context

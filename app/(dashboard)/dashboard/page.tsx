@@ -13,6 +13,7 @@ import Link from 'next/link'
 import type { Lead } from '@/lib/types'
 
 const CUSTOMER_CATEGORIES = [
+  { label: 'Agentic Payments Customer',           color: '#f472b6', bar: 'rgba(244,114,182,0.7)' },
   { label: 'LayerZero Customer',                  color: '#60a5fa', bar: 'rgba(96,165,250,0.7)'  },
   { label: 'Hacked Protocol',                     color: '#f87171', bar: 'rgba(248,113,113,0.7)' },
   { label: 'Needs On/Off Ramp',                   color: '#34d399', bar: 'rgba(52,211,153,0.7)'  },
@@ -203,7 +204,7 @@ export default function DashboardPage() {
               Manage Sources →
             </Link>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
             {CUSTOMER_CATEGORIES.map(({ label, color, bar }, i) => {
               const count = categoryCounts[label] || 0
               const pct = Math.min((count / CATEGORY_CAP) * 100, 100)

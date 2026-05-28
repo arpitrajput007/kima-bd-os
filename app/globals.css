@@ -333,6 +333,24 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+/* ─── Contact chip (Today's Plan) ────────────────────── */
+.contact-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  color: rgb(167,139,250);
+  background: rgba(124,58,237,0.1);
+  border: 1px solid rgba(124,58,237,0.2);
+  transition: all 0.15s ease;
+}
+.contact-chip:hover {
+  background: rgba(124,58,237,0.2);
+  color: #c4b5fd;
+}
+
 /* ─── Divider ────────────────────────────────────────── */
 .divider { border: none; border-top: 1px solid var(--border); margin: 0; }
 

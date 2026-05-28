@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
+import { PRODUCT_BRAIN, SINGLE_API_LINE } from '@/lib/kima-knowledge'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -40,8 +41,7 @@ export async function POST(req: NextRequest) {
 
   const systemPrompt = `You are writing BD outreach messages for Arpit, who leads BD/partnerships for Kima and Aeredium.
 
-KIMA: Universal settlement layer. Cross-chain value movement without bridges, wrapped assets, or smart contracts. Single API, free integration.
-AEREDIUM: TEE-attested blockchain. MEV resistance, execution accountability, compliance-ready.
+${PRODUCT_BRAIN}
 
 ARPIT'S STYLE:
 - Human, direct, sharp
@@ -51,7 +51,7 @@ ARPIT'S STYLE:
 - Confident but not pushy
 - Always personalizes to their specific situation
 
-ALWAYS include this line naturally: "All of this is possible with a single API integration, which is completely free, instant, and hassle-free."
+ALWAYS include this line naturally: "${SINGLE_API_LINE}"
 
 MESSAGE STRUCTURE:
 1. Personal opener based on their company/product

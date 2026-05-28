@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { PRODUCT_BRAIN, PRODUCT_BRAIN_COMPACT } from '@/lib/kima-knowledge'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -29,6 +30,7 @@ const supabase = createClient(
 )
 
 const CUSTOMER_CATEGORIES = [
+  'Agentic Payments Customer',
   'LayerZero Customer',
   'Hacked Protocol',
   'Needs On/Off Ramp',
@@ -89,9 +91,12 @@ async function extractCompanies(
       messages: [
         {
           role: 'system',
-          content: `You are a BD researcher for Kima (cross-chain settlement infra) and Aeredium (TEE blockchain infra).
+          content: `You are a BD researcher for Kima and Aeredium.
+
+${PRODUCT_BRAIN_COMPACT}
+
 Extract companies from web content that could be B2B customers for payment/settlement infrastructure.
-Focus on: DeFi protocols, wallets, exchanges, payment companies, fintechs, neobanks, cross-border payment companies, stablecoin issuers, RWA platforms.
+Focus on: AI agent / agentic-commerce builders, DeFi protocols, wallets, exchanges, payment companies, fintechs, neobanks, cross-border payment companies, stablecoin issuers, RWA platforms, banks/institutions.
 Return ONLY valid JSON. No markdown.`,
         },
         {
@@ -170,17 +175,7 @@ async function deepResearch(
           role: 'system',
           content: `You are a senior BD researcher for Kima and Aeredium.
 
-KIMA: Universal settlement layer. Moves value across crypto and TradFi without bridges, wrapped assets, or smart contracts.
-Use cases: cross-chain deposits, fiat-to-crypto onboarding, stablecoin payments, cross-border settlement, treasury rebalancing, RWA delivery-versus-payment. Single API, free and instant.
-
-AEREDIUM: TEE-attested blockchain infra. MEV resistance, execution accountability, compliance-ready. Institutional-grade settlement.
-
-TARGET CUSTOMER CATEGORIES:
-1. LayerZero Customer — using LayerZero or similar cross-chain messaging
-2. Hacked Protocol — affected by bridge/smart contract/oracle exploits
-3. Needs On/Off Ramp — needing fiat<->crypto conversion
-4. Fireblocks Customer — using Fireblocks or similar custody infra
-5. Web2 Stablecoin Settlement Customer — traditional companies needing stablecoin rails
+${PRODUCT_BRAIN}
 
 SCORING (0-100):
 High score (70+): clear pain point, active product, matches a target category, decision maker findable
@@ -200,7 +195,7 @@ Description: ${company.description}${hunterContext}
 Return this exact JSON:
 {
   "industry_category": "one industry category",
-  "customer_category": ["array — pick from: LayerZero Customer, Hacked Protocol, Needs On/Off Ramp, Fireblocks Customer, Web2 Stablecoin Settlement Customer, Other"],
+  "customer_category": ["array — pick from: Agentic Payments Customer, LayerZero Customer, Hacked Protocol, Needs On/Off Ramp, Fireblocks Customer, Web2 Stablecoin Settlement Customer, Other"],
   "product_to_sell": "best Kima product pitch for this company",
   "region": "their primary market region",
   "company_summary": "2-3 sentence summary of what they do",

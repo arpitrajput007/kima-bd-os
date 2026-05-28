@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
+import { PRODUCT_BRAIN } from '@/lib/kima-knowledge'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -31,16 +32,7 @@ export async function POST(req: NextRequest) {
 
   const systemPrompt = `You are a senior BD researcher for Kima and Aeredium — financial infrastructure companies.
 
-KIMA: Universal settlement and interoperability layer. Moves value across crypto and traditional finance without bridges, wrapped assets, or smart contracts. Key use cases: cross-chain deposits, fiat-to-crypto onboarding, crypto-to-fiat settlement, stablecoin payments, cross-border settlement, treasury rebalancing, RWA delivery-versus-payment. Single API integration, free and instant.
-
-AEREDIUM: TEE-attested blockchain infrastructure. MEV resistance, execution accountability, compliance-ready design. Institutional-grade settlement.
-
-TARGET CUSTOMER CATEGORIES:
-1. LayerZero Customers - projects using LayerZero or similar cross-chain messaging
-2. Hacked Protocols - projects affected by bridge/smart contract/oracle exploits
-3. Needs On/Off Ramp - companies needing fiat<->crypto conversion
-4. Fireblocks Customers - companies using Fireblocks or similar custody infrastructure
-5. Web2 Stablecoin Settlement - traditional companies needing stablecoin settlement rails
+${PRODUCT_BRAIN}
 
 Always respond with valid JSON only. No markdown, no prose outside JSON.
 Always separate FACTS (verified) from ASSUMPTIONS (inferred).
@@ -125,8 +117,8 @@ Description: ${description || 'unknown'}
 Return JSON:
 {
   "industry_category": "One of: Cross-border payment company, PSP/payment gateway, On/off-ramp provider, Stablecoin payment company, Wallet, DEX, Perp DEX, Launchpad, RWA platform, iGaming/payment-heavy platform, Neobank, Fintech, Exchange, Chain ecosystem, AI commerce/payment agent, Treasury management platform, Custody/payment infrastructure company, Web2 company with payment/settlement friction, Other",
-  "customer_category": ["Array of: LayerZero Customer, Hacked Protocol, Needs On/Off Ramp, Fireblocks Customer, Web2 Stablecoin Settlement Customer, Other"],
-  "product_to_sell": "One of: Cross-chain settlement, Stablecoin settlement, Fiat on/off-ramp, Treasury movement, DvP settlement, iGaming payments, RWA settlement, PSP settlement, Wallet onboarding, Launchpad participation, Payment orchestration, Cross-border USDT/USDC settlement",
+  "customer_category": ["Array of: Agentic Payments Customer, LayerZero Customer, Hacked Protocol, Needs On/Off Ramp, Fireblocks Customer, Web2 Stablecoin Settlement Customer, Other"],
+  "product_to_sell": "One of: Agentic payment rails, Cross-chain settlement, Stablecoin settlement, Fiat on/off-ramp, Treasury movement, DvP settlement, iGaming payments, RWA settlement, PSP settlement, Wallet onboarding, Launchpad participation, Payment orchestration, Cross-border USDT/USDC settlement",
   "region": "Their primary market region",
   "classification_reasoning": "Why you classified them this way"
 }`
@@ -139,7 +131,7 @@ Description: ${description || 'unknown'}
 
 SCORING SYSTEM:
 Base scores: pain_point (25), traction (20), contact_found (15), trigger (15), category_fit (10), integration_feasibility (10), revenue_potential (5)
-Boosts: LayerZero+real_value (+20), Hacked_protocol+bridge_exploit (+25), needs_ramp (+15), fireblocks_customer (+15), web2_stablecoin (+25), recent_trigger (+15), decision_maker_found (+15)
+Boosts: agentic_payments_fit (+25), LayerZero+real_value (+20), Hacked_protocol+bridge_exploit (+25), needs_ramp (+15), fireblocks_customer (+15), web2_stablecoin (+25), recent_trigger (+15), decision_maker_found (+15)
 Penalties: no_pain_point (-25), no_active_product (-20), no_decision_maker (-15), nft_only (-30), no_source_proof (-30), generic_web3_only (-25)
 
 Return JSON:
