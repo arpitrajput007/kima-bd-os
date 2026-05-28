@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import {
   cn, getScoreBg, getStatusColor, getStatusLabel, getSeverityColor,
-  getConfidenceColor, formatDate
+  getConfidenceColor, formatDate, isHttpUrl, pickBestUrl
 } from '@/lib/utils'
 import type { Lead, Contact, OutreachMessage } from '@/lib/types'
 import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL, REGIONS } from '@/lib/types'
@@ -113,9 +113,9 @@ function FindingCard({ icon: Icon, title, subtitle, body, rightLabel, rightValue
   return (
     <div style={{ borderRadius: 16, border: C.border, background: C.cardBg, boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
       {/* row */}
-      <button onClick={onToggle} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '18px 20px', display: 'grid', gridTemplateColumns: '1fr auto 24px', gap: 20, alignItems: 'center', borderBottom: expanded ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+      <div style={{ width: '100%', padding: '18px 20px', display: 'grid', gridTemplateColumns: '1fr auto 24px', gap: 20, alignItems: 'center', borderBottom: expanded ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
         {/* left */}
-        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', textAlign: 'left' }}>
+        <div onClick={onToggle} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', textAlign: 'left', cursor: 'pointer' }}>
           <div style={{ width: 48, height: 48, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, ...iconBg[pillVariant] }}>
             <Icon size={22} />
           </div>
@@ -129,10 +129,18 @@ function FindingCard({ icon: Icon, title, subtitle, body, rightLabel, rightValue
         <div style={{ minWidth: 200 }}>
           {rightLabel && <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.22em', color: 'rgb(100,107,140)', marginBottom: 8 }}>{rightLabel}</p>}
           {rightValue && (
-            <p style={{ fontSize: 13, color: 'rgb(96,165,250)', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rightValue}</span>
-              <ExternalLink size={13} />
-            </p>
+            isHttpUrl(rightValue) ? (
+              <a href={rightValue} target="_blank" rel="noopener noreferrer" title={rightValue}
+                style={{ fontSize: 13, color: 'rgb(96,165,250)', display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
+                <span style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rightValue}</span>
+                <ExternalLink size={13} style={{ flexShrink: 0 }} />
+              </a>
+            ) : (
+              <p style={{ fontSize: 13, color: 'rgb(96,165,250)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rightValue}</span>
+                <ExternalLink size={13} />
+              </p>
+            )
           )}
           {pill && (
             <span style={{ display: 'inline-flex', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 500, ...pillSty[pillVariant] }}>
@@ -141,8 +149,10 @@ function FindingCard({ icon: Icon, title, subtitle, body, rightLabel, rightValue
           )}
         </div>
         {/* chevron */}
-        {expanded ? <ChevronUp size={18} color="rgb(100,107,140)" /> : <ChevronDown size={18} color="rgb(100,107,140)" />}
-      </button>
+        <div onClick={onToggle} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {expanded ? <ChevronUp size={18} color="rgb(100,107,140)" /> : <ChevronDown size={18} color="rgb(100,107,140)" />}
+        </div>
+      </div>
       {/* expanded body */}
       {expanded && children && (
         <div style={{ padding: '20px 24px' }}>{children}</div>
@@ -353,6 +363,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
       if (action === 'research') {
+        const bestSource = pickBestUrl([...(json.data.source_urls || []), lead.website])
         await supabase.from('leads').update({
           description: json.data.company_summary || lead.description,
           business_model: json.data.business_model, product_summary: json.data.product_summary,
@@ -360,6 +371,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           current_providers: json.data.current_providers, trigger_reason: json.data.trigger_reason,
           facts: json.data.facts?.map((f: string) => ({ text: f })) || [],
           assumptions: json.data.assumptions?.map((a: string) => ({ text: a })) || [],
+          ...(bestSource ? { source_url: bestSource } : {}),
           updated_at: new Date().toISOString()
         }).eq('id', id); loadLead()
       } else if (action === 'classify') {

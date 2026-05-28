@@ -57,7 +57,7 @@ Return JSON with this exact structure:
   "facts": ["fact1", "fact2"],
   "assumptions": ["assumption1", "assumption2"],
   "trigger_reason": "Why is this a good time to reach out? Recent news, funding, expansion, hack, etc.",
-  "source_urls": ["url1", "url2"]
+  "source_urls": ["exact, specific page URLs (article/news/funding post) that evidence the trigger — full links to specific pages, NOT homepages"]
 }`
 
     } else if (action === 'pain_points') {

@@ -2,6 +2,7 @@ import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { PRODUCT_BRAIN, PRODUCT_BRAIN_COMPACT } from '@/lib/kima-knowledge'
+import { pickBestUrl } from '@/lib/utils'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -209,6 +210,7 @@ Return this exact JSON:
   "suggested_use_case": "specific Kima use case to pitch",
   "aeredium_fit": "how Aeredium strengthens the pitch",
   "trigger_reason": "why is NOW a good time to reach out? funding, expansion, hack, etc.",
+  "source_url": "the exact, specific URL (news article, funding announcement, blog post, tweet) that best evidences the trigger_reason — must be a full link to a specific page, NOT a homepage. Use null if you don't have a specific real URL.",
   "settlement_angle": "how Kima improves their settlement",
   "integration_feasibility": "high|medium|low",
   "revenue_potential": "estimated business impact for them",
@@ -382,7 +384,11 @@ export async function POST(req: NextRequest) {
           revenue_potential: research.revenue_potential,
           lead_score: research.lead_score,
           priority: research.priority,
-          source_url: source.source_url_or_query,
+          source_url: pickBestUrl([
+            research.source_url as string,
+            source.source_url_or_query,
+            company.website,
+          ]) || source.source_url_or_query,
           status: 'new',
         })
         .select('id')

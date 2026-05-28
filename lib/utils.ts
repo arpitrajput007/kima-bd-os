@@ -106,6 +106,27 @@ export function truncate(str: string, maxLength: number): string {
   return str.slice(0, maxLength) + '...'
 }
 
+export function isHttpUrl(v?: string | null): boolean {
+  return !!v && /^https?:\/\//i.test(v.trim())
+}
+
+// True when the URL points to a specific page, not just a domain root.
+function urlHasPath(v: string): boolean {
+  try {
+    const u = new URL(v.trim())
+    return u.pathname.replace(/\/+$/, '').length > 0
+  } catch {
+    return false
+  }
+}
+
+// Pick the most specific source link: prefer a real URL with a path
+// (article/post), then any http(s) URL, else null.
+export function pickBestUrl(candidates: (string | null | undefined)[]): string | null {
+  const urls = candidates.filter(isHttpUrl).map(c => (c as string).trim())
+  return urls.find(urlHasPath) || urls[0] || null
+}
+
 export function getRuleTypeColor(type: string): string {
   switch (type) {
     case 'prioritize': return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
