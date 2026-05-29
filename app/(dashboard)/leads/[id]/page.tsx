@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, use } from 'react'
+import { useEffect, useState, use, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -94,7 +94,7 @@ function TagBadge({ label, variant = 'gray' }: { label: string; variant?: 'purpl
 
 function ActionBtn({ icon: Icon, label, variant = 'default', onClick, disabled, href }: {
   icon: React.ComponentType<{ size?: number; color?: string; style?: React.CSSProperties }>; label: string
-  variant?: 'default' | 'green' | 'red' | 'purple'
+  variant?: 'default' | 'green' | 'red' | 'purple' | 'cyan'
   onClick?: () => void; disabled?: boolean; href?: string
 }) {
   const styles: Record<string, React.CSSProperties> = {
@@ -102,6 +102,7 @@ function ActionBtn({ icon: Icon, label, variant = 'default', onClick, disabled, 
     green:   { border: '1px solid rgba(52,211,153,0.3)',  background: 'rgba(52,211,153,0.1)',   color: 'rgb(110,231,183)' },
     red:     { border: '1px solid rgba(248,113,133,0.3)', background: 'rgba(248,113,133,0.1)',  color: 'rgb(252,165,165)' },
     purple:  { border: '1px solid rgba(168,85,247,0.4)',  background: 'rgba(168,85,247,0.13)',  color: 'rgb(196,167,252)' },
+    cyan:    { border: '1px solid rgba(34,211,238,0.4)',  background: 'rgba(34,211,238,0.12)',  color: 'rgb(103,232,249)' },
   }
   const base: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -330,6 +331,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [editForm, setEditForm] = useState<Partial<Lead>>({})
   const [saving, setSaving] = useState(false)
   const [aiAction, setAiAction] = useState<AIAction>(null)
+  const [discussOpen, setDiscussOpen] = useState(false)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     overview: true, research: true, pain: true, kima: true,
     aeredium: true, contacts: true, outreach: true, feedback: false
@@ -533,6 +535,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               {lead.status === 'approved' && (
                 <ActionBtn icon={Send} label="Mark Contacted" onClick={() => updateStatus('contacted')} />
               )}
+              <ActionBtn icon={Brain} label="Discuss Lead" variant="cyan" onClick={() => setDiscussOpen(true)} />
               <ActionBtn icon={MessageSquare} label="Outreach Studio" variant="purple" href={`/outreach?lead=${lead.id}`} />
             </div>
           </div>
@@ -836,6 +839,150 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             </AccordionPanel>
 
           </div>
+        </div>
+      </div>
+
+      {discussOpen && <DiscussPanel lead={lead} onClose={() => setDiscussOpen(false)} />}
+    </div>
+  )
+}
+
+/* ── Discuss Lead: research-grounded chat that teaches the agent ──────────── */
+interface ChatMsg { role: 'user' | 'assistant'; content: string }
+
+function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
+  const [messages, setMessages] = useState<ChatMsg[]>([])
+  const [input, setInput] = useState('')
+  const [thinking, setThinking] = useState(false)
+  const [dossier, setDossier] = useState<string>('')
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const researched = dossier.length > 0
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+  }, [messages, thinking])
+
+  // Save what was learned when the panel closes (auto, no extra click).
+  const closeAndLearn = () => {
+    if (messages.filter(m => m.role === 'user').length >= 1 && messages.length >= 2) {
+      fetch('/api/ai/discuss', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'distill', lead_id: lead.id, transcript: messages }),
+      }).then(r => r.json()).then(j => {
+        if (j?.saved) toast.success('Saved what I learned to the agent’s memory')
+      }).catch(() => {})
+    }
+    onClose()
+  }
+
+  const ask = async (q: string) => {
+    const question = q.trim()
+    if (!question || thinking) return
+    const next = [...messages, { role: 'user' as const, content: question }]
+    setMessages(next)
+    setInput('')
+    setThinking(true)
+    try {
+      const res = await fetch('/api/ai/discuss', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead_id: lead.id, message: question, messages, dossier: dossier || undefined }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      if (json.dossier) setDossier(json.dossier)
+      setMessages([...next, { role: 'assistant', content: json.reply }])
+    } catch (err: unknown) {
+      setMessages([...next, { role: 'assistant', content: `⚠️ ${err instanceof Error ? err.message : 'Something went wrong'}` }])
+    } finally {
+      setThinking(false)
+    }
+  }
+
+  const starters = [
+    'What do they actually do, in depth?',
+    'What’s the strongest angle to pitch Kima here?',
+    'What objections will they raise, and how do I counter them?',
+    'How does their tech work and where does Kima/Aeredium fit?',
+  ]
+
+  return (
+    <div onClick={closeAndLearn}
+      style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)', display: 'flex', justifyContent: 'flex-end' }}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ width: 'min(560px, 100vw)', height: '100%', background: 'rgb(14,14,22)', borderLeft: '1px solid rgba(34,211,238,0.2)', display: 'flex', flexDirection: 'column', boxShadow: '-40px 0 80px rgba(0,0,0,0.6)' }}>
+
+        {/* Header */}
+        <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Brain size={16} color="rgb(103,232,249)" />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Discuss {lead.company_name}</div>
+              <div style={{ fontSize: 11, color: researched ? 'rgb(110,231,183)' : 'rgb(100,107,140)' }}>
+                {researched ? 'Live research loaded · ask anything' : 'Deep-dive research runs on your first question'}
+              </div>
+            </div>
+          </div>
+          <button onClick={closeAndLearn}
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgb(150,157,180)', cursor: 'pointer' }}>
+            <X size={15} />
+          </button>
+        </div>
+
+        {/* Messages */}
+        <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {messages.length === 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <p style={{ fontSize: 13, color: 'rgb(150,157,180)', lineHeight: 1.6, margin: 0 }}>
+                Ask anything about {lead.company_name} — their tech, business, risks, or how to position Kima/Aeredium. I’ll research them live before answering, and I’ll remember what we figure out.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                {starters.map(s => (
+                  <button key={s} onClick={() => ask(s)}
+                    style={{ textAlign: 'left', borderRadius: 10, border: '1px solid rgba(34,211,238,0.18)', background: 'rgba(34,211,238,0.05)', padding: '10px 12px', fontSize: 12.5, color: 'rgb(180,220,230)', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1.4 }}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {messages.map((m, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+              <div style={{
+                maxWidth: '86%', borderRadius: 12, padding: '10px 13px', fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap',
+                ...(m.role === 'user'
+                  ? { background: 'rgba(168,85,247,0.16)', border: '1px solid rgba(168,85,247,0.3)', color: 'rgb(225,215,250)' }
+                  : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgb(205,210,228)' }),
+              }}>
+                {m.content}
+              </div>
+            </div>
+          ))}
+
+          {thinking && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'rgb(103,232,249)' }}>
+              <Loader2 size={13} className="animate-spin" />
+              {researched ? 'Thinking…' : `Researching ${lead.company_name} live… (this first answer takes a few seconds)`}
+            </div>
+          )}
+        </div>
+
+        {/* Composer */}
+        <div style={{ padding: 14, borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+          <textarea
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(input) } }}
+            placeholder={`Ask about ${lead.company_name}…`}
+            rows={1}
+            style={{ flex: 1, resize: 'none', maxHeight: 120, borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', padding: '10px 12px', fontSize: 13, color: 'white', fontFamily: 'inherit', lineHeight: 1.5, outline: 'none' }}
+          />
+          <button onClick={() => ask(input)} disabled={thinking || !input.trim()}
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, flexShrink: 0, borderRadius: 10, border: '1px solid rgba(34,211,238,0.4)', background: 'rgba(34,211,238,0.14)', color: 'rgb(103,232,249)', cursor: thinking || !input.trim() ? 'not-allowed' : 'pointer', opacity: thinking || !input.trim() ? 0.5 : 1 }}>
+            <Send size={15} />
+          </button>
         </div>
       </div>
     </div>

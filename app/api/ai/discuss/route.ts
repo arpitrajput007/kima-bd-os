@@ -1,0 +1,286 @@
+import OpenAI from 'openai'
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { FULL_BRAIN } from '@/lib/kima-knowledge'
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
+// ── Live web research via Jina (no extra API key needed) ──────────────────────
+
+// Read a page's text content. Capped + timed out so one slow page can't hang
+// the whole discussion.
+async function readUrl(url: string, cap = 6000): Promise<string> {
+  try {
+    const res = await fetch(`https://r.jina.ai/${url}`, {
+      headers: { Accept: 'text/plain' },
+      signal: AbortSignal.timeout(20000),
+    })
+    if (!res.ok) return ''
+    const t = await res.text()
+    return t.slice(0, cap)
+  } catch {
+    return ''
+  }
+}
+
+// Web search — returns the top results as text.
+async function webSearch(query: string, cap = 4500): Promise<string> {
+  try {
+    const res = await fetch(`https://s.jina.ai/${encodeURIComponent(query)}`, {
+      headers: { Accept: 'text/plain' },
+      signal: AbortSignal.timeout(20000),
+    })
+    if (!res.ok) return ''
+    const t = await res.text()
+    return t.slice(0, cap)
+  } catch {
+    return ''
+  }
+}
+
+interface LeadRow {
+  id: string
+  company_name: string
+  website?: string | null
+  source_url?: string | null
+  description?: string | null
+  business_model?: string | null
+  product_summary?: string | null
+  supported_chains_or_rails?: string | null
+  current_providers?: string | null
+  customer_category?: string[] | null
+  industry_category?: string | null
+  product_to_sell?: string | null
+  region?: string | null
+  pain_point?: string | null
+  pain_point_evidence?: string | null
+  kima_fit?: string | null
+  aeredium_fit?: string | null
+  suggested_use_case?: string | null
+  settlement_angle?: string | null
+  security_angle?: string | null
+  trigger_reason?: string | null
+  lead_score?: number | null
+  status?: string | null
+  contacts?: { name?: string | null; role?: string | null }[] | null
+}
+
+function leadFacts(lead: LeadRow): string {
+  const lines = [
+    `Company: ${lead.company_name}`,
+    lead.website && `Website: ${lead.website}`,
+    lead.industry_category && `Industry: ${lead.industry_category}`,
+    (lead.customer_category || []).length > 0 && `Customer category: ${(lead.customer_category || []).join(', ')}`,
+    lead.region && `Region: ${lead.region}`,
+    lead.description && `What they do: ${lead.description}`,
+    lead.business_model && `Business model: ${lead.business_model}`,
+    lead.product_summary && `Product: ${lead.product_summary}`,
+    lead.supported_chains_or_rails && `Chains/rails: ${lead.supported_chains_or_rails}`,
+    lead.current_providers && `Current providers: ${lead.current_providers}`,
+    lead.pain_point && `Pain point: ${lead.pain_point}`,
+    lead.pain_point_evidence && `Pain evidence: ${lead.pain_point_evidence}`,
+    lead.trigger_reason && `Reason to reach out now: ${lead.trigger_reason}`,
+    lead.kima_fit && `Kima fit: ${lead.kima_fit}`,
+    lead.aeredium_fit && `Aeredium fit: ${lead.aeredium_fit}`,
+    lead.settlement_angle && `Settlement angle: ${lead.settlement_angle}`,
+    lead.security_angle && `Security angle: ${lead.security_angle}`,
+    lead.suggested_use_case && `Suggested use case: ${lead.suggested_use_case}`,
+    lead.product_to_sell && `Best product to sell: ${lead.product_to_sell}`,
+    typeof lead.lead_score === 'number' && `Lead score: ${lead.lead_score}`,
+    lead.source_url && `Source/proof: ${lead.source_url}`,
+    (lead.contacts || []).length > 0 && `Known contacts: ${(lead.contacts || []).map(c => `${c.name || 'unknown'}${c.role ? ` (${c.role})` : ''}`).join(', ')}`,
+  ].filter(Boolean)
+  return lines.join('\n')
+}
+
+// Build a fresh research dossier by pulling the lead's own site, the proof URL,
+// and a live web search. Done once per discussion (the client caches & resends).
+async function buildDossier(lead: LeadRow): Promise<string> {
+  const tasks: Promise<string>[] = []
+  const labels: string[] = []
+
+  if (lead.website) {
+    labels.push(`THEIR SITE (${lead.website})`)
+    tasks.push(readUrl(lead.website, 6000))
+  }
+  if (lead.source_url && lead.source_url !== lead.website) {
+    labels.push(`TRIGGER SOURCE (${lead.source_url})`)
+    tasks.push(readUrl(lead.source_url, 4000))
+  }
+  const cat = (lead.customer_category || [])[0] || lead.industry_category || 'crypto'
+  const query = `${lead.company_name} ${cat} blockchain payments settlement latest news`
+  labels.push(`WEB SEARCH "${query}"`)
+  tasks.push(webSearch(query, 4500))
+
+  const results = await Promise.all(tasks)
+  const parts = results
+    .map((r, i) => (r ? `=== ${labels[i]} ===\n${r}` : ''))
+    .filter(Boolean)
+  return parts.join('\n\n')
+}
+
+// Pull the Kima/Aeredium brain + what the agent has already learned, so answers
+// are grounded in our products AND prior intelligence about this exact lead.
+async function loadAgentContext(leadId: string): Promise<string> {
+  const [rulesRes, knowledgeRes] = await Promise.all([
+    supabase.from('agent_rules').select('rule_type, rule').eq('status', 'active').order('weight', { ascending: false }).limit(20),
+    supabase.from('agent_knowledge').select('title, content, knowledge_type, tags').eq('status', 'active').order('created_at', { ascending: false }).limit(20),
+  ])
+  let ctx = ''
+  if (rulesRes.data?.length) {
+    ctx += `\n\nYOUR ACTIVE BD RULES:\n${rulesRes.data.map(r => `[${r.rule_type}] ${r.rule}`).join('\n')}`
+  }
+  if (knowledgeRes.data?.length) {
+    // Surface knowledge tagged to this lead first.
+    const tagged = knowledgeRes.data.filter(k => (k.tags as string[] | null)?.includes(`lead:${leadId}`))
+    const general = knowledgeRes.data.filter(k => !(k.tags as string[] | null)?.includes(`lead:${leadId}`)).slice(0, 10)
+    const fmt = (k: { knowledge_type: string; title: string; content: string }) => `[${k.knowledge_type}] ${k.title}: ${k.content.slice(0, 350)}`
+    if (tagged.length) ctx += `\n\nWHAT YOU'VE ALREADY LEARNED ABOUT THIS LEAD:\n${tagged.map(fmt).join('\n\n')}`
+    if (general.length) ctx += `\n\nYOUR LEARNED INTELLIGENCE:\n${general.map(fmt).join('\n\n')}`
+  }
+  return ctx
+}
+
+// ── DISTILL: turn a discussion into durable agent memory ──────────────────────
+async function distill(leadId: string, transcript: { role: string; content: string }[]) {
+  const { data: lead } = await supabase.from('leads').select('company_name').eq('id', leadId).single()
+  const company = lead?.company_name || 'this lead'
+
+  const convo = transcript
+    .map(m => `${m.role === 'user' ? 'BD (Arpit)' : 'Agent'}: ${m.content}`)
+    .join('\n\n')
+
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [
+      {
+        role: 'system',
+        content: `You are the memory engine for the Kima BD OS. Read a discussion between the BD person and the agent about a specific lead, and extract ONLY durable, reusable intelligence worth remembering. Skip pleasantries and obvious facts. Return ONLY valid JSON.`,
+      },
+      {
+        role: 'user',
+        content: `Discussion about "${company}":\n\n${convo}\n\nExtract what's worth saving to long-term memory. Return JSON:
+{
+  "worth_saving": true/false,
+  "title": "short title (max 10 words)",
+  "content": "150-350 words of specific, reusable insight: their tech, real objections raised and how to handle them, angles that resonated, competitive context, decision dynamics. Write as notes the agent can reuse later.",
+  "knowledge_type": "one of: icp_signal | competitor_intel | market_trend | product_context | outreach_strategy | general",
+  "tags": ["2-5 tags"],
+  "new_rules": [{ "rule_type": "prioritize|reject|score_boost|score_penalty|outreach_style|source_preference", "rule": "only if a GENERAL, broadly-applicable lesson emerged (not just about this one company)", "weight": 0 }]
+}
+Set worth_saving=false if nothing durable came up. Create new_rules ONLY for genuinely general lessons — usually [].`,
+      },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.3,
+    max_tokens: 1200,
+  })
+
+  const parsed = JSON.parse(completion.choices[0].message.content || '{}')
+  if (!parsed.worth_saving || !parsed.content) return { saved: false }
+
+  const tags = [...(parsed.tags || []), `lead:${leadId}`]
+  await supabase.from('agent_knowledge').insert({
+    title: parsed.title || `Discussion: ${company}`,
+    content: parsed.content,
+    source_type: 'text',
+    source_name: `Discussion: ${company}`,
+    tags,
+    knowledge_type: parsed.knowledge_type || 'general',
+    status: 'active',
+  })
+
+  let rulesCreated = 0
+  for (const rule of (parsed.new_rules || []).slice(0, 2)) {
+    if (!rule.rule || rule.rule.length < 12) continue
+    const { error } = await supabase.from('agent_rules').insert({
+      rule_type: rule.rule_type || 'prioritize', rule: rule.rule, weight: rule.weight || 0, status: 'active',
+    })
+    if (!error) rulesCreated++
+  }
+
+  return { saved: true, title: parsed.title, rules_created: rulesCreated }
+}
+
+export async function POST(req: NextRequest) {
+  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your_openai_api_key_here') {
+    return NextResponse.json({ error: 'OpenAI API key not configured.' }, { status: 400 })
+  }
+
+  try {
+    const body = await req.json()
+
+    // ── Distill mode: save what was learned (called when the panel closes) ──
+    if (body.mode === 'distill') {
+      if (!body.lead_id || !Array.isArray(body.transcript) || body.transcript.length < 2) {
+        return NextResponse.json({ success: true, saved: false })
+      }
+      const result = await distill(body.lead_id, body.transcript)
+      return NextResponse.json({ success: true, ...result })
+    }
+
+    // ── Chat mode ──
+    const { lead_id, message, messages: history, dossier: clientDossier } = body
+    if (!lead_id) return NextResponse.json({ error: 'lead_id is required' }, { status: 400 })
+    if (!message || !message.trim()) return NextResponse.json({ error: 'Empty message' }, { status: 400 })
+
+    const { data: lead, error } = await supabase
+      .from('leads')
+      .select('*, contacts(name, role)')
+      .eq('id', lead_id)
+      .single()
+    if (error || !lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+
+    // First turn → do the live deep-dive once and hand the dossier back so the
+    // client can resend it (no repeated fetching mid-conversation).
+    let dossier: string = typeof clientDossier === 'string' ? clientDossier : ''
+    if (!dossier) {
+      dossier = await buildDossier(lead as LeadRow)
+    }
+
+    const agentContext = await loadAgentContext(lead_id)
+
+    const systemPrompt = `You are the Kima BD Intelligence Agent in a focused, deep-dive discussion about ONE specific lead. The BD person wants to truly understand this company — its tech, business, risks, and how Kima/Aeredium fit — so they can have a smart, credible conversation with the prospect.
+
+${FULL_BRAIN}
+
+HOW YOU ANSWER:
+- Ground every answer in the live research below and the saved facts. Cite specifics (numbers, products, chains, events) — never generic filler.
+- If the research doesn't cover something, say what you'd verify and give your best-reasoned read, clearly marked as inference — don't bluff.
+- Be a sharp BD strategist: connect what they do to a concrete Kima/Aeredium angle when relevant.
+- Anticipate the PROSPECT's likely cross-questions and objections, and arm the BD person with crisp answers.
+- Be direct and substantive. Use short paragraphs or tight bullets. No fluff, no "great question", no corporate filler.
+
+=== SAVED FACTS ON THIS LEAD ===
+${leadFacts(lead as LeadRow)}
+
+=== LIVE RESEARCH (fetched just now) ===
+${dossier || '(live research returned nothing — rely on saved facts and reasoning, and flag the gap)'}
+${agentContext}`
+
+    const historyMessages: { role: 'user' | 'assistant'; content: string }[] = Array.isArray(history) ? history : []
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...historyMessages.slice(-16),
+        { role: 'user', content: message },
+      ],
+      temperature: 0.5,
+      max_tokens: 1100,
+    })
+
+    const reply = completion.choices[0].message.content || 'I had trouble with that — try rephrasing?'
+    return NextResponse.json({ reply, dossier })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Discussion failed'
+    console.error('[discuss route]', err)
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
+}
