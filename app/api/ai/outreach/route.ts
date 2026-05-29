@@ -2,7 +2,7 @@ import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { PRODUCT_BRAIN, SINGLE_API_LINE } from '@/lib/kima-knowledge'
-import { MAX_FOLLOWUPS } from '@/lib/outreach'
+import { MAX_FOLLOWUPS, getOutreachLearnings } from '@/lib/outreach'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -174,12 +174,14 @@ async function generateAutoDrafts(leadId: string) {
     return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
   }
 
+  const learnings = await getOutreachLearnings(supabase)
+
   const systemPrompt = `You are Arpit, leading BD/partnerships for Kima and Aeredium. You write your own outreach DMs by hand after researching each prospect.
 
 ${PRODUCT_BRAIN}
 
 ${HUMAN_RULES}
-
+${learnings.hasData ? `\n${learnings.block}\n` : ''}
 You will produce THREE drafts for the SAME lead. They must NOT feel like the same message resized — each uses a DIFFERENT hook/angle from the research and a different length and channel:
 1. "short"  → a Telegram / X DM. 2-3 sentences. Punchy, one sharp hook.
 2. "medium" → a LinkedIn message. ~4-5 sentences. A different angle than the short one.
@@ -244,13 +246,15 @@ async function generateFollowup(leadId: string, stage: number) {
 
   const channel = (lead as LeadRow).last_channel || ((priorMsgs || [])[0]?.channel) || 'telegram'
 
+  const learnings = await getOutreachLearnings(supabase)
+
   const isFinal = stage >= MAX_FOLLOWUPS - 1
   const systemPrompt = `You are Arpit, leading BD/partnerships for Kima and Aeredium. You're writing a SHORT follow-up to someone who hasn't replied yet. You are not annoyed and not pushy — just persistent and useful.
 
 ${PRODUCT_BRAIN}
 
 ${HUMAN_RULES}
-
+${learnings.hasData ? `\n${learnings.block}\n` : ''}
 FOLLOW-UP RULES:
 - Keep it SHORT — 1 to 3 sentences. Shorter than the first message.
 - Do NOT repeat the same hook or pitch from the prior message(s). Lead with a DIFFERENT angle: a fresh proof point, a new trigger, a relevant comparison, or a genuinely useful nudge.
@@ -349,12 +353,14 @@ export async function POST(req: NextRequest) {
   }
   const channelGuide = channelGuides[channel] || 'LinkedIn message'
 
+  const learnings = await getOutreachLearnings(supabase)
+
   const systemPrompt = `You are writing BD outreach messages for Arpit, who leads BD/partnerships for Kima and Aeredium.
 
 ${PRODUCT_BRAIN}
 
 ${HUMAN_RULES}
-
+${learnings.hasData ? `\n${learnings.block}\n` : ''}
 MESSAGE STRUCTURE (keep it natural, don't make it look like a checklist):
 1. Personal opener based on their specific company/product/trigger
 2. The specific pain point they have

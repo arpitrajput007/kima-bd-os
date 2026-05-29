@@ -18,7 +18,8 @@ import {
   getConfidenceColor, formatDate, isHttpUrl, pickBestUrl
 } from '@/lib/utils'
 import {
-  buildTarget, channelDeepLink, logTouch, type OutreachMeta,
+  buildTarget, channelDeepLink, logTouch, recordOutcome,
+  type OutreachMeta, type OutreachOutcome,
 } from '@/lib/outreach'
 import type { Lead, Contact, OutreachMessage } from '@/lib/types'
 import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL, REGIONS } from '@/lib/types'
@@ -792,6 +793,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               <InlineOutreach lead={lead} onSent={loadLead} />
 
               {outreachMessages.length > 0 && (
+                <OutcomeBar lead={lead} onRecorded={loadLead} />
+              )}
+
+              {outreachMessages.length > 0 && (
                 <div style={{ marginTop: 18, borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 16 }}>
                   <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgb(100,107,140)', marginBottom: 12 }}>
                     Sent &amp; saved ({outreachMessages.length})
@@ -832,6 +837,52 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Outcome bar: one-tap capture of what happened (feeds the learning loop) ── */
+function OutcomeBar({ lead, onRecorded }: { lead: Lead; onRecorded: () => void }) {
+  const supabase = createClient()
+  const [saving, setSaving] = useState<OutreachOutcome | null>(null)
+
+  // Already resolved — show the result instead of the prompt.
+  if (lead.status === 'replied' || lead.status === 'meeting_booked') {
+    const label = lead.status === 'meeting_booked' ? 'Meeting booked 🎉' : 'They replied'
+    return (
+      <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 8, borderRadius: 10, border: '1px solid rgba(110,231,183,0.25)', background: 'rgba(110,231,183,0.07)', padding: '10px 14px', fontSize: 12, color: 'rgb(110,231,183)' }}>
+        <CheckCircle2 size={14} />{label} · outcome logged, the agent is learning from this
+      </div>
+    )
+  }
+  if (lead.status === 'archived') return null
+
+  const record = async (outcome: OutreachOutcome) => {
+    setSaving(outcome)
+    const { error } = await recordOutcome(supabase, { leadId: lead.id, outcome })
+    setSaving(null)
+    if (error) { toast.error('Could not save outcome'); return }
+    toast.success(
+      outcome === 'no_response' ? 'Marked dead — stopped chasing' : 'Logged — the agent learns from what converts',
+    )
+    onRecorded()
+  }
+
+  const btn = (o: OutreachOutcome, Icon: React.ComponentType<{ size?: number }>, label: string, color: string) => (
+    <button onClick={() => record(o)} disabled={saving !== null}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 8, border: `1px solid ${color}33`, background: `${color}14`, padding: '7px 12px', fontSize: 12, color, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving && saving !== o ? 0.5 : 1, fontFamily: 'inherit' }}>
+      {saving === o ? <Loader2 size={12} className="animate-spin" /> : <Icon size={12} />}{label}
+    </button>
+  )
+
+  return (
+    <div style={{ marginTop: 14, borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', padding: '12px 14px' }}>
+      <div style={{ fontSize: 11, color: 'rgb(150,157,180)', marginBottom: 10 }}>How did it go? Logging the outcome trains the agent on what converts.</div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {btn('replied', CheckCircle2, 'They replied', 'rgb(110,231,183)')}
+        {btn('meeting_booked', Calendar, 'Meeting booked', 'rgb(196,167,252)')}
+        {btn('no_response', X, 'No reply / dead', 'rgb(148,163,184)')}
       </div>
     </div>
   )

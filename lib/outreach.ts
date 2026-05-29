@@ -105,6 +105,128 @@ export function followUpDue(lead: Pick<Lead, 'status' | 'follow_up_stage' | 'nex
   return Date.now() - new Date(base).getTime() >= FOLLOWUP_GAP_DAYS * 86400000
 }
 
+// The outcome of an outreach attempt, captured by the human after they send.
+// 'replied'/'meeting_booked' = it worked; 'no_response' = stop chasing it.
+export type OutreachOutcome = 'replied' | 'meeting_booked' | 'no_response'
+
+// Record what happened after we reached out. Updates the lead's status, stops
+// the follow-up clock, and (for positive outcomes) marks the most recent sent
+// message as 'replied' so the learning loop can see which channel/angle won.
+export async function recordOutcome(
+  supabase: SupabaseClient,
+  opts: { leadId: string; outcome: OutreachOutcome },
+): Promise<{ error: string | null }> {
+  const statusMap: Record<OutreachOutcome, string> = {
+    replied: 'replied',
+    meeting_booked: 'meeting_booked',
+    no_response: 'archived',
+  }
+  const now = new Date().toISOString()
+
+  const { error: e1 } = await supabase
+    .from('leads')
+    .update({ status: statusMap[opts.outcome], next_follow_up_at: null, updated_at: now })
+    .eq('id', opts.leadId)
+
+  // A reply (or meeting) means the last message we sent landed — tag it so we
+  // can learn from what actually converts.
+  let e2: { message: string } | null = null
+  if (opts.outcome !== 'no_response') {
+    const { data: last } = await supabase
+      .from('outreach_messages')
+      .select('id')
+      .eq('lead_id', opts.leadId)
+      .eq('status', 'sent')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (last?.id) {
+      const { error } = await supabase
+        .from('outreach_messages')
+        .update({ status: 'replied', updated_at: now })
+        .eq('id', last.id)
+      e2 = error
+    }
+  }
+  return { error: e1?.message || e2?.message || null }
+}
+
+// What the agent has learned from real outcomes — a compact block injected into
+// the drafting prompt so new messages lean into the channels, categories, and
+// voice that have actually been getting replies.
+export interface OutreachLearnings {
+  block: string
+  hasData: boolean
+}
+
+export async function getOutreachLearnings(supabase: SupabaseClient): Promise<OutreachLearnings> {
+  const empty: OutreachLearnings = { block: '', hasData: false }
+  const since = new Date(Date.now() - 120 * 86400000).toISOString()
+
+  const { data: msgs } = await supabase
+    .from('outreach_messages')
+    .select('channel, status, message, created_at')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+
+  if (!msgs || msgs.length === 0) return empty
+
+  // Per-channel sent vs. replied tallies.
+  const tally: Record<string, { sent: number; replied: number }> = {}
+  for (const m of msgs) {
+    const ch = m.channel || 'unknown'
+    if (!tally[ch]) tally[ch] = { sent: 0, replied: 0 }
+    tally[ch].sent++
+    if (m.status === 'replied') tally[ch].replied++
+  }
+
+  const sections: string[] = []
+
+  // Channel reply rates — only channels with enough sends to mean something.
+  const rates = Object.entries(tally)
+    .filter(([, v]) => v.sent >= 2)
+    .map(([ch, v]) => ({ ch, rate: v.replied / v.sent, ...v }))
+    .sort((a, b) => b.rate - a.rate)
+  if (rates.length > 0) {
+    const line = rates
+      .map(r => `${r.ch} ${Math.round(r.rate * 100)}% (${r.replied}/${r.sent})`)
+      .join(', ')
+    sections.push(`Channel reply rates (last 120d): ${line}. Favour the channels that actually get replies when you have a contact there.`)
+  }
+
+  // Real messages that earned a reply — the strongest signal of what works.
+  const winners = msgs
+    .filter(m => m.status === 'replied' && m.message)
+    .slice(0, 2)
+  if (winners.length > 0) {
+    const examples = winners
+      .map((m, i) => {
+        const text = (m.message || '').slice(0, 500)
+        return `--- replied example ${i + 1} (${m.channel || 'unknown'}) ---\n${text}`
+      })
+      .join('\n\n')
+    sections.push(`These are messages YOU sent that GOT a reply — mirror their voice, length, and structure (never copy literally):\n${examples}`)
+  }
+
+  // Categories that have converted recently.
+  const { data: wonLeads } = await supabase
+    .from('leads')
+    .select('customer_category')
+    .in('status', ['replied', 'meeting_booked'])
+    .limit(50)
+  const cats = [...new Set((wonLeads || []).flatMap(l => (l.customer_category as string[] | null) || []))]
+    .slice(0, 6)
+  if (cats.length > 0) {
+    sections.push(`Categories that have replied recently: ${cats.join(', ')}.`)
+  }
+
+  if (sections.length === 0) return empty
+  return {
+    hasData: true,
+    block: `WHAT'S BEEN WORKING — learn from your own real results:\n${sections.join('\n\n')}`,
+  }
+}
+
 // Record an outreach touch: advance the lead's follow-up state and log the
 // sent message. `kind` is 'initial' for the first message, 'followup' after.
 export async function logTouch(
