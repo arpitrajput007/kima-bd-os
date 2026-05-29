@@ -10,13 +10,16 @@ import {
   Sparkles, Target, Shield, Users, MessageSquare, ThumbsUp,
   Copy, CheckCircle, CheckCircle2, AlertTriangle, Globe, Link2, Send,
   ChevronDown, ChevronUp, RefreshCw, Building2, Brain,
-  FileSearch, Puzzle, Calendar, Mail,
+  FileSearch, Puzzle, Calendar, Mail, Wand2,
   MapPin, AtSign, MessageCircle
 } from 'lucide-react'
 import {
   cn, getScoreBg, getStatusColor, getStatusLabel, getSeverityColor,
   getConfidenceColor, formatDate, isHttpUrl, pickBestUrl
 } from '@/lib/utils'
+import {
+  buildTarget, channelDeepLink, logTouch, type OutreachMeta,
+} from '@/lib/outreach'
 import type { Lead, Contact, OutreachMessage } from '@/lib/types'
 import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL, REGIONS } from '@/lib/types'
 
@@ -328,7 +331,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [aiAction, setAiAction] = useState<AIAction>(null)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     overview: true, research: true, pain: true, kima: true,
-    aeredium: true, contacts: true, outreach: false, feedback: false
+    aeredium: true, contacts: true, outreach: true, feedback: false
   })
 
   const toggle = (k: string) => setExpanded(s => ({ ...s, [k]: !s[k] }))
@@ -783,41 +786,40 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               </div>
             </Card>
 
-            {/* Outreach Messages accordion */}
-            <AccordionPanel icon={MessageSquare} title="Outreach Messages" iconColor="rgb(253,224,71)"
+            {/* Outreach accordion — draft & send right here */}
+            <AccordionPanel icon={MessageSquare} title="Outreach" iconColor="rgb(253,224,71)"
               expanded={expanded.outreach} onToggle={() => toggle('outreach')}>
-              {outreachMessages.length === 0 ? (
-                <div style={{ textAlign: 'center', paddingBottom: 8 }}>
-                  <p style={{ fontSize: 13, color: 'rgb(100,107,140)', marginBottom: 14 }}>No messages drafted yet</p>
-                  <Link href={`/outreach?lead=${lead.id}`}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 9, border: '1px solid rgba(253,224,71,0.28)', background: 'rgba(253,224,71,0.08)', padding: '8px 16px', fontSize: 13, color: 'rgb(253,224,71)', textDecoration: 'none' }}>
-                    <MessageSquare size={12} />Open Outreach Studio
-                  </Link>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {outreachMessages.map(msg => (
-                    <div key={msg.id} style={{ borderRadius: 12, border: '1px solid rgba(253,224,71,0.12)', background: 'rgba(253,224,71,0.04)', padding: 16 }}>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-                        <span style={{ borderRadius: 6, border: '1px solid rgba(253,224,71,0.2)', background: 'rgba(253,224,71,0.08)', padding: '3px 10px', fontSize: 11, color: 'rgb(253,224,71)' }}>{msg.channel}</span>
-                        <span style={{ fontSize: 11, color: 'rgb(100,107,140)', alignSelf: 'center' }}>{msg.tone} · {formatDate(msg.created_at)}</span>
+              <InlineOutreach lead={lead} onSent={loadLead} />
+
+              {outreachMessages.length > 0 && (
+                <div style={{ marginTop: 18, borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 16 }}>
+                  <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgb(100,107,140)', marginBottom: 12 }}>
+                    Sent &amp; saved ({outreachMessages.length})
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {outreachMessages.map(msg => (
+                      <div key={msg.id} style={{ borderRadius: 12, border: '1px solid rgba(253,224,71,0.12)', background: 'rgba(253,224,71,0.04)', padding: 14 }}>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                          <span style={{ borderRadius: 6, border: '1px solid rgba(253,224,71,0.2)', background: 'rgba(253,224,71,0.08)', padding: '3px 10px', fontSize: 11, color: 'rgb(253,224,71)' }}>{msg.channel}</span>
+                          <span style={{ borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', padding: '3px 10px', fontSize: 11, color: msg.status === 'sent' ? 'rgb(110,231,183)' : 'rgb(100,107,140)' }}>{msg.status}</span>
+                          <span style={{ fontSize: 11, color: 'rgb(100,107,140)', alignSelf: 'center' }}>{formatDate(msg.created_at)}</span>
+                        </div>
+                        {msg.message && (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+                              <button onClick={() => { navigator.clipboard.writeText(msg.message!); toast.success('Copied') }}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgb(100,107,140)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                                <Copy size={10} />Copy
+                              </button>
+                            </div>
+                            <div style={{ fontSize: 12, lineHeight: 1.65, color: 'rgb(190,195,220)', whiteSpace: 'pre-wrap', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 12 }}>
+                              {msg.message}
+                            </div>
+                          </>
+                        )}
                       </div>
-                      {msg.message && (
-                        <>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                            <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgb(100,107,140)' }}>First Message</span>
-                            <button onClick={() => { navigator.clipboard.writeText(msg.message!); toast.success('Copied') }}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgb(100,107,140)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                              <Copy size={10} />Copy
-                            </button>
-                          </div>
-                          <div style={{ fontSize: 12, lineHeight: 1.65, color: 'rgb(190,195,220)', whiteSpace: 'pre-wrap', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 12 }}>
-                            {msg.message}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </AccordionPanel>
@@ -831,6 +833,124 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/* ── Inline outreach: draft 3 human variations & send in place ──── */
+interface InlineDraft { id: string; label: string; channel: string; subject?: string; text: string }
+
+const inlineChannelIcon: Record<string, React.ComponentType<{ size?: number }>> = {
+  telegram: Send, twitter: AtSign, linkedin: MessageSquare, email: Mail,
+}
+
+function InlineOutreach({ lead, onSent }: { lead: Lead; onSent: () => void }) {
+  const supabase = createClient()
+  const [drafts, setDrafts] = useState<InlineDraft[]>([])
+  const [meta, setMeta] = useState<OutreachMeta | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [sendingId, setSendingId] = useState<string | null>(null)
+
+  const draft = async () => {
+    setLoading(true); setDrafts([]); setMeta(null)
+    try {
+      const res = await fetch('/api/ai/outreach', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'auto', lead_id: lead.id }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      setDrafts(json.data?.drafts || [])
+      setMeta(json.data?.meta || null)
+      if (!(json.data?.drafts || []).length) toast.error('No drafts returned — try again')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Draft failed')
+    } finally { setLoading(false) }
+  }
+
+  const copy = (d: InlineDraft) => {
+    navigator.clipboard.writeText(d.subject ? `${d.subject}\n\n${d.text}` : d.text)
+    toast.success('Copied!')
+  }
+
+  const send = async (d: InlineDraft) => {
+    setSendingId(d.id)
+    const target = buildTarget(meta)
+    const url = channelDeepLink(d.channel, target, d.text, d.subject)
+    const fullText = d.subject ? `${d.subject}\n\n${d.text}` : d.text
+    const { error } = await logTouch(supabase, {
+      leadId: lead.id, channel: d.channel, text: d.text, subject: d.subject,
+      contactId: meta?.contact?.id, kind: 'initial',
+    })
+    setSendingId(null)
+    if (error) { toast.error('Could not log the touch'); return }
+    if (url) {
+      if (d.channel !== 'email') navigator.clipboard.writeText(fullText)
+      window.open(url, '_blank')
+      toast.success('Logged as contacted · follow-up in 5 days')
+    } else {
+      navigator.clipboard.writeText(fullText)
+      toast.success('Logged · no destination on file — text copied')
+    }
+    onSent()
+  }
+
+  if (drafts.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
+        <p style={{ fontSize: 13, color: 'rgb(100,107,140)', marginBottom: 14 }}>
+          Let the agent draft 3 human, research-backed messages for {lead.company_name}
+        </p>
+        <button onClick={draft} disabled={loading}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 9, border: '1px solid rgba(168,85,247,0.4)', background: 'rgba(168,85,247,0.13)', padding: '9px 18px', fontSize: 13, color: 'rgb(196,167,252)', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, fontFamily: 'inherit', fontWeight: 500 }}>
+          {loading ? <><Loader2 size={13} className="animate-spin" />Drafting…</> : <><Wand2 size={13} />Draft with AI</>}
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'rgb(196,167,252)' }}>
+          <Wand2 size={13} />Agent drafts · 3 variations
+        </span>
+        <button onClick={draft} disabled={loading}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'rgb(100,107,140)', background: 'none', border: 'none', cursor: 'pointer' }}>
+          <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />Regenerate
+        </button>
+      </div>
+
+      {drafts.map(d => {
+        const Icon = inlineChannelIcon[d.channel] || MessageSquare
+        return (
+          <div key={d.id} style={{ borderRadius: 12, border: '1px solid rgba(168,85,247,0.18)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(168,85,247,0.08)', borderBottom: '1px solid rgba(168,85,247,0.12)' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 600, color: 'rgb(196,167,252)' }}>
+                <Icon size={12} />{d.label}
+              </span>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button onClick={() => copy(d)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'rgb(150,157,180)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>
+                  <Copy size={10} />Copy
+                </button>
+                <button onClick={() => send(d)} disabled={sendingId === d.id}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'rgb(196,167,252)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>
+                  {sendingId === d.id ? <Loader2 size={10} className="animate-spin" /> : <ExternalLink size={10} />}Open &amp; send
+                </button>
+              </div>
+            </div>
+            {d.subject && (
+              <div style={{ padding: '8px 12px 0', fontSize: 11, color: '#fbbf24' }}>
+                <span style={{ opacity: 0.7 }}>Subject: </span><span style={{ color: 'white' }}>{d.subject}</span>
+              </div>
+            )}
+            <pre style={{ margin: 0, padding: 12, fontSize: 12, lineHeight: 1.65, color: 'rgb(200,205,225)', whiteSpace: 'pre-wrap', fontFamily: 'Inter, sans-serif', background: 'rgba(22,22,34,0.5)' }}>
+              {d.text}
+            </pre>
+          </div>
+        )
+      })}
     </div>
   )
 }
