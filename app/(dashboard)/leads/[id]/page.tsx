@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, use, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -850,13 +851,54 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 /* ── Discuss Lead: research-grounded chat that teaches the agent ──────────── */
 interface ChatMsg { role: 'user' | 'assistant'; content: string }
 
+// Lightweight renderer: **bold**, "- " bullets, and paragraph spacing.
+function RichText({ text }: { text: string }) {
+  const renderInline = (s: string, keyBase: string) =>
+    s.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+      part.startsWith('**') && part.endsWith('**')
+        ? <strong key={`${keyBase}-${i}`} style={{ color: 'white', fontWeight: 600 }}>{part.slice(2, -2)}</strong>
+        : <span key={`${keyBase}-${i}`}>{part}</span>,
+    )
+  const lines = text.split('\n')
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {lines.map((raw, i) => {
+        const line = raw.trimEnd()
+        if (!line.trim()) return <div key={i} style={{ height: 2 }} />
+        if (/^\s*[-*•]\s+/.test(line)) {
+          return (
+            <div key={i} style={{ display: 'flex', gap: 8, paddingLeft: 2 }}>
+              <span style={{ color: 'rgb(103,232,249)', flexShrink: 0, lineHeight: 1.6 }}>•</span>
+              <span style={{ flex: 1, lineHeight: 1.6 }}>{renderInline(line.replace(/^\s*[-*•]\s+/, ''), `${i}`)}</span>
+            </div>
+          )
+        }
+        return <div key={i} style={{ lineHeight: 1.65 }}>{renderInline(line, `${i}`)}</div>
+      })}
+    </div>
+  )
+}
+
 function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
   const [thinking, setThinking] = useState(false)
   const [dossier, setDossier] = useState<string>('')
+  const [shown, setShown] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const researched = dossier.length > 0
+
+  // Portal availability + slide-in + body scroll lock + autofocus.
+  useEffect(() => {
+    setMounted(true)
+    const t = requestAnimationFrame(() => setShown(true))
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const f = setTimeout(() => inputRef.current?.focus(), 120)
+    return () => { cancelAnimationFrame(t); clearTimeout(f); document.body.style.overflow = prevOverflow }
+  }, [])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
@@ -872,7 +914,8 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
         if (j?.saved) toast.success('Saved what I learned to the agent’s memory')
       }).catch(() => {})
     }
-    onClose()
+    setShown(false)
+    setTimeout(onClose, 180) // let the slide-out play
   }
 
   const ask = async (q: string) => {
@@ -881,6 +924,7 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
     const next = [...messages, { role: 'user' as const, content: question }]
     setMessages(next)
     setInput('')
+    if (inputRef.current) inputRef.current.style.height = 'auto'
     setThinking(true)
     try {
       const res = await fetch('/api/ai/discuss', {
@@ -905,42 +949,54 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
     'How does their tech work and where does Kima/Aeredium fit?',
   ]
 
-  return (
+  if (!mounted) return null
+
+  const panel = (
     <div onClick={closeAndLearn}
-      style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)', display: 'flex', justifyContent: 'flex-end' }}>
+      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: shown ? 'rgba(4,4,10,0.6)' : 'rgba(4,4,10,0)', backdropFilter: 'blur(3px)', display: 'flex', justifyContent: 'flex-end', transition: 'background 0.25s ease' }}>
       <div onClick={e => e.stopPropagation()}
-        style={{ width: 'min(560px, 100vw)', height: '100%', background: 'rgb(14,14,22)', borderLeft: '1px solid rgba(34,211,238,0.2)', display: 'flex', flexDirection: 'column', boxShadow: '-40px 0 80px rgba(0,0,0,0.6)' }}>
+        style={{
+          width: 'min(580px, 100vw)', height: '100dvh', background: 'linear-gradient(180deg, rgb(17,18,28), rgb(12,12,19))',
+          borderLeft: '1px solid rgba(34,211,238,0.25)', display: 'flex', flexDirection: 'column',
+          boxShadow: '-40px 0 90px rgba(0,0,0,0.65)',
+          transform: shown ? 'translateX(0)' : 'translateX(100%)', transition: 'transform 0.28s cubic-bezier(0.22,1,0.36,1)',
+        }}>
 
         {/* Header */}
-        <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-            <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Brain size={16} color="rgb(103,232,249)" />
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: 'rgba(34,211,238,0.04)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, rgba(34,211,238,0.25), rgba(34,211,238,0.08))', border: '1px solid rgba(34,211,238,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Brain size={17} color="rgb(103,232,249)" />
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Discuss {lead.company_name}</div>
-              <div style={{ fontSize: 11, color: researched ? 'rgb(110,231,183)' : 'rgb(100,107,140)' }}>
-                {researched ? 'Live research loaded · ask anything' : 'Deep-dive research runs on your first question'}
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Discuss {lead.company_name}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: researched ? 'rgb(110,231,183)' : 'rgb(120,127,160)', marginTop: 1 }}>
+                <span style={{ width: 6, height: 6, borderRadius: 999, background: researched ? 'rgb(110,231,183)' : 'rgb(120,127,160)' }} />
+                {researched ? 'Live research loaded · ask anything' : 'Researches live on your first question'}
               </div>
             </div>
           </div>
           <button onClick={closeAndLearn}
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgb(150,157,180)', cursor: 'pointer' }}>
-            <X size={15} />
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 9, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgb(160,167,190)', cursor: 'pointer' }}>
+            <X size={16} />
           </button>
         </div>
 
         {/* Messages */}
-        <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
           {messages.length === 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <p style={{ fontSize: 13, color: 'rgb(150,157,180)', lineHeight: 1.6, margin: 0 }}>
-                Ask anything about {lead.company_name} — their tech, business, risks, or how to position Kima/Aeredium. I’ll research them live before answering, and I’ll remember what we figure out.
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <p style={{ fontSize: 13, color: 'rgb(150,157,180)', lineHeight: 1.65, margin: 0 }}>
+                Ask anything about <span style={{ color: 'rgb(103,232,249)' }}>{lead.company_name}</span> — their tech, business, risks, or how to position Kima/Aeredium. I research them live before answering, and I remember what we figure out.
               </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+              <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgb(100,107,140)', marginTop: 2 }}>Try asking</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {starters.map(s => (
                   <button key={s} onClick={() => ask(s)}
-                    style={{ textAlign: 'left', borderRadius: 10, border: '1px solid rgba(34,211,238,0.18)', background: 'rgba(34,211,238,0.05)', padding: '10px 12px', fontSize: 12.5, color: 'rgb(180,220,230)', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1.4 }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', borderRadius: 11, border: '1px solid rgba(34,211,238,0.18)', background: 'rgba(34,211,238,0.05)', padding: '11px 13px', fontSize: 12.5, color: 'rgb(190,225,235)', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1.45, transition: 'background 0.15s' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(34,211,238,0.1)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'rgba(34,211,238,0.05)')}>
+                    <Sparkles size={13} color="rgb(103,232,249)" style={{ flexShrink: 0 }} />
                     {s}
                   </button>
                 ))}
@@ -949,44 +1005,66 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
           )}
 
           {messages.map((m, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-              <div style={{
-                maxWidth: '86%', borderRadius: 12, padding: '10px 13px', fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap',
-                ...(m.role === 'user'
-                  ? { background: 'rgba(168,85,247,0.16)', border: '1px solid rgba(168,85,247,0.3)', color: 'rgb(225,215,250)' }
-                  : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgb(205,210,228)' }),
-              }}>
-                {m.content}
+            m.role === 'user' ? (
+              <div key={i} style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{ maxWidth: '85%', borderRadius: '14px 14px 4px 14px', padding: '10px 14px', fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', background: 'rgba(168,85,247,0.18)', border: '1px solid rgba(168,85,247,0.32)', color: 'rgb(228,218,252)' }}>
+                  {m.content}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                  <Brain size={13} color="rgb(103,232,249)" />
+                </div>
+                <div style={{ flex: 1, minWidth: 0, borderRadius: '4px 14px 14px 14px', padding: '11px 14px', fontSize: 13, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgb(208,213,230)' }}>
+                  <RichText text={m.content} />
+                </div>
+              </div>
+            )
           ))}
 
           {thinking && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'rgb(103,232,249)' }}>
-              <Loader2 size={13} className="animate-spin" />
-              {researched ? 'Thinking…' : `Researching ${lead.company_name} live… (this first answer takes a few seconds)`}
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Loader2 size={13} className="animate-spin" color="rgb(103,232,249)" />
+              </div>
+              <div style={{ fontSize: 12.5, color: 'rgb(120,200,215)', lineHeight: 1.5 }}>
+                {researched ? 'Thinking…' : `Researching ${lead.company_name} live — first answer takes a few seconds…`}
+              </div>
             </div>
           )}
         </div>
 
         {/* Composer */}
-        <div style={{ padding: 14, borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-          <textarea
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(input) } }}
-            placeholder={`Ask about ${lead.company_name}…`}
-            rows={1}
-            style={{ flex: 1, resize: 'none', maxHeight: 120, borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', padding: '10px 12px', fontSize: 13, color: 'white', fontFamily: 'inherit', lineHeight: 1.5, outline: 'none' }}
-          />
-          <button onClick={() => ask(input)} disabled={thinking || !input.trim()}
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, flexShrink: 0, borderRadius: 10, border: '1px solid rgba(34,211,238,0.4)', background: 'rgba(34,211,238,0.14)', color: 'rgb(103,232,249)', cursor: thinking || !input.trim() ? 'not-allowed' : 'pointer', opacity: thinking || !input.trim() ? 0.5 : 1 }}>
-            <Send size={15} />
-          </button>
+        <div style={{ padding: '12px 16px 16px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', borderRadius: 13, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', padding: 6 }}>
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={e => {
+                setInput(e.target.value)
+                e.target.style.height = 'auto'
+                e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px'
+              }}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(input) } }}
+              placeholder={`Ask about ${lead.company_name}…`}
+              rows={1}
+              style={{ flex: 1, resize: 'none', maxHeight: 140, border: 'none', background: 'transparent', padding: '8px 10px', fontSize: 13, color: 'white', fontFamily: 'inherit', lineHeight: 1.5, outline: 'none' }}
+            />
+            <button onClick={() => ask(input)} disabled={thinking || !input.trim()}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, flexShrink: 0, borderRadius: 10, border: 'none', background: thinking || !input.trim() ? 'rgba(34,211,238,0.12)' : 'rgb(34,211,238)', color: thinking || !input.trim() ? 'rgb(103,232,249)' : 'rgb(8,12,16)', cursor: thinking || !input.trim() ? 'not-allowed' : 'pointer', transition: 'all 0.15s' }}>
+              {thinking ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+            </button>
+          </div>
+          <div style={{ fontSize: 10.5, color: 'rgb(90,97,125)', marginTop: 7, textAlign: 'center' }}>
+            Enter to send · Shift+Enter for a new line · closing saves what I learned
+          </div>
         </div>
       </div>
     </div>
   )
+
+  return createPortal(panel, document.body)
 }
 
 /* ── Outcome bar: one-tap capture of what happened (feeds the learning loop) ── */
