@@ -1,19 +1,162 @@
 import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { PRODUCT_BRAIN, SINGLE_API_LINE } from '@/lib/kima-knowledge'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
+// Rules that make every message read as a hand-written, researched DM — not a
+// blast. Shared by both the auto-draft and the custom-config flows.
+const HUMAN_RULES = `WRITE LIKE A REAL PERSON WHO DID THE RESEARCH — NOT A TEMPLATE.
+
+HARD BANS (never use these — they scream "mass outreach"):
+- "I hope this email/message finds you well", "I wanted to reach out", "I came across", "I noticed your company"
+- "game-changer", "revolutionary", "cutting-edge", "synergy", "leverage", "seamless", "robust", "best-in-class", "in today's fast-paced world"
+- "circle back", "touch base", "pick your brain", "hop on a quick call", "let's connect"
+- "I'd love to", "we are excited to", "we believe", over-the-top flattery
+- generic openers that could be sent to any company
+
+REQUIRED:
+- Open with a SPECIFIC detail about THEM: the exact trigger/event, a chain/provider they use, a number, a recent hack/launch/funding — something only someone who researched them would know. Reference the source if there is one.
+- Tie that detail to ONE concrete problem Kima/Aeredium fixes for them. Be specific, not a feature dump.
+- Sound human: contractions, varied sentence length, plain words. A small amount of imperfection is good. No corporate voice.
+- Confident peer tone, never pushy or salesy. No exclamation spam, at most one emoji and only if it fits the channel.
+- End with a low-friction, specific CTA (a yes/no question or a tiny ask), and vary it across drafts.
+- No signature block, no "Best regards". Sign-offs should be minimal or omitted (the human sends from their own account).
+- Naturally include this idea once where it fits (don't force it): "${SINGLE_API_LINE}"`
+
+interface LeadRow {
+  company_name: string
+  website?: string | null
+  description?: string | null
+  business_model?: string | null
+  product_summary?: string | null
+  supported_chains_or_rails?: string | null
+  current_providers?: string | null
+  customer_category?: string[] | null
+  product_to_sell?: string | null
+  region?: string | null
+  pain_point?: string | null
+  pain_point_evidence?: string | null
+  kima_fit?: string | null
+  aeredium_fit?: string | null
+  suggested_use_case?: string | null
+  settlement_angle?: string | null
+  security_angle?: string | null
+  trigger_reason?: string | null
+  source_url?: string | null
+  contacts?: { name?: string | null; role?: string | null }[] | null
+}
+
+function leadContextBlock(lead: LeadRow): string {
+  const contact = (lead.contacts || [])[0]
+  const lines = [
+    `Company: ${lead.company_name}`,
+    lead.website && `Website: ${lead.website}`,
+    contact?.name && `Likely contact: ${contact.name}${contact.role ? ` (${contact.role})` : ''}`,
+    lead.description && `What they do: ${lead.description}`,
+    lead.business_model && `Business model: ${lead.business_model}`,
+    lead.supported_chains_or_rails && `Chains/rails they use: ${lead.supported_chains_or_rails}`,
+    lead.current_providers && `Current providers: ${lead.current_providers}`,
+    (lead.customer_category || []).length > 0 && `Category: ${(lead.customer_category || []).join(', ')}`,
+    lead.region && `Region: ${lead.region}`,
+    lead.trigger_reason && `*** REASON TO REACH OUT NOW (use this as the hook): ${lead.trigger_reason}`,
+    lead.source_url && `Source/proof: ${lead.source_url}`,
+    lead.pain_point && `Their pain point: ${lead.pain_point}`,
+    lead.pain_point_evidence && `Pain evidence: ${lead.pain_point_evidence}`,
+    lead.kima_fit && `How Kima fits them: ${lead.kima_fit}`,
+    lead.aeredium_fit && `How Aeredium fits them: ${lead.aeredium_fit}`,
+    lead.settlement_angle && `Settlement angle: ${lead.settlement_angle}`,
+    lead.security_angle && `Security angle: ${lead.security_angle}`,
+    lead.suggested_use_case && `Suggested use case: ${lead.suggested_use_case}`,
+    lead.product_to_sell && `Best product to sell: ${lead.product_to_sell}`,
+  ].filter(Boolean)
+  return lines.join('\n')
+}
+
+// ── AUTO MODE: agent writes 2-3 ready-to-send human drafts on its own ──
+async function generateAutoDrafts(leadId: string) {
+  const { data: lead, error } = await supabase
+    .from('leads')
+    .select('*, contacts(name, role)')
+    .eq('id', leadId)
+    .single()
+
+  if (error || !lead) {
+    return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+  }
+
+  const systemPrompt = `You are Arpit, leading BD/partnerships for Kima and Aeredium. You write your own outreach DMs by hand after researching each prospect.
+
+${PRODUCT_BRAIN}
+
+${HUMAN_RULES}
+
+You will produce THREE drafts for the SAME lead. They must NOT feel like the same message resized — each uses a DIFFERENT hook/angle from the research and a different length and channel:
+1. "short"  → a Telegram / X DM. 2-3 sentences. Punchy, one sharp hook.
+2. "medium" → a LinkedIn message. ~4-5 sentences. A different angle than the short one.
+3. "long"   → an email (include a subject line). ~6-8 sentences, a bit more context and proof, yet still tight and human.
+
+Return JSON only.`
+
+  const userPrompt = `Here is everything I researched on this lead. Write the 3 drafts so they could ONLY have been written for this specific company.
+
+${leadContextBlock(lead as LeadRow)}
+
+Return JSON exactly:
+{
+  "drafts": [
+    { "id": "short",  "label": "Short — Telegram / X DM", "channel": "telegram", "text": "..." },
+    { "id": "medium", "label": "Medium — LinkedIn",        "channel": "linkedin", "text": "..." },
+    { "id": "long",   "label": "Longer — Email",           "channel": "email", "subject": "...", "text": "..." }
+  ]
+}`
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.85,
+      max_tokens: 2200,
+    })
+    const result = JSON.parse(completion.choices[0].message.content || '{}')
+    return NextResponse.json({ success: true, mode: 'auto', data: result })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'AI request failed'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
 
 export async function POST(req: NextRequest) {
   if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your_openai_api_key_here') {
     return NextResponse.json({ error: 'OpenAI API key not configured. Please add OPENAI_API_KEY to your .env.local file.' }, { status: 400 })
   }
 
+  const body = await req.json()
+
+  // Auto mode — the agent drafts on its own from the saved research.
+  if (body.mode === 'auto') {
+    if (!body.lead_id) {
+      return NextResponse.json({ error: 'lead_id is required for auto mode' }, { status: 400 })
+    }
+    return generateAutoDrafts(body.lead_id)
+  }
+
+  // ── CUSTOM MODE: user-configured full sequence ──
   const {
     company_name, contact_name, channel, tone, customer_category,
     product_to_sell, use_case, pain_point, kima_fit, aeredium_fit,
     message_length = 'medium'
-  } = await req.json()
+  } = body
 
   const lengthGuides: Record<string, string> = {
     short: '2-3 sentences max per message',
@@ -43,23 +186,15 @@ export async function POST(req: NextRequest) {
 
 ${PRODUCT_BRAIN}
 
-ARPIT'S STYLE:
-- Human, direct, sharp
-- Not too formal, not generic
-- Uses exact pain points, not generic pitch
-- Short enough for DMs
-- Confident but not pushy
-- Always personalizes to their specific situation
+${HUMAN_RULES}
 
-ALWAYS include this line naturally: "${SINGLE_API_LINE}"
-
-MESSAGE STRUCTURE:
-1. Personal opener based on their company/product
-2. Specific pain point they have
+MESSAGE STRUCTURE (keep it natural, don't make it look like a checklist):
+1. Personal opener based on their specific company/product/trigger
+2. The specific pain point they have
 3. Kima/Aeredium fit for their situation
 4. Product/use case to sell
-5. Single API line
-6. Soft CTA
+5. The single-API idea woven in
+6. Soft, specific CTA
 
 Return JSON only. No markdown prose.`
 
