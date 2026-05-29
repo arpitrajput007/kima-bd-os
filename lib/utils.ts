@@ -140,21 +140,62 @@ const TWITTER_RESERVED = new Set([
   'about', 'tos', 'privacy', 'status',
 ])
 
+const SOCIAL_STOP_TOKENS = new Set([
+  'protocol', 'finance', 'network', 'labs', 'lab', 'app', 'inc', 'the',
+  'foundation', 'capital', 'ventures', 'group', 'global', 'dao', 'defi',
+  'exchange', 'wallet', 'chain', 'crypto', 'web3', 'company', 'xyz',
+])
+
+function nameTokens(name?: string): string[] {
+  if (!name) return []
+  return name
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(t => t.length >= 3 && !SOCIAL_STOP_TOKENS.has(t))
+}
+
+// From a list of handles, prefer one that matches the company name
+// (handle contains a name token, or a name token contains the handle).
+// Falls back to the first handle when there's no name match.
+function pickHandle(handles: string[], tokens: string[]): string | undefined {
+  const seen = new Set<string>()
+  const ordered = handles.filter(h => {
+    const k = h.toLowerCase()
+    if (seen.has(k)) return false
+    seen.add(k)
+    return true
+  })
+  if (ordered.length === 0) return undefined
+  if (tokens.length > 0) {
+    const matched = ordered.find(h => {
+      const flat = h.toLowerCase().replace(/[_+]/g, '')
+      return tokens.some(t => flat.includes(t) || t.includes(flat))
+    })
+    if (matched) return matched
+  }
+  return ordered[0]
+}
+
 // Extract real social links from page text/markdown (e.g. a website footer).
 // Pure regex — does not invent links, only returns ones present in the text.
-export function extractSocials(text: string): Socials {
+// When companyName is given, prefer handles that match the company name so an
+// official account wins over community bots/aggregators on the same page.
+export function extractSocials(text: string, companyName?: string): Socials {
   const out: Socials = {}
   if (!text) return out
+  const tokens = nameTokens(companyName)
 
-  const tw = text.match(/https?:\/\/(?:www\.)?(?:twitter|x)\.com\/([A-Za-z0-9_]{1,30})/i)
-  if (tw && !TWITTER_RESERVED.has(tw[1].toLowerCase())) {
-    out.twitter_url = `https://x.com/${tw[1]}`
-  }
+  const twHandles = [...text.matchAll(/https?:\/\/(?:www\.)?(?:twitter|x)\.com\/([A-Za-z0-9_]{1,30})/gi)]
+    .map(m => m[1])
+    .filter(h => !TWITTER_RESERVED.has(h.toLowerCase()))
+  const tw = pickHandle(twHandles, tokens)
+  if (tw) out.twitter_url = `https://x.com/${tw}`
 
-  const tg = text.match(/https?:\/\/(?:www\.)?t\.me\/([A-Za-z0-9_+]{3,40})/i)
-  if (tg && tg[1].toLowerCase() !== 'share') {
-    out.telegram_url = `https://t.me/${tg[1]}`
-  }
+  const tgHandles = [...text.matchAll(/https?:\/\/(?:www\.)?t\.me\/([A-Za-z0-9_+]{3,40})/gi)]
+    .map(m => m[1])
+    .filter(h => h.toLowerCase() !== 'share')
+  const tg = pickHandle(tgHandles, tokens)
+  if (tg) out.telegram_url = `https://t.me/${tg}`
 
   const dc = text.match(/https?:\/\/(?:www\.)?(?:discord\.gg|discord\.com\/invite)\/[A-Za-z0-9-]{3,40}/i)
   if (dc) out.discord_url = dc[0]

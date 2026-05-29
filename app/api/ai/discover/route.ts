@@ -59,7 +59,7 @@ async function readUrl(url: string): Promise<string> {
 
 // Read a company website and pull real social links (twitter/telegram/discord)
 // from the page (usually the header/footer). No AI guessing — regex only.
-async function fetchSocials(website?: string): Promise<Socials> {
+async function fetchSocials(website?: string, companyName?: string): Promise<Socials> {
   if (!website) return {}
   try {
     const url = website.startsWith('http') ? website : `https://${website}`
@@ -69,7 +69,7 @@ async function fetchSocials(website?: string): Promise<Socials> {
     })
     if (!res.ok) return {}
     const text = await res.text()
-    return extractSocials(text)
+    return extractSocials(text, companyName)
   } catch {
     return {}
   }
@@ -377,7 +377,7 @@ export async function POST(req: NextRequest) {
       if (!hasRoom) { results.skipped_cap++; continue }
 
       // Pull real social links from the company website (footer/header)
-      const socials = await fetchSocials(company.website)
+      const socials = await fetchSocials(company.website, company.name)
 
       // Insert lead
       const { data: newLead, error: leadErr } = await supabase
