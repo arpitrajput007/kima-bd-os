@@ -127,6 +127,41 @@ export function pickBestUrl(candidates: (string | null | undefined)[]): string |
   return urls.find(urlHasPath) || urls[0] || null
 }
 
+export interface Socials {
+  twitter_url?: string
+  telegram_url?: string
+  discord_url?: string
+}
+
+// Twitter/X handles that are not real accounts (UI/intent routes).
+const TWITTER_RESERVED = new Set([
+  'home', 'share', 'intent', 'search', 'hashtag', 'i', 'explore',
+  'login', 'signup', 'messages', 'notifications', 'settings', 'compose',
+  'about', 'tos', 'privacy', 'status',
+])
+
+// Extract real social links from page text/markdown (e.g. a website footer).
+// Pure regex — does not invent links, only returns ones present in the text.
+export function extractSocials(text: string): Socials {
+  const out: Socials = {}
+  if (!text) return out
+
+  const tw = text.match(/https?:\/\/(?:www\.)?(?:twitter|x)\.com\/([A-Za-z0-9_]{1,30})/i)
+  if (tw && !TWITTER_RESERVED.has(tw[1].toLowerCase())) {
+    out.twitter_url = `https://x.com/${tw[1]}`
+  }
+
+  const tg = text.match(/https?:\/\/(?:www\.)?t\.me\/([A-Za-z0-9_+]{3,40})/i)
+  if (tg && tg[1].toLowerCase() !== 'share') {
+    out.telegram_url = `https://t.me/${tg[1]}`
+  }
+
+  const dc = text.match(/https?:\/\/(?:www\.)?(?:discord\.gg|discord\.com\/invite)\/[A-Za-z0-9-]{3,40}/i)
+  if (dc) out.discord_url = dc[0]
+
+  return out
+}
+
 export function getRuleTypeColor(type: string): string {
   switch (type) {
     case 'prioritize': return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'

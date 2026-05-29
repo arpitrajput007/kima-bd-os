@@ -159,6 +159,9 @@ export interface Lead {
   integration_feasibility?: string
   source_url?: string
   source_summary?: string
+  twitter_url?: string
+  telegram_url?: string
+  discord_url?: string
   facts?: Record<string, unknown>[]
   assumptions?: Record<string, unknown>[]
   lead_score?: number

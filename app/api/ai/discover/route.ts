@@ -2,7 +2,7 @@ import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { PRODUCT_BRAIN, PRODUCT_BRAIN_COMPACT } from '@/lib/kima-knowledge'
-import { pickBestUrl } from '@/lib/utils'
+import { pickBestUrl, extractSocials, type Socials } from '@/lib/utils'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -54,6 +54,24 @@ async function readUrl(url: string): Promise<string> {
   } catch (e) {
     console.error('[readUrl]', e)
     return ''
+  }
+}
+
+// Read a company website and pull real social links (twitter/telegram/discord)
+// from the page (usually the header/footer). No AI guessing — regex only.
+async function fetchSocials(website?: string): Promise<Socials> {
+  if (!website) return {}
+  try {
+    const url = website.startsWith('http') ? website : `https://${website}`
+    const res = await fetch(`https://r.jina.ai/${url}`, {
+      headers: { Accept: 'text/plain' },
+      signal: AbortSignal.timeout(20000),
+    })
+    if (!res.ok) return {}
+    const text = await res.text()
+    return extractSocials(text)
+  } catch {
+    return {}
   }
 }
 
@@ -358,12 +376,18 @@ export async function POST(req: NextRequest) {
       const hasRoom = categories.some(cat => (categoryCounts[cat] || 0) < CATEGORY_CAP)
       if (!hasRoom) { results.skipped_cap++; continue }
 
+      // Pull real social links from the company website (footer/header)
+      const socials = await fetchSocials(company.website)
+
       // Insert lead
       const { data: newLead, error: leadErr } = await supabase
         .from('leads')
         .insert({
           company_name: company.name,
           website: company.website || null,
+          twitter_url: socials.twitter_url || null,
+          telegram_url: socials.telegram_url || null,
+          discord_url: socials.discord_url || null,
           description: company.description,
           industry_category: research.industry_category,
           customer_category: research.customer_category,

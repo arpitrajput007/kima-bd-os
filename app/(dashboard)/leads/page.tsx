@@ -6,7 +6,8 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import {
   Plus, Search, Filter, Star, ExternalLink, ChevronDown,
-  CheckCircle, XCircle, Eye, MessageSquare, Loader2, RefreshCw
+  CheckCircle, XCircle, Eye, MessageSquare, Loader2, RefreshCw,
+  AtSign, Send, MessageCircle
 } from 'lucide-react'
 import {
   cn, getScoreBg, getStatusColor, getStatusLabel, formatDate, truncate
@@ -270,6 +271,31 @@ export default function LeadsPage() {
                                 {lead.website.replace(/^https?:\/\//, '').slice(0, 25)}
                                 <ExternalLink size={9} />
                               </a>
+                            )}
+                            {(lead.twitter_url || lead.telegram_url || lead.discord_url) && (
+                              <div className="flex items-center gap-1.5 mt-1">
+                                {lead.twitter_url && (
+                                  <a href={lead.twitter_url} target="_blank" rel="noopener noreferrer"
+                                    title="Twitter / X" onClick={e => e.stopPropagation()}
+                                    style={{ color: '#38bdf8' }}>
+                                    <AtSign size={12} />
+                                  </a>
+                                )}
+                                {lead.telegram_url && (
+                                  <a href={lead.telegram_url} target="_blank" rel="noopener noreferrer"
+                                    title="Telegram" onClick={e => e.stopPropagation()}
+                                    style={{ color: '#22d3ee' }}>
+                                    <Send size={12} />
+                                  </a>
+                                )}
+                                {lead.discord_url && (
+                                  <a href={lead.discord_url} target="_blank" rel="noopener noreferrer"
+                                    title="Discord" onClick={e => e.stopPropagation()}
+                                    style={{ color: '#818cf8' }}>
+                                    <MessageCircle size={12} />
+                                  </a>
+                                )}
+                              </div>
                             )}
                           </div>
                         </div>

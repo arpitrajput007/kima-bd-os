@@ -11,7 +11,7 @@ import {
   Copy, CheckCircle, CheckCircle2, AlertTriangle, Globe, Link2, Send,
   ChevronDown, ChevronUp, RefreshCw, Building2, Brain,
   FileSearch, Puzzle, Calendar, Mail,
-  MapPin
+  MapPin, AtSign, MessageCircle
 } from 'lucide-react'
 import {
   cn, getScoreBg, getStatusColor, getStatusLabel, getSeverityColor,
@@ -55,6 +55,22 @@ function InfoBlock({ title, value }: { title: string; value?: string | null }) {
       </p>
       <p style={{ fontSize: 14, lineHeight: 1.65, color: 'rgb(210,215,235)' }}>{value}</p>
     </div>
+  )
+}
+
+function SocialChip({ icon: Icon, label, href, color }: {
+  icon: React.ComponentType<{ size?: number }>; label: string; href: string; color: string
+}) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" title={label}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 11px',
+        borderRadius: 8, fontSize: 12, fontWeight: 500, textDecoration: 'none',
+        border: `1px solid ${color}40`, background: `${color}14`, color,
+      }}>
+      <Icon size={13} />
+      {label}
+    </a>
   )
 }
 
@@ -482,6 +498,14 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     {lead.website}
                     <ExternalLink size={12} />
                   </a>
+                )}
+                {(lead.website || lead.twitter_url || lead.telegram_url || lead.discord_url) && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                    {lead.website && <SocialChip icon={Globe} label="Website" href={lead.website} color="#60a5fa" />}
+                    {lead.twitter_url && <SocialChip icon={AtSign} label="Twitter / X" href={lead.twitter_url} color="#38bdf8" />}
+                    {lead.telegram_url && <SocialChip icon={Send} label="Telegram" href={lead.telegram_url} color="#22d3ee" />}
+                    {lead.discord_url && <SocialChip icon={MessageCircle} label="Discord" href={lead.discord_url} color="#818cf8" />}
+                  </div>
                 )}
               </div>
             </div>
