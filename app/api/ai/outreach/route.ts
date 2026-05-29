@@ -31,6 +31,55 @@ REQUIRED:
 - No signature block, no "Best regards". Sign-offs should be minimal or omitted (the human sends from their own account).
 - Naturally include this idea once where it fits (don't force it): "${SINGLE_API_LINE}"`
 
+// High-signal phrases that scream "mass outreach". GPT sometimes ignores the
+// prompt ban, so we scan the output and force one rewrite if any slip through.
+const BANNED_PHRASES = [
+  'i hope this email finds you well', 'i hope this message finds you well',
+  'hope this finds you well', 'hope this email finds you', 'hope this message finds you',
+  'i wanted to reach out', 'just wanted to reach out', 'i came across', 'i noticed your company',
+  'game-changer', 'game changer', 'revolutionary', 'cutting-edge', 'cutting edge',
+  'synergy', 'seamless', 'best-in-class', "in today's fast-paced world",
+  'circle back', 'touch base', 'pick your brain', 'hop on a quick call',
+  "let's connect", 'we are excited to', "we're excited to", 'just bumping this',
+  'just circling back', 'just following up',
+]
+
+function findBannedPhrases(text: string): string[] {
+  const t = (text || '').toLowerCase()
+  return BANNED_PHRASES.filter(p => t.includes(p))
+}
+
+// Run a JSON completion, then scan the extracted text for banned phrases. If any
+// appear, retry ONCE with the offenders called out explicitly.
+async function completeWithBanGuard(
+  systemPrompt: string,
+  userPrompt: string,
+  opts: { temperature: number; max_tokens: number },
+  extractTexts: (parsed: Record<string, unknown>) => string[],
+): Promise<Record<string, unknown>> {
+  const run = async (user: string) => {
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: user },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: opts.temperature,
+      max_tokens: opts.max_tokens,
+    })
+    return JSON.parse(completion.choices[0].message.content || '{}') as Record<string, unknown>
+  }
+
+  let parsed = await run(userPrompt)
+  const banned = [...new Set(extractTexts(parsed).flatMap(findBannedPhrases))]
+  if (banned.length > 0) {
+    const fixUser = `${userPrompt}\n\nYOUR PREVIOUS ATTEMPT USED THESE BANNED PHRASES: ${banned.map(b => `"${b}"`).join(', ')}. Rewrite everything so NONE of these — or any phrase from the HARD BANS — appears anywhere. Keep it specific, human, and tailored to this exact lead.`
+    parsed = await run(fixUser)
+  }
+  return parsed
+}
+
 interface LeadRow {
   company_name: string
   website?: string | null
@@ -152,17 +201,13 @@ Return JSON exactly:
 }`
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.85,
-      max_tokens: 2200,
-    })
-    const result = JSON.parse(completion.choices[0].message.content || '{}')
+    const result = await completeWithBanGuard(
+      systemPrompt,
+      userPrompt,
+      { temperature: 0.85, max_tokens: 2200 },
+      (p) => ((p.drafts as { subject?: string; text?: string }[]) || [])
+        .map(d => `${d.subject || ''} ${d.text || ''}`),
+    )
     return NextResponse.json({
       success: true,
       mode: 'auto',
@@ -230,17 +275,15 @@ Return JSON exactly:
 { "draft": { "channel": "${channel}", ${channel === 'email' ? '"subject": "...", ' : ''}"text": "..." } }`
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.85,
-      max_tokens: 800,
-    })
-    const result = JSON.parse(completion.choices[0].message.content || '{}')
+    const result = await completeWithBanGuard(
+      systemPrompt,
+      userPrompt,
+      { temperature: 0.85, max_tokens: 800 },
+      (p) => {
+        const d = p.draft as { subject?: string; text?: string } | undefined
+        return [`${d?.subject || ''} ${d?.text || ''}`]
+      },
+    )
     return NextResponse.json({
       success: true,
       mode: 'followup',
@@ -347,18 +390,13 @@ Return JSON:
 }`
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.7,
-      max_tokens: 2000,
-    })
-
-    const result = JSON.parse(completion.choices[0].message.content || '{}')
+    const result = await completeWithBanGuard(
+      systemPrompt,
+      userPrompt,
+      { temperature: 0.7, max_tokens: 2000 },
+      (p) => ['message', 'followup_1', 'followup_2', 'objection_reply', 'call_opening', 'meeting_agenda']
+        .map(k => String(p[k] || '')),
+    )
     return NextResponse.json({ success: true, data: result })
 
   } catch (err: unknown) {

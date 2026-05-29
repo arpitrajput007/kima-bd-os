@@ -33,6 +33,22 @@ export interface OutreachMeta {
   } | null
 }
 
+// The contacts finder often returns a guessed *pattern* (firstname@acme.com)
+// rather than a real inbox. Sending to that literal is worse than not sending,
+// so we treat patterns as "no email".
+const EMAIL_PLACEHOLDERS = [
+  'firstname', 'lastname', 'first.last', 'first_last', 'first-last',
+  'first.name', 'name.surname', 'fname', 'lname', 'yourname', 'your.name',
+  'name@', 'email@', 'user@', 'example.com', '@example',
+]
+
+export function isRealEmail(email?: string | null): boolean {
+  if (!email) return false
+  const e = email.trim().toLowerCase()
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return false
+  return !EMAIL_PLACEHOLDERS.some(p => e.includes(p))
+}
+
 // Merge contact-level and company-level handles into a single target,
 // always preferring the individual contact when we have them.
 export function buildTarget(meta?: OutreachMeta | null): TouchTarget {
@@ -42,7 +58,7 @@ export function buildTarget(meta?: OutreachMeta | null): TouchTarget {
     ? rawTg.replace(/^@/, '').replace(/^https?:\/\/(www\.)?t\.me\//, '')
     : undefined
   return {
-    email: c?.email || undefined,
+    email: isRealEmail(c?.email) ? (c!.email as string) : undefined,
     telegram_url: tgHandle ? `https://t.me/${tgHandle}` : (meta?.telegram_url || undefined),
     twitter_url: c?.twitter_url || meta?.twitter_url || undefined,
     linkedin_url: c?.linkedin_url || undefined,
