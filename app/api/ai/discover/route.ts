@@ -85,7 +85,7 @@ async function searchWeb(query: string): Promise<string> {
 async function extractCompanies(
   content: string,
   sourceContext: string
-): Promise<Array<{ name: string; website: string; description: string }>> {
+): Promise<Array<{ name: string; website: string; description: string; source_url: string }>> {
   try {
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -113,7 +113,8 @@ Extract up to 15 companies mentioned. Return JSON:
     {
       "name": "Company name",
       "website": "https://... or empty string if unknown",
-      "description": "1-2 sentence description of what they do"
+      "description": "1-2 sentence description of what they do",
+      "source_url": "the EXACT link from the content above that is specifically about THIS company (e.g. the article/post URL next to its name). Copy the real link verbatim from the content — do NOT invent one. Use empty string if no specific link is present."
     }
   ]
 }`,
@@ -385,8 +386,9 @@ export async function POST(req: NextRequest) {
           lead_score: research.lead_score,
           priority: research.priority,
           source_url: pickBestUrl([
-            research.source_url as string,
-            source.source_url_or_query,
+            company.source_url,            // exact link copied from the source page (most reliable)
+            research.source_url as string, // AI-found specific URL
+            source.source_url_or_query,    // the discovery source (may be a homepage/query)
             company.website,
           ]) || source.source_url_or_query,
           status: 'new',
