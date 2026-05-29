@@ -12,7 +12,7 @@ import {
   Copy, CheckCircle, CheckCircle2, AlertTriangle, Globe, Link2, Send,
   ChevronDown, ChevronUp, RefreshCw, Building2, Brain,
   FileSearch, Puzzle, Calendar, Mail, Wand2,
-  MapPin, AtSign, MessageCircle
+  MapPin, AtSign, MessageCircle, Plus, Trash2, History
 } from 'lucide-react'
 import {
   cn, getScoreBg, getStatusColor, getStatusLabel, getSeverityColor,
@@ -879,13 +879,31 @@ function RichText({ text }: { text: string }) {
   )
 }
 
+interface DiscussionSession { id: string; title: string; message_count: number; updated_at: string }
+
+function relTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  const d = Math.floor(h / 24)
+  if (d < 7) return `${d}d ago`
+  return new Date(iso).toLocaleDateString()
+}
+
 function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
+  const supabase = createClient()
+  const [sessions, setSessions] = useState<DiscussionSession[]>([])
+  const [activeId, setActiveId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
   const [thinking, setThinking] = useState(false)
   const [dossier, setDossier] = useState<string>('')
   const [shown, setShown] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [listOpen, setListOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const researched = dossier.length > 0
@@ -900,20 +918,70 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
     return () => { cancelAnimationFrame(t); clearTimeout(f); document.body.style.overflow = prevOverflow }
   }, [])
 
+  // Load this lead's past conversations and open the most recent one.
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('lead_discussions')
+        .select('id, title, message_count, updated_at')
+        .eq('lead_id', lead.id)
+        .order('updated_at', { ascending: false })
+      const list = (data || []) as DiscussionSession[]
+      setSessions(list)
+      if (list.length) loadSession(list[0].id)
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, thinking])
 
-  // Save what was learned when the panel closes (auto, no extra click).
-  const closeAndLearn = () => {
-    if (messages.filter(m => m.role === 'user').length >= 1 && messages.length >= 2) {
+  async function loadSession(id: string) {
+    setActiveId(id)
+    setListOpen(false)
+    const { data } = await supabase
+      .from('lead_discussion_messages')
+      .select('role, content')
+      .eq('discussion_id', id)
+      .order('created_at', { ascending: true })
+    setMessages((data || []).map((m: { role: string; content: string }) => ({ role: m.role as 'user' | 'assistant', content: m.content })))
+  }
+
+  function newConversation() {
+    // Persist what we learned from the current thread before starting fresh.
+    distill(messages)
+    setActiveId(null)
+    setMessages([])
+    setListOpen(false)
+    setTimeout(() => inputRef.current?.focus(), 60)
+  }
+
+  async function deleteSession(id: string) {
+    await supabase.from('lead_discussions').delete().eq('id', id)
+    const remaining = sessions.filter(s => s.id !== id)
+    setSessions(remaining)
+    if (activeId === id) {
+      if (remaining.length) loadSession(remaining[0].id)
+      else { setActiveId(null); setMessages([]) }
+    }
+  }
+
+  // Distill a transcript into the agent's memory (fire-and-forget).
+  function distill(transcript: ChatMsg[]) {
+    if (transcript.filter(m => m.role === 'user').length >= 1 && transcript.length >= 2) {
       fetch('/api/ai/discuss', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'distill', lead_id: lead.id, transcript: messages }),
+        body: JSON.stringify({ mode: 'distill', lead_id: lead.id, transcript }),
       }).then(r => r.json()).then(j => {
         if (j?.saved) toast.success('Saved what I learned to the agent’s memory')
       }).catch(() => {})
     }
+  }
+
+  // Save what was learned when the panel closes (auto, no extra click).
+  const closeAndLearn = () => {
+    distill(messages)
     setShown(false)
     setTimeout(onClose, 180) // let the slide-out play
   }
@@ -921,11 +989,29 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
   const ask = async (q: string) => {
     const question = q.trim()
     if (!question || thinking) return
+
+    // Lazily create a thread on the first message of a new conversation.
+    let sessionId = activeId
+    if (!sessionId) {
+      const { data } = await supabase
+        .from('lead_discussions')
+        .insert({ lead_id: lead.id, title: question.slice(0, 70) })
+        .select('id, title, message_count, updated_at')
+        .single()
+      if (data) {
+        sessionId = data.id
+        setActiveId(data.id)
+        setSessions(prev => [data as DiscussionSession, ...prev])
+      }
+    }
+
     const next = [...messages, { role: 'user' as const, content: question }]
     setMessages(next)
     setInput('')
     if (inputRef.current) inputRef.current.style.height = 'auto'
     setThinking(true)
+    if (sessionId) supabase.from('lead_discussion_messages').insert({ discussion_id: sessionId, lead_id: lead.id, role: 'user', content: question }).then(() => {})
+
     try {
       const res = await fetch('/api/ai/discuss', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -935,6 +1021,14 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
       if (!res.ok) throw new Error(json.error)
       if (json.dossier) setDossier(json.dossier)
       setMessages([...next, { role: 'assistant', content: json.reply }])
+      if (sessionId) {
+        const ts = new Date().toISOString()
+        const count = next.length + 1
+        supabase.from('lead_discussion_messages').insert({ discussion_id: sessionId, lead_id: lead.id, role: 'assistant', content: json.reply }).then(() => {})
+        supabase.from('lead_discussions').update({ message_count: count, updated_at: ts }).eq('id', sessionId).then(() => {})
+        setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, message_count: count, updated_at: ts } : s)
+          .sort((a, b) => b.updated_at.localeCompare(a.updated_at)))
+      }
     } catch (err: unknown) {
       setMessages([...next, { role: 'assistant', content: `⚠️ ${err instanceof Error ? err.message : 'Something went wrong'}` }])
     } finally {
@@ -958,7 +1052,7 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
         style={{
           width: 'min(580px, 100vw)', height: '100dvh', background: 'linear-gradient(180deg, rgb(17,18,28), rgb(12,12,19))',
           borderLeft: '1px solid rgba(34,211,238,0.25)', display: 'flex', flexDirection: 'column',
-          boxShadow: '-40px 0 90px rgba(0,0,0,0.65)',
+          boxShadow: '-40px 0 90px rgba(0,0,0,0.65)', position: 'relative', overflow: 'hidden',
           transform: shown ? 'translateX(0)' : 'translateX(100%)', transition: 'transform 0.28s cubic-bezier(0.22,1,0.36,1)',
         }}>
 
@@ -976,10 +1070,23 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
               </div>
             </div>
           </div>
-          <button onClick={closeAndLearn}
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 9, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgb(160,167,190)', cursor: 'pointer' }}>
-            <X size={16} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <button onClick={() => setListOpen(v => !v)} title="Conversation history"
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 9, border: `1px solid ${listOpen ? 'rgba(34,211,238,0.4)' : 'rgba(255,255,255,0.1)'}`, background: listOpen ? 'rgba(34,211,238,0.12)' : 'rgba(255,255,255,0.04)', color: listOpen ? 'rgb(103,232,249)' : 'rgb(160,167,190)', cursor: 'pointer', position: 'relative' }}>
+              <History size={15} />
+              {sessions.length > 0 && (
+                <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 15, height: 15, padding: '0 3px', borderRadius: 999, background: 'rgb(34,211,238)', color: 'rgb(8,12,16)', fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>{sessions.length}</span>
+              )}
+            </button>
+            <button onClick={newConversation} title="New conversation"
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 9, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgb(160,167,190)', cursor: 'pointer' }}>
+              <Plus size={16} />
+            </button>
+            <button onClick={closeAndLearn} title="Close"
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 9, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgb(160,167,190)', cursor: 'pointer' }}>
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
@@ -1058,6 +1165,46 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
           </div>
           <div style={{ fontSize: 10.5, color: 'rgb(90,97,125)', marginTop: 7, textAlign: 'center' }}>
             Enter to send · Shift+Enter for a new line · closing saves what I learned
+          </div>
+        </div>
+
+        {/* Conversations drawer (this lead's chat history) */}
+        <div onClick={() => setListOpen(false)}
+          style={{ position: 'absolute', inset: 0, zIndex: 5, background: listOpen ? 'rgba(4,4,10,0.45)' : 'rgba(4,4,10,0)', pointerEvents: listOpen ? 'auto' : 'none', transition: 'background 0.2s ease' }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: 'min(300px, 82%)', background: 'linear-gradient(180deg, rgb(20,21,32), rgb(14,14,22))', borderRight: '1px solid rgba(34,211,238,0.22)', boxShadow: '24px 0 60px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', transform: listOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.26s cubic-bezier(0.22,1,0.36,1)' }}>
+            <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'rgb(190,225,235)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Conversations</div>
+              <button onClick={newConversation} title="New conversation"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, borderRadius: 8, border: '1px solid rgba(34,211,238,0.3)', background: 'rgba(34,211,238,0.1)', color: 'rgb(103,232,249)', fontSize: 11, fontWeight: 600, padding: '5px 9px', cursor: 'pointer' }}>
+                <Plus size={12} /> New
+              </button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {sessions.length === 0 && (
+                <div style={{ fontSize: 12, color: 'rgb(110,117,145)', padding: '16px 10px', lineHeight: 1.6 }}>
+                  No conversations yet. Ask a question and it’ll be saved here so you can review it later.
+                </div>
+              )}
+              {sessions.map(s => (
+                <div key={s.id} onClick={() => loadSession(s.id)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, borderRadius: 10, padding: '9px 10px', cursor: 'pointer', border: `1px solid ${activeId === s.id ? 'rgba(34,211,238,0.3)' : 'transparent'}`, background: activeId === s.id ? 'rgba(34,211,238,0.08)' : 'transparent' }}
+                  onMouseEnter={e => { if (activeId !== s.id) e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
+                  onMouseLeave={e => { if (activeId !== s.id) e.currentTarget.style.background = 'transparent' }}>
+                  <MessageSquare size={13} color={activeId === s.id ? 'rgb(103,232,249)' : 'rgb(120,127,160)'} style={{ flexShrink: 0 }} />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 12.5, color: activeId === s.id ? 'white' : 'rgb(200,205,222)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.title}</div>
+                    <div style={{ fontSize: 10, color: 'rgb(110,117,145)', marginTop: 1 }}>{relTime(s.updated_at)} · {s.message_count} msg</div>
+                  </div>
+                  <button onClick={e => { e.stopPropagation(); deleteSession(s.id) }} title="Delete conversation"
+                    style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 7, border: 'none', background: 'transparent', color: 'rgb(120,127,160)', cursor: 'pointer' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248,113,113,0.12)'; e.currentTarget.style.color = 'rgb(248,113,113)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgb(120,127,160)' }}>
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
