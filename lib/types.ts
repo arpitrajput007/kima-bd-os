@@ -168,6 +168,11 @@ export interface Lead {
   confidence_score?: number
   priority?: LeadPriority
   status: LeadStatus
+  contacted_at?: string
+  last_contacted_at?: string
+  follow_up_stage?: number
+  next_follow_up_at?: string
+  last_channel?: string
   created_at: string
   updated_at: string
   contacts?: Contact[]

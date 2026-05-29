@@ -7,17 +7,20 @@ import { toast } from 'sonner'
 import {
   Sun, Target, Flame, ArrowRight, MessageSquare, Mail, Link2,
   AtSign, CheckCircle, Eye, Loader2, RefreshCw, Clock, CalendarCheck,
-  Sparkles, Zap, TrendingUp,
+  Sparkles, Zap, TrendingUp, Wand2, Copy, ExternalLink,
 } from 'lucide-react'
 import { cn, getScoreBg, truncate } from '@/lib/utils'
 import type { Lead, Contact } from '@/lib/types'
+import {
+  buildTarget, channelDeepLink, logTouch, followUpDue,
+  MAX_FOLLOWUPS, FOLLOWUP_GAP_DAYS, type OutreachMeta,
+} from '@/lib/outreach'
 
 type LeadWithContacts = Lead & { contacts?: Contact[] }
 
 // Statuses that mean "ready to reach out" — agent has researched, you haven't contacted yet
 const READY_STATUSES = ['new', 'researching', 'qualified', 'approved', 'needs_more_research']
 const DAILY_GOAL = 5
-const FOLLOWUP_AFTER_DAYS = 3
 
 function bestContact(contacts?: Contact[]): Contact | null {
   if (!contacts || contacts.length === 0) return null
@@ -29,6 +32,117 @@ function bestContact(contacts?: Contact[]): Contact | null {
 
 function daysSince(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24))
+}
+
+interface AgentDraft { channel: string; subject?: string; text: string }
+
+// A due follow-up: draft a fresh-angle nudge inline, then open the channel
+// and log the touch (advancing the lead's follow-up stage).
+function FollowUpRow({ lead, onSent }: { lead: LeadWithContacts; onSent: () => void }) {
+  const supabase = createClient()
+  const [draft, setDraft] = useState<AgentDraft | null>(null)
+  const [meta, setMeta] = useState<OutreachMeta | null>(null)
+  const [drafting, setDrafting] = useState(false)
+  const [sending, setSending] = useState(false)
+  const stage = lead.follow_up_stage ?? 0
+  const baseDate = lead.last_contacted_at || lead.updated_at
+
+  const draftFollowup = async () => {
+    setDrafting(true)
+    try {
+      const res = await fetch('/api/ai/outreach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'followup', lead_id: lead.id, stage }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      setDraft(json.data?.draft || null)
+      setMeta(json.data?.meta || null)
+      if (!json.data?.draft) toast.error('No follow-up returned — try again')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Draft failed')
+    } finally {
+      setDrafting(false)
+    }
+  }
+
+  const sendFollowup = async () => {
+    if (!draft) return
+    setSending(true)
+    const target = buildTarget(meta)
+    const url = channelDeepLink(draft.channel, target, draft.text, draft.subject)
+    const fullText = draft.subject ? `${draft.subject}\n\n${draft.text}` : draft.text
+    const { error } = await logTouch(supabase, {
+      leadId: lead.id,
+      channel: draft.channel,
+      text: draft.text,
+      subject: draft.subject,
+      contactId: meta?.contact?.id,
+      kind: 'followup',
+      currentStage: stage,
+    })
+    setSending(false)
+    if (error) { toast.error('Could not log the follow-up'); return }
+    if (url) {
+      if (draft.channel !== 'email') navigator.clipboard.writeText(fullText)
+      window.open(url, '_blank')
+    } else {
+      navigator.clipboard.writeText(fullText)
+    }
+    toast.success(`Follow-up #${stage + 1} logged`)
+    onSent()
+  }
+
+  return (
+    <div className="px-3 py-2.5 rounded-lg" style={{ background: draft ? 'rgba(251,191,36,0.04)' : 'transparent' }}>
+      <div className="flex items-center justify-between gap-2">
+        <Link href={`/leads/${lead.id}`} className="min-w-0">
+          <div className="text-[13px] font-semibold text-white truncate hover:text-violet-300 transition-colors">{lead.company_name}</div>
+          <div className="text-[11px]" style={{ color: 'rgb(100,106,135)' }}>
+            {baseDate ? `Last touch ${daysSince(baseDate)}d ago` : 'Contacted'} · follow-up #{stage + 1} of {MAX_FOLLOWUPS}
+          </div>
+        </Link>
+        {!draft ? (
+          <button onClick={draftFollowup} disabled={drafting}
+            className="btn btn-secondary flex-shrink-0" style={{ fontSize: '11px', padding: '5px 10px' }}>
+            {drafting ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+            Draft follow-up
+          </button>
+        ) : (
+          <ArrowRight size={14} style={{ color: 'rgb(110,115,145)' }} className="flex-shrink-0" />
+        )}
+      </div>
+
+      {draft && (
+        <div className="mt-2.5 rounded-lg overflow-hidden" style={{ border: '1px solid rgba(251,191,36,0.18)' }}>
+          {draft.subject && (
+            <div className="px-3 pt-2 text-[11px]" style={{ color: '#fbbf24' }}>
+              <span style={{ opacity: 0.7 }}>Subject: </span><span className="text-white">{draft.subject}</span>
+            </div>
+          )}
+          <pre className="px-3 py-2.5 text-[12px] leading-relaxed whitespace-pre-wrap"
+            style={{ color: 'rgb(210,210,230)', fontFamily: 'Inter, sans-serif', background: 'rgba(22,22,34,0.5)' }}>
+            {draft.text}
+          </pre>
+          <div className="flex items-center gap-1.5 px-3 py-2" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            <button onClick={() => { navigator.clipboard.writeText(draft.subject ? `${draft.subject}\n\n${draft.text}` : draft.text); toast.success('Copied!') }}
+              className="btn btn-ghost" style={{ fontSize: '11px', padding: '3px 8px' }}>
+              <Copy size={11} /> Copy
+            </button>
+            <button onClick={draftFollowup} disabled={drafting}
+              className="btn btn-ghost" style={{ fontSize: '11px', padding: '3px 8px' }}>
+              <RefreshCw size={11} className={drafting ? 'animate-spin' : ''} /> Redraft
+            </button>
+            <button onClick={sendFollowup} disabled={sending}
+              className="btn btn-primary ml-auto" style={{ fontSize: '11px', padding: '4px 10px' }}>
+              {sending ? <Loader2 size={11} className="animate-spin" /> : <ExternalLink size={11} />} Open &amp; send
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function TodayPage() {
@@ -53,12 +167,20 @@ export default function TodayPage() {
 
   const markContacted = async (id: string) => {
     setActionLoading(id)
+    const now = new Date()
     const { error } = await supabase
       .from('leads')
-      .update({ status: 'contacted', updated_at: new Date().toISOString() })
+      .update({
+        status: 'contacted',
+        contacted_at: now.toISOString(),
+        last_contacted_at: now.toISOString(),
+        follow_up_stage: 0,
+        next_follow_up_at: new Date(now.getTime() + FOLLOWUP_GAP_DAYS * 86400000).toISOString(),
+        updated_at: now.toISOString(),
+      })
       .eq('id', id)
     if (error) toast.error('Update failed')
-    else { toast.success('Marked as contacted — nice work'); loadData() }
+    else { toast.success(`Marked contacted — follow-up scheduled in ${FOLLOWUP_GAP_DAYS} days`); loadData() }
     setActionLoading(null)
   }
 
@@ -69,9 +191,7 @@ export default function TodayPage() {
     .filter(l => READY_STATUSES.includes(l.status))
     .slice(0, DAILY_GOAL)
 
-  const followUps = leads.filter(
-    l => l.status === 'contacted' && daysSince(l.updated_at) >= FOLLOWUP_AFTER_DAYS
-  )
+  const followUps = leads.filter(followUpDue)
 
   const toBook = leads.filter(l => l.status === 'replied')
 
@@ -285,27 +405,18 @@ export default function TodayPage() {
                 </div>
                 <div>
                   <div className="text-[13px] font-semibold text-white">Follow-ups due</div>
-                  <div className="text-[11px]" style={{ color: 'rgb(100,106,135)' }}>Contacted {FOLLOWUP_AFTER_DAYS}+ days ago, no reply</div>
+                  <div className="text-[11px]" style={{ color: 'rgb(100,106,135)' }}>No reply after {FOLLOWUP_GAP_DAYS} days — draft &amp; send in one click</div>
                 </div>
               </div>
               <span className="badge" style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', borderColor: 'rgba(251,191,36,0.2)', fontSize: '11px' }}>
                 {followUps.length}
               </span>
             </div>
-            <div className="p-3">
+            <div className="p-3 flex flex-col gap-1">
               {followUps.length === 0 ? (
                 <div className="text-[12px] text-center py-6" style={{ color: 'rgb(100,106,135)' }}>Nothing to chase right now</div>
               ) : followUps.slice(0, 6).map(lead => (
-                <Link key={lead.id} href={`/outreach?lead=${lead.id}`}
-                  className="flex items-center justify-between px-3 py-2.5 rounded-lg transition-colors hover:bg-white/[0.03]">
-                  <div className="min-w-0">
-                    <div className="text-[13px] font-semibold text-white truncate">{lead.company_name}</div>
-                    <div className="text-[11px]" style={{ color: 'rgb(100,106,135)' }}>
-                      Contacted {daysSince(lead.updated_at)}d ago
-                    </div>
-                  </div>
-                  <ArrowRight size={14} style={{ color: 'rgb(110,115,145)' }} />
-                </Link>
+                <FollowUpRow key={lead.id} lead={lead} onSent={loadData} />
               ))}
             </div>
           </div>

@@ -2,6 +2,7 @@ import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { PRODUCT_BRAIN, SINGLE_API_LINE } from '@/lib/kima-knowledge'
+import { MAX_FOLLOWUPS } from '@/lib/outreach'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -50,7 +51,40 @@ interface LeadRow {
   security_angle?: string | null
   trigger_reason?: string | null
   source_url?: string | null
-  contacts?: { name?: string | null; role?: string | null }[] | null
+  twitter_url?: string | null
+  telegram_url?: string | null
+  discord_url?: string | null
+  last_channel?: string | null
+  contacts?: {
+    id?: string | null
+    name?: string | null
+    role?: string | null
+    email?: string | null
+    linkedin_url?: string | null
+    twitter_url?: string | null
+    telegram?: string | null
+  }[] | null
+}
+
+// Build the contact/social bundle the UI uses for one-click "open & send".
+function buildMeta(lead: LeadRow) {
+  const c = (lead.contacts || [])[0]
+  return {
+    telegram_url: lead.telegram_url || null,
+    twitter_url: lead.twitter_url || null,
+    discord_url: lead.discord_url || null,
+    website: lead.website || null,
+    contact: c
+      ? {
+          id: c.id || undefined,
+          name: c.name || null,
+          email: c.email || null,
+          linkedin_url: c.linkedin_url || null,
+          twitter_url: c.twitter_url || null,
+          telegram: c.telegram || null,
+        }
+      : null,
+  }
 }
 
 function leadContextBlock(lead: LeadRow): string {
@@ -83,7 +117,7 @@ function leadContextBlock(lead: LeadRow): string {
 async function generateAutoDrafts(leadId: string) {
   const { data: lead, error } = await supabase
     .from('leads')
-    .select('*, contacts(name, role)')
+    .select('*, contacts(id, name, role, email, linkedin_url, twitter_url, telegram)')
     .eq('id', leadId)
     .single()
 
@@ -129,7 +163,89 @@ Return JSON exactly:
       max_tokens: 2200,
     })
     const result = JSON.parse(completion.choices[0].message.content || '{}')
-    return NextResponse.json({ success: true, mode: 'auto', data: result })
+    return NextResponse.json({
+      success: true,
+      mode: 'auto',
+      data: { ...result, meta: buildMeta(lead as LeadRow) },
+    })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'AI request failed'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
+// ── FOLLOW-UP MODE: one short, fresh-angle nudge for a no-reply lead ──
+async function generateFollowup(leadId: string, stage: number) {
+  const { data: lead, error } = await supabase
+    .from('leads')
+    .select('*, contacts(id, name, role, email, linkedin_url, twitter_url, telegram)')
+    .eq('id', leadId)
+    .single()
+
+  if (error || !lead) {
+    return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+  }
+
+  // Pull the prior messages so the follow-up doesn't repeat the same angle.
+  const { data: priorMsgs } = await supabase
+    .from('outreach_messages')
+    .select('message, channel, created_at')
+    .eq('lead_id', leadId)
+    .order('created_at', { ascending: true })
+
+  const priorText = (priorMsgs || [])
+    .map((m, i) => `Message ${i + 1} (${m.channel || 'unknown'}):\n${m.message || ''}`)
+    .join('\n\n') || '(no prior message text on file)'
+
+  const channel = (lead as LeadRow).last_channel || ((priorMsgs || [])[0]?.channel) || 'telegram'
+
+  const isFinal = stage >= MAX_FOLLOWUPS - 1
+  const systemPrompt = `You are Arpit, leading BD/partnerships for Kima and Aeredium. You're writing a SHORT follow-up to someone who hasn't replied yet. You are not annoyed and not pushy — just persistent and useful.
+
+${PRODUCT_BRAIN}
+
+${HUMAN_RULES}
+
+FOLLOW-UP RULES:
+- Keep it SHORT — 1 to 3 sentences. Shorter than the first message.
+- Do NOT repeat the same hook or pitch from the prior message(s). Lead with a DIFFERENT angle: a fresh proof point, a new trigger, a relevant comparison, or a genuinely useful nudge.
+- Lightly acknowledge you reached out before without guilt-tripping ("following up" is fine; no "just bumping this" or "circling back").
+- ${isFinal
+    ? 'This is the LAST follow-up — make it an easy, no-pressure close: a simple yes/no, or "should I close the loop?" so it is painless to reply even with a no.'
+    : 'End with a tiny, low-friction question that is easy to answer.'}
+- Match the channel: ${channel}. ${channel === 'email' ? 'Include a short subject line.' : 'No subject line.'}
+- No signature block.
+
+Return JSON only.`
+
+  const userPrompt = `Lead research:
+${leadContextBlock(lead as LeadRow)}
+
+What I've already sent them (do NOT repeat these angles):
+${priorText}
+
+This is follow-up #${stage + 1}${isFinal ? ' (the final one)' : ''}. Write ONE follow-up message for the ${channel} channel.
+
+Return JSON exactly:
+{ "draft": { "channel": "${channel}", ${channel === 'email' ? '"subject": "...", ' : ''}"text": "..." } }`
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.85,
+      max_tokens: 800,
+    })
+    const result = JSON.parse(completion.choices[0].message.content || '{}')
+    return NextResponse.json({
+      success: true,
+      mode: 'followup',
+      data: { ...result, meta: buildMeta(lead as LeadRow) },
+    })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'AI request failed'
     return NextResponse.json({ error: message }, { status: 500 })
@@ -149,6 +265,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'lead_id is required for auto mode' }, { status: 400 })
     }
     return generateAutoDrafts(body.lead_id)
+  }
+
+  // Follow-up mode — one short, different-angle nudge for a no-reply lead.
+  if (body.mode === 'followup') {
+    if (!body.lead_id) {
+      return NextResponse.json({ error: 'lead_id is required for followup mode' }, { status: 400 })
+    }
+    return generateFollowup(body.lead_id, typeof body.stage === 'number' ? body.stage : 0)
   }
 
   // ── CUSTOM MODE: user-configured full sequence ──

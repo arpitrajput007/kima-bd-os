@@ -4,9 +4,10 @@ import { useEffect, useState, Suspense, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Sparkles, Copy, Save, Loader2, MessageSquare, RefreshCw, Send, AtSign, Mail, Wand2, SlidersHorizontal } from 'lucide-react'
+import { Sparkles, Copy, Save, Loader2, MessageSquare, RefreshCw, Send, AtSign, Mail, Wand2, SlidersHorizontal, ExternalLink } from 'lucide-react'
 import { CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL } from '@/lib/types'
 import type { Lead } from '@/lib/types'
+import { buildTarget, channelDeepLink, logTouch, type OutreachMeta } from '@/lib/outreach'
 
 const CHANNELS = ['telegram', 'linkedin', 'twitter', 'email'] as const
 const TONES = ['casual', 'professional', 'founder_to_founder', 'concise', 'strong_bd'] as const
@@ -53,8 +54,10 @@ function OutreachStudioContent() {
 
   // Agent auto-drafts (the default, zero-config path).
   const [autoDrafts, setAutoDrafts] = useState<AgentDraft[]>([])
+  const [autoMeta, setAutoMeta] = useState<OutreachMeta | null>(null)
   const [autoLoading, setAutoLoading] = useState(false)
   const [savingDraftId, setSavingDraftId] = useState<string | null>(null)
+  const [sendingId, setSendingId] = useState<string | null>(null)
 
   // Manual "write your own" path.
   const [showCustom, setShowCustom] = useState(false)
@@ -88,6 +91,7 @@ function OutreachStudioContent() {
   const generateAuto = useCallback(async (leadId: string) => {
     setAutoLoading(true)
     setAutoDrafts([])
+    setAutoMeta(null)
     try {
       const res = await fetch('/api/ai/outreach', {
         method: 'POST',
@@ -98,6 +102,7 @@ function OutreachStudioContent() {
       if (!res.ok) throw new Error(json.error)
       const drafts: AgentDraft[] = json.data?.drafts || []
       setAutoDrafts(drafts)
+      setAutoMeta(json.data?.meta || null)
       if (drafts.length === 0) toast.error('No drafts returned — try regenerating')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Draft generation failed'
@@ -210,6 +215,37 @@ function OutreachStudioContent() {
     toast.success('Copied!')
   }
 
+  // One-click: open the channel (email fully prefilled), copy the text for
+  // paste, and log the touch so the follow-up engine takes over.
+  const sendDraft = async (draft: AgentDraft) => {
+    if (!selectedLeadId) return
+    setSendingId(draft.id)
+    const target = buildTarget(autoMeta)
+    const url = channelDeepLink(draft.channel, target, draft.text, draft.subject)
+    const fullText = draft.subject ? `${draft.subject}\n\n${draft.text}` : draft.text
+
+    const { error } = await logTouch(supabase, {
+      leadId: selectedLeadId,
+      channel: draft.channel,
+      text: draft.text,
+      subject: draft.subject,
+      contactId: autoMeta?.contact?.id,
+      kind: 'initial',
+    })
+    setSendingId(null)
+
+    if (error) { toast.error('Could not log the touch'); return }
+
+    if (url) {
+      if (draft.channel !== 'email') navigator.clipboard.writeText(fullText)
+      window.open(url, '_blank')
+      toast.success('Logged as contacted · follow-up scheduled in 5 days')
+    } else {
+      navigator.clipboard.writeText(fullText)
+      toast.success('Logged · no destination on file — text copied, paste it')
+    }
+  }
+
   const inputClass = 'input-dark'
   const selStyle = { fontSize: '13px' }
 
@@ -248,6 +284,9 @@ function OutreachStudioContent() {
             </button>
             <button onClick={() => saveDraft(draft)} disabled={savingDraftId === draft.id} className="btn btn-ghost" style={{ padding: '2px 6px', fontSize: '11px' }}>
               {savingDraftId === draft.id ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />} Save
+            </button>
+            <button onClick={() => sendDraft(draft)} disabled={sendingId === draft.id} className="btn btn-ghost" style={{ padding: '2px 6px', fontSize: '11px', color: '#c4b5fd' }}>
+              {sendingId === draft.id ? <Loader2 size={10} className="animate-spin" /> : <ExternalLink size={10} />} Send
             </button>
           </div>
         </div>
