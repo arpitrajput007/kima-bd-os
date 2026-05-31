@@ -26,7 +26,6 @@ const QUALITY_COLORS: Record<string, string> = {
 
 const emptyForm: Partial<Source> = {
   source_name: '', source_type: 'google_search', source_url_or_query: '',
-  target_industry_category: '', target_customer_category: '',
   frequency: 'weekly', quality_rating: 'unrated', status: 'active', notes: '',
 }
 
@@ -198,14 +197,10 @@ export default function SourcesPage() {
                     URL or Search Query <span style={{ color: 'rgb(100,100,120)' }}>— the bot will read this page to find companies</span>
                   </label>
                   <input className={inputClass} style={selStyle} value={form.source_url_or_query || ''} onChange={e => setForm(f => ({ ...f, source_url_or_query: e.target.value }))} placeholder="e.g. https://layerzero.network/ecosystem  or  https://defillama.com/chains" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: 'rgb(160,160,180)' }}>Target Industry Category</label>
-                  <input className={inputClass} style={selStyle} value={form.target_industry_category || ''} onChange={e => setForm(f => ({ ...f, target_industry_category: e.target.value }))} placeholder="e.g. DEX, Wallet, RWA platform" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: 'rgb(160,160,180)' }}>Target Sales Category</label>
-                  <input className={inputClass} style={selStyle} value={form.target_customer_category || ''} onChange={e => setForm(f => ({ ...f, target_customer_category: e.target.value }))} placeholder="e.g. LayerZero Customer, Needs On/Off Ramp" />
+                  <p className="mt-1.5 text-xs leading-relaxed" style={{ color: 'rgb(110,110,130)' }}>
+                    Just point the agent at strong sources — Telegram groups, sites, Google or X searches.
+                    It researches each company itself and decides the industry &amp; sales fit using everything you&apos;ve taught it.
+                  </p>
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1.5" style={{ color: 'rgb(160,160,180)' }}>Frequency</label>
@@ -302,9 +297,6 @@ export default function SourcesPage() {
                       </div>
                       <div className="flex items-center gap-3 text-xs" style={{ color: 'rgb(110,110,135)' }}>
                         <span className="truncate max-w-xs mono">{source.source_url_or_query || '—'}</span>
-                        {source.target_customer_category && (
-                          <span>· {source.target_customer_category}</span>
-                        )}
                         {source.last_run_at && (
                           <span className="flex items-center gap-1">
                             <Clock size={11} /> Last run {formatDate(source.last_run_at)}
