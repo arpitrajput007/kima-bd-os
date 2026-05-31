@@ -18,6 +18,7 @@ import {
   BookOpen,
   Mic,
   Sun,
+  Kanban,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -33,6 +34,7 @@ const navGroups: {
       { href: '/today',        label: "Today's Plan",       icon: Sun },
       { href: '/dashboard',    label: 'BD Command Center', icon: LayoutDashboard },
       { href: '/leads',        label: 'Lead Inbox',         icon: Inbox },
+      { href: '/crm',          label: 'CRM',                icon: Kanban },
       { href: '/reports',      label: 'Weekly Reports',     icon: BarChart3 },
       { href: '/learn',        label: 'Make Agent Learn',   icon: BookOpen, glow: true },
       { href: '/voice',        label: 'Voice Chat',         icon: Mic, voice: true },
