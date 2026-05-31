@@ -34,6 +34,23 @@ function daysSince(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24))
 }
 
+// Local YYYY-MM-DD key for grouping leads by the day they came in.
+function dayKey(dateStr: string): string {
+  const d = new Date(dateStr)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// Human label for a day key: "Today" / "Yesterday" / "Mon, Jun 1".
+function dayLabel(key: string): string {
+  const [y, m, d] = key.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const diff = Math.round((today.getTime() - date.getTime()) / 86400000)
+  if (diff === 0) return 'Today'
+  if (diff === 1) return 'Yesterday'
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
 interface AgentDraft { channel: string; subject?: string; text: string }
 
 // A due follow-up: draft a fresh-angle nudge inline, then open the channel
@@ -145,6 +162,117 @@ function FollowUpRow({ lead, onSent }: { lead: LeadWithContacts; onSent: () => v
   )
 }
 
+// One lead card in the plan — used for both today's picks and the date-grouped backlog.
+function PlanLeadCard({ lead, rank, actionLoading, onContacted }: {
+  lead: LeadWithContacts; rank: number | null; actionLoading: string | null; onContacted: (id: string) => void
+}) {
+  const contact = bestContact(lead.contacts)
+  const waiting = daysSince(lead.created_at)
+  return (
+    <div className="section-card" style={{ padding: '18px 20px' }}>
+      <div className="flex items-start gap-4">
+        {/* Rank + avatar */}
+        <div className="flex flex-col items-center gap-1.5 flex-shrink-0 pt-0.5">
+          {rank != null && <div className="text-[11px] font-bold tabular-nums" style={{ color: 'rgb(90,95,120)' }}>#{rank}</div>}
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-[13px] font-bold"
+            style={{ background: 'rgba(124,58,237,0.15)', color: '#a78bfa' }}>
+            {lead.company_name.charAt(0).toUpperCase()}
+          </div>
+        </div>
+
+        {/* Main */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1.5">
+            <Link href={`/leads/${lead.id}`}
+              className="text-[14px] font-bold text-white hover:text-violet-300 transition-colors">
+              {lead.company_name}
+            </Link>
+            {lead.lead_score != null && (
+              <span className={cn('badge', getScoreBg(lead.lead_score))} style={{ fontSize: '10px' }}>
+                {lead.lead_score}
+              </span>
+            )}
+            {(lead.customer_category || []).slice(0, 1).map(cat => (
+              <span key={cat} className="badge" style={{ fontSize: '10px', padding: '1px 6px', background: 'rgba(139,92,246,0.1)', color: '#a78bfa', borderColor: 'rgba(139,92,246,0.2)' }}>
+                {cat.replace(' Customer', '')}
+              </span>
+            ))}
+            {lead.product_to_sell && (
+              <span className="text-[11px]" style={{ color: 'rgb(110,115,145)' }}>· {lead.product_to_sell}</span>
+            )}
+            {waiting >= 1 && (
+              <span className="text-[11px]" style={{ color: waiting >= 3 ? '#fbbf24' : 'rgb(110,115,145)' }}>
+                · waiting {waiting}d
+              </span>
+            )}
+          </div>
+
+          {/* Pain point — the "why" */}
+          {lead.pain_point && (
+            <div className="text-[12px] mb-2.5 leading-relaxed" style={{ color: 'rgb(150,155,185)' }}>
+              <span style={{ color: '#fb7185', fontWeight: 600 }}>Pain: </span>
+              {truncate(lead.pain_point, 150)}
+            </div>
+          )}
+
+          {/* Contact line — who to message */}
+          <div className="flex items-center gap-2 flex-wrap text-[11px]">
+            <span style={{ color: 'rgb(100,106,135)' }}>Reach out to:</span>
+            {contact ? (
+              <>
+                <span className="font-semibold text-white">
+                  {contact.name || contact.role || 'Decision maker'}
+                </span>
+                {contact.role && contact.name && (
+                  <span style={{ color: 'rgb(110,115,145)' }}>· {contact.role}</span>
+                )}
+                <div className="flex items-center gap-1.5 ml-1">
+                  {contact.linkedin_url && (
+                    <a href={contact.linkedin_url} target="_blank" rel="noopener noreferrer"
+                      className="contact-chip" title="LinkedIn"><Link2 size={12} /></a>
+                  )}
+                  {contact.twitter_url && (
+                    <a href={contact.twitter_url} target="_blank" rel="noopener noreferrer"
+                      className="contact-chip" title="Twitter/X"><AtSign size={12} /></a>
+                  )}
+                  {contact.email && (
+                    <a href={`mailto:${contact.email}`}
+                      className="contact-chip" title={contact.email}><Mail size={12} /></a>
+                  )}
+                </div>
+              </>
+            ) : (
+              <span style={{ color: 'rgb(110,115,145)' }} className="italic">
+                No contact yet — open the lead to find one
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-col gap-2 flex-shrink-0 w-[150px]">
+          <Link href={`/outreach?lead=${lead.id}`}
+            className="btn btn-primary justify-center" style={{ fontSize: '12px', padding: '8px 12px' }}>
+            <MessageSquare size={13} /> Draft message
+          </Link>
+          <button
+            onClick={() => onContacted(lead.id)}
+            disabled={actionLoading === lead.id}
+            className="btn btn-secondary justify-center" style={{ fontSize: '12px', padding: '7px 12px', color: '#34d399' }}>
+            {actionLoading === lead.id
+              ? <Loader2 size={13} className="animate-spin" />
+              : <><CheckCircle size={13} /> Mark contacted</>}
+          </button>
+          <Link href={`/leads/${lead.id}`}
+            className="btn btn-ghost justify-center" style={{ fontSize: '11px', padding: '5px 12px', color: 'rgb(130,135,165)' }}>
+            <Eye size={12} /> View details
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function TodayPage() {
   const supabase = createClient()
   const [leads, setLeads] = useState<LeadWithContacts[]>([])
@@ -187,9 +315,24 @@ export default function TodayPage() {
   // ── Build today's plan ────────────────────────────────────────────────────
   const today = new Date(); today.setHours(0, 0, 0, 0)
 
-  const hotLeads = leads
-    .filter(l => READY_STATUSES.includes(l.status))
-    .slice(0, DAILY_GOAL)
+  // All researched leads you haven't reached out to yet (sorted by score from the query).
+  const readyLeads = leads.filter(l => READY_STATUSES.includes(l.status))
+  // Top priorities to contact today.
+  const todaysPicks = readyLeads.slice(0, DAILY_GOAL)
+  // Everyone else still waiting — grouped by the day they came in, so nothing piles up invisibly.
+  const backlog = readyLeads.slice(DAILY_GOAL)
+  const backlogGroups: { key: string; label: string; leads: LeadWithContacts[] }[] = []
+  {
+    const map = new Map<string, LeadWithContacts[]>()
+    backlog.forEach(l => {
+      const k = dayKey(l.created_at)
+      if (!map.has(k)) map.set(k, [])
+      map.get(k)!.push(l)
+    })
+    Array.from(map.keys()).sort((a, b) => b.localeCompare(a)).forEach(k => {
+      backlogGroups.push({ key: k, label: dayLabel(k), leads: map.get(k)! })
+    })
+  }
 
   const followUps = leads.filter(followUpDue)
 
@@ -262,12 +405,12 @@ export default function TodayPage() {
           </div>
         </div>
 
-        {/* ── Hot leads to contact ───────────────────────── */}
+        {/* ── Reach out today ────────────────────────────── */}
         <div>
           <div className="flex items-center gap-2 mb-3">
             <Flame size={14} style={{ color: '#fb7185' }} />
             <span className="text-[11px] font-bold tracking-widest uppercase" style={{ color: 'rgb(100,106,135)' }}>
-              Contact these now · top {hotLeads.length}
+              Reach out today · top {todaysPicks.length}
             </span>
           </div>
 
@@ -276,7 +419,7 @@ export default function TodayPage() {
               <Loader2 size={20} className="animate-spin mx-auto mb-3" style={{ color: '#a78bfa' }} />
               Building your plan…
             </div>
-          ) : hotLeads.length === 0 ? (
+          ) : todaysPicks.length === 0 ? (
             <div className="section-card p-14 text-center">
               <Sparkles size={40} className="mx-auto mb-4 opacity-15" style={{ color: 'rgb(160,165,195)' }} />
               <div className="text-[14px] font-semibold text-white mb-2">Inbox zero — every researched lead is handled</div>
@@ -289,110 +432,45 @@ export default function TodayPage() {
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {hotLeads.map((lead, i) => {
-                const contact = bestContact(lead.contacts)
-                return (
-                  <div key={lead.id} className="section-card" style={{ padding: '18px 20px' }}>
-                    <div className="flex items-start gap-4">
-                      {/* Rank + avatar */}
-                      <div className="flex flex-col items-center gap-1.5 flex-shrink-0 pt-0.5">
-                        <div className="text-[11px] font-bold tabular-nums" style={{ color: 'rgb(90,95,120)' }}>#{i + 1}</div>
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-[13px] font-bold"
-                          style={{ background: 'rgba(124,58,237,0.15)', color: '#a78bfa' }}>
-                          {lead.company_name.charAt(0).toUpperCase()}
-                        </div>
-                      </div>
-
-                      {/* Main */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                          <Link href={`/leads/${lead.id}`}
-                            className="text-[14px] font-bold text-white hover:text-violet-300 transition-colors">
-                            {lead.company_name}
-                          </Link>
-                          {lead.lead_score != null && (
-                            <span className={cn('badge', getScoreBg(lead.lead_score))} style={{ fontSize: '10px' }}>
-                              {lead.lead_score}
-                            </span>
-                          )}
-                          {(lead.customer_category || []).slice(0, 1).map(cat => (
-                            <span key={cat} className="badge" style={{ fontSize: '10px', padding: '1px 6px', background: 'rgba(139,92,246,0.1)', color: '#a78bfa', borderColor: 'rgba(139,92,246,0.2)' }}>
-                              {cat.replace(' Customer', '')}
-                            </span>
-                          ))}
-                          {lead.product_to_sell && (
-                            <span className="text-[11px]" style={{ color: 'rgb(110,115,145)' }}>· {lead.product_to_sell}</span>
-                          )}
-                        </div>
-
-                        {/* Pain point — the "why" */}
-                        {lead.pain_point && (
-                          <div className="text-[12px] mb-2.5 leading-relaxed" style={{ color: 'rgb(150,155,185)' }}>
-                            <span style={{ color: '#fb7185', fontWeight: 600 }}>Pain: </span>
-                            {truncate(lead.pain_point, 150)}
-                          </div>
-                        )}
-
-                        {/* Contact line — who to message */}
-                        <div className="flex items-center gap-2 flex-wrap text-[11px]">
-                          <span style={{ color: 'rgb(100,106,135)' }}>Reach out to:</span>
-                          {contact ? (
-                            <>
-                              <span className="font-semibold text-white">
-                                {contact.name || contact.role || 'Decision maker'}
-                              </span>
-                              {contact.role && contact.name && (
-                                <span style={{ color: 'rgb(110,115,145)' }}>· {contact.role}</span>
-                              )}
-                              <div className="flex items-center gap-1.5 ml-1">
-                                {contact.linkedin_url && (
-                                  <a href={contact.linkedin_url} target="_blank" rel="noopener noreferrer"
-                                    className="contact-chip" title="LinkedIn"><Link2 size={12} /></a>
-                                )}
-                                {contact.twitter_url && (
-                                  <a href={contact.twitter_url} target="_blank" rel="noopener noreferrer"
-                                    className="contact-chip" title="Twitter/X"><AtSign size={12} /></a>
-                                )}
-                                {contact.email && (
-                                  <a href={`mailto:${contact.email}`}
-                                    className="contact-chip" title={contact.email}><Mail size={12} /></a>
-                                )}
-                              </div>
-                            </>
-                          ) : (
-                            <span style={{ color: 'rgb(110,115,145)' }} className="italic">
-                              No contact yet — open the lead to find one
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex flex-col gap-2 flex-shrink-0 w-[150px]">
-                        <Link href={`/outreach?lead=${lead.id}`}
-                          className="btn btn-primary justify-center" style={{ fontSize: '12px', padding: '8px 12px' }}>
-                          <MessageSquare size={13} /> Draft message
-                        </Link>
-                        <button
-                          onClick={() => markContacted(lead.id)}
-                          disabled={actionLoading === lead.id}
-                          className="btn btn-secondary justify-center" style={{ fontSize: '12px', padding: '7px 12px', color: '#34d399' }}>
-                          {actionLoading === lead.id
-                            ? <Loader2 size={13} className="animate-spin" />
-                            : <><CheckCircle size={13} /> Mark contacted</>}
-                        </button>
-                        <Link href={`/leads/${lead.id}`}
-                          className="btn btn-ghost justify-center" style={{ fontSize: '11px', padding: '5px 12px', color: 'rgb(130,135,165)' }}>
-                          <Eye size={12} /> View details
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+              {todaysPicks.map((lead, i) => (
+                <PlanLeadCard key={lead.id} lead={lead} rank={i + 1} actionLoading={actionLoading} onContacted={markContacted} />
+              ))}
             </div>
           )}
         </div>
+
+        {/* ── Backlog: still waiting, grouped by day ──────── */}
+        {!loading && backlog.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <CalendarCheck size={14} style={{ color: '#fbbf24' }} />
+              <span className="text-[11px] font-bold tracking-widest uppercase" style={{ color: 'rgb(100,106,135)' }}>
+                Still waiting · not reached out yet · {backlog.length}
+              </span>
+            </div>
+            <p className="text-[12px] mb-4" style={{ color: 'rgb(100,106,135)' }}>
+              Leads the agent found on earlier days that you haven&apos;t contacted. They keep stacking up here by date until you action them.
+            </p>
+            <div className="flex flex-col gap-7">
+              {backlogGroups.map(group => (
+                <div key={group.key}>
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <span className="text-[12px] font-semibold text-white">{group.label}</span>
+                    <span className="badge" style={{ fontSize: '10px', padding: '1px 7px', background: 'rgba(255,255,255,0.05)', color: 'rgb(150,155,185)', borderColor: 'rgba(255,255,255,0.08)' }}>
+                      {group.leads.length} lead{group.leads.length > 1 ? 's' : ''}
+                    </span>
+                    <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    {group.leads.map(lead => (
+                      <PlanLeadCard key={lead.id} lead={lead} rank={null} actionLoading={actionLoading} onContacted={markContacted} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ── Follow-ups + book meetings ─────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
