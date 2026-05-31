@@ -47,6 +47,9 @@ interface SourceSuggestion {
   why: string
   expected_leads: string
   confidence: 'high' | 'medium' | 'low'
+  verified?: boolean
+  check_status?: 'good' | 'thin' | 'unverified'
+  check_note?: string
 }
 
 export default function SourcesPage() {
@@ -253,7 +256,7 @@ export default function SourcesPage() {
               </button>
             </div>
             <p className="text-xs mb-4" style={{ color: 'rgb(120,127,160)' }}>
-              Sources the agent thinks could bring strong leads. Review each and add the ones you like.
+              Sources the agent thinks could bring strong leads — each one test-crawled to drop dead links. Review and add the ones you like.
             </p>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {suggestions.map((s, idx) => {
@@ -274,9 +277,19 @@ export default function SourcesPage() {
                     </div>
                     <p className="text-[11.5px] leading-relaxed mb-1.5" style={{ color: 'rgb(170,175,200)' }}>{s.why}</p>
                     {s.expected_leads && (
-                      <p className="text-[11px] mb-3" style={{ color: 'rgb(110,115,145)' }}>
+                      <p className="text-[11px] mb-2" style={{ color: 'rgb(110,115,145)' }}>
                         <span style={{ color: '#38bdf8' }}>Brings: </span>{s.expected_leads}
                       </p>
+                    )}
+                    {s.check_note && (
+                      <div className="flex items-center gap-1.5 mb-3 text-[10.5px]" style={{
+                        color: s.check_status === 'good' ? '#34d399' : s.check_status === 'thin' ? '#fbbf24' : 'rgb(130,135,165)',
+                      }}>
+                        {s.check_status === 'good'
+                          ? <CheckCircle size={11} />
+                          : <AlertCircle size={11} />}
+                        {s.check_note}
+                      </div>
                     )}
                     <div className="flex gap-2">
                       <button onClick={() => acceptSuggestion(s, idx)} disabled={addingIdx === idx}

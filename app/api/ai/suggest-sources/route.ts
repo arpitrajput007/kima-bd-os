@@ -30,6 +30,59 @@ async function searchWeb(query: string): Promise<string> {
   } catch { return '' }
 }
 
+// How many Tavily results a search query returns (for validating query-type sources).
+async function searchCount(query: string): Promise<number | null> {
+  if (!process.env.TAVILY_API_KEY) return null
+  try {
+    const res = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: process.env.TAVILY_API_KEY, query, search_depth: 'basic', max_results: 8 }),
+    })
+    const data = await res.json()
+    return Array.isArray(data.results) ? data.results.length : 0
+  } catch { return null }
+}
+
+interface SourceLike {
+  source_url_or_query: string
+  source_type: string
+}
+type Verdict = { status: 'good' | 'thin' | 'dead' | 'unverified'; note: string }
+
+// Dry-run a single suggestion: is the URL reachable with real, crawlable content,
+// or does the search query return results? Used to drop low-yield ideas.
+async function validateSuggestion(s: SourceLike): Promise<Verdict> {
+  const target = (s.source_url_or_query || '').trim()
+  if (!target) return { status: 'dead', note: 'No URL or query' }
+
+  const isUrl = target.startsWith('http://') || target.startsWith('https://')
+  if (!isUrl) {
+    // Treat as a search query.
+    const n = await searchCount(target)
+    if (n === null) return { status: 'unverified', note: 'Search query (not test-crawled)' }
+    if (n === 0) return { status: 'dead', note: 'Query returned no results' }
+    return { status: 'good', note: `Query returns ${n}+ results` }
+  }
+
+  // URL: fetch through Jina and judge by reachability + content richness.
+  try {
+    const res = await fetch(`https://r.jina.ai/${target}`, {
+      headers: { Accept: 'text/plain' },
+      signal: AbortSignal.timeout(12000),
+    })
+    if (!res.ok) return { status: 'unverified', note: `Couldn’t reach (HTTP ${res.status})` }
+    const text = (await res.text()) || ''
+    if (text.length < 250) return { status: 'thin', note: 'Reachable but very little content' }
+    // Rough signal: number of links + capitalized multi-word names hints at a list of companies.
+    const links = (text.match(/https?:\/\//g) || []).length
+    if (text.length > 1200 && links >= 5) return { status: 'good', note: 'Reachable · rich, link-heavy page' }
+    return { status: 'good', note: 'Reachable · has content' }
+  } catch {
+    return { status: 'unverified', note: 'Couldn’t reach in time' }
+  }
+}
+
 export async function POST() {
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 400 })
@@ -133,7 +186,7 @@ Return JSON:
     })
 
     const parsed = JSON.parse(completion.choices[0].message.content || '{"suggestions":[]}')
-    const suggestions = (Array.isArray(parsed.suggestions) ? parsed.suggestions : [])
+    const raw = (Array.isArray(parsed.suggestions) ? parsed.suggestions : [])
       .filter((s: { source_url_or_query?: string }) =>
         !existingUrls.has((s.source_url_or_query || '').toLowerCase().trim()))
       .map((s: Record<string, string>) => ({
@@ -145,7 +198,23 @@ Return JSON:
         confidence: ['high', 'medium', 'low'].includes(s.confidence) ? s.confidence : 'medium',
       }))
 
-    return NextResponse.json({ success: true, suggestions })
+    // Dry-run each suggestion in parallel, then drop the dead ones.
+    const verdicts = await Promise.all(raw.map((s: SourceLike) => validateSuggestion(s)))
+    const suggestions = raw
+      .map((s: Record<string, string>, i: number) => ({
+        ...s,
+        verified: verdicts[i].status === 'good',
+        check_status: verdicts[i].status,
+        check_note: verdicts[i].note,
+      }))
+      .filter((s: { check_status: string }) => s.check_status !== 'dead')
+      // Show verified/reachable ones first.
+      .sort((a: { check_status: string }, b: { check_status: string }) => {
+        const rank: Record<string, number> = { good: 0, unverified: 1, thin: 2 }
+        return (rank[a.check_status] ?? 3) - (rank[b.check_status] ?? 3)
+      })
+
+    return NextResponse.json({ success: true, suggestions, tested: raw.length, kept: suggestions.length })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Suggestion failed'
     return NextResponse.json({ error: message }, { status: 500 })
