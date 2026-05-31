@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import {
   Plus, Edit, Trash2, Loader2, Save, X,
   Database, Play, Pause, Zap, CheckCircle, AlertCircle, Clock,
+  Sparkles, Lightbulb, Check,
 } from 'lucide-react'
 import type { Source } from '@/lib/types'
 import { cn, formatDate } from '@/lib/utils'
@@ -39,6 +40,15 @@ interface RunResult {
   error?: string
 }
 
+interface SourceSuggestion {
+  source_name: string
+  source_type: Source['source_type']
+  source_url_or_query: string
+  why: string
+  expected_leads: string
+  confidence: 'high' | 'medium' | 'low'
+}
+
 export default function SourcesPage() {
   const supabase = createClient()
   const [sources, setSources] = useState<Source[]>([])
@@ -50,6 +60,48 @@ export default function SourcesPage() {
   const [search, setSearch] = useState('')
   const [runningId, setRunningId] = useState<string | null>(null)
   const [runResults, setRunResults] = useState<Record<string, RunResult>>({})
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestions, setSuggestions] = useState<SourceSuggestion[]>([])
+  const [addingIdx, setAddingIdx] = useState<number | null>(null)
+
+  // Ask the agent which new sources are worth adding.
+  const suggestSources = async () => {
+    setSuggesting(true)
+    try {
+      const res = await fetch('/api/ai/suggest-sources', { method: 'POST' })
+      const data = await res.json()
+      if (data.error) { toast.error(data.error); return }
+      if (!data.suggestions?.length) { toast('No new source ideas right now — try again later'); return }
+      setSuggestions(data.suggestions)
+      toast.success(`${data.suggestions.length} source ideas ready for review`)
+    } catch {
+      toast.error('Could not get suggestions')
+    } finally {
+      setSuggesting(false)
+    }
+  }
+
+  // Accept a suggestion → create it as an active source.
+  const acceptSuggestion = async (s: SourceSuggestion, idx: number) => {
+    setAddingIdx(idx)
+    const { error } = await supabase.from('sources').insert({
+      source_name: s.source_name,
+      source_type: s.source_type,
+      source_url_or_query: s.source_url_or_query,
+      frequency: 'weekly',
+      quality_rating: 'unrated',
+      status: 'active',
+      notes: s.why || null,
+    })
+    setAddingIdx(null)
+    if (error) { toast.error('Failed to add source'); return }
+    toast.success(`Added: ${s.source_name}`)
+    setSuggestions(prev => prev.filter((_, i) => i !== idx))
+    loadSources()
+  }
+
+  const dismissSuggestion = (idx: number) =>
+    setSuggestions(prev => prev.filter((_, i) => i !== idx))
 
   const loadSources = async () => {
     setLoading(true)
@@ -162,19 +214,86 @@ export default function SourcesPage() {
         <div>
           <h1 className="text-xl font-bold text-white">Source Manager</h1>
           <p className="text-xs mt-1" style={{ color: 'rgb(100,100,120)' }}>
-            {sources.filter(s => s.status === 'active').length} active sources · Agent runs daily at 6:00 AM IST · Max 3 leads per category
+            {sources.filter(s => s.status === 'active').length} active sources · Agent runs daily at 6:00 AM IST · Max 5 leads per category
           </p>
         </div>
-        <button
-          onClick={() => { setForm(emptyForm); setEditId(null); setShowForm(!showForm) }}
-          className="btn btn-primary"
-          style={{ fontSize: '13px' }}
-        >
-          <Plus size={14} /> Add Source
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={suggestSources}
+            disabled={suggesting}
+            className="btn btn-secondary"
+            style={{ fontSize: '13px', opacity: suggesting ? 0.8 : 1 }}
+          >
+            {suggesting
+              ? <><Loader2 size={14} className="animate-spin" /> Thinking…</>
+              : <><Sparkles size={14} /> Suggest sources</>}
+          </button>
+          <button
+            onClick={() => { setForm(emptyForm); setEditId(null); setShowForm(!showForm) }}
+            className="btn btn-primary"
+            style={{ fontSize: '13px' }}
+          >
+            <Plus size={14} /> Add Source
+          </button>
+        </div>
       </div>
 
       <div className="p-8 space-y-6">
+
+        {/* Agent source suggestions */}
+        {suggestions.length > 0 && (
+          <div className="rounded-xl p-5" style={{ background: 'rgba(56,189,248,0.04)', border: '1px solid rgba(56,189,248,0.2)' }}>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Lightbulb size={15} style={{ color: '#38bdf8' }} />
+                Agent&apos;s source suggestions
+              </h2>
+              <button onClick={() => setSuggestions([])} className="text-xs" style={{ color: 'rgb(120,127,160)' }}>
+                Dismiss all
+              </button>
+            </div>
+            <p className="text-xs mb-4" style={{ color: 'rgb(120,127,160)' }}>
+              Sources the agent thinks could bring strong leads. Review each and add the ones you like.
+            </p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {suggestions.map((s, idx) => {
+                const confColor = s.confidence === 'high' ? '#34d399' : s.confidence === 'medium' ? '#fbbf24' : 'rgb(150,155,185)'
+                return (
+                  <div key={idx} className="rounded-lg p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                      <div className="text-[13px] font-bold text-white">{s.source_name}</div>
+                      <span className="badge" style={{ fontSize: '9px', flexShrink: 0, color: confColor, background: confColor + '18', borderColor: confColor + '40' }}>
+                        {s.confidence}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <span className="badge" style={{ fontSize: '9px', background: 'rgba(167,139,250,0.1)', color: '#a78bfa', borderColor: 'rgba(167,139,250,0.2)' }}>
+                        {s.source_type?.replace(/_/g, ' ')}
+                      </span>
+                      <span className="text-[11px] mono truncate" style={{ color: 'rgb(130,135,165)', maxWidth: 240 }}>{s.source_url_or_query}</span>
+                    </div>
+                    <p className="text-[11.5px] leading-relaxed mb-1.5" style={{ color: 'rgb(170,175,200)' }}>{s.why}</p>
+                    {s.expected_leads && (
+                      <p className="text-[11px] mb-3" style={{ color: 'rgb(110,115,145)' }}>
+                        <span style={{ color: '#38bdf8' }}>Brings: </span>{s.expected_leads}
+                      </p>
+                    )}
+                    <div className="flex gap-2">
+                      <button onClick={() => acceptSuggestion(s, idx)} disabled={addingIdx === idx}
+                        className="btn btn-primary" style={{ fontSize: '11px', padding: '5px 11px', flex: 1, justifyContent: 'center' }}>
+                        {addingIdx === idx ? <Loader2 size={12} className="animate-spin" /> : <><Check size={12} /> Add source</>}
+                      </button>
+                      <button onClick={() => dismissSuggestion(idx)}
+                        className="btn btn-ghost" style={{ fontSize: '11px', padding: '5px 11px', color: 'rgb(130,135,165)' }}>
+                        <X size={12} /> Skip
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Add/Edit Form */}
         {showForm && (
