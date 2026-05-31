@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import {
   Sun, Target, Flame, ArrowRight, MessageSquare, Mail, Link2,
   AtSign, CheckCircle, Eye, Loader2, RefreshCw, Clock, CalendarCheck,
-  Sparkles, Zap, TrendingUp, Wand2, Copy, ExternalLink,
+  Sparkles, Zap, TrendingUp, Wand2, Copy, ExternalLink, Download,
 } from 'lucide-react'
 import { cn, getScoreBg, truncate } from '@/lib/utils'
 import type { Lead, Contact } from '@/lib/types'
@@ -278,6 +278,45 @@ export default function TodayPage() {
   const [leads, setLeads] = useState<LeadWithContacts[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [fetching, setFetching] = useState(false)
+  const [fetchProgress, setFetchProgress] = useState<string>('')
+
+  // Run all active sources one-by-one and reload leads when done.
+  const fetchFreshLeads = async () => {
+    setFetching(true)
+    setFetchProgress('Loading sources…')
+    try {
+      const { data: sources } = await supabase
+        .from('sources')
+        .select('id, source_name')
+        .eq('status', 'active')
+        .order('created_at', { ascending: true })
+      if (!sources || sources.length === 0) {
+        toast.error('No active sources found — add some in Discovery Sources')
+        setFetching(false); setFetchProgress(''); return
+      }
+      let totalSaved = 0
+      for (let i = 0; i < sources.length; i++) {
+        const src = sources[i]
+        setFetchProgress(`Running ${src.source_name} (${i + 1}/${sources.length})…`)
+        try {
+          const res = await fetch('/api/ai/discover', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source_id: src.id }),
+          })
+          const data = await res.json()
+          if (data.saved) totalSaved += data.saved
+        } catch { /* one source failing shouldn't stop the rest */ }
+      }
+      setFetchProgress('')
+      toast.success(totalSaved > 0 ? `Done! Found ${totalSaved} new leads` : 'Done — no new leads found (may already be at category cap)')
+      loadData()
+    } catch {
+      toast.error('Fetch failed')
+    } finally {
+      setFetching(false); setFetchProgress('')
+    }
+  }
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -366,10 +405,18 @@ export default function TodayPage() {
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} · {greeting}, let&apos;s close some deals
           </p>
         </div>
-        <button onClick={loadData} className="btn btn-secondary" style={{ padding: '7px 12px', fontSize: '12px' }}>
-          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-          Refresh
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button onClick={loadData} className="btn btn-secondary" style={{ padding: '7px 12px', fontSize: '12px' }}>
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+          <button onClick={fetchFreshLeads} disabled={fetching}
+            className="btn btn-primary" style={{ padding: '7px 14px', fontSize: '12px', opacity: fetching ? 0.8 : 1 }}>
+            {fetching
+              ? <><Loader2 size={13} className="animate-spin" />{fetchProgress || 'Fetching…'}</>
+              : <><Download size={13} /> Fetch fresh leads</>}
+          </button>
+        </div>
       </div>
 
       <div style={{ padding: '28px 36px', display: 'flex', flexDirection: 'column', gap: '24px' }}>

@@ -20,7 +20,7 @@ const CUSTOMER_CATEGORIES = [
   { label: 'Fireblocks Customer',                 color: '#a78bfa', bar: 'rgba(167,139,250,0.7)' },
   { label: 'Web2 Stablecoin Settlement Customer', color: '#fbbf24', bar: 'rgba(251,191,36,0.7)'  },
 ]
-const CATEGORY_CAP = 3
+const CATEGORY_CAP = 5
 
 interface DashboardStats {
   new_leads: number; qualified: number; excellent: number; approved: number

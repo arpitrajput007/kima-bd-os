@@ -38,7 +38,7 @@ const CUSTOMER_CATEGORIES = [
   'Fireblocks Customer',
   'Web2 Stablecoin Settlement Customer',
 ]
-const CATEGORY_CAP = 3
+const CATEGORY_CAP = 5
 
 // Read any URL as clean text via Jina.ai (free, no key needed)
 async function readUrl(url: string): Promise<string> {
