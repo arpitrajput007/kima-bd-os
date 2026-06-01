@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { PRODUCT_BRAIN, PRODUCT_BRAIN_COMPACT } from '@/lib/kima-knowledge'
 import { pickBestUrl, extractSocials, type Socials } from '@/lib/utils'
-import { apolloConfigured, apolloFindContacts, apolloSearchCompanies, toDomain } from '@/lib/apollo'
+import { apolloConfigured, apolloEnrichContacts, apolloSearchCompanies, toDomain } from '@/lib/apollo'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -471,10 +471,13 @@ export async function POST(req: NextRequest) {
         .single()
 
       if (!leadErr && newLead) {
-        // Prefer REAL contacts from Apollo (verified people/emails) when we have a domain.
-        // No email reveal here to stay credit-efficient in bulk discovery.
+        // Verify the AI's named contacts against Apollo to attach REAL titles,
+        // LinkedIn and verified work emails (no personal-email reveal → credit-safe).
         const domain = toDomain(company.website)
-        const apolloContacts = domain ? await apolloFindContacts(domain) : []
+        const aiContacts = (research.contacts as Record<string, string>[]) || []
+        const apolloContacts = domain
+          ? await apolloEnrichContacts(domain, company.name, aiContacts.map(c => ({ name: c.name, role: c.role })))
+          : []
 
         if (apolloContacts.length > 0) {
           for (const c of apolloContacts.slice(0, 3)) {
@@ -486,7 +489,7 @@ export async function POST(req: NextRequest) {
               linkedin_url: c.linkedin_url,
               email: c.email,
               contact_confidence: c.email ? 'high' : 'medium',
-              reason_this_person: `Found via Apollo${c.seniority ? ` · ${c.seniority}` : ''}${c.title ? ` · ${c.title}` : ''}`,
+              reason_this_person: `Verified via Apollo${c.seniority ? ` · ${c.seniority}` : ''}${c.title ? ` · ${c.title}` : ''}`,
             })
           }
         } else {

@@ -455,8 +455,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
-      if (json.added > 0) { toast.success(`Apollo added ${json.added} real contact${json.added > 1 ? 's' : ''}`); loadLead() }
-      else toast(json.message || 'No new contacts found via Apollo')
+      if (json.verified > 0) { toast.success(`Apollo verified ${json.verified} contact${json.verified > 1 ? 's' : ''} with real emails`); loadLead() }
+      else toast(json.message || 'Apollo found nothing new to verify')
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Apollo lookup failed')
     } finally { setApolloLoading(false) }
@@ -583,10 +583,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             ))}
             {/* Apollo — real verified contacts (not guessed) */}
             <button onClick={findApolloContacts} disabled={apolloLoading}
-              title="Pull real decision-makers with verified emails from Apollo.io"
+              title="Verify this lead's contacts against Apollo.io and attach their real verified emails"
               style={{ borderRadius: 9, border: '1px solid rgba(52,211,153,0.3)', background: 'rgba(52,211,153,0.1)', padding: '8px 14px', fontSize: 13, color: 'rgb(110,231,183)', cursor: apolloLoading ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, transition: 'background 0.15s', fontFamily: 'inherit' }}>
               {apolloLoading ? <Loader2 size={12} className="animate-spin" /> : <Users size={12} />}
-              Apollo: Find Contacts
+              Apollo: Verify Emails
             </button>
           </div>
         </div>
