@@ -356,20 +356,20 @@ export default function TodayPage() {
 
   // All researched leads you haven't reached out to yet (sorted by score from the query).
   const readyLeads = leads.filter(l => READY_STATUSES.includes(l.status))
-  // Top priorities to contact today.
-  const todaysPicks = readyLeads.slice(0, DAILY_GOAL)
-  // Everyone else still waiting — grouped by the day they came in, so nothing piles up invisibly.
-  const backlog = readyLeads.slice(DAILY_GOAL)
-  const backlogGroups: { key: string; label: string; leads: LeadWithContacts[] }[] = []
+  // Group EVERY un-contacted lead by the day it came in, newest day first — this is
+  // the date-wise plan: "on Jun 1 reach out to these, on Jun 2 these…".
+  const planGroups: { key: string; label: string; leads: LeadWithContacts[] }[] = []
   {
     const map = new Map<string, LeadWithContacts[]>()
-    backlog.forEach(l => {
+    readyLeads.forEach(l => {
       const k = dayKey(l.created_at)
       if (!map.has(k)) map.set(k, [])
       map.get(k)!.push(l)
     })
     Array.from(map.keys()).sort((a, b) => b.localeCompare(a)).forEach(k => {
-      backlogGroups.push({ key: k, label: dayLabel(k), leads: map.get(k)! })
+      // Highest-score leads first within each day.
+      const dayLeads = map.get(k)!.sort((a, b) => (b.lead_score || 0) - (a.lead_score || 0))
+      planGroups.push({ key: k, label: dayLabel(k), leads: dayLeads })
     })
   }
 
@@ -452,12 +452,12 @@ export default function TodayPage() {
           </div>
         </div>
 
-        {/* ── Reach out today ────────────────────────────── */}
+        {/* ── Date-wise plan: who to reach out to, by day ─── */}
         <div>
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-4">
             <Flame size={14} style={{ color: '#fb7185' }} />
             <span className="text-[11px] font-bold tracking-widest uppercase" style={{ color: 'rgb(100,106,135)' }}>
-              Reach out today · top {todaysPicks.length}
+              Reach-out plan · by day · {readyLeads.length} waiting
             </span>
           </div>
 
@@ -466,7 +466,7 @@ export default function TodayPage() {
               <Loader2 size={20} className="animate-spin mx-auto mb-3" style={{ color: '#a78bfa' }} />
               Building your plan…
             </div>
-          ) : todaysPicks.length === 0 ? (
+          ) : planGroups.length === 0 ? (
             <div className="section-card p-14 text-center">
               <Sparkles size={40} className="mx-auto mb-4 opacity-15" style={{ color: 'rgb(160,165,195)' }} />
               <div className="text-[14px] font-semibold text-white mb-2">Inbox zero — every researched lead is handled</div>
@@ -478,46 +478,30 @@ export default function TodayPage() {
               </Link>
             </div>
           ) : (
-            <div className="flex flex-col gap-3">
-              {todaysPicks.map((lead, i) => (
-                <PlanLeadCard key={lead.id} lead={lead} rank={i + 1} actionLoading={actionLoading} onContacted={markContacted} />
-              ))}
+            <div className="flex flex-col gap-8">
+              {planGroups.map((group, gi) => {
+                const isToday = group.label === 'Today'
+                return (
+                  <div key={group.key}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <CalendarCheck size={14} style={{ color: isToday ? '#fb7185' : '#fbbf24' }} />
+                      <span className="text-[13px] font-bold" style={{ color: isToday ? '#fb7185' : 'white' }}>{group.label}</span>
+                      <span className="badge" style={{ fontSize: '10px', padding: '1px 7px', background: isToday ? 'rgba(251,113,133,0.1)' : 'rgba(255,255,255,0.05)', color: isToday ? '#fb7185' : 'rgb(150,155,185)', borderColor: isToday ? 'rgba(251,113,133,0.2)' : 'rgba(255,255,255,0.08)' }}>
+                        {group.leads.length} to reach out
+                      </span>
+                      <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
+                    </div>
+                    <div className="flex flex-col gap-3">
+                      {group.leads.map((lead, i) => (
+                        <PlanLeadCard key={lead.id} lead={lead} rank={gi === 0 ? i + 1 : null} actionLoading={actionLoading} onContacted={markContacted} />
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
-
-        {/* ── Backlog: still waiting, grouped by day ──────── */}
-        {!loading && backlog.length > 0 && (
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <CalendarCheck size={14} style={{ color: '#fbbf24' }} />
-              <span className="text-[11px] font-bold tracking-widest uppercase" style={{ color: 'rgb(100,106,135)' }}>
-                Still waiting · not reached out yet · {backlog.length}
-              </span>
-            </div>
-            <p className="text-[12px] mb-4" style={{ color: 'rgb(100,106,135)' }}>
-              Leads the agent found on earlier days that you haven&apos;t contacted. They keep stacking up here by date until you action them.
-            </p>
-            <div className="flex flex-col gap-7">
-              {backlogGroups.map(group => (
-                <div key={group.key}>
-                  <div className="flex items-center gap-2 mb-2.5">
-                    <span className="text-[12px] font-semibold text-white">{group.label}</span>
-                    <span className="badge" style={{ fontSize: '10px', padding: '1px 7px', background: 'rgba(255,255,255,0.05)', color: 'rgb(150,155,185)', borderColor: 'rgba(255,255,255,0.08)' }}>
-                      {group.leads.length} lead{group.leads.length > 1 ? 's' : ''}
-                    </span>
-                    <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
-                  </div>
-                  <div className="flex flex-col gap-3">
-                    {group.leads.map(lead => (
-                      <PlanLeadCard key={lead.id} lead={lead} rank={null} actionLoading={actionLoading} onContacted={markContacted} />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* ── Follow-ups + book meetings ─────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -40,6 +40,35 @@ const CUSTOMER_CATEGORIES = [
 ]
 const CATEGORY_CAP = 5
 
+// Safety net: reject generic category/segment names the model might slip through
+// as if they were real companies (e.g. "Stablecoin Issuers", "Lending Platforms").
+const GENERIC_WORDS = [
+  'issuers', 'platforms', 'platform', 'providers', 'provider', 'protocols', 'protocol',
+  'wallets', 'wallet', 'exchanges', 'exchange', 'companies', 'company', 'projects',
+  'solutions', 'services', 'networks', 'apps', 'startups', 'builders', 'firms',
+  'custody', 'custodians', 'lending', 'staking', 'bridges', 'bridge', 'aggregators',
+  'neobanks', 'banks', 'fintechs', 'fintech', 'dexs', 'dexes', 'cexs', 'rails',
+  'stablecoins', 'stablecoin', 'gateways', 'processors', 'marketplaces', 'ecosystem',
+  'institutions', 'enterprises', 'organizations', 'merchants', 'issuance',
+]
+const GENERIC_EXACT = new Set([
+  'defi', 'cefi', 'web3', 'web2', 'crypto', 'blockchain', 'payments', 'payment',
+  'rwa', 'nft', 'nfts', 'dao', 'daos', 'l1', 'l2', 'cbdc', 'cbdcs', 'others', 'other',
+])
+
+function isGenericName(name: string): boolean {
+  const n = (name || '').trim().toLowerCase()
+  if (!n || n.length < 2) return true
+  if (GENERIC_EXACT.has(n)) return true
+  const words = n.split(/\s+/)
+  // Short label made only of category words → it's a segment, not a company.
+  if (words.length <= 4 && words.every(w => GENERIC_WORDS.includes(w) || GENERIC_EXACT.has(w))) return true
+  // Ends in a plural category word and has no distinctive brand token (e.g. "Cross-border Payment Providers").
+  const last = words[words.length - 1]
+  if (GENERIC_WORDS.includes(last) && words.every(w => GENERIC_WORDS.includes(w) || GENERIC_EXACT.has(w) || /^(cross|on|off|multi|inter|de|cross-border|fiat|tokenized|digital|institutional)/.test(w))) return true
+  return false
+}
+
 // Read any URL as clean text via Jina.ai (free, no key needed)
 async function readUrl(url: string): Promise<string> {
   try {
@@ -114,8 +143,14 @@ async function extractCompanies(
 
 ${PRODUCT_BRAIN_COMPACT}
 
-Extract companies from web content that could be B2B customers for payment/settlement infrastructure.
+Extract REAL, SPECIFIC, NAMED companies/products from web content that could be B2B customers for payment/settlement infrastructure.
 Focus on: AI agent / agentic-commerce builders, DeFi protocols, wallets, exchanges, payment companies, fintechs, neobanks, cross-border payment companies, stablecoin issuers, RWA platforms, banks/institutions.
+
+CRITICAL — what counts as a valid company:
+- It MUST be a specific brand / proper-noun name you could google and find a single real company (e.g. "Circle", "MetaMask", "Gnosis Safe", "Fireblocks", "Stripe").
+- DO NOT return generic categories, market segments, or descriptive groupings. Reject names like: "Stablecoin Issuers", "Lending Platforms", "Custody", "Wallets", "DEXs", "Payment Companies", "RWA Platforms", "Neobanks", "Exchanges", "Bridges", "Cross-border Payment Providers". These are CATEGORIES, not companies — never output them.
+- If the page only describes a category in general terms (no specific named company), return an empty list for that part. Quality over quantity — it is better to return 2 real companies than 15 generic categories.
+
 Return ONLY valid JSON. No markdown.`,
         },
         {
@@ -125,13 +160,13 @@ Return ONLY valid JSON. No markdown.`,
 Content:
 ${content}
 
-Extract up to 15 companies mentioned. Return JSON:
+Extract up to 15 SPECIFIC, NAMED companies mentioned (skip anything that is a generic category/segment). Return JSON:
 {
   "companies": [
     {
-      "name": "Company name",
+      "name": "The specific company's real brand name (a proper noun, NOT a category)",
       "website": "https://... or empty string if unknown",
-      "description": "1-2 sentence description of what they do",
+      "description": "1-2 sentence description of what this specific company does",
       "source_url": "the EXACT link from the content above that is specifically about THIS company (e.g. the article/post URL next to its name). Copy the real link verbatim from the content — do NOT invent one. Use empty string if no specific link is present."
     }
   ]
@@ -342,17 +377,21 @@ export async function POST(req: NextRequest) {
     // 5b. Load learned intelligence to inject into all deepResearch calls
     const learnedIntelligence = await getLearnedIntelligence()
 
+    // Drop generic categories that slipped through as "companies".
+    const realCompanies = companies.filter(c => !isGenericName(c.name))
+
     const results = {
-      found: companies.length,
+      found: realCompanies.length,
       saved: 0,
       skipped_duplicate: 0,
+      skipped_generic: companies.length - realCompanies.length,
       skipped_cap: 0,
       skipped_low_score: 0,
       leads_saved: [] as string[],
     }
 
     // 6. Deep-research each company and save qualified ones
-    for (const company of companies) {
+    for (const company of realCompanies) {
       const nameKey = (company.name || '').toLowerCase().trim()
       const websiteKey = (company.website || '').toLowerCase().trim()
 

@@ -34,6 +34,7 @@ interface RunResult {
   found: number
   saved: number
   skipped_duplicate: number
+  skipped_generic?: number
   skipped_cap: number
   skipped_low_score: number
   leads_saved: string[]
@@ -501,6 +502,9 @@ export default function SourcesPage() {
                           <span style={{ color: 'rgb(110,110,135)' }}>{result.found} companies found on page</span>
                           {result.skipped_duplicate > 0 && (
                             <span style={{ color: 'rgb(110,110,135)' }}>{result.skipped_duplicate} already in DB</span>
+                          )}
+                          {(result.skipped_generic ?? 0) > 0 && (
+                            <span style={{ color: 'rgb(110,110,135)' }}>{result.skipped_generic} generic categories filtered</span>
                           )}
                           {result.skipped_cap > 0 && (
                             <span style={{ color: '#fbbf24' }}>{result.skipped_cap} skipped (category full)</span>
