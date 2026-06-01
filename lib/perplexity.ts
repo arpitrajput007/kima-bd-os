@@ -1,19 +1,21 @@
 // ============================================================
-// Perplexity Sonar client — real-time grounded research.
+// Real-time grounded research using OpenAI's web-search model.
 //
-// Why Perplexity over GPT-4o for trigger research:
-//   - Real-time web access (GPT-4o knowledge cutoff → misses recent events)
-//   - Cites sources automatically (so trigger_reason has verifiable URLs)
-//   - Sonar Pro is tuned for research synthesis, not just Q&A
-//   - Much better at: "Did X raise recently? Get hacked? Launch new product?"
+// Uses gpt-4o-search-preview — same OpenAI key you already have,
+// no extra signup, no minimum spend. Real-time web access + citations.
 //
-// Fails soft — if the key is missing, callers fall back to GPT-4o.
+// Why this instead of Perplexity:
+//   - No $50 minimum — pay per token on your existing OpenAI account
+//   - Same quality: real-time search, grounded answers, source URLs
+//   - Zero new keys needed
+//
+// Fails soft — if OpenAI isn't configured, callers get empty strings.
 // ============================================================
 
-const PERP_BASE = 'https://api.perplexity.ai'
-
 export function perplexityConfigured(): boolean {
-  return !!process.env.PERPLEXITY_API_KEY
+  // Reuses the OpenAI key — always available if the agent is running.
+  return !!process.env.OPENAI_API_KEY &&
+    process.env.OPENAI_API_KEY !== 'your_openai_api_key_here'
 }
 
 export interface PerplexityResponse {
@@ -21,8 +23,7 @@ export interface PerplexityResponse {
   citations: string[]
 }
 
-// Core research call — uses sonar-pro for deep research.
-// Returns the answer text and any citation URLs Perplexity found.
+// Core research call via OpenAI's gpt-4o-search-preview (real-time web search).
 export async function perplexityResearch(
   prompt: string,
   systemPrompt?: string,
@@ -30,27 +31,33 @@ export async function perplexityResearch(
 ): Promise<PerplexityResponse> {
   if (!perplexityConfigured()) return { content: '', citations: [] }
   try {
-    const body: Record<string, unknown> = {
-      model: opts.model ?? 'sonar-pro',
-      messages: [
-        ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
-        { role: 'user', content: prompt },
-      ],
-      max_tokens: opts.maxTokens ?? 1200,
-      temperature: 0.2,
-      return_citations: true,
-    }
+    const messages: { role: string; content: string }[] = []
+    if (systemPrompt) messages.push({ role: 'system', content: systemPrompt })
+    messages.push({ role: 'user', content: prompt })
 
-    const res = await fetch(`${PERP_BASE}/chat/completions`, {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.PERPLEXITY_API_KEY}` },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(30000),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: JSON.stringify({
+        model: opts.model ?? 'gpt-4o-search-preview',
+        messages,
+        max_tokens: opts.maxTokens ?? 1000,
+        web_search_options: { search_context_size: 'medium' },
+      }),
+      signal: AbortSignal.timeout(35000),
     })
     if (!res.ok) return { content: '', citations: [] }
     const data = await res.json()
-    const content = data?.choices?.[0]?.message?.content || ''
-    const citations: string[] = Array.isArray(data?.citations) ? data.citations : []
+    const content: string = data?.choices?.[0]?.message?.content || ''
+
+    // Extract cited URLs from annotations (OpenAI search model format).
+    const annotations: { type: string; url_citation?: { url: string } }[] =
+      data?.choices?.[0]?.message?.annotations || []
+    const citations = annotations
+      .filter(a => a.type === 'url_citation' && a.url_citation?.url)
+      .map(a => a.url_citation!.url)
+      .filter((v, i, arr) => arr.indexOf(v) === i) // dedupe
+
     return { content, citations }
   } catch { return { content: '', citations: [] } }
 }
@@ -73,20 +80,16 @@ Answer these specifically:
 3. Why is RIGHT NOW a good time to reach out? What is their current growth trigger or pain?
 4. Any recent news about them struggling with cross-chain settlement, payment friction, or security?
 
-Be specific and cite dates. If you find no recent news, say so.`,
-    `You are a senior BD researcher. Give concise, factual, cited answers. Focus on what's actionable for a BD outreach pitch.`,
-    { model: 'sonar-pro', maxTokens: 800 }
+Be specific and cite dates. Say "no recent news found" if nothing relevant.`,
+    'You are a senior BD researcher. Give concise, factual answers with sources. Focus on what is actionable for a BD outreach pitch.',
+    { maxTokens: 800 }
   )
 
   if (!content) return { trigger: '', sourceUrls: [] }
-
-  return {
-    trigger: content.slice(0, 1500),
-    sourceUrls: citations.slice(0, 3),
-  }
+  return { trigger: content.slice(0, 1500), sourceUrls: citations.slice(0, 3) }
 }
 
-// Quick company snapshot — used to enrich company description during discovery.
+// Quick company snapshot — enriches description during discovery.
 export async function quickCompanySnapshot(
   companyName: string,
   website: string,
@@ -95,7 +98,7 @@ export async function quickCompanySnapshot(
   const { content } = await perplexityResearch(
     `In 2-3 sentences: what does ${companyName} (${website}) do, who are their customers, and how do they handle cross-chain or payment settlement today?`,
     undefined,
-    { model: 'sonar', maxTokens: 300 }
+    { maxTokens: 300 }
   )
   return content
 }
