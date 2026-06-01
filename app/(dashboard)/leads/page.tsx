@@ -73,6 +73,8 @@ export default function LeadsPage() {
       .order('created_at', { ascending: false })
 
     if (filters.status) query = query.eq('status', filters.status)
+    // Hide archived/rejected by default — only show them when explicitly filtered.
+    else query = query.not('status', 'in', '("archived","rejected")')
     if (filters.industry_category) query = query.eq('industry_category', filters.industry_category)
     if (filters.product_to_sell) query = query.eq('product_to_sell', filters.product_to_sell)
     if (filters.priority) query = query.eq('priority', filters.priority)

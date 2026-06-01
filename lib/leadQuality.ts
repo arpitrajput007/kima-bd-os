@@ -41,7 +41,7 @@ const GENERIC_TAIL = new Set([
 ])
 
 // Qualifier prefixes that don't make a category specific.
-const QUALIFIER = /^(cross|on|off|multi|inter|de|cross-border|fiat|tokenized|digital|institutional|crypto|web3|web2|global|major|large|small|traditional|regional|defi|cefi|enterprise|real-world|real|world|asset|data|payment|payments|settlement|blockchain|decentralized|centralized|smart|onchain|on-chain)$/
+const QUALIFIER = /^(cross|border|cross-border|on|off|multi|inter|de|fiat|tokenized|digital|institutional|crypto|web3|web2|global|major|large|small|traditional|regional|defi|cefi|enterprise|real-world|real|world|asset|data|payment|payments|settlement|blockchain|decentralized|centralized|smart|onchain|on-chain|b2b|b2c|p2p|next-gen|nextgen|emerging|leading|top|key|various|several|many|consumer|retail|wholesale)$/
 
 export function isGenericName(name: string): boolean {
   const raw = (name || '').trim()
