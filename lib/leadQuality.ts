@@ -1,40 +1,62 @@
 // ============================================================
 // Shared lead-quality heuristics.
-// isGenericName() rejects category/segment labels that slip in as if they were
-// real companies (e.g. "Crypto Exchanges", "Banks", "Stablecoin Issuers").
-// Used by discovery (to block new ones) and the cleanup route (to purge old ones).
+// isGenericName() is a CHEAP first-pass that rejects obvious category/segment
+// labels masquerading as companies (e.g. "Crypto Exchanges", "Banks",
+// "Infrastructure", "AI"). It is intentionally aggressive. The authoritative
+// check is the AI classifier (classifyCompanyNames) — this is just the fast gate.
 // ============================================================
 
-const GENERIC_WORDS = [
-  'issuers', 'platforms', 'platform', 'providers', 'provider', 'protocols', 'protocol',
-  'wallets', 'wallet', 'exchanges', 'exchange', 'companies', 'company', 'projects',
-  'solutions', 'services', 'networks', 'apps', 'startups', 'builders', 'firms',
-  'custody', 'custodians', 'lending', 'staking', 'bridges', 'bridge', 'aggregators',
-  'neobanks', 'banks', 'bank', 'fintechs', 'fintech', 'dexs', 'dexes', 'cexs', 'rails',
-  'stablecoins', 'stablecoin', 'gateways', 'processors', 'marketplaces', 'ecosystem',
-  'institutions', 'enterprises', 'organizations', 'merchants', 'issuance', 'desks',
-  'aggregator', 'remittance', 'payments', 'payment', 'settlements', 'settlement',
-]
-
+// Single tokens that are never a company on their own (sector / tech / segment words).
 const GENERIC_EXACT = new Set([
-  'defi', 'cefi', 'web3', 'web2', 'crypto', 'blockchain', 'payments', 'payment',
-  'rwa', 'nft', 'nfts', 'dao', 'daos', 'l1', 'l2', 'cbdc', 'cbdcs', 'others', 'other',
-  'banks', 'exchanges', 'wallets', 'custody', 'lending',
+  'defi', 'cefi', 'web3', 'web2', 'crypto', 'cryptocurrency', 'blockchain', 'blockchains',
+  'payments', 'payment', 'rwa', 'rwas', 'nft', 'nfts', 'dao', 'daos', 'l1', 'l2', 'cbdc', 'cbdcs',
+  'others', 'other', 'misc', 'general', 'various', 'tbd', 'unknown', 'na',
+  'ai', 'ml', 'genai', 'agents', 'agentic', 'infra', 'infrastructure', 'analytics',
+  'technology', 'technologies', 'tech', 'data', 'software', 'hardware', 'tools', 'tooling',
+  'finance', 'fintech', 'fintechs', 'banking', 'banks', 'bank', 'neobanks', 'neobank',
+  'exchanges', 'exchange', 'wallets', 'wallet', 'custody', 'custodians', 'lending', 'staking',
+  'bridges', 'bridge', 'aggregators', 'aggregator', 'launchpads', 'launchpad', 'dex', 'dexs',
+  'dexes', 'cex', 'cexs', 'cexes', 'stablecoins', 'stablecoin', 'remittance', 'remittances',
+  'treasury', 'gaming', 'igaming', 'merchants', 'merchant', 'protocols', 'protocol',
+  'platforms', 'platform', 'networks', 'network', 'solutions', 'solution', 'services', 'service',
+  'applications', 'application', 'apps', 'app', 'products', 'product', 'startups', 'startup',
+  'enterprises', 'enterprise', 'institutions', 'institution', 'businesses', 'business',
+  'organizations', 'organization', 'companies', 'company', 'firms', 'firm', 'vendors', 'vendor',
+  'providers', 'provider', 'operators', 'operator', 'players', 'player', 'markets', 'market',
+  'sectors', 'sector', 'industries', 'industry', 'ecosystems', 'ecosystem', 'projects', 'project',
+  'issuers', 'issuer', 'processors', 'processor', 'gateways', 'gateway', 'marketplaces', 'marketplace',
+  'rails', 'rail', 'settlements', 'settlement', 'desks', 'desk', 'funds', 'fund', 'wallets', 'chains', 'chain',
 ])
 
+// Words that, as the LAST word of a multi-word name, make it a category
+// ("Lending Platforms", "Cross-border Payment Providers").
+const GENERIC_TAIL = new Set([
+  'platforms', 'platform', 'providers', 'provider', 'protocols', 'protocol', 'wallets', 'wallet',
+  'exchanges', 'exchange', 'companies', 'company', 'projects', 'solutions', 'services', 'service',
+  'networks', 'apps', 'startups', 'builders', 'firms', 'issuers', 'custody', 'custodians',
+  'bridges', 'aggregators', 'neobanks', 'banks', 'bank', 'fintechs', 'fintech', 'dexs', 'dexes',
+  'cexs', 'rails', 'stablecoins', 'gateways', 'processors', 'marketplaces', 'institutions',
+  'enterprises', 'organizations', 'merchants', 'desks', 'tools', 'systems', 'infrastructure',
+  'analytics', 'technologies', 'technology', 'finance',
+])
+
+// Qualifier prefixes that don't make a category specific.
+const QUALIFIER = /^(cross|on|off|multi|inter|de|cross-border|fiat|tokenized|digital|institutional|crypto|web3|web2|global|major|large|small|traditional|regional|defi|cefi|enterprise|real-world|real|world|asset|data|payment|payments|settlement|blockchain|decentralized|centralized|smart|onchain|on-chain)$/
+
 export function isGenericName(name: string): boolean {
-  const n = (name || '').trim().toLowerCase()
-  if (!n || n.length < 2) return true
-  if (GENERIC_EXACT.has(n)) return true
-  const words = n.split(/\s+/)
-  // Short label made only of category words → it's a segment, not a company.
-  if (words.length <= 4 && words.every(w => GENERIC_WORDS.includes(w) || GENERIC_EXACT.has(w))) return true
-  // Ends in a category word with only generic/qualifier tokens before it
-  // (e.g. "Cross-border Payment Providers", "Crypto Exchanges").
+  const raw = (name || '').trim()
+  if (!raw || raw.length < 2) return true
+  const n = raw.toLowerCase().replace(/[.,]/g, '')
+  const words = n.split(/[\s/&-]+/).filter(Boolean)
+
+  if (words.length === 0) return true
+  // Single-word category (e.g. "Infrastructure", "AI", "Payments", "Fintech").
+  if (words.length === 1) return GENERIC_EXACT.has(words[0])
+  // Every token is a generic/qualifier word → it's a segment, not a company.
+  if (words.every(w => GENERIC_EXACT.has(w) || QUALIFIER.test(w))) return true
+  // Ends in a category word and the rest are only generic/qualifier tokens
+  // (e.g. "Analytics Platforms", "Cross-border Payment Providers").
   const last = words[words.length - 1]
-  if (GENERIC_WORDS.includes(last) && words.every(w =>
-    GENERIC_WORDS.includes(w) || GENERIC_EXACT.has(w) ||
-    /^(cross|on|off|multi|inter|de|cross-border|fiat|tokenized|digital|institutional|crypto|web3|global|major|large|small|traditional|regional)/.test(w)
-  )) return true
+  if (GENERIC_TAIL.has(last) && words.slice(0, -1).every(w => GENERIC_EXACT.has(w) || QUALIFIER.test(w))) return true
   return false
 }

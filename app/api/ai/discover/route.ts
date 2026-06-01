@@ -213,6 +213,8 @@ async function deepResearch(
 
 ${PRODUCT_BRAIN}
 
+FIRST, validate the input is a REAL, SPECIFIC company (a brand you can google to one company's site like "Bybit", "JPMorgan", "Circle") and NOT a generic category/segment ("Crypto Exchanges", "Banks", "Fintechs", "Infrastructure", "AI", "RWA Platforms", "Analytics Platforms", "Payments", "Wallets"). If it is a category and not a real single company, set "is_specific_real_company": false and you may leave other fields minimal.
+
 SCORING (0-100):
 High score (70+): clear pain point, active product, matches a target category, decision maker findable
 Medium (40-69): possible fit but unclear pain point or no direct match
@@ -230,6 +232,7 @@ Description: ${company.description}${hunterContext}
 
 Return this exact JSON:
 {
+  "is_specific_real_company": true,
   "industry_category": "one industry category",
   "customer_category": ["array — pick from: Agentic Payments Customer, LayerZero Customer, Hacked Protocol, Needs On/Off Ramp, Fireblocks Customer, Web2 Stablecoin Settlement Customer, Other"],
   "product_to_sell": "best Kima product pitch for this company",
@@ -393,6 +396,9 @@ export async function POST(req: NextRequest) {
       // Full research — inject learned intelligence
       const research = await deepResearch(company, learnedIntelligence)
       if (!research) continue
+
+      // Hard gate: the model itself confirms this is a real company, not a category.
+      if (research.is_specific_real_company === false) { results.skipped_generic++; continue }
 
       // Skip low-quality leads
       if ((research.lead_score as number) < 50) { results.skipped_low_score++; continue }

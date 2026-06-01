@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { isGenericName } from '@/lib/leadQuality'
+import { classifyRealCompanies } from '@/lib/classifyCompany'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,7 +9,9 @@ const supabase = createClient(
 )
 
 // Find (and optionally archive) existing leads whose name is a generic category
-// rather than a real company. POST { dryRun?: boolean }.
+// rather than a real company. Uses a cheap wordlist UNION an AI classifier so it
+// catches everything ("Infrastructure", "AI", "Analytics Platforms", …).
+// POST { dryRun?: boolean }.
 //   dryRun=true  → just return the matches (preview)
 //   dryRun=false → archive them (status='archived', recoverable)
 export async function POST(req: NextRequest) {
@@ -23,7 +26,14 @@ export async function POST(req: NextRequest) {
       .limit(1000)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    const generic = (leads || []).filter(l => isGenericName(l.company_name || ''))
+    const all = leads || []
+    // 1) Cheap heuristic pass.
+    const heuristic = new Set(all.filter(l => isGenericName(l.company_name || '')).map(l => l.id))
+    // 2) Authoritative AI pass over the rest.
+    const remaining = all.filter(l => !heuristic.has(l.id))
+    const verdict = await classifyRealCompanies(remaining.map(l => l.company_name || ''))
+    const generic = all.filter(l =>
+      heuristic.has(l.id) || verdict[(l.company_name || '').trim()] === false)
     const names = generic.map(l => l.company_name)
 
     if (dryRun || generic.length === 0) {
