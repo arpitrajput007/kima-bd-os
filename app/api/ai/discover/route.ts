@@ -116,13 +116,21 @@ async function extractCompanies(
 
 ${PRODUCT_BRAIN_COMPACT}
 
-Extract REAL, SPECIFIC, NAMED companies/products from web content that could be B2B customers for payment/settlement infrastructure.
-Focus on: AI agent / agentic-commerce builders, DeFi protocols, wallets, exchanges, payment companies, fintechs, neobanks, cross-border payment companies, stablecoin issuers, RWA platforms, banks/institutions.
+Output REAL, SPECIFIC, NAMED companies that could be B2B customers for payment/settlement infrastructure — never categories.
 
-CRITICAL — what counts as a valid company:
-- It MUST be a specific brand / proper-noun name you could google and find a single real company (e.g. "Circle", "MetaMask", "Gnosis Safe", "Fireblocks", "Stripe").
-- DO NOT return generic categories, market segments, or descriptive groupings. Reject names like: "Stablecoin Issuers", "Lending Platforms", "Custody", "Wallets", "DEXs", "Payment Companies", "RWA Platforms", "Neobanks", "Exchanges", "Bridges", "Cross-border Payment Providers". These are CATEGORIES, not companies — never output them.
-- If the page only describes a category in general terms (no specific named company), return an empty list for that part. Quality over quantity — it is better to return 2 real companies than 15 generic categories.
+CRITICAL — every "name" MUST be a single real company you could google and land on one company's website:
+- GOOD (real companies): "Bybit", "Coinbase", "Binance", "Circle", "MetaMask", "Fireblocks", "JPMorgan", "Revolut", "Stripe", "Ripple".
+- BANNED (categories / segments / groupings — NEVER output these as a name): "Crypto Exchanges", "Banks", "Exchanges", "Stablecoin Issuers", "Lending Platforms", "Custody", "Wallets", "DEXs", "Payment Companies", "RWA Platforms", "Neobanks", "Bridges", "Cross-border Payment Providers", "Fintechs".
+
+EXPAND CATEGORIES INTO REAL COMPANIES (very important):
+- If the content (or the source/search topic) points at a CATEGORY like "crypto exchanges" or "banks", DO NOT return the category. Instead, name the specific, real, well-known companies in that segment that best fit Kima/Aeredium's ICP.
+  · "crypto exchanges" → Binance, Bybit, OKX, Kraken, Bitget, KuCoin, Coinbase
+  · "banks" → JPMorgan, Standard Chartered, DBS Bank, BBVA, Santander, HSBC
+  · "wallets" → MetaMask, Trust Wallet, Phantom, Rabby
+  · "stablecoin issuers" → Circle, Tether, Paxos, Ethena
+- Only name companies that genuinely exist. Each must be a real brand with a findable website.
+
+Quality bar: it is far better to return 5 real, correctly-named companies than 15 vague ones. If you truly cannot name any real company, return an empty list — but prefer naming the real market leaders/best-fit players in the relevant segment.
 
 Return ONLY valid JSON. No markdown.`,
         },
@@ -133,14 +141,14 @@ Return ONLY valid JSON. No markdown.`,
 Content:
 ${content}
 
-Extract up to 15 SPECIFIC, NAMED companies mentioned (skip anything that is a generic category/segment). Return JSON:
+Return up to 15 SPECIFIC, REAL, NAMED companies. If the source points at a category, expand it into the actual best-fit named companies (see rules above). Never output a category/segment as a name. Return JSON:
 {
   "companies": [
     {
-      "name": "The specific company's real brand name (a proper noun, NOT a category)",
-      "website": "https://... or empty string if unknown",
-      "description": "1-2 sentence description of what this specific company does",
-      "source_url": "the EXACT link from the content above that is specifically about THIS company (e.g. the article/post URL next to its name). Copy the real link verbatim from the content — do NOT invent one. Use empty string if no specific link is present."
+      "name": "The specific company's real brand name (a proper noun like 'Bybit' or 'JPMorgan', NEVER a category like 'Crypto Exchanges')",
+      "website": "https://<the company's real domain> — required; give your best real guess (e.g. https://www.bybit.com) rather than leaving blank",
+      "description": "1-2 sentence description of what this specific company actually does",
+      "source_url": "the EXACT link from the content that is specifically about THIS company, copied verbatim. Empty string if none."
     }
   ]
 }`,
