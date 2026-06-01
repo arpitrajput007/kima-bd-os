@@ -12,7 +12,7 @@ import type { Source } from '@/lib/types'
 import { cn, formatDate } from '@/lib/utils'
 
 const SOURCE_TYPES = [
-  'website', 'google_search', 'twitter_profile', 'linkedin_company',
+  'apollo_search', 'website', 'google_search', 'twitter_profile', 'linkedin_company',
   'telegram_group', 'rss_feed', 'defillama_category', 'crunchbase_list',
   'ecosystem_directory', 'hackathon_directory', 'news_source', 'manual_list',
 ]
@@ -327,9 +327,14 @@ export default function SourcesPage() {
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-xs font-medium mb-1.5" style={{ color: 'rgb(160,160,180)' }}>
-                    URL or Search Query <span style={{ color: 'rgb(100,100,120)' }}>— the bot will read this page to find companies</span>
+                    {form.source_type === 'apollo_search'
+                      ? <>Apollo keywords <span style={{ color: 'rgb(100,100,120)' }}>— comma-separated tags; Apollo finds matching companies</span></>
+                      : <>URL or Search Query <span style={{ color: 'rgb(100,100,120)' }}>— the bot will read this page to find companies</span></>}
                   </label>
-                  <input className={inputClass} style={selStyle} value={form.source_url_or_query || ''} onChange={e => setForm(f => ({ ...f, source_url_or_query: e.target.value }))} placeholder="e.g. https://layerzero.network/ecosystem  or  https://defillama.com/chains" />
+                  <input className={inputClass} style={selStyle} value={form.source_url_or_query || ''} onChange={e => setForm(f => ({ ...f, source_url_or_query: e.target.value }))}
+                    placeholder={form.source_type === 'apollo_search'
+                      ? 'e.g. stablecoin, cross-border payments, crypto exchange'
+                      : 'e.g. https://layerzero.network/ecosystem  or  https://defillama.com/chains'} />
                   <p className="mt-1.5 text-xs leading-relaxed" style={{ color: 'rgb(110,110,130)' }}>
                     Just point the agent at strong sources — Telegram groups, sites, Google or X searches.
                     It researches each company itself and decides the industry &amp; sales fit using everything you&apos;ve taught it.

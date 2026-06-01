@@ -332,6 +332,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [editForm, setEditForm] = useState<Partial<Lead>>({})
   const [saving, setSaving] = useState(false)
   const [aiAction, setAiAction] = useState<AIAction>(null)
+  const [apolloLoading, setApolloLoading] = useState(false)
   const [discussOpen, setDiscussOpen] = useState(false)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     overview: true, research: true, pain: true, kima: true,
@@ -441,6 +442,24 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'AI action failed')
     } finally { setAiAction(null) }
+  }
+
+  // Pull REAL decision-maker contacts (with verified emails) from Apollo.
+  const findApolloContacts = async () => {
+    if (!lead) return
+    setApolloLoading(true)
+    try {
+      const res = await fetch('/api/leads/apollo-enrich', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead_id: lead.id }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      if (json.added > 0) { toast.success(`Apollo added ${json.added} real contact${json.added > 1 ? 's' : ''}`); loadLead() }
+      else toast(json.message || 'No new contacts found via Apollo')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Apollo lookup failed')
+    } finally { setApolloLoading(false) }
   }
 
   if (loading) return (
@@ -562,6 +581,13 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 {label}
               </button>
             ))}
+            {/* Apollo — real verified contacts (not guessed) */}
+            <button onClick={findApolloContacts} disabled={apolloLoading}
+              title="Pull real decision-makers with verified emails from Apollo.io"
+              style={{ borderRadius: 9, border: '1px solid rgba(52,211,153,0.3)', background: 'rgba(52,211,153,0.1)', padding: '8px 14px', fontSize: 13, color: 'rgb(110,231,183)', cursor: apolloLoading ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, transition: 'background 0.15s', fontFamily: 'inherit' }}>
+              {apolloLoading ? <Loader2 size={12} className="animate-spin" /> : <Users size={12} />}
+              Apollo: Find Contacts
+            </button>
           </div>
         </div>
 

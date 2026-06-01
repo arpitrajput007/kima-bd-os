@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { PRODUCT_BRAIN, PRODUCT_BRAIN_COMPACT } from '@/lib/kima-knowledge'
 import { pickBestUrl, extractSocials, type Socials } from '@/lib/utils'
+import { apolloConfigured, apolloFindContacts, apolloSearchCompanies, toDomain } from '@/lib/apollo'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -348,31 +349,41 @@ export async function POST(req: NextRequest) {
         .filter(Boolean)
     )
 
-    // 4. Get content via URL or Search
+    // 4. Get the company list — either straight from Apollo, or by crawling a URL/search.
     const sourceQuery = source.source_url_or_query.trim()
-    let content = ''
-    
-    if (sourceQuery.startsWith('http://') || sourceQuery.startsWith('https://')) {
-      content = await readUrl(sourceQuery)
-    } else {
-      if (!process.env.TAVILY_API_KEY) {
-        return NextResponse.json({ error: 'Tavily API key required for search queries. Add it to .env.local' }, { status: 400 })
+    const isApolloSource = source.source_type === 'apollo_search' || /^apollo:/i.test(sourceQuery)
+    let companies: Array<{ name: string; website: string; description: string; source_url: string }> = []
+
+    if (isApolloSource) {
+      if (!apolloConfigured()) {
+        return NextResponse.json({ error: 'Apollo API key not configured. Add APOLLO_API_KEY to your environment.' }, { status: 400 })
       }
-      content = await searchWeb(sourceQuery)
-    }
+      const q = sourceQuery.replace(/^apollo:/i, '').trim()
+      companies = await apolloSearchCompanies(q, 20)
+      if (!companies.length) {
+        return NextResponse.json({ error: 'Apollo returned no companies for that query — try different keywords.' }, { status: 400 })
+      }
+    } else {
+      let content = ''
+      if (sourceQuery.startsWith('http://') || sourceQuery.startsWith('https://')) {
+        content = await readUrl(sourceQuery)
+      } else {
+        if (!process.env.TAVILY_API_KEY) {
+          return NextResponse.json({ error: 'Tavily API key required for search queries. Add it to .env.local' }, { status: 400 })
+        }
+        content = await searchWeb(sourceQuery)
+      }
 
-    if (!content || content.length < 100) {
-      return NextResponse.json(
-        { error: 'Could not fetch content or content too short (try a different URL or search query)' },
-        { status: 400 }
-      )
-    }
+      if (!content || content.length < 100) {
+        return NextResponse.json(
+          { error: 'Could not fetch content or content too short (try a different URL or search query)' },
+          { status: 400 }
+        )
+      }
 
-    // 5. Extract company list from the page
-    const companies = await extractCompanies(
-      content,
-      `${source.source_name} (${source.source_type})`
-    )
+      // Extract company list from the page
+      companies = await extractCompanies(content, `${source.source_name} (${source.source_type})`)
+    }
 
     // 5b. Load learned intelligence to inject into all deepResearch calls
     const learnedIntelligence = await getLearnedIntelligence()
@@ -460,28 +471,48 @@ export async function POST(req: NextRequest) {
         .single()
 
       if (!leadErr && newLead) {
-        // Save contacts
-        const contacts = (research.contacts as Record<string, string>[]) || []
-        for (const contact of contacts.slice(0, 3)) {
-          const linkedinUrl = contact.linkedin_hint
-            ? `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(contact.linkedin_hint)}`
-            : null
-          const twitterUrl = contact.twitter_hint
-            ? contact.twitter_hint.startsWith('http')
-              ? contact.twitter_hint
-              : `https://x.com/search?q=${encodeURIComponent(contact.twitter_hint)}`
-            : null
+        // Prefer REAL contacts from Apollo (verified people/emails) when we have a domain.
+        // No email reveal here to stay credit-efficient in bulk discovery.
+        const domain = toDomain(company.website)
+        const apolloContacts = domain ? await apolloFindContacts(domain) : []
 
-          await supabase.from('contacts').insert({
-            lead_id: newLead.id,
-            name: contact.name || null,
-            role: contact.role,
-            linkedin_url: linkedinUrl,
-            twitter_url: twitterUrl,
-            email: contact.email_pattern || null,
-            contact_confidence: contact.contact_confidence,
-            reason_this_person: contact.why_this_person,
-          })
+        if (apolloContacts.length > 0) {
+          for (const c of apolloContacts.slice(0, 3)) {
+            await supabase.from('contacts').insert({
+              lead_id: newLead.id,
+              name: c.name,
+              role: c.title || 'Decision maker',
+              company: company.name,
+              linkedin_url: c.linkedin_url,
+              email: c.email,
+              contact_confidence: c.email ? 'high' : 'medium',
+              reason_this_person: `Found via Apollo${c.seniority ? ` · ${c.seniority}` : ''}${c.title ? ` · ${c.title}` : ''}`,
+            })
+          }
+        } else {
+          // Fallback: AI-suggested contacts (guessed patterns).
+          const contacts = (research.contacts as Record<string, string>[]) || []
+          for (const contact of contacts.slice(0, 3)) {
+            const linkedinUrl = contact.linkedin_hint
+              ? `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(contact.linkedin_hint)}`
+              : null
+            const twitterUrl = contact.twitter_hint
+              ? contact.twitter_hint.startsWith('http')
+                ? contact.twitter_hint
+                : `https://x.com/search?q=${encodeURIComponent(contact.twitter_hint)}`
+              : null
+
+            await supabase.from('contacts').insert({
+              lead_id: newLead.id,
+              name: contact.name || null,
+              role: contact.role,
+              linkedin_url: linkedinUrl,
+              twitter_url: twitterUrl,
+              email: contact.email_pattern || null,
+              contact_confidence: contact.contact_confidence,
+              reason_this_person: contact.why_this_person,
+            })
+          }
         }
 
         // Update in-memory counts

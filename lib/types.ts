@@ -33,6 +33,7 @@ export type SourceType =
   | 'hackathon_directory'
   | 'news_source'
   | 'manual_list'
+  | 'apollo_search'
 
 export type OutreachChannel = 'telegram' | 'linkedin' | 'twitter' | 'email'
 
