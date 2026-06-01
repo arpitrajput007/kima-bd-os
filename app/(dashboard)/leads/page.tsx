@@ -288,6 +288,12 @@ export default function LeadsPage() {
       {/* Category view */}
       {!loading && viewMode === 'category' && filteredLeads.length > 0 && (
         <div className="p-8 space-y-4">
+          {/* Legend */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12, fontSize: 11, color: 'rgb(120,127,160)' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><Star size={11} color="#a78bfa" /> <strong style={{ color: 'rgb(160,165,195)' }}>Excellent</strong> — score 85+, top BD target</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 999, background: '#a78bfa', display: 'inline-block' }} /> Kima target category</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 999, background: '#38bdf8', display: 'inline-block' }} /> Other category</span>
+          </div>
           {/* Summary strip */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
             {categoryGroups.map(({ cat, leads: catLeads }) => (
@@ -340,7 +346,7 @@ export default function LeadsPage() {
                           <tr key={lead.id}>
                             <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                {lead.priority === 'excellent' && <Star size={11} style={{ color: '#a78bfa', flexShrink: 0 }} />}
+                                {lead.priority === 'excellent' && <span title="Excellent priority — score 85+, top BD target" style={{ display:'inline-flex', flexShrink:0 }}><Star size={11} style={{ color: '#a78bfa' }} /></span>}
                                 <div>
                                   <Link href={`/leads/${lead.id}`} className="text-sm font-medium text-white hover:text-violet-300 transition-colors">{lead.company_name}</Link>
                                   {lead.website && <a href={lead.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs mt-0.5" style={{ color: 'rgb(100,100,120)' }} onClick={e => e.stopPropagation()}>{lead.website.replace(/^https?:\/\//, '').slice(0, 25)}<ExternalLink size={9} /></a>}
