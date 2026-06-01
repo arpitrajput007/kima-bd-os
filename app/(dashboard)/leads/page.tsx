@@ -5,9 +5,9 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import {
-  Plus, Search, Filter, Star, ExternalLink, ChevronDown,
+  Plus, Search, Filter, Star, ExternalLink, ChevronDown, ChevronRight,
   CheckCircle, XCircle, Eye, MessageSquare, Loader2, RefreshCw,
-  AtSign, Send, MessageCircle, Sparkles
+  AtSign, Send, MessageCircle, Sparkles, LayoutList, Layers
 } from 'lucide-react'
 import {
   cn, getScoreBg, getStatusColor, getStatusLabel, formatDate, truncate
@@ -35,6 +35,9 @@ export default function LeadsPage() {
   })
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [showFilters, setShowFilters] = useState(false)
+  const [viewMode, setViewMode] = useState<'list' | 'category'>('category')
+  const [collapsedCats, setCollapsedCats] = useState<Record<string, boolean>>({})
+  const toggleCat = (cat: string) => setCollapsedCats(p => ({ ...p, [cat]: !p[cat] }))
   const [cleaning, setCleaning] = useState(false)
 
   // Archive existing leads whose name is a generic category, not a real company.
@@ -98,6 +101,26 @@ export default function LeadsPage() {
     l.pain_point?.toLowerCase().includes(search.toLowerCase())
   )
 
+  // Build category groups — each lead can appear in multiple categories.
+  const DEFINED_CATS: string[] = [...CUSTOMER_CATEGORIES]
+  const categoryGroups: { cat: string; leads: Lead[] }[] = (() => {
+    const map: Record<string, Lead[]> = {}
+    filteredLeads.forEach(l => {
+      const cats = (l.customer_category || []).filter(Boolean)
+      if (cats.length === 0) {
+        (map['Uncategorised'] ??= []).push(l)
+      } else {
+        cats.forEach(c => { (map[c] ??= []).push(l) })
+      }
+    })
+    // Sort: defined categories first (in their canonical order), then the rest, then Uncategorised last.
+    const defined = DEFINED_CATS.filter(c => map[c as string])
+    const extra = Object.keys(map).filter(c => !DEFINED_CATS.includes(c) && c !== 'Uncategorised').sort()
+    const groups = [...defined as string[], ...extra]
+    if (map['Uncategorised']) groups.push('Uncategorised')
+    return groups.map(cat => ({ cat, leads: map[cat as string] }))
+  })()
+
   const updateLeadStatus = async (id: string, status: string) => {
     setActionLoading(id + status)
     const { error } = await supabase
@@ -133,13 +156,26 @@ export default function LeadsPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {/* View toggle */}
+            <div style={{ display: 'flex', borderRadius: 9, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+              <button onClick={() => setViewMode('category')}
+                className={viewMode === 'category' ? 'btn btn-primary' : 'btn btn-ghost'}
+                style={{ borderRadius: 0, padding: '6px 11px', fontSize: '12px', gap: 5 }}>
+                <Layers size={12} /> Category
+              </button>
+              <button onClick={() => setViewMode('list')}
+                className={viewMode === 'list' ? 'btn btn-primary' : 'btn btn-ghost'}
+                style={{ borderRadius: 0, padding: '6px 11px', fontSize: '12px', gap: 5 }}>
+                <LayoutList size={12} /> List
+              </button>
+            </div>
             <button onClick={loadLeads} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '12px' }}>
               <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
             </button>
             <button onClick={cleanupGeneric} disabled={cleaning} className="btn btn-secondary" style={{ padding: '7px 12px', fontSize: '12px' }}
               title="Archive leads whose name is a generic category instead of a real company">
               {cleaning ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-              Clean up generic
+              Clean up
             </button>
             <Link href="/leads/new" className="btn btn-primary" style={{ padding: '7px 14px', fontSize: '13px' }}>
               <Plus size={14} />
@@ -249,8 +285,100 @@ export default function LeadsPage() {
         )}
       </div>
 
-      {/* Table */}
-      <div className="p-8">
+      {/* Category view */}
+      {!loading && viewMode === 'category' && filteredLeads.length > 0 && (
+        <div className="p-8 space-y-4">
+          {/* Summary strip */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+            {categoryGroups.map(({ cat, leads: catLeads }) => (
+              <button key={cat} onClick={() => toggleCat(cat)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgb(170,175,200)' }}>
+                <span style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: DEFINED_CATS.includes(cat) ? '#a78bfa' : '#38bdf8', display: 'inline-block' }} />
+                {cat.replace(' Customer', '')} <span style={{ color: '#a78bfa', fontWeight: 700 }}>{catLeads.length}</span>
+              </button>
+            ))}
+          </div>
+
+          {categoryGroups.map(({ cat, leads: catLeads }) => {
+            const collapsed = collapsedCats[cat]
+            const statusColors: Record<string, string> = { new: '#a78bfa', contacted: '#38bdf8', replied: '#fbbf24', meeting_booked: '#34d399', approved: '#34d399' }
+            return (
+              <div key={cat} className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(22,22,34,0.8)' }}>
+                {/* Category header */}
+                <button onClick={() => toggleCat(cat)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '13px 18px', background: 'rgba(255,255,255,0.02)', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                  {collapsed ? <ChevronRight size={14} color="rgb(120,127,160)" /> : <ChevronDown size={14} color="rgb(120,127,160)" />}
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'white' }}>{cat.replace(' Customer', '')}</span>
+                    <span style={{ marginLeft: 10, fontSize: 12, color: 'rgb(130,135,165)' }}>{catLeads.length} lead{catLeads.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  {/* Mini status bar */}
+                  <div style={{ display: 'flex', gap: 5 }}>
+                    {(['new', 'contacted', 'replied', 'meeting_booked'] as const).map(s => {
+                      const n = catLeads.filter(l => l.status === s).length
+                      if (!n) return null
+                      return <span key={s} style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 9, background: (statusColors[s] || '#a78bfa') + '18', color: statusColors[s] || '#a78bfa', border: `1px solid ${(statusColors[s] || '#a78bfa')}30` }}>{getStatusLabel(s)} {n}</span>
+                    })}
+                  </div>
+                </button>
+
+                {!collapsed && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full data-table" style={{ marginBottom: 0 }}>
+                      <thead>
+                        <tr style={{ background: 'rgba(255,255,255,0.015)' }}>
+                          <th className="text-left">Company</th>
+                          <th className="text-left">Industry</th>
+                          <th className="text-left">Pain Point</th>
+                          <th className="text-left">Product</th>
+                          <th className="text-left">Score</th>
+                          <th className="text-left">Status</th>
+                          <th className="text-left">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {catLeads.sort((a, b) => (b.lead_score || 0) - (a.lead_score || 0)).map(lead => (
+                          <tr key={lead.id}>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                {lead.priority === 'excellent' && <Star size={11} style={{ color: '#a78bfa', flexShrink: 0 }} />}
+                                <div>
+                                  <Link href={`/leads/${lead.id}`} className="text-sm font-medium text-white hover:text-violet-300 transition-colors">{lead.company_name}</Link>
+                                  {lead.website && <a href={lead.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs mt-0.5" style={{ color: 'rgb(100,100,120)' }} onClick={e => e.stopPropagation()}>{lead.website.replace(/^https?:\/\//, '').slice(0, 25)}<ExternalLink size={9} /></a>}
+                                  <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+                                    {lead.twitter_url && <a href={lead.twitter_url} target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8' }}><AtSign size={11} /></a>}
+                                    {lead.telegram_url && <a href={lead.telegram_url} target="_blank" rel="noopener noreferrer" style={{ color: '#22d3ee' }}><Send size={11} /></a>}
+                                    {lead.discord_url && <a href={lead.discord_url} target="_blank" rel="noopener noreferrer" style={{ color: '#818cf8' }}><MessageCircle size={11} /></a>}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td><span className="text-xs" style={{ color: 'rgb(160,160,180)' }}>{lead.industry_category ? truncate(lead.industry_category, 22) : '—'}</span></td>
+                            <td><span className="text-xs" style={{ color: 'rgb(140,140,160)' }}>{lead.pain_point ? truncate(lead.pain_point, 50) : '—'}</span></td>
+                            <td><span className="text-xs" style={{ color: 'rgb(160,160,180)' }}>{lead.product_to_sell ? truncate(lead.product_to_sell, 22) : '—'}</span></td>
+                            <td>{lead.lead_score != null ? <span className={cn('badge', getScoreBg(lead.lead_score))}>{lead.lead_score}</span> : '—'}</td>
+                            <td><span className={cn('badge', getStatusColor(lead.status))}>{getStatusLabel(lead.status)}</span></td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <Link href={`/leads/${lead.id}`} className="btn btn-ghost p-1.5" title="View" style={{ padding: 5 }}><Eye size={13} /></Link>
+                                {lead.status !== 'approved' && <button onClick={() => updateLeadStatus(lead.id, 'approved')} disabled={actionLoading === lead.id + 'approved'} className="btn btn-ghost p-1.5" title="Approve" style={{ padding: 5, color: '#34d399' }}>{actionLoading === lead.id + 'approved' ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle size={13} />}</button>}
+                                {lead.status !== 'rejected' && <button onClick={() => updateLeadStatus(lead.id, 'rejected')} disabled={actionLoading === lead.id + 'rejected'} className="btn btn-ghost p-1.5" title="Reject" style={{ padding: 5, color: '#f87171' }}>{actionLoading === lead.id + 'rejected' ? <Loader2 size={13} className="animate-spin" /> : <XCircle size={13} />}</button>}
+                                <Link href={`/outreach?lead=${lead.id}`} className="btn btn-ghost p-1.5" title="Outreach" style={{ padding: 5, color: '#a78bfa' }}><MessageSquare size={13} /></Link>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* List / fallback */}
+      <div className={viewMode === 'list' ? 'p-8' : (filteredLeads.length === 0 || loading ? 'p-8' : 'hidden')}>
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 size={24} className="animate-spin" style={{ color: 'rgb(139, 92, 246)' }} />
@@ -424,3 +552,4 @@ export default function LeadsPage() {
     </div>
   )
 }
+
