@@ -34,6 +34,8 @@ export type SourceType =
   | 'news_source'
   | 'manual_list'
   | 'apollo_search'
+  | 'exa_search'
+  | 'exa_similar'
 
 export type OutreachChannel = 'telegram' | 'linkedin' | 'twitter' | 'email'
 

@@ -12,7 +12,8 @@ import type { Source } from '@/lib/types'
 import { cn, formatDate } from '@/lib/utils'
 
 const SOURCE_TYPES = [
-  'apollo_search', 'website', 'google_search', 'twitter_profile', 'linkedin_company',
+  'exa_search', 'exa_similar', 'apollo_search',
+  'website', 'google_search', 'twitter_profile', 'linkedin_company',
   'telegram_group', 'rss_feed', 'defillama_category', 'crunchbase_list',
   'ecosystem_directory', 'hackathon_directory', 'news_source', 'manual_list',
 ]
@@ -329,11 +330,17 @@ export default function SourcesPage() {
                   <label className="block text-xs font-medium mb-1.5" style={{ color: 'rgb(160,160,180)' }}>
                     {form.source_type === 'apollo_search'
                       ? <>Apollo keywords <span style={{ color: 'rgb(100,100,120)' }}>— comma-separated tags; Apollo finds matching companies</span></>
+                      : form.source_type === 'exa_search'
+                      ? <>Exa search query <span style={{ color: 'rgb(100,100,120)' }}>— natural language; Exa semantically finds real companies</span></>
+                      : form.source_type === 'exa_similar'
+                      ? <>Company URL <span style={{ color: 'rgb(100,100,120)' }}>— paste a company's homepage; Exa finds similar companies</span></>
                       : <>URL or Search Query <span style={{ color: 'rgb(100,100,120)' }}>— the bot will read this page to find companies</span></>}
                   </label>
                   <input className={inputClass} style={selStyle} value={form.source_url_or_query || ''} onChange={e => setForm(f => ({ ...f, source_url_or_query: e.target.value }))}
-                    placeholder={form.source_type === 'apollo_search'
-                      ? 'e.g. stablecoin, cross-border payments, crypto exchange'
+                    placeholder={
+                      form.source_type === 'apollo_search' ? 'e.g. stablecoin, cross-border payments, crypto exchange'
+                      : form.source_type === 'exa_search' ? 'e.g. DeFi protocols with cross-chain settlement problems'
+                      : form.source_type === 'exa_similar' ? 'e.g. https://layerzero.network'
                       : 'e.g. https://layerzero.network/ecosystem  or  https://defillama.com/chains'} />
                   <p className="mt-1.5 text-xs leading-relaxed" style={{ color: 'rgb(110,110,130)' }}>
                     Just point the agent at strong sources — Telegram groups, sites, Google or X searches.

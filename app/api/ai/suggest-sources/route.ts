@@ -10,6 +10,7 @@ const supabase = createClient(
 )
 
 const SOURCE_TYPES = [
+  'exa_search', 'exa_similar', 'apollo_search',
   'website', 'google_search', 'twitter_profile', 'linkedin_company',
   'telegram_group', 'rss_feed', 'defillama_category', 'crunchbase_list',
   'ecosystem_directory', 'hackathon_directory', 'news_source', 'manual_list',

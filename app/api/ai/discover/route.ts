@@ -5,6 +5,8 @@ import { PRODUCT_BRAIN, PRODUCT_BRAIN_COMPACT } from '@/lib/kima-knowledge'
 import { pickBestUrl, extractSocials, type Socials } from '@/lib/utils'
 import { apolloConfigured, apolloEnrichContacts, apolloSearchCompanies, toDomain } from '@/lib/apollo'
 import { isGenericName } from '@/lib/leadQuality'
+import { exaConfigured, exaSearch, exaSearchCompanies, exaCompanyNews } from '@/lib/exa'
+import { perplexityConfigured, researchCompanyTrigger } from '@/lib/perplexity'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -395,13 +397,37 @@ export async function POST(req: NextRequest) {
       if (!companies.length) {
         return NextResponse.json({ error: 'Apollo returned no companies for that query — try different keywords.' }, { status: 400 })
       }
+    } else if (source.source_type === 'exa_similar') {
+      // Exa findSimilar — point at a good lead URL, get more companies like it.
+      if (!exaConfigured()) {
+        return NextResponse.json({ error: 'EXA_API_KEY not configured.' }, { status: 400 })
+      }
+      const { exaFindSimilar } = await import('@/lib/exa')
+      const similar = await exaFindSimilar(sourceQuery, { numResults: 20, category: 'company', includeText: true })
+      companies = similar.filter(r => r.url && r.title).map(r => ({
+        name: r.title?.replace(/[\|\-–].*$/, '').trim() || '',
+        website: r.url,
+        description: (r.text || '').slice(0, 300).trim(),
+        source_url: r.url,
+      })).filter(c => c.name.length > 1)
+      if (!companies.length) {
+        return NextResponse.json({ error: 'Exa could not find similar companies for that URL.' }, { status: 400 })
+      }
+    } else if (source.source_type === 'exa_search' || (!sourceQuery.startsWith('http') && exaConfigured())) {
+      // Exa neural search — semantically finds real companies matching the query.
+      // Returns companies directly (no page-scraping + AI extraction needed).
+      companies = await exaSearchCompanies(sourceQuery, 25)
+      if (!companies.length) {
+        return NextResponse.json({ error: 'Exa returned no companies for that query — try different keywords.' }, { status: 400 })
+      }
     } else {
       let content = ''
       if (sourceQuery.startsWith('http://') || sourceQuery.startsWith('https://')) {
         content = await readUrl(sourceQuery)
       } else {
+        // Exa not configured — fall back to Tavily.
         if (!process.env.TAVILY_API_KEY) {
-          return NextResponse.json({ error: 'Tavily API key required for search queries. Add it to .env.local' }, { status: 400 })
+          return NextResponse.json({ error: 'No search API configured. Add EXA_API_KEY (recommended) or TAVILY_API_KEY to your environment.' }, { status: 400 })
         }
         content = await searchWeb(sourceQuery)
       }
@@ -442,9 +468,34 @@ export async function POST(req: NextRequest) {
       if (existingNames.has(nameKey)) { results.skipped_duplicate++; continue }
       if (websiteKey && existingWebsites.has(websiteKey)) { results.skipped_duplicate++; continue }
 
-      // Full research — inject learned intelligence
-      const research = await deepResearch(company, learnedIntelligence)
+      // Enrich company context with real-time research before the main deep-dive.
+      // Perplexity: grounded trigger research (recent news, funding, events).
+      // Exa: recent news as additional context.
+      // Both run in parallel; both fail soft.
+      const websiteForResearch = company.website || ''
+      const [perplexityContext, exaNewsContext] = await Promise.all([
+        perplexityConfigured() ? researchCompanyTrigger(company.name, websiteForResearch, company.description) : Promise.resolve({ trigger: '', sourceUrls: [] }),
+        exaConfigured() ? exaCompanyNews(company.name) : Promise.resolve(''),
+      ])
+
+      // Merge the enriched context into company description for deepResearch.
+      const enrichedCompany = {
+        ...company,
+        description: [
+          company.description,
+          perplexityContext.trigger ? `\n\nRECENT INTELLIGENCE (Perplexity, grounded):\n${perplexityContext.trigger}` : '',
+          exaNewsContext ? `\n\nRECENT NEWS (Exa):\n${exaNewsContext.slice(0, 800)}` : '',
+        ].filter(Boolean).join(''),
+      }
+
+      // Full research — inject learned intelligence + live context
+      const research = await deepResearch(enrichedCompany, learnedIntelligence)
       if (!research) continue
+
+      // If Perplexity found citation URLs, prefer them as source_url.
+      if (perplexityContext.sourceUrls.length) {
+        research.source_url = perplexityContext.sourceUrls[0]
+      }
 
       // Hard gate: the model itself confirms this is a real company, not a category.
       if (research.is_specific_real_company === false) { results.skipped_generic++; continue }
