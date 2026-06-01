@@ -1,28 +1,17 @@
 // ============================================================
 // Exa.ai client — neural search for high-quality lead discovery.
-//
-// Why Exa over Tavily for BD:
-//   - Semantic / neural search (understands "DeFi protocols with cross-chain
-//     settlement problems" — not just keyword matching)
-//   - findSimilar: point at one good lead → get 10 companies like it
-//   - company category filter returns actual company homepages, not news articles
-//   - Full page content retrieval included in one call
-//
-// All functions fail soft (return [] / '') so the agent keeps working with
-// Tavily as fallback if the key is missing or Exa errors.
+// Uses the official exa-js SDK. All functions fail soft.
+// Docs: https://docs.exa.ai/reference/search-api-guide-for-coding-agents
 // ============================================================
 
-const EXA_BASE = 'https://api.exa.ai'
+import Exa from 'exa-js'
 
 export function exaConfigured(): boolean {
   return !!process.env.EXA_API_KEY
 }
 
-function headers() {
-  return {
-    'Content-Type': 'application/json',
-    'x-api-key': process.env.EXA_API_KEY || '',
-  }
+function client() {
+  return new Exa(process.env.EXA_API_KEY!)
 }
 
 export interface ExaResult {
@@ -30,104 +19,140 @@ export interface ExaResult {
   url: string
   title: string
   text?: string
+  highlights?: string[]
   publishedDate?: string
 }
 
-// Neural search — returns semantically relevant results.
-// `category: 'company'` restricts to company homepages (great for lead discovery).
-export async function exaSearch(
-  query: string,
-  opts: { numResults?: number; category?: 'company' | 'news' | 'research paper' | 'tweet'; includeText?: boolean; startPublishedDate?: string } = {}
-): Promise<ExaResult[]> {
-  if (!exaConfigured()) return []
-  try {
-    const body: Record<string, unknown> = {
-      query,
-      numResults: opts.numResults ?? 15,
-      type: 'neural',
-    }
-    if (opts.category) body.category = opts.category
-    if (opts.includeText) body.contents = { text: { maxCharacters: 3000 } }
-    if (opts.startPublishedDate) body.startPublishedDate = opts.startPublishedDate
+type BDCompany = { name: string; website: string; description: string; source_url: string }
 
-    const res = await fetch(`${EXA_BASE}/search`, {
-      method: 'POST', headers: headers(), body: JSON.stringify(body),
-      signal: AbortSignal.timeout(20000),
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return Array.isArray(data?.results) ? data.results as ExaResult[] : []
-  } catch { return [] }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toCompanies(results: any[]): BDCompany[] {
+  return results
+    .filter(r => r.url && r.title)
+    .map(r => ({
+      name: (r.title as string)?.replace(/[\|\-–].*$/, '').trim() || '',
+      website: r.url as string,
+      description: (Array.isArray(r.highlights) ? r.highlights.join(' ') : r.text || '') as string,
+      source_url: r.url as string,
+    }))
+    .filter(c => c.name.length > 1)
 }
 
-// Find companies similar to a given URL — Exa's most powerful BD feature.
-// Point at one good lead (e.g. "https://layerzero.network") and get more like it.
-export async function exaFindSimilar(
-  url: string,
-  opts: { numResults?: number; category?: string; includeText?: boolean } = {}
-): Promise<ExaResult[]> {
-  if (!exaConfigured() || !url) return []
-  try {
-    const body: Record<string, unknown> = {
-      url,
-      numResults: opts.numResults ?? 15,
-    }
-    if (opts.category) body.category = opts.category
-    if (opts.includeText) body.contents = { text: { maxCharacters: 2000 } }
-
-    const res = await fetch(`${EXA_BASE}/findSimilar`, {
-      method: 'POST', headers: headers(), body: JSON.stringify(body),
-      signal: AbortSignal.timeout(20000),
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return Array.isArray(data?.results) ? data.results as ExaResult[] : []
-  } catch { return [] }
-}
-
-// Search for real companies matching a BD query.
-// Returns them in the same shape as extractCompanies() expects.
+// Neural company search — finds real companies matching a BD query.
+// Uses category: 'company' which returns company homepages (not articles).
 export async function exaSearchCompanies(
   query: string,
   numResults = 20
 ): Promise<Array<{ name: string; website: string; description: string; source_url: string }>> {
-  const results = await exaSearch(query, { numResults, category: 'company', includeText: true })
-  return results
-    .filter(r => r.url && r.title)
-    .map(r => ({
-      name: r.title?.replace(/[\|\-–].*$/, '').trim() || '',
-      website: r.url,
-      description: (r.text || '').slice(0, 300).trim(),
-      source_url: r.url,
-    }))
-    .filter(c => c.name && c.name.length > 1)
-}
-
-// Get full text content for a batch of Exa result IDs.
-export async function exaGetContents(ids: string[]): Promise<ExaResult[]> {
-  if (!exaConfigured() || !ids.length) return []
+  if (!exaConfigured()) return []
   try {
-    const res = await fetch(`${EXA_BASE}/contents`, {
-      method: 'POST', headers: headers(),
-      body: JSON.stringify({ ids, contents: { text: { maxCharacters: 5000 } } }),
-      signal: AbortSignal.timeout(20000),
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return Array.isArray(data?.results) ? data.results as ExaResult[] : []
-  } catch { return [] }
+    const exa = client()
+    const res = await exa.search(query, {
+      type: 'auto',
+      numResults,
+      category: 'company',
+      contents: { highlights: { numSentences: 3, highlightsPerUrl: 2 } as unknown as true },
+    } as Parameters<typeof exa.search>[1])
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return toCompanies((res.results || []) as any[])
+  } catch (e) {
+    console.error('[exaSearchCompanies]', e)
+    return []
+  }
 }
 
-// Search for recent news/events about a specific company (for trigger research).
+// Find companies similar to a given URL — Exa's most powerful BD feature.
+// Point at one good lead → get more companies like it.
+export async function exaFindSimilar(
+  url: string,
+  numResults = 20
+): Promise<Array<{ name: string; website: string; description: string; source_url: string }>> {
+  if (!exaConfigured() || !url) return []
+  try {
+    const exa = client()
+    const res = await exa.findSimilar(url, {
+      numResults,
+      contents: { highlights: { numSentences: 3, highlightsPerUrl: 2 } as unknown as true },
+    } as Parameters<typeof exa.findSimilar>[1])
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return toCompanies((res.results || []) as any[])
+  } catch (e) {
+    console.error('[exaFindSimilar]', e)
+    return []
+  }
+}
+
+// Fetch recent news about a specific company for trigger research.
+// Uses category: 'news' (date filters work on news, not on company/people).
 export async function exaCompanyNews(companyName: string, daysBack = 60): Promise<string> {
   if (!exaConfigured()) return ''
-  const since = new Date(Date.now() - daysBack * 86400000).toISOString().split('T')[0]
-  const results = await exaSearch(
-    `${companyName} latest news funding partnership expansion`,
-    { numResults: 6, category: 'news', includeText: true, startPublishedDate: since }
-  )
-  if (!results.length) return ''
-  return results.map(r =>
-    `[${r.publishedDate?.split('T')[0] || 'recent'}] ${r.title}\n${r.url}\n${(r.text || '').slice(0, 400)}`
-  ).join('\n\n---\n\n')
+  try {
+    const exa = client()
+    const since = new Date(Date.now() - daysBack * 86400000).toISOString().split('T')[0]
+    const res = await exa.search(
+      `${companyName} latest news funding partnership expansion announcement`,
+      {
+        type: 'auto',
+        numResults: 6,
+        category: 'news',
+        startPublishedDate: since,
+        contents: { highlights: { numSentences: 3, highlightsPerUrl: 2 } as unknown as true },
+      } as Parameters<typeof exa.search>[1]
+    )
+    if (!res.results?.length) return ''
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[]).map((r) => {
+      const text = Array.isArray(r.highlights) ? r.highlights.join(' ') : (r.text || '')
+      return `[${(r.publishedDate as string)?.split('T')[0] || 'recent'}] ${r.title}\n${r.url}\n${text.slice(0, 350)}`
+    }).join('\n\n---\n\n')
+  } catch (e) {
+    console.error('[exaCompanyNews]', e)
+    return ''
+  }
+}
+
+// Search for BD decision-makers at a company (people search).
+// Use for contact enrichment when Apollo doesn't have coverage.
+export async function exaFindPeople(
+  query: string,
+  numResults = 5
+): Promise<Array<{ name: string; url: string; highlights: string }>> {
+  if (!exaConfigured()) return []
+  try {
+    const exa = client()
+    const res = await exa.search(query, {
+      type: 'auto',
+      numResults,
+      category: 'people',
+      contents: { highlights: { numSentences: 2, highlightsPerUrl: 1 } as unknown as true },
+    } as Parameters<typeof exa.search>[1])
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results || [] as any[]).map((r: any) => ({
+      name: (r.title as string)?.split('|')[0].trim() || '',
+      url: r.url as string,
+      highlights: Array.isArray(r.highlights) ? (r.highlights as string[]).join(' ') : '',
+    }))
+  } catch (e) {
+    console.error('[exaFindPeople]', e)
+    return []
+  }
+}
+
+// Get full page content for known URLs (enrichment, not search).
+// On /contents, highlights/text are top-level (not nested in contents).
+export async function exaGetContents(urls: string[]): Promise<ExaResult[]> {
+  if (!exaConfigured() || !urls.length) return []
+  try {
+    const exa = client()
+    const res = await exa.getContents(urls, {
+      text: { maxCharacters: 5000 },
+    } as Parameters<typeof exa.getContents>[1])
+    return (res.results || []) as ExaResult[]
+  } catch (e) {
+    console.error('[exaGetContents]', e)
+    return []
+  }
 }

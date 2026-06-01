@@ -5,7 +5,7 @@ import { PRODUCT_BRAIN, PRODUCT_BRAIN_COMPACT } from '@/lib/kima-knowledge'
 import { pickBestUrl, extractSocials, type Socials } from '@/lib/utils'
 import { apolloConfigured, apolloEnrichContacts, apolloSearchCompanies, toDomain } from '@/lib/apollo'
 import { isGenericName } from '@/lib/leadQuality'
-import { exaConfigured, exaSearch, exaSearchCompanies, exaCompanyNews } from '@/lib/exa'
+import { exaConfigured, exaSearchCompanies, exaCompanyNews } from '@/lib/exa'
 import { perplexityConfigured, researchCompanyTrigger } from '@/lib/perplexity'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -403,13 +403,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'EXA_API_KEY not configured.' }, { status: 400 })
       }
       const { exaFindSimilar } = await import('@/lib/exa')
-      const similar = await exaFindSimilar(sourceQuery, { numResults: 20, category: 'company', includeText: true })
-      companies = similar.filter(r => r.url && r.title).map(r => ({
-        name: r.title?.replace(/[\|\-–].*$/, '').trim() || '',
-        website: r.url,
-        description: (r.text || '').slice(0, 300).trim(),
-        source_url: r.url,
-      })).filter(c => c.name.length > 1)
+      const similar = await exaFindSimilar(sourceQuery, 20)
+      companies = similar
       if (!companies.length) {
         return NextResponse.json({ error: 'Exa could not find similar companies for that URL.' }, { status: 400 })
       }
