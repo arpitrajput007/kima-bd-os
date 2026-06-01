@@ -77,6 +77,55 @@ async function fetchSocials(website?: string, companyName?: string): Promise<Soc
   }
 }
 
+// If the extracted company has no website, do a quick search to find the real one.
+// Returns the best URL found, or '' if nothing found.
+async function resolveWebsite(companyName: string): Promise<string> {
+  try {
+    // First try Jina search — fast and free.
+    const jinaSearch = `https://s.jina.ai/${encodeURIComponent(companyName + ' official website')}`
+    const res = await fetch(jinaSearch, {
+      headers: { Accept: 'text/plain' },
+      signal: AbortSignal.timeout(12000),
+    })
+    if (res.ok) {
+      const text = await res.text()
+      // Find first https:// link that looks like a homepage (not a social or news site).
+      const links = [...text.matchAll(/https?:\/\/(?!.*(?:twitter|t\.co|x\.com|linkedin|facebook|instagram|crunchbase|wikipedia|medium|substack|coinmarketcap|coingecko|techcrunch|theblock|decrypt|cointelegraph|github|reddit|youtube|bloomberg|forbes|reuters|wsj))[a-z0-9.-]+\.[a-z]{2,}(?:\/)?(?=$|\s|\))/gi)]
+      if (links.length) return links[0][0].replace(/\/$/, '')
+    }
+  } catch { /* fall through */ }
+
+  // Tavily fallback.
+  if (process.env.TAVILY_API_KEY) {
+    try {
+      const res = await fetch('https://api.tavily.com/search', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: process.env.TAVILY_API_KEY, query: companyName + ' official site', max_results: 3, search_depth: 'basic' }),
+        signal: AbortSignal.timeout(12000),
+      })
+      const data = await res.json()
+      const top = (data?.results || [])[0]?.url
+      if (top && !/(twitter|linkedin|facebook|crunchbase|wikipedia|medium|github|reddit|youtube|bloomberg|theblock|decrypt|cointelegraph)/i.test(top)) {
+        return top.replace(/\/$/, '')
+      }
+    } catch { /* fall through */ }
+  }
+  return ''
+}
+
+// Pull socials from a web-search result page (fallback when we have no website to crawl).
+async function fetchSocialsFromSearch(companyName: string): Promise<Socials> {
+  try {
+    const q = encodeURIComponent(companyName + ' twitter telegram discord')
+    const res = await fetch(`https://s.jina.ai/${q}`, {
+      headers: { Accept: 'text/plain' },
+      signal: AbortSignal.timeout(12000),
+    })
+    if (!res.ok) return {}
+    return extractSocials(await res.text(), companyName)
+  } catch { return {} }
+}
+
 // Search web using Tavily API
 async function searchWeb(query: string): Promise<string> {
   if (!process.env.TAVILY_API_KEY) return ''
@@ -412,15 +461,27 @@ export async function POST(req: NextRequest) {
       const hasRoom = categories.some(cat => (categoryCounts[cat] || 0) < CATEGORY_CAP)
       if (!hasRoom) { results.skipped_cap++; continue }
 
-      // Pull real social links from the company website (footer/header)
-      const socials = await fetchSocials(company.website, company.name)
+      // Resolve website — required before saving. If the extractor didn't find it,
+      // do a quick search to look it up. Skip the lead if we still can't find one.
+      let website = company.website?.trim() || (research.website as string | undefined)?.trim() || ''
+      if (!website) {
+        website = await resolveWebsite(company.name)
+      }
+      if (!website) { results.skipped_low_score++; continue } // no website = can't reach out
+
+      // Pull real social links. Crawl the website first; fall back to a search.
+      let socials = await fetchSocials(website, company.name)
+      if (!socials.twitter_url && !socials.telegram_url && !socials.discord_url) {
+        const searchSocials = await fetchSocialsFromSearch(company.name)
+        socials = { ...searchSocials, ...Object.fromEntries(Object.entries(socials).filter(([, v]) => v)) }
+      }
 
       // Insert lead
       const { data: newLead, error: leadErr } = await supabase
         .from('leads')
         .insert({
           company_name: company.name,
-          website: company.website || null,
+          website: website || null,
           twitter_url: socials.twitter_url || null,
           telegram_url: socials.telegram_url || null,
           discord_url: socials.discord_url || null,
@@ -459,7 +520,7 @@ export async function POST(req: NextRequest) {
       if (!leadErr && newLead) {
         // Verify the AI's named contacts against Apollo to attach REAL titles,
         // LinkedIn and verified work emails (no personal-email reveal → credit-safe).
-        const domain = toDomain(company.website)
+        const domain = toDomain(website)
         const aiContacts = (research.contacts as Record<string, string>[]) || []
         const apolloContacts = domain
           ? await apolloEnrichContacts(domain, company.name, aiContacts.map(c => ({ name: c.name, role: c.role })))
