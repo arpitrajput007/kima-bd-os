@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import {
   Plus, Search, Filter, Star, ExternalLink, ChevronDown,
   CheckCircle, XCircle, Eye, MessageSquare, Loader2, RefreshCw,
-  AtSign, Send, MessageCircle
+  AtSign, Send, MessageCircle, Sparkles
 } from 'lucide-react'
 import {
   cn, getScoreBg, getStatusColor, getStatusLabel, formatDate, truncate
@@ -35,6 +35,34 @@ export default function LeadsPage() {
   })
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [showFilters, setShowFilters] = useState(false)
+  const [cleaning, setCleaning] = useState(false)
+
+  // Archive existing leads whose name is a generic category, not a real company.
+  const cleanupGeneric = async () => {
+    setCleaning(true)
+    try {
+      // Preview first so the user sees exactly what will be archived.
+      const preview = await fetch('/api/leads/cleanup-generic', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dryRun: true }),
+      }).then(r => r.json())
+      if (preview.error) throw new Error(preview.error)
+      if (!preview.matched) { toast.success('No generic-category leads found — your list is clean'); return }
+      const sample = (preview.names || []).slice(0, 8).join(', ')
+      if (!confirm(`Archive ${preview.matched} generic-category lead(s)?\n\n${sample}${preview.matched > 8 ? '…' : ''}\n\n(They’ll be archived, not deleted — recoverable.)`)) return
+      const res = await fetch('/api/leads/cleanup-generic', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dryRun: false }),
+      }).then(r => r.json())
+      if (res.error) throw new Error(res.error)
+      toast.success(`Archived ${res.archived} generic lead(s)`)
+      loadLeads()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Cleanup failed')
+    } finally {
+      setCleaning(false)
+    }
+  }
 
   const loadLeads = useCallback(async () => {
     setLoading(true)
@@ -105,6 +133,11 @@ export default function LeadsPage() {
           <div className="flex items-center gap-2">
             <button onClick={loadLeads} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '12px' }}>
               <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+            </button>
+            <button onClick={cleanupGeneric} disabled={cleaning} className="btn btn-secondary" style={{ padding: '7px 12px', fontSize: '12px' }}
+              title="Archive leads whose name is a generic category instead of a real company">
+              {cleaning ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+              Clean up generic
             </button>
             <Link href="/leads/new" className="btn btn-primary" style={{ padding: '7px 14px', fontSize: '13px' }}>
               <Plus size={14} />

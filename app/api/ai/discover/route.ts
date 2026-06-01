@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { PRODUCT_BRAIN, PRODUCT_BRAIN_COMPACT } from '@/lib/kima-knowledge'
 import { pickBestUrl, extractSocials, type Socials } from '@/lib/utils'
 import { apolloConfigured, apolloEnrichContacts, apolloSearchCompanies, toDomain } from '@/lib/apollo'
+import { isGenericName } from '@/lib/leadQuality'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -40,35 +41,6 @@ const CUSTOMER_CATEGORIES = [
   'Web2 Stablecoin Settlement Customer',
 ]
 const CATEGORY_CAP = 5
-
-// Safety net: reject generic category/segment names the model might slip through
-// as if they were real companies (e.g. "Stablecoin Issuers", "Lending Platforms").
-const GENERIC_WORDS = [
-  'issuers', 'platforms', 'platform', 'providers', 'provider', 'protocols', 'protocol',
-  'wallets', 'wallet', 'exchanges', 'exchange', 'companies', 'company', 'projects',
-  'solutions', 'services', 'networks', 'apps', 'startups', 'builders', 'firms',
-  'custody', 'custodians', 'lending', 'staking', 'bridges', 'bridge', 'aggregators',
-  'neobanks', 'banks', 'fintechs', 'fintech', 'dexs', 'dexes', 'cexs', 'rails',
-  'stablecoins', 'stablecoin', 'gateways', 'processors', 'marketplaces', 'ecosystem',
-  'institutions', 'enterprises', 'organizations', 'merchants', 'issuance',
-]
-const GENERIC_EXACT = new Set([
-  'defi', 'cefi', 'web3', 'web2', 'crypto', 'blockchain', 'payments', 'payment',
-  'rwa', 'nft', 'nfts', 'dao', 'daos', 'l1', 'l2', 'cbdc', 'cbdcs', 'others', 'other',
-])
-
-function isGenericName(name: string): boolean {
-  const n = (name || '').trim().toLowerCase()
-  if (!n || n.length < 2) return true
-  if (GENERIC_EXACT.has(n)) return true
-  const words = n.split(/\s+/)
-  // Short label made only of category words → it's a segment, not a company.
-  if (words.length <= 4 && words.every(w => GENERIC_WORDS.includes(w) || GENERIC_EXACT.has(w))) return true
-  // Ends in a plural category word and has no distinctive brand token (e.g. "Cross-border Payment Providers").
-  const last = words[words.length - 1]
-  if (GENERIC_WORDS.includes(last) && words.every(w => GENERIC_WORDS.includes(w) || GENERIC_EXACT.has(w) || /^(cross|on|off|multi|inter|de|cross-border|fiat|tokenized|digital|institutional)/.test(w))) return true
-  return false
-}
 
 // Read any URL as clean text via Jina.ai (free, no key needed)
 async function readUrl(url: string): Promise<string> {
