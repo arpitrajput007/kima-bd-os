@@ -61,6 +61,31 @@ async function readUrl(url: string): Promise<string> {
   }
 }
 
+// Check a URL against ChainPatrol's phishing registry (free, no key needed).
+// Used by MetaMask, SEAL, and other Web3 security tools.
+// Returns true if safe, false if flagged as phishing/malicious.
+// Fails open (returns true) so a network error never blocks all discovery.
+async function isSafeDomain(url: string): Promise<boolean> {
+  try {
+    const fullUrl = url.startsWith('http') ? url : `https://${url}`
+    const res = await fetch('https://app.chainpatrol.io/api/v2/asset/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'URL', content: fullUrl }),
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!res.ok) return true // fail open
+    const json = await res.json()
+    if (json.status === 'BLOCKED') {
+      console.warn(`[isSafeDomain] Phishing domain blocked: ${fullUrl}`)
+      return false
+    }
+    return true
+  } catch {
+    return true // fail open — don't block discovery if check times out
+  }
+}
+
 // Read a company website and pull real social links (twitter/telegram/discord)
 // from the page (usually the header/footer). No AI guessing — regex only.
 async function fetchSocials(website?: string, companyName?: string): Promise<Socials> {
@@ -531,6 +556,14 @@ export async function POST(req: NextRequest) {
         website = await resolveWebsite(company.name)
       }
       if (!website) { results.skipped_low_score++; continue } // no website = can't reach out
+
+      // Safety check — never save a phishing / malicious domain.
+      const safe = await isSafeDomain(website)
+      if (!safe) {
+        console.warn(`[discover] Skipping ${company.name} — domain flagged as phishing: ${website}`)
+        results.skipped_duplicate++ // reuse counter; will log clearly in console
+        continue
+      }
 
       // Pull real social links. Crawl the website first; fall back to a search.
       let socials = await fetchSocials(website, company.name)
