@@ -48,6 +48,7 @@ export function getStatusColor(status: Lead['status']): string {
     case 'meeting_booked': return 'bg-green-500/15 text-green-300 border-green-500/30'
     case 'archived': return 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30'
     case 'needs_more_research': return 'bg-orange-500/15 text-orange-300 border-orange-500/30'
+    case 'reserved': return 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
     default: return 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30'
   }
 }
@@ -64,6 +65,7 @@ export function getStatusLabel(status: Lead['status']): string {
     case 'meeting_booked': return 'Meeting Booked'
     case 'archived': return 'Archived'
     case 'needs_more_research': return 'Needs Research'
+    case 'reserved': return 'Reserved'
     default: return status
   }
 }

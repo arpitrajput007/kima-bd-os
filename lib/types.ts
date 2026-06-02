@@ -13,6 +13,7 @@ export type LeadStatus =
   | 'meeting_booked'
   | 'archived'
   | 'needs_more_research'
+  | 'reserved'
 
 export type LeadPriority = 'excellent' | 'qualified' | 'needs_research' | 'low_priority'
 

@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import {
   Plus, Search, Filter, Star, ExternalLink, ChevronDown, ChevronRight,
   CheckCircle, XCircle, Eye, MessageSquare, Loader2, RefreshCw,
-  AtSign, Send, MessageCircle, Sparkles, LayoutList, Layers
+  AtSign, Send, MessageCircle, Sparkles, LayoutList, Layers, Clock
 } from 'lucide-react'
 import {
   cn, getScoreBg, getStatusColor, getStatusLabel, formatDate, truncate
@@ -17,7 +17,7 @@ import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL } from '@/li
 
 const STATUS_OPTIONS = [
   'new', 'researching', 'qualified', 'approved', 'rejected',
-  'contacted', 'replied', 'meeting_booked', 'archived', 'needs_more_research'
+  'contacted', 'replied', 'meeting_booked', 'archived', 'needs_more_research', 'reserved'
 ]
 
 export default function LeadsPage() {
@@ -76,8 +76,8 @@ export default function LeadsPage() {
       .order('created_at', { ascending: false })
 
     if (filters.status) query = query.eq('status', filters.status)
-    // Hide archived/rejected by default — only show them when explicitly filtered.
-    else query = query.not('status', 'in', '("archived","rejected")')
+    // Hide archived/rejected/reserved by default — only show when explicitly filtered.
+    else query = query.not('status', 'in', '("archived","rejected","reserved")')
     if (filters.industry_category) query = query.eq('industry_category', filters.industry_category)
     if (filters.product_to_sell) query = query.eq('product_to_sell', filters.product_to_sell)
     if (filters.priority) query = query.eq('priority', filters.priority)
@@ -368,6 +368,7 @@ export default function LeadsPage() {
                                 <Link href={`/leads/${lead.id}`} className="btn btn-ghost p-1.5" title="View" style={{ padding: 5 }}><Eye size={13} /></Link>
                                 {lead.status !== 'approved' && <button onClick={() => updateLeadStatus(lead.id, 'approved')} disabled={actionLoading === lead.id + 'approved'} className="btn btn-ghost p-1.5" title="Approve" style={{ padding: 5, color: '#34d399' }}>{actionLoading === lead.id + 'approved' ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle size={13} />}</button>}
                                 {lead.status !== 'rejected' && <button onClick={() => updateLeadStatus(lead.id, 'rejected')} disabled={actionLoading === lead.id + 'rejected'} className="btn btn-ghost p-1.5" title="Reject" style={{ padding: 5, color: '#f87171' }}>{actionLoading === lead.id + 'rejected' ? <Loader2 size={13} className="animate-spin" /> : <XCircle size={13} />}</button>}
+                                {lead.status !== 'reserved' && <button onClick={() => updateLeadStatus(lead.id, 'reserved')} disabled={actionLoading === lead.id + 'reserved'} className="btn btn-ghost p-1.5" title="Reserve for later — too big right now" style={{ padding: 5, color: '#818cf8' }}>{actionLoading === lead.id + 'reserved' ? <Loader2 size={13} className="animate-spin" /> : <Clock size={13} />}</button>}
                                 <Link href={`/outreach?lead=${lead.id}`} className="btn btn-ghost p-1.5" title="Outreach" style={{ padding: 5, color: '#a78bfa' }}><MessageSquare size={13} /></Link>
                               </div>
                             </td>

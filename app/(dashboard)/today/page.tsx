@@ -163,8 +163,9 @@ function FollowUpRow({ lead, onSent }: { lead: LeadWithContacts; onSent: () => v
 }
 
 // One lead card in the plan — used for both today's picks and the date-grouped backlog.
-function PlanLeadCard({ lead, rank, actionLoading, onContacted }: {
-  lead: LeadWithContacts; rank: number | null; actionLoading: string | null; onContacted: (id: string) => void
+function PlanLeadCard({ lead, rank, actionLoading, onContacted, onReserved }: {
+  lead: LeadWithContacts; rank: number | null; actionLoading: string | null
+  onContacted: (id: string) => void; onReserved?: (id: string) => void
 }) {
   const contact = bestContact(lead.contacts)
   const waiting = daysSince(lead.created_at)
@@ -263,6 +264,16 @@ function PlanLeadCard({ lead, rank, actionLoading, onContacted }: {
               ? <Loader2 size={13} className="animate-spin" />
               : <><CheckCircle size={13} /> Mark contacted</>}
           </button>
+          {onReserved && (
+            <button
+              onClick={() => onReserved(lead.id)}
+              disabled={actionLoading === lead.id}
+              className="btn btn-ghost justify-center"
+              title="Too big to approach now — save for later when you're bigger"
+              style={{ fontSize: '11px', padding: '5px 12px', color: '#818cf8', borderColor: 'rgba(129,140,248,0.25)', background: 'rgba(129,140,248,0.06)' }}>
+              <Clock size={12} /> Reserve for later
+            </button>
+          )}
           <Link href={`/leads/${lead.id}`}
             className="btn btn-ghost justify-center" style={{ fontSize: '11px', padding: '5px 12px', color: 'rgb(130,135,165)' }}>
             <Eye size={12} /> View details
@@ -370,11 +381,35 @@ export default function TodayPage() {
     setActionLoading(null)
   }
 
+  const markReserved = async (id: string) => {
+    setActionLoading(id)
+    const { error } = await supabase
+      .from('leads')
+      .update({ status: 'reserved', updated_at: new Date().toISOString() })
+      .eq('id', id)
+    if (error) toast.error('Update failed')
+    else { toast.success('Saved for later — will appear in your Reserved pipeline'); loadData() }
+    setActionLoading(null)
+  }
+
+  const unReserve = async (id: string) => {
+    setActionLoading(id)
+    const { error } = await supabase
+      .from('leads')
+      .update({ status: 'new', updated_at: new Date().toISOString() })
+      .eq('id', id)
+    if (error) toast.error('Update failed')
+    else { toast.success('Moved back to active pipeline'); loadData() }
+    setActionLoading(null)
+  }
+
   // ── Build today's plan ────────────────────────────────────────────────────
   const today = new Date(); today.setHours(0, 0, 0, 0)
 
   // All researched leads you haven't reached out to yet (sorted by score from the query).
   const readyLeads = leads.filter(l => READY_STATUSES.includes(l.status))
+  // Reserved leads (saved for later — too big right now)
+  const reservedLeads = leads.filter(l => l.status === 'reserved')
   // Group EVERY un-contacted lead by the day it came in, newest day first — this is
   // the date-wise plan: "on Jun 1 reach out to these, on Jun 2 these…".
   const planGroups: { key: string; label: string; leads: LeadWithContacts[] }[] = []
@@ -528,7 +563,7 @@ export default function TodayPage() {
                     </div>
                     <div className="flex flex-col gap-3">
                       {group.leads.map((lead, i) => (
-                        <PlanLeadCard key={lead.id} lead={lead} rank={gi === 0 ? i + 1 : null} actionLoading={actionLoading} onContacted={markContacted} />
+                        <PlanLeadCard key={lead.id} lead={lead} rank={gi === 0 ? i + 1 : null} actionLoading={actionLoading} onContacted={markContacted} onReserved={markReserved} />
                       ))}
                     </div>
                   </div>
@@ -599,6 +634,58 @@ export default function TodayPage() {
             </div>
           </div>
         </div>
+
+        {/* ── Reserved pipeline ─────────────────────────── */}
+        {reservedLeads.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Clock size={14} style={{ color: '#818cf8' }} />
+              <span className="text-[11px] font-bold tracking-widest uppercase" style={{ color: 'rgb(100,106,135)' }}>
+                Reserved for later · {reservedLeads.length}
+              </span>
+            </div>
+            <p className="text-[12px] mb-4" style={{ color: 'rgb(100,106,135)' }}>
+              Companies that are too big to approach right now. Move them back to active pipeline when you&apos;re ready.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {reservedLeads.map(lead => (
+                <div key={lead.id} className="section-card" style={{ padding: '14px 18px', borderColor: 'rgba(129,140,248,0.15)', background: 'rgba(129,140,248,0.03)' }}>
+                  <div className="flex items-center gap-4">
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-bold flex-shrink-0"
+                      style={{ background: 'rgba(129,140,248,0.12)', color: '#818cf8' }}>
+                      {lead.company_name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Link href={`/leads/${lead.id}`} className="text-[13px] font-semibold text-white hover:text-indigo-300 transition-colors">
+                          {lead.company_name}
+                        </Link>
+                        {lead.lead_score != null && (
+                          <span className={cn('badge', getScoreBg(lead.lead_score))} style={{ fontSize: '10px' }}>{lead.lead_score}</span>
+                        )}
+                        {lead.website && (
+                          <a href={lead.website} target="_blank" rel="noopener noreferrer" className="text-[11px]" style={{ color: 'rgb(110,115,145)' }}>
+                            {lead.website.replace(/^https?:\/\//, '').slice(0, 30)}
+                          </a>
+                        )}
+                      </div>
+                      {lead.pain_point && (
+                        <div className="text-[11px] mt-1" style={{ color: 'rgb(140,145,175)' }}>{truncate(lead.pain_point, 100)}</div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => unReserve(lead.id)}
+                      disabled={actionLoading === lead.id}
+                      className="btn btn-ghost flex-shrink-0"
+                      style={{ fontSize: '11px', padding: '5px 10px', color: '#818cf8', borderColor: 'rgba(129,140,248,0.3)' }}>
+                      {actionLoading === lead.id ? <Loader2 size={12} className="animate-spin" /> : '↑ Move to active'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
