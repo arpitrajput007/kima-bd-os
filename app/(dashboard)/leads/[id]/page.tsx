@@ -229,9 +229,11 @@ function StatStrip({ score, confidence, addedAt }: { score?: number | null; conf
 }
 
 function ContactCard({ contact, onRefresh, refreshing }: { contact: Contact; onRefresh: () => void; refreshing: boolean }) {
+  const supabase = createClient()
+  const [enriching, setEnriching] = useState(false)
   const initials = contact.name
     ? contact.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-    : 'UN'
+    : '?'
 
   const confStyle: React.CSSProperties = contact.contact_confidence === 'high'
     ? { border: '1px solid rgba(52,211,153,0.4)', background: 'rgba(52,211,153,0.1)', color: 'rgb(110,231,183)' }
@@ -239,63 +241,122 @@ function ContactCard({ contact, onRefresh, refreshing }: { contact: Contact; onR
     ? { border: '1px solid rgba(248,113,133,0.4)', background: 'rgba(248,113,133,0.1)', color: 'rgb(252,165,165)' }
     : { border: '1px solid rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.1)', color: 'rgb(253,224,71)' }
 
+  // Extract display handle from URL
+  const twitterHandle = contact.twitter_url?.match(/(?:twitter|x)\.com\/([A-Za-z0-9_]+)/)?.[1]
+  const linkedinPath = contact.linkedin_url?.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\/?/, '').replace(/\/$/, '')
+  const githubUser = contact.github_url?.match(/github\.com\/([A-Za-z0-9_-]+)/)?.[1]
+
+  const hasSocials = contact.email || contact.twitter_url || contact.linkedin_url || contact.github_url
+
+  // One-click enrich: search Exa for this person's profiles
+  const enrichContact = async () => {
+    if (!contact.name) return
+    setEnriching(true)
+    try {
+      const res = await fetch('/api/ai/enrich-contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contact_id: contact.id, name: contact.name, role: contact.role }),
+      })
+      const data = await res.json()
+      if (data.twitter_url || data.linkedin_url || data.github_url || data.email) {
+        await supabase.from('contacts').update({
+          twitter_url: data.twitter_url || contact.twitter_url,
+          linkedin_url: data.linkedin_url || contact.linkedin_url,
+          github_url: data.github_url || contact.github_url,
+          email: data.email || contact.email,
+        }).eq('id', contact.id)
+        toast.success(`Found: ${[data.twitter_url && 'Twitter', data.linkedin_url && 'LinkedIn', data.github_url && 'GitHub', data.email && 'Email'].filter(Boolean).join(', ')}`)
+        onRefresh()
+      } else {
+        toast('No new handles found for this person')
+      }
+    } catch { toast.error('Enrichment failed') }
+    finally { setEnriching(false) }
+  }
+
   return (
-    <div style={{ borderRadius: 16, border: C.border, background: C.nestedBg, padding: 20 }}>
-      {/* top row */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-        <div style={{ display: 'flex', gap: 16 }}>
-          {/* circular avatar */}
-          <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg, #374151, #111827)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 600, color: 'rgb(209,213,219)', flexShrink: 0 }}>
+    <div style={{ borderRadius: 16, border: C.border, background: C.nestedBg, padding: '18px 20px' }}>
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+          <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,rgba(124,58,237,0.3),rgba(56,189,248,0.2))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: '#a78bfa', flexShrink: 0 }}>
             {initials}
           </div>
           <div>
-            <h3 style={{ fontSize: 16, fontWeight: 600, color: 'white', margin: 0 }}>{contact.name || 'Unknown Name'}</h3>
-            <p style={{ fontSize: 13, color: 'rgb(148,163,184)', marginTop: 2 }}>{contact.role}</p>
-            {contact.reason_this_person && (
-              <p style={{ marginTop: 8, fontSize: 13, lineHeight: 1.6, color: 'rgb(203,213,225)', maxWidth: 400 }}>
-                {contact.reason_this_person}
-              </p>
-            )}
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'white' }}>{contact.name || '—'}</div>
+            <div style={{ fontSize: 12, color: 'rgb(148,163,184)', marginTop: 2 }}>{contact.role}</div>
           </div>
         </div>
-        {/* confidence badge */}
         {contact.contact_confidence && (
-          <span style={{ borderRadius: 8, padding: '5px 12px', fontSize: 11, fontWeight: 500, flexShrink: 0, ...confStyle }}>
-            {contact.contact_confidence.charAt(0).toUpperCase() + contact.contact_confidence.slice(1)} Confidence
+          <span style={{ borderRadius: 7, padding: '4px 10px', fontSize: 11, fontWeight: 600, flexShrink: 0, ...confStyle }}>
+            {contact.contact_confidence.charAt(0).toUpperCase() + contact.contact_confidence.slice(1)}
           </span>
         )}
       </div>
 
-      {/* social buttons */}
-      <div style={{ marginTop: 20, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-        {contact.linkedin_url && (
-          <a href={contact.linkedin_url} target="_blank" rel="noopener noreferrer"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 8, border: C.border, background: 'rgba(255,255,255,0.04)', padding: '7px 14px', fontSize: 13, color: 'rgb(203,213,225)', textDecoration: 'none' }}>
-            <ExternalLink size={14} color="rgb(196,167,252)" />LinkedIn
-          </a>
-        )}
+      {/* Social chips — show actual handles, not generic labels */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: hasSocials ? 14 : 0 }}>
         {contact.twitter_url && (
           <a href={contact.twitter_url} target="_blank" rel="noopener noreferrer"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 8, border: C.border, background: 'rgba(255,255,255,0.04)', padding: '7px 14px', fontSize: 13, color: 'rgb(203,213,225)', textDecoration: 'none' }}>
-            <ExternalLink size={14} color="rgb(196,167,252)" />Twitter / X
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: 'none', border: '1px solid rgba(56,189,248,0.3)', background: 'rgba(56,189,248,0.08)', color: '#38bdf8' }}>
+            <AtSign size={12} />@{twitterHandle || 'Twitter'}
+          </a>
+        )}
+        {contact.linkedin_url && (
+          <a href={contact.linkedin_url} target="_blank" rel="noopener noreferrer"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: 'none', border: '1px solid rgba(96,165,250,0.3)', background: 'rgba(96,165,250,0.08)', color: '#60a5fa' }}>
+            <ExternalLink size={12} />{linkedinPath ? `in/${linkedinPath.slice(0, 20)}` : 'LinkedIn'}
+          </a>
+        )}
+        {contact.github_url && (
+          <a href={contact.github_url} target="_blank" rel="noopener noreferrer"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: 'none', border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.08)', color: '#a78bfa' }}>
+            <Link2 size={12} />{githubUser || 'GitHub'}
           </a>
         )}
         {contact.email && (
-          <button onClick={() => { navigator.clipboard.writeText(contact.email!); toast.success('Copied') }}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 8, border: C.border, background: 'rgba(255,255,255,0.04)', padding: '7px 14px', fontSize: 13, color: 'rgb(203,213,225)', cursor: 'pointer', maxWidth: 220 }}>
-            <Mail size={14} color="rgb(196,167,252)" />
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contact.email}</span>
+          <button onClick={() => { navigator.clipboard.writeText(contact.email!); toast.success('Email copied') }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.08)', color: '#c084fc' }}>
+            <Mail size={12} />{contact.email.length > 28 ? contact.email.slice(0, 28) + '…' : contact.email}
           </button>
+        )}
+        {contact.telegram && (
+          <a href={contact.telegram.startsWith('http') ? contact.telegram : `https://t.me/${contact.telegram}`} target="_blank" rel="noopener noreferrer"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: 'none', border: '1px solid rgba(34,211,238,0.3)', background: 'rgba(34,211,238,0.08)', color: '#22d3ee' }}>
+            <Send size={12} />{contact.telegram.replace(/^.*t\.me\//, '@')}
+          </a>
         )}
       </div>
 
-      {/* refresh */}
-      <div style={{ marginTop: 18, borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 14 }}>
-        <button onClick={onRefresh} disabled={refreshing}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'rgb(196,167,252)', background: 'none', border: 'none', cursor: refreshing ? 'not-allowed' : 'pointer', opacity: refreshing ? 0.5 : 1 }}>
-          {refreshing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-          Refresh with AI
+      {/* Reason */}
+      {contact.reason_this_person && (
+        <div style={{ fontSize: 12, color: 'rgb(150,155,185)', lineHeight: 1.55, marginBottom: 14, paddingLeft: 2 }}>
+          {contact.reason_this_person}
+        </div>
+      )}
+
+      {/* Footer actions */}
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
+        <button onClick={onRefresh} disabled={refreshing || enriching}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'rgb(196,167,252)', background: 'none', border: 'none', cursor: 'pointer', opacity: refreshing ? 0.5 : 1 }}>
+          {refreshing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+          Refresh
         </button>
+        {!hasSocials && (
+          <button onClick={enrichContact} disabled={enriching || refreshing}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#34d399', background: 'none', border: 'none', cursor: 'pointer', opacity: enriching ? 0.5 : 1 }}>
+            {enriching ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+            Find handles
+          </button>
+        )}
+        {hasSocials && !contact.email && (
+          <button onClick={enrichContact} disabled={enriching || refreshing}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#fbbf24', background: 'none', border: 'none', cursor: 'pointer', opacity: enriching ? 0.5 : 1 }}>
+            {enriching ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+            Find email
+          </button>
+        )}
       </div>
     </div>
   )
@@ -575,9 +636,9 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             contact_confidence: c.contact_confidence,
             reason_this_person: c.why_this_person,
             email: c.email_pattern || null,
-            // Use real URL if provided, otherwise skip (no more guessed search URLs)
             linkedin_url: c.linkedin_url || null,
             twitter_url: c.twitter_url || null,
+            github_url: c.github_url || null,
           })
         }
         loadLead()

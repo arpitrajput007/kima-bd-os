@@ -193,6 +193,7 @@ export interface Contact {
   company?: string
   linkedin_url?: string
   twitter_url?: string
+  github_url?: string
   telegram?: string
   email?: string
   contact_confidence?: ContactConfidence
