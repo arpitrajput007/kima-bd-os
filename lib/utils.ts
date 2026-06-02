@@ -187,18 +187,26 @@ export function extractSocials(text: string, companyName?: string): Socials {
   if (!text) return out
   const tokens = nameTokens(companyName)
 
+  // Twitter/X — full URL match
   const twHandles = [...text.matchAll(/https?:\/\/(?:www\.)?(?:twitter|x)\.com\/([A-Za-z0-9_]{1,30})/gi)]
     .map(m => m[1])
     .filter(h => !TWITTER_RESERVED.has(h.toLowerCase()))
   const tw = pickHandle(twHandles, tokens)
   if (tw) out.twitter_url = `https://x.com/${tw}`
 
-  const tgHandles = [...text.matchAll(/https?:\/\/(?:www\.)?t\.me\/([A-Za-z0-9_+]{3,40})/gi)]
+  // Telegram — both t.me URLs and @handle patterns, plus catch "telegram" page links
+  const tgUrlMatches = [...text.matchAll(/https?:\/\/(?:www\.)?t\.me\/([A-Za-z0-9_+]{3,40})/gi)]
     .map(m => m[1])
     .filter(h => h.toLowerCase() !== 'share')
+  // Also catch @handle mentions (e.g. "@hyperbridgeio")
+  const tgAtMatches = [...text.matchAll(/@([A-Za-z0-9_]{3,40})/g)]
+    .map(m => m[1])
+    .filter(h => h.toLowerCase() !== 'share')
+  const tgHandles = [...tgUrlMatches, ...tgAtMatches]
   const tg = pickHandle(tgHandles, tokens)
   if (tg) out.telegram_url = `https://t.me/${tg}`
 
+  // Discord — full invite URLs
   const dc = text.match(/https?:\/\/(?:www\.)?(?:discord\.gg|discord\.com\/invite)\/[A-Za-z0-9-]{3,40}/i)
   if (dc) out.discord_url = dc[0]
 
