@@ -95,13 +95,13 @@ async function fromExaTwitter(companyName: string): Promise<FoundContact[]> {
   } catch { return [] }
 }
 
-// ── GitHub: find real org via Exa, then scrape members ───
+// ── GitHub: find real orgs via Exa, scrape ALL, pick best ─
 async function fromGitHub(companyName: string, website: string): Promise<FoundContact[]> {
   try {
-    // Step 1: Use Exa to find the real GitHub org (handles parent-company cases
-    // like Hyperbridge → polytope-labs, which name-guessing would miss entirely).
     let orgsToTry: string[] = []
 
+    // Step 1: Exa finds real GitHub orgs (catches parent-company cases like
+    // Hyperbridge → polytope-labs that name-guessing would miss)
     if (exaConfigured()) {
       try {
         const { default: Exa } = await import('exa-js')
@@ -109,64 +109,78 @@ async function fromGitHub(companyName: string, website: string): Promise<FoundCo
         const exaRes = await exa.search(
           `${companyName} GitHub organization repository source code`,
           {
-            type: 'auto', numResults: 5,
+            type: 'auto', numResults: 8,
             includeDomains: ['github.com'],
-            contents: { text: { maxCharacters: 500 } as unknown as true },
+            contents: { text: { maxCharacters: 300 } as unknown as true },
           } as Parameters<typeof exa.search>[1]
         )
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const exaOrgs = (exaRes.results || [] as any[])
           .map((r: any) => (r.url as string)?.match(/github\.com\/([A-Za-z0-9_-]+)/)?.[1])
-          .filter((o: string | undefined): o is string => !!o && !['topics','orgs','sponsors','features','about'].includes(o))
+          .filter((o: string | undefined): o is string =>
+            !!o && !['topics','orgs','sponsors','features','about','marketplace','search'].includes(o)
+          )
         orgsToTry.push(...[...new Set(exaOrgs)])
-      } catch { /* Exa unavailable, fall through */ }
+      } catch { /* fall through */ }
     }
 
-    // Step 2: Fallback name/domain guesses
+    // Step 2: Name/domain fallback guesses
     const nameGuess = companyName.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
     const domainGuess = website?.replace(/^https?:\/\//, '').split('.')[0].replace(/[^a-z0-9-]/g, '-')
     orgsToTry.push(nameGuess, domainGuess, `${nameGuess}-labs`, `${nameGuess}-network`, `${nameGuess}-protocol`)
     orgsToTry = [...new Set(orgsToTry.filter(Boolean))]
 
-    for (const org of orgsToTry.slice(0, 6)) {
-      const res = await fetch(`https://api.github.com/orgs/${org}/members?per_page=12`, {
-        headers: { Accept: 'application/vnd.github.v3+json' },
-        signal: AbortSignal.timeout(6000),
-      })
-      if (!res.ok) continue
-      const members = await res.json()
-      if (!Array.isArray(members) || !members.length) continue
+    // Step 3: Fetch members from ALL valid orgs, collect everyone
+    const allProfiles: Array<{ name: string; bio?: string; html_url: string; twitter_username?: string; company?: string; org: string }> = []
 
-      // Fetch profiles for all members in parallel
-      const profiles = await Promise.all(
-        members.slice(0, 10).map(async (m: { login: string }) => {
-          try {
-            const r = await fetch(`https://api.github.com/users/${m.login}`, {
-              headers: { Accept: 'application/vnd.github.v3+json' },
-              signal: AbortSignal.timeout(5000),
-            })
-            return r.ok ? r.json() : null
-          } catch { return null }
+    await Promise.all(orgsToTry.slice(0, 6).map(async org => {
+      try {
+        const res = await fetch(`https://api.github.com/orgs/${org}/members?per_page=20`, {
+          headers: { Accept: 'application/vnd.github.v3+json' },
+          signal: AbortSignal.timeout(6000),
         })
-      )
+        if (!res.ok) return
+        const members = await res.json()
+        if (!Array.isArray(members)) return
 
-      const contacts: FoundContact[] = profiles
-        .filter(Boolean)
-        .filter(p => p.name) // must have a real name set
-        .map(p => ({
-          name: p.name,
-          role: p.bio?.slice(0, 80) || 'Engineering / Core Team',
-          github_url: p.html_url,
-          twitter_url: p.twitter_username ? `https://x.com/${p.twitter_username}` : undefined,
-          source: 'github' as const,
-          confidence: 'medium' as const,
-          why_contact: `GitHub org member (${org}) — ${p.bio?.slice(0, 80) || p.company || 'core team'}`,
-          raw_snippet: p.bio,
-        }))
+        const profiles = await Promise.all(
+          members.slice(0, 15).map(async (m: { login: string }) => {
+            try {
+              const r = await fetch(`https://api.github.com/users/${m.login}`, {
+                headers: { Accept: 'application/vnd.github.v3+json' },
+                signal: AbortSignal.timeout(4000),
+              })
+              const p = r.ok ? await r.json() : null
+              return p?.name ? { ...p, org } : null
+            } catch { return null }
+          })
+        )
+        allProfiles.push(...profiles.filter(Boolean))
+      } catch { /* one org failing is fine */ }
+    }))
 
-      if (contacts.length) return contacts
-    }
-    return []
+    if (!allProfiles.length) return []
+
+    // Step 4: Score each profile — founders/leadership first, pure devs last
+    const LEADER_KEYWORDS = /founder|ceo|cto|co-founder|chief|head|lead|director|partner|president/i
+    const scored = allProfiles
+      .filter(p => p.name)
+      .map(p => ({
+        profile: p,
+        score: LEADER_KEYWORDS.test(p.bio || '') ? 2 : p.twitter_username ? 1 : 0,
+      }))
+      .sort((a, b) => b.score - a.score)
+
+    return scored.slice(0, 6).map(({ profile: p }) => ({
+      name: p.name,
+      role: p.bio?.slice(0, 80) || 'Core Team',
+      github_url: p.html_url,
+      twitter_url: p.twitter_username ? `https://x.com/${p.twitter_username}` : undefined,
+      source: 'github' as const,
+      confidence: 'medium' as const,
+      why_contact: `GitHub org member (${p.org}) — ${p.bio?.slice(0, 80) || p.company || 'core team'}`,
+      raw_snippet: p.bio,
+    }))
   } catch { return [] }
 }
 
@@ -220,9 +234,10 @@ function dedup(contacts: FoundContact[]): FoundContact[] {
 }
 
 // ── Main entry point ──────────────────────────────────────
+// BD-relevant roles to search for — prioritize founders + partnerships
 const BD_ROLES = [
-  'Head of Partnerships', 'Business Development', 'CEO', 'Founder',
-  'CTO', 'Head of Growth', 'VP Business Development', 'Co-founder'
+  'Founder', 'Co-founder', 'CEO', 'Head of Partnerships',
+  'Head of Business Development', 'CTO', 'Head of Growth',
 ]
 
 export async function findContacts(
@@ -243,7 +258,16 @@ export async function findContacts(
   const all = [...apollo, ...exaLinkedIn, ...exaTwitter, ...github, ...hunter]
   const deduped = dedup(all)
 
-  // Filter out "Unknown" names if we have real ones
+  // Filter unnamed, then sort: leadership first (founder/CEO/CTO), devs last
+  const LEADER_RE = /founder|ceo|cto|co-founder|chief|head|lead|director|partner|bd|business.dev|partner/i
   const named = deduped.filter(c => c.name && c.name !== 'Unknown' && c.name.length > 2)
-  return named.length ? named.slice(0, 8) : deduped.slice(0, 5)
+  named.sort((a, b) => {
+    const aIsLeader = LEADER_RE.test(a.role || '')
+    const bIsLeader = LEADER_RE.test(b.role || '')
+    if (aIsLeader && !bIsLeader) return -1
+    if (!aIsLeader && bIsLeader) return 1
+    return 0
+  })
+
+  return named.slice(0, 6)
 }

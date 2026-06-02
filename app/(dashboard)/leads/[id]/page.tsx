@@ -620,11 +620,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           updated_at: new Date().toISOString()
         }).eq('id', id); loadLead()
       } else if (action === 'contacts') {
-        // Delete old "Unknown Name" AI-guessed contacts first
-        await supabase.from('contacts')
-          .delete()
-          .eq('lead_id', id)
-          .or('name.is.null,name.eq.Unknown Name,name.eq.Unknown')
+        // Delete all existing contacts and replace with fresh ones
+        await supabase.from('contacts').delete().eq('lead_id', id)
 
         for (const c of (json.data.suggested_contacts || []).slice(0, 6)) {
           if (!c.name) continue // skip nameless contacts entirely
@@ -733,8 +730,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 {(lead.website || lead.twitter_url || lead.telegram_url || lead.discord_url) && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                     {lead.website && <SocialChip icon={Globe} label="Website" href={lead.website} color="#60a5fa" />}
-                    {lead.twitter_url && <SocialChip icon={AtSign} label="Twitter / X" href={lead.twitter_url} color="#38bdf8" />}
-                    {lead.telegram_url && <SocialChip icon={Send} label="Telegram" href={lead.telegram_url} color="#22d3ee" />}
+                    {lead.twitter_url && <SocialChip icon={AtSign} label={`@${lead.twitter_url.match(/(?:twitter|x)\.com\/([A-Za-z0-9_]+)/)?.[1] || 'Twitter'}`} href={lead.twitter_url} color="#38bdf8" />}
+                    {lead.telegram_url && <SocialChip icon={Send} label={lead.telegram_url.match(/t\.me\/([A-Za-z0-9_+]+)/)?.[1] ? `t.me/${lead.telegram_url.match(/t\.me\/([A-Za-z0-9_+]+)/)?.[1]}` : 'Telegram'} href={lead.telegram_url} color="#22d3ee" />}
                     {lead.discord_url && <SocialChip icon={MessageCircle} label="Discord" href={lead.discord_url} color="#818cf8" />}
                   </div>
                 )}
