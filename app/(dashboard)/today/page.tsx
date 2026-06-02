@@ -292,6 +292,7 @@ export default function TodayPage() {
   const [fetching, setFetching] = useState(false)
   const [hackFetching, setHackFetching] = useState(false)
   const [bgJob, setBgJob] = useState<{ status: string; sources_done: number; sources_total: number; leads_saved: number } | null>(null)
+  const [contactingLead, setContactingLead] = useState<LeadWithContacts | null>(null)
 
   // Poll for background job status (runs even if user navigates away and comes back).
   const pollJob = useCallback(async () => {
@@ -362,23 +363,29 @@ export default function TodayPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  const markContacted = async (id: string) => {
+  const markContacted = async (id: string, channel: string, note: string, followUpDays: number) => {
     setActionLoading(id)
     const now = new Date()
-    const { error } = await supabase
-      .from('leads')
-      .update({
-        status: 'contacted',
-        contacted_at: now.toISOString(),
-        last_contacted_at: now.toISOString(),
-        follow_up_stage: 0,
-        next_follow_up_at: new Date(now.getTime() + FOLLOWUP_GAP_DAYS * 86400000).toISOString(),
-        updated_at: now.toISOString(),
+    const followUpAt = new Date(now.getTime() + followUpDays * 86400000)
+    const { error } = await supabase.from('leads').update({
+      status: 'contacted',
+      contacted_at: now.toISOString(),
+      last_contacted_at: now.toISOString(),
+      last_channel: channel,
+      follow_up_stage: 0,
+      next_follow_up_at: followUpAt.toISOString(),
+      updated_at: now.toISOString(),
+    }).eq('id', id)
+    if (!error) {
+      await supabase.from('lead_activities').insert({
+        lead_id: id, type: 'email', channel,
+        content: note || `Reached out via ${channel}`,
+        follow_up_at: followUpAt.toISOString(),
       })
-      .eq('id', id)
-    if (error) toast.error('Update failed')
-    else { toast.success(`Marked contacted — follow-up scheduled in ${FOLLOWUP_GAP_DAYS} days`); loadData() }
+      toast.success(`Logged — follow-up in ${followUpDays} days`); loadData()
+    } else { toast.error('Update failed') }
     setActionLoading(null)
+    setContactingLead(null)
   }
 
   const markReserved = async (id: string) => {
@@ -447,6 +454,7 @@ export default function TodayPage() {
   })()
 
   return (
+    <>
     <div className="fade-in">
       {/* ── Header ─────────────────────────────────────── */}
       <div className="page-header flex items-center justify-between">
@@ -563,7 +571,7 @@ export default function TodayPage() {
                     </div>
                     <div className="flex flex-col gap-3">
                       {group.leads.map((lead, i) => (
-                        <PlanLeadCard key={lead.id} lead={lead} rank={gi === 0 ? i + 1 : null} actionLoading={actionLoading} onContacted={markContacted} onReserved={markReserved} />
+                        <PlanLeadCard key={lead.id} lead={lead} rank={gi === 0 ? i + 1 : null} actionLoading={actionLoading} onContacted={(id) => setContactingLead(leads.find(l => l.id === id) || null)} onReserved={markReserved} />
                       ))}
                     </div>
                   </div>
@@ -687,6 +695,83 @@ export default function TodayPage() {
           </div>
         )}
 
+      </div>
+    </div>
+
+    {/* Contacted Modal */}
+    {contactingLead && <TodayContactedModal lead={contactingLead}
+      onClose={() => setContactingLead(null)}
+      onSaved={(channel, note, days) => markContacted(contactingLead.id, channel, note, days)} />}
+    </>
+  )
+}
+
+/* ── Mini contacted modal for Today's Plan ──────────────── */
+const TODAY_CHANNELS = [
+  { id: 'telegram', label: 'Telegram', color: '#22d3ee' },
+  { id: 'twitter',  label: 'Twitter',  color: '#38bdf8' },
+  { id: 'linkedin', label: 'LinkedIn', color: '#60a5fa' },
+  { id: 'email',    label: 'Email',    color: '#a78bfa' },
+  { id: 'discord',  label: 'Discord',  color: '#818cf8' },
+]
+
+function TodayContactedModal({ lead, onClose, onSaved }: {
+  lead: LeadWithContacts
+  onClose: () => void
+  onSaved: (channel: string, note: string, days: number) => void
+}) {
+  const [channel, setChannel] = useState('')
+  const [note, setNote] = useState('')
+  const [days, setDays] = useState('7')
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(4,4,10,0.75)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ width: '100%', maxWidth: 440, background: 'linear-gradient(180deg,rgb(18,19,30),rgb(13,13,21))', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: 24, boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'white' }}>Mark as Contacted</div>
+            <div style={{ fontSize: 11, color: 'rgb(120,127,160)', marginTop: 2 }}>{lead.company_name}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgb(120,127,160)', cursor: 'pointer' }}>✕</button>
+        </div>
+
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'rgb(150,155,185)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Where? *</div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+          {TODAY_CHANNELS.map(ch => (
+            <button key={ch.id} onClick={() => setChannel(ch.id)}
+              style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                border: `1px solid ${channel === ch.id ? ch.color + '60' : 'rgba(255,255,255,0.08)'}`,
+                background: channel === ch.id ? ch.color + '18' : 'rgba(255,255,255,0.03)',
+                color: channel === ch.id ? ch.color : 'rgb(150,155,185)' }}>
+              {ch.label}
+            </button>
+          ))}
+        </div>
+
+        <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="What did you send? (optional)" rows={2}
+          style={{ width: '100%', resize: 'none', padding: '9px 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.35)', color: 'white', fontSize: 12, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', marginBottom: 14 }} />
+
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'rgb(150,155,185)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Follow-up in</div>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
+          {['3','5','7','14'].map(d => (
+            <button key={d} onClick={() => setDays(d)}
+              style={{ flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                border: `1px solid ${days === d ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                background: days === d ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.03)',
+                color: days === d ? '#a78bfa' : 'rgb(150,155,185)' }}>{d}d
+            </button>
+          ))}
+        </div>
+
+        <button onClick={() => channel && onSaved(channel, note, parseInt(days))} disabled={!channel}
+          style={{ width: '100%', padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: channel ? 'pointer' : 'not-allowed',
+            background: channel ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.04)',
+            border: `1px solid ${channel ? 'rgba(52,211,153,0.4)' : 'rgba(255,255,255,0.06)'}`,
+            color: channel ? '#34d399' : 'rgb(100,107,140)' }}>
+          ✓ Log outreach &amp; set follow-up
+        </button>
       </div>
     </div>
   )

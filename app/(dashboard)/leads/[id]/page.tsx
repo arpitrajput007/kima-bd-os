@@ -319,6 +319,131 @@ function AccordionPanel({ icon: Icon, title, iconColor, expanded, onToggle, chil
   )
 }
 
+/* ── Contacted Modal ──────────────────────────────────── */
+const CHANNELS: { id: string; label: string; icon: string; color: string }[] = [
+  { id: 'telegram',  label: 'Telegram',  icon: '✈️', color: '#22d3ee' },
+  { id: 'twitter',   label: 'Twitter / X', icon: '𝕏', color: '#38bdf8' },
+  { id: 'linkedin',  label: 'LinkedIn',  icon: 'in', color: '#60a5fa' },
+  { id: 'email',     label: 'Email',     icon: '✉️', color: '#a78bfa' },
+  { id: 'discord',   label: 'Discord',   icon: '💬', color: '#818cf8' },
+  { id: 'call',      label: 'Call',      icon: '📞', color: '#34d399' },
+]
+
+function ContactedModal({ lead, onClose, onSaved }: {
+  lead: Lead; onClose: () => void; onSaved: () => void
+}) {
+  const supabase = createClient()
+  const [channel, setChannel] = useState('')
+  const [note, setNote] = useState('')
+  const [followUpDays, setFollowUpDays] = useState('7')
+  const [saving, setSaving] = useState(false)
+
+  const save = async () => {
+    if (!channel) { toast.error('Pick a channel'); return }
+    setSaving(true)
+    const now = new Date()
+    const followUpAt = new Date(now.getTime() + parseInt(followUpDays) * 86400000)
+
+    // 1. Update lead status + last_channel + follow-up
+    await supabase.from('leads').update({
+      status: 'contacted',
+      contacted_at: now.toISOString(),
+      last_contacted_at: now.toISOString(),
+      last_channel: channel,
+      follow_up_stage: 0,
+      next_follow_up_at: followUpAt.toISOString(),
+      updated_at: now.toISOString(),
+    }).eq('id', lead.id)
+
+    // 2. Log it as a CRM activity with channel + follow-up date
+    await supabase.from('lead_activities').insert({
+      lead_id: lead.id,
+      type: 'email',   // maps to outreach in the timeline
+      channel,
+      content: note.trim() || `Reached out via ${CHANNELS.find(c => c.id === channel)?.label}`,
+      scheduled_at: null,
+      follow_up_at: followUpAt.toISOString(),
+    })
+
+    setSaving(false)
+    toast.success(`Logged — follow-up in ${followUpDays} days`)
+    onSaved()
+    onClose()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(4,4,10,0.75)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ width: '100%', maxWidth: 480, background: 'linear-gradient(180deg, rgb(18,19,30), rgb(13,13,21))', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: 28, boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22 }}>
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: 'white' }}>Mark as Contacted</div>
+            <div style={{ fontSize: 12, color: 'rgb(120,127,160)', marginTop: 3 }}>{lead.company_name}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgb(120,127,160)', cursor: 'pointer' }}><X size={16} /></button>
+        </div>
+
+        {/* Channel picker */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'rgb(150,155,185)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Where did you reach out? *</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            {CHANNELS.map(ch => (
+              <button key={ch.id} onClick={() => setChannel(ch.id)}
+                style={{ padding: '10px 8px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center',
+                  border: `1px solid ${channel === ch.id ? ch.color + '70' : 'rgba(255,255,255,0.08)'}`,
+                  background: channel === ch.id ? ch.color + '1a' : 'rgba(255,255,255,0.03)',
+                  color: channel === ch.id ? ch.color : 'rgb(150,155,185)' }}>
+                <div style={{ fontSize: 16, marginBottom: 4 }}>{ch.icon}</div>
+                {ch.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Note */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'rgb(150,155,185)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Note (optional)</div>
+          <textarea value={note} onChange={e => setNote(e.target.value)}
+            placeholder="What did you send? Key points, message thread, etc."
+            rows={3}
+            style={{ width: '100%', resize: 'none', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.35)', color: 'white', fontSize: 13, fontFamily: 'inherit', lineHeight: 1.6, outline: 'none', boxSizing: 'border-box' }} />
+        </div>
+
+        {/* Follow-up */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'rgb(150,155,185)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Follow-up reminder</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {['3', '5', '7', '14'].map(d => (
+              <button key={d} onClick={() => setFollowUpDays(d)}
+                style={{ flex: 1, padding: '8px 0', borderRadius: 9, fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+                  border: `1px solid ${followUpDays === d ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                  background: followUpDays === d ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.03)',
+                  color: followUpDays === d ? '#a78bfa' : 'rgb(150,155,185)' }}>
+                {d}d
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onClose}
+            style={{ flex: 1, padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgb(150,155,185)' }}>
+            Cancel
+          </button>
+          <button onClick={save} disabled={saving || !channel}
+            style={{ flex: 2, padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: saving || !channel ? 'not-allowed' : 'pointer', background: channel ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${channel ? 'rgba(52,211,153,0.4)' : 'rgba(255,255,255,0.06)'}`, color: channel ? '#34d399' : 'rgb(100,107,140)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: saving ? 0.7 : 1 }}>
+            {saving ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : <><CheckCircle size={14} /> Log & set follow-up</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ══════════════════════════════════════════════════════ */
 export default function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -335,6 +460,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [aiAction, setAiAction] = useState<AIAction>(null)
   const [apolloLoading, setApolloLoading] = useState(false)
   const [discussOpen, setDiscussOpen] = useState(false)
+  const [contactedModalOpen, setContactedModalOpen] = useState(false)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     overview: true, research: true, pain: true, kima: true,
     aeredium: true, contacts: true, outreach: true, feedback: false
@@ -558,7 +684,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 <ActionBtn icon={X} label="Reject" variant="red" onClick={() => updateStatus('rejected')} />
               )}
               {lead.status === 'approved' && (
-                <ActionBtn icon={Send} label="Mark Contacted" onClick={() => updateStatus('contacted')} />
+                <ActionBtn icon={Send} label="Mark Contacted" onClick={() => setContactedModalOpen(true)} />
               )}
               <ActionBtn icon={Brain} label="Discuss Lead" variant="cyan" onClick={() => setDiscussOpen(true)} />
               <ActionBtn icon={MessageSquare} label="Outreach Studio" variant="purple" href={`/outreach?lead=${lead.id}`} />
@@ -962,6 +1088,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       </div>
 
       {discussOpen && <DiscussPanel lead={lead} onClose={() => setDiscussOpen(false)} />}
+      {contactedModalOpen && <ContactedModal lead={lead} onClose={() => setContactedModalOpen(false)} onSaved={loadLead} />}
     </div>
   )
 }
