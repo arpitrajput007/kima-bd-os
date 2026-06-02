@@ -782,15 +782,50 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             {/* Kima Fit */}
             <FindingCard
               icon={Puzzle} title="Kima Fit" pillVariant="green"
-              body={lead.kima_fit || 'Kima fit not analyzed yet.'}
-              rightLabel={lead.settlement_angle ? 'Settlement Angle' : lead.integration_feasibility ? 'Integration' : undefined}
-              pill={lead.settlement_angle || lead.integration_feasibility || undefined}
+              body={lead.kima_fit ? lead.kima_fit.split('\n')[0] : 'Kima fit not analyzed yet.'}
               expanded={expanded.kima} onToggle={() => toggle('kima')}
             >
               {lead.kima_fit ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <InfoBlock title="Suggested Use Case"     value={lead.suggested_use_case} />
-                  <InfoBlock title="Integration Feasibility" value={lead.integration_feasibility} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {/* Main pitch */}
+                  <div style={{ borderRadius: 12, border: '1px solid rgba(52,211,153,0.2)', background: 'rgba(52,211,153,0.06)', padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                      <Puzzle size={14} color="#34d399" />
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.08em' }}>How Kima helps</span>
+                    </div>
+                    <div style={{ fontSize: 13, color: 'rgb(220,225,240)', lineHeight: 1.65 }}>
+                      {lead.kima_fit}
+                    </div>
+                  </div>
+                  {/* Use case + feasibility */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    {lead.suggested_use_case && (
+                      <div style={{ borderRadius: 10, border: '1px solid rgba(96,165,250,0.2)', background: 'rgba(96,165,250,0.06)', padding: '12px 14px' }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgb(147,197,253)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Use Case</div>
+                        <div style={{ fontSize: 12, color: 'rgb(220,225,240)', lineHeight: 1.5 }}>{lead.suggested_use_case}</div>
+                      </div>
+                    )}
+                    {lead.integration_feasibility && (
+                      <div style={{ borderRadius: 10, border: '1px solid rgba(34,211,153,0.2)', background: 'rgba(34,211,153,0.06)', padding: '12px 14px' }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgb(110,231,183)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Integration</div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: lead.integration_feasibility === 'high' ? '#34d399' : lead.integration_feasibility === 'medium' ? '#fbbf24' : '#f87171' }}>
+                          {lead.integration_feasibility?.charAt(0).toUpperCase() + lead.integration_feasibility?.slice(1)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {/* Settlement Angle */}
+                  {lead.settlement_angle && (
+                    <div style={{ borderRadius: 12, border: '1px solid rgba(168,85,247,0.2)', background: 'rgba(168,85,247,0.06)', padding: '14px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                        <ArrowRight size={14} color="#c084fc" />
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#c084fc', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Settlement Angle</span>
+                      </div>
+                      <div style={{ fontSize: 13, color: 'rgb(220,225,240)', lineHeight: 1.65 }}>
+                        {lead.settlement_angle}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <button onClick={() => runAI('kima_fit')} disabled={aiAction !== null}
@@ -803,13 +838,34 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             {/* Aeredium Fit */}
             <FindingCard
               icon={Shield} title="Aeredium Fit" pillVariant="purple"
-              body={lead.aeredium_fit || 'Aeredium fit not analyzed yet.'}
-              rightLabel={lead.security_angle ? 'Security Angle' : undefined}
-              pill={lead.security_angle || undefined}
+              body={lead.aeredium_fit ? lead.aeredium_fit.split('\n')[0] : 'Aeredium fit not analyzed yet.'}
               expanded={expanded.aeredium} onToggle={() => toggle('aeredium')}
             >
               {lead.aeredium_fit ? (
-                <InfoBlock title="Risk Angle" value={lead.risk_angle} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {/* Main pitch */}
+                  <div style={{ borderRadius: 12, border: '1px solid rgba(168,85,247,0.2)', background: 'rgba(168,85,247,0.06)', padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                      <Shield size={14} color="#c084fc" />
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#c084fc', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Trust & Security</span>
+                    </div>
+                    <div style={{ fontSize: 13, color: 'rgb(220,225,240)', lineHeight: 1.65 }}>
+                      {lead.aeredium_fit}
+                    </div>
+                  </div>
+                  {/* Risk Angle */}
+                  {lead.risk_angle && (
+                    <div style={{ borderRadius: 12, border: '1px solid rgba(244,114,182,0.2)', background: 'rgba(244,114,182,0.06)', padding: '14px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                        <AlertTriangle size={14} color='#f472b6' />
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#f472b6', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Risk Angle</span>
+                      </div>
+                      <div style={{ fontSize: 13, color: 'rgb(220,225,240)', lineHeight: 1.65 }}>
+                        {lead.risk_angle}
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <button onClick={() => runAI('aeredium_fit')} disabled={aiAction !== null}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 9, border: '1px solid rgba(168,85,247,0.28)', background: 'rgba(168,85,247,0.09)', padding: '8px 14px', fontSize: 13, color: 'rgb(196,167,252)', cursor: 'pointer', fontFamily: 'inherit' }}>
