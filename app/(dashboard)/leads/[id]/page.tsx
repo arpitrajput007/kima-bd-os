@@ -12,7 +12,8 @@ import {
   Copy, CheckCircle, CheckCircle2, AlertTriangle, Globe, Link2, Send,
   ChevronDown, ChevronUp, RefreshCw, Building2, Brain,
   FileSearch, Puzzle, Calendar, Mail, Wand2,
-  MapPin, AtSign, MessageCircle, Plus, Trash2, History
+  MapPin, AtSign, MessageCircle, Plus, Trash2, History,
+  BadgeCheck, AlertCircle, Lightbulb
 } from 'lucide-react'
 import {
   cn, getScoreBg, getStatusColor, getStatusLabel, getSeverityColor,
@@ -406,8 +407,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         }).eq('id', id); loadLead()
       } else if (action === 'pain_points') {
         await supabase.from('leads').update({
-          pain_point: json.data.pain_point, pain_point_severity: json.data.pain_point_severity,
-          pain_point_evidence: json.data.pain_point_evidence, updated_at: new Date().toISOString()
+          pain_point: json.data.pain_point,
+          pain_point_severity: json.data.pain_point_severity,
+          pain_point_evidence: json.data.pain_point_evidence,
+          pain_point_source_url: json.data.pain_point_source_url || null,
+          pain_point_evidence_type: json.data.pain_point_evidence_type || 'agent_analysis',
+          updated_at: new Date().toISOString()
         }).eq('id', id); loadLead()
       } else if (action === 'kima_fit') {
         await supabase.from('leads').update({
@@ -718,7 +723,38 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             >
               {lead.pain_point ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {lead.pain_point_evidence && <InfoBlock title="Evidence" value={lead.pain_point_evidence} />}
+                  {lead.pain_point_evidence && (() => {
+                    const t = lead.pain_point_evidence_type || 'agent_analysis'
+                    const config = t === 'verified_source'
+                      ? { label: 'Verified Source', color: '#34d399', bg: 'rgba(52,211,153,0.08)', border: 'rgba(52,211,153,0.3)', icon: BadgeCheck, sub: 'Backed by a real article or announcement' }
+                      : t === 'agent_analysis'
+                      ? { label: 'Agent Analysis', color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.3)', icon: Brain, sub: 'Reasoned from their tech stack & public facts' }
+                      : { label: 'Inferred', color: '#fbbf24', bg: 'rgba(251,191,36,0.08)', border: 'rgba(251,191,36,0.3)', icon: Lightbulb, sub: 'General industry knowledge — verify before using in outreach' }
+                    const Icon = config.icon
+                    return (
+                      <div style={{ borderRadius: 12, border: `1px solid ${config.border}`, background: config.bg, padding: '14px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                          <Icon size={14} color={config.color} />
+                          <span style={{ fontSize: 11, fontWeight: 700, color: config.color, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Evidence · {config.label}</span>
+                          <span style={{ fontSize: 11, color: 'rgb(120,127,160)', marginLeft: 'auto' }}>{config.sub}</span>
+                        </div>
+                        <div style={{ fontSize: 13, color: 'rgb(220,225,240)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>
+                          {lead.pain_point_evidence}
+                        </div>
+                        {lead.pain_point_source_url && (
+                          <a href={lead.pain_point_source_url} target="_blank" rel="noopener noreferrer"
+                            style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: config.color, textDecoration: 'none', padding: '6px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${config.border}` }}>
+                            <ExternalLink size={12} /> View source · {lead.pain_point_source_url.replace(/^https?:\/\//, '').slice(0, 45)}{lead.pain_point_source_url.length > 50 ? '…' : ''}
+                          </a>
+                        )}
+                        {!lead.pain_point_source_url && t === 'verified_source' && (
+                          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#fbbf24' }}>
+                            <AlertCircle size={11} /> Marked as verified but no source URL — re-run pain point analysis
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
                   {editing && (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div>

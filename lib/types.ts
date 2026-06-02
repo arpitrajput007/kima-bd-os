@@ -152,6 +152,8 @@ export interface Lead {
   pain_point?: string
   pain_point_severity?: PainPointSeverity
   pain_point_evidence?: string
+  pain_point_source_url?: string
+  pain_point_evidence_type?: 'verified_source' | 'agent_analysis' | 'inferred'
   kima_fit?: string
   aeredium_fit?: string
   suggested_use_case?: string

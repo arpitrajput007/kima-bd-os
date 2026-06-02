@@ -70,7 +70,9 @@ Return JSON:
 {
   "pain_point": "The single most important pain point Kima can solve",
   "pain_point_severity": "critical|high|medium|low",
-  "pain_point_evidence": "Evidence or reasoning for this pain point",
+  "pain_point_evidence": "Specific evidence. If from a real article/news/hack report, paste the exact quote. If reasoned from their public tech stack or business model, explain the reasoning.",
+  "pain_point_source_url": "EXACT URL to article/news/blog/tweet/hack report that proves this pain. Empty string if no real URL — never invent one.",
+  "pain_point_evidence_type": "verified_source if pain_point_source_url is a real article that explicitly mentions this pain | agent_analysis if reasoned from publicly known facts | inferred if general industry knowledge with no specific backing",
   "why_it_matters": "Why this pain point matters to their business",
   "how_urgent": "How urgent is this problem for them?",
   "secondary_pain_points": ["other pain point 1", "other pain point 2"]
