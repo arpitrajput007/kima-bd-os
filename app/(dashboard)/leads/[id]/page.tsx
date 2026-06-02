@@ -559,12 +559,25 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           updated_at: new Date().toISOString()
         }).eq('id', id); loadLead()
       } else if (action === 'contacts') {
-        for (const c of (json.data.suggested_contacts || []).slice(0, 3)) {
+        // Delete old "Unknown Name" AI-guessed contacts first
+        await supabase.from('contacts')
+          .delete()
+          .eq('lead_id', id)
+          .or('name.is.null,name.eq.Unknown Name,name.eq.Unknown')
+
+        for (const c of (json.data.suggested_contacts || []).slice(0, 6)) {
+          if (!c.name) continue // skip nameless contacts entirely
           await supabase.from('contacts').insert({
-            lead_id: id, name: c.name || null, role: c.role, company: lead.company_name,
-            contact_confidence: c.contact_confidence, reason_this_person: c.why_this_person,
+            lead_id: id,
+            name: c.name,
+            role: c.role || c.ideal_contact_title,
+            company: lead.company_name,
+            contact_confidence: c.contact_confidence,
+            reason_this_person: c.why_this_person,
             email: c.email_pattern || null,
-            linkedin_url: c.linkedin_hint ? `https://linkedin.com/search/results/people/?keywords=${encodeURIComponent(c.linkedin_hint)}` : null,
+            // Use real URL if provided, otherwise skip (no more guessed search URLs)
+            linkedin_url: c.linkedin_url || null,
+            twitter_url: c.twitter_url || null,
           })
         }
         loadLead()

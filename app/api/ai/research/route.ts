@@ -156,28 +156,64 @@ Return JSON:
 }`
 
     } else if (action === 'contacts') {
+      // Run real multi-source contact discovery first
+      const { findContacts } = await import('@/lib/contactFinder')
+      const realContacts = await findContacts(company_name, website || '')
+
+      if (realContacts.length > 0) {
+        // Return real contacts directly — no AI hallucination needed
+        return NextResponse.json({
+          success: true,
+          data: {
+            suggested_contacts: realContacts.map(c => ({
+              name: c.name,
+              role: c.role,
+              email_pattern: c.email || null,
+              linkedin_url: c.linkedin_url || null,
+              twitter_url: c.twitter_url || null,
+              github_url: c.github_url || null,
+              why_this_person: c.why_contact,
+              contact_confidence: c.confidence,
+              source: c.source,
+              outreach_angle: c.raw_snippet || null,
+            })),
+            ideal_contact_title: realContacts[0]?.role || 'Head of Partnerships',
+            research_notes: `Found ${realContacts.length} real contacts via ${[...new Set(realContacts.map(c => c.source))].join(', ')}`,
+            sources_used: [...new Set(realContacts.map(c => c.source))],
+          }
+        })
+      }
+
+      // Fallback: AI suggestion with Hunter data if no real contacts found
       const hunterData = await getHunterContacts(website)
-      const hunterContext = hunterData ? `\nVerified emails from Hunter.io database:\n${hunterData}\nSelect the most relevant BD contacts from this list if any, otherwise guess patterns.` : ''
-      
-      userPrompt = `Find the ideal contacts at this company for Kima/Aeredium BD outreach:
+      const hunterContext = hunterData
+        ? `\nVerified emails from Hunter.io:\n${hunterData}\nUse these real emails. Do NOT guess emails.`
+        : '\nNo verified emails found. Do NOT invent email addresses — leave email_pattern null.'
+
+      userPrompt = `Find real contacts at this company for Kima BD outreach.
 Company: ${company_name}
 Website: ${website || 'unknown'}
 Description: ${description || 'unknown'}${hunterContext}
+
+CRITICAL: Only return contacts with REAL names you know from public sources (LinkedIn, Twitter, GitHub, press).
+Do NOT make up names. Do NOT guess emails. Mark confidence as "low" if name is uncertain.
 
 Return JSON:
 {
   "suggested_contacts": [
     {
-      "name": "Name if known or null",
-      "email_pattern": "Their verified email from Hunter, or an educated guess if none exist",
-      "role": "Ideal role to contact",
+      "name": "Real full name from public source, or null if unknown",
+      "email_pattern": "Verified email only, null if not found",
+      "role": "Their actual title",
       "why_this_person": "Why this person is the right contact",
-      "linkedin_hint": "LinkedIn search query to find them",
+      "linkedin_url": "Full LinkedIn profile URL if known, else null",
+      "twitter_url": "Full Twitter URL if known, else null",
       "contact_confidence": "high|medium|low",
+      "source": "linkedin|twitter|github|press|unknown",
       "outreach_angle": "How to approach this person specifically"
     }
   ],
-  "ideal_contact_title": "The most important contact title",
+  "ideal_contact_title": "The most important contact title to reach",
   "research_notes": "Notes on how to find the right contact"
 }`
     }

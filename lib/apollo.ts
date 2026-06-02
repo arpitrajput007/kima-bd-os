@@ -116,6 +116,40 @@ export async function apolloEnrichContacts(
   return out
 }
 
+export interface ApolloPersonResult {
+  name: string; title: string; email?: string; linkedin_url?: string; seniority?: string
+}
+
+// Search Apollo for people at a company by domain. Uses the mixed_people/search endpoint.
+// Returns verified contacts with real names, titles, and emails where available.
+export async function apolloSearchPeople(companyName: string, domain: string): Promise<ApolloPersonResult[]> {
+  if (!apolloConfigured() || !domain) return []
+  try {
+    const res = await fetch(`${APOLLO_BASE}/mixed_people/search`, {
+      method: 'POST', headers: headers(),
+      body: JSON.stringify({
+        q_organization_domains: [domain],
+        person_seniorities: ['owner', 'founder', 'c_suite', 'vp', 'director', 'manager'],
+        page: 1, per_page: 10,
+      }),
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    interface ApolloPeopleResult { name?: string; title?: string; email?: string; linkedin_url?: string; seniority?: string; email_status?: string }
+    const people: ApolloPeopleResult[] = Array.isArray(data?.people) ? data.people : []
+    return people
+      .filter(p => p.name && p.name.toLowerCase() !== 'unknown')
+      .map(p => ({
+        name: p.name || '',
+        title: p.title || '',
+        email: p.email_status === 'verified' || p.email_status === 'likely to engage' ? p.email : undefined,
+        linkedin_url: p.linkedin_url || undefined,
+        seniority: p.seniority || undefined,
+      }))
+  } catch { return [] }
+}
+
 export interface ApolloCompany { name: string; website: string; description: string; source_url: string }
 
 // Search Apollo for companies matching free-text keyword tags (a "find companies" source).
