@@ -1,11 +1,14 @@
 // ============================================================
-// Multi-source contact finder for BD outreach.
-// For every person found, we auto-enrich with Twitter + LinkedIn
-// via Exa so you always get clickable outreach links.
+// Contact finder — three-stage pipeline:
+// 1. OpenAI web search (real-time) → finds actual named founders/team
+// 2. Exa → finds their Twitter + LinkedIn profiles by name
+// 3. Apollo + Hunter → verified emails
 // ============================================================
 
-import { exaConfigured } from './exa'
+import OpenAI from 'openai'
 import { apolloConfigured, apolloSearchPeople } from './apollo'
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 export interface FoundContact {
   name: string
@@ -14,45 +17,102 @@ export interface FoundContact {
   linkedin_url?: string
   twitter_url?: string
   github_url?: string
-  source: 'apollo' | 'exa_linkedin' | 'exa_twitter' | 'github' | 'hunter' | 'ai'
+  source: 'apollo' | 'exa_linkedin' | 'exa_twitter' | 'github' | 'hunter' | 'web_search' | 'ai'
   confidence: 'high' | 'medium' | 'low'
   why_contact: string
   raw_snippet?: string
 }
 
-// ── Exa helpers ──────────────────────────────────────────────
-
-async function exaSearch(query: string, domains: string[], numResults = 5) {
-  if (!exaConfigured()) return []
-  const res = await fetch('https://api.exa.ai/search', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.EXA_API_KEY! },
-    body: JSON.stringify({
-      query, type: 'auto', numResults,
-      includeDomains: domains,
-      contents: { highlights: { numSentences: 2, highlightsPerUrl: 1 } },
-    }),
-    signal: AbortSignal.timeout(10000),
-  })
-  if (!res.ok) return []
-  const data = await res.json()
-  return (data.results || []) as Array<{ url: string; title: string; highlights?: string[] }>
+// ── Raw Exa fetch ─────────────────────────────────────────────
+async function exaFetch(query: string, domains: string[], numResults = 4) {
+  if (!process.env.EXA_API_KEY) return []
+  try {
+    const res = await fetch('https://api.exa.ai/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.EXA_API_KEY },
+      body: JSON.stringify({
+        query, type: 'auto', numResults, includeDomains: domains,
+        contents: { highlights: { numSentences: 2, highlightsPerUrl: 1 } },
+      }),
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return (data.results || []) as Array<{ url: string; title: string; highlights?: string[] }>
+  } catch { return [] }
 }
 
-// Given a real person's name, find their Twitter + LinkedIn via Exa
-async function enrichPersonSocials(name: string, companyName: string): Promise<{
-  twitter_url?: string; linkedin_url?: string
+// ── Stage 1: real-time web search for team members ────────────
+async function findTeamViaWebSearch(companyName: string, website: string): Promise<Array<{ name: string; role: string }>> {
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: JSON.stringify({
+        model: 'gpt-4o-search-preview',
+        web_search_options: {},
+        messages: [{
+          role: 'user',
+          content: `Who are the founders and key BD/partnerships/leadership team at "${companyName}" (${website})?
+List only real, named people with their exact titles. Focus on founders, CEO, CTO, Head of Partnerships/BD.
+Return only a JSON array: [{"name":"Full Name","role":"exact title"}]
+No explanation, just the JSON array.`,
+        }],
+        max_tokens: 400,
+      }),
+      signal: AbortSignal.timeout(25000),
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    const content = data.choices?.[0]?.message?.content || ''
+    // Extract JSON array from the response
+    const match = content.match(/\[[\s\S]*\]/)
+    if (!match) return []
+    const parsed = JSON.parse(match[0])
+    return Array.isArray(parsed)
+      ? parsed.filter((p: { name?: string }) => p.name && p.name.length > 2 && !p.name.includes('Unknown')).slice(0, 6)
+      : []
+  } catch { return [] }
+}
+
+// ── Stage 2: find each person's social links ──────────────────
+async function enrichPerson(name: string, companyName: string): Promise<{
+  twitter_url?: string; linkedin_url?: string; github_url?: string
 }> {
-  const result: { twitter_url?: string; linkedin_url?: string } = {}
+  const result: { twitter_url?: string; linkedin_url?: string; github_url?: string } = {}
+
   await Promise.all([
-    // Twitter search
+    // Twitter — check GitHub user search first (reliable source of twitter_username)
     (async () => {
       try {
-        const hits = await exaSearch(`${name} ${companyName} crypto blockchain`, ['twitter.com', 'x.com'], 3)
+        const ghRes = await fetch(
+          `https://api.github.com/search/users?q=${encodeURIComponent(name)}&per_page=5`,
+          { headers: { Accept: 'application/vnd.github.v3+json' }, signal: AbortSignal.timeout(6000) }
+        )
+        if (ghRes.ok) {
+          const ghData = await ghRes.json()
+          for (const user of (ghData.items || []).slice(0, 5)) {
+            const profile = await fetch(`https://api.github.com/users/${user.login}`, {
+              headers: { Accept: 'application/vnd.github.v3+json' }, signal: AbortSignal.timeout(4000)
+            }).then(r => r.json()).catch(() => null)
+            // Verify the company matches
+            const company = (profile?.company || profile?.bio || '').toLowerCase()
+            const nameLower = companyName.toLowerCase()
+            if (profile?.twitter_username && (company.includes(nameLower.split(' ')[0]) || name.toLowerCase() === profile.name?.toLowerCase())) {
+              result.twitter_url = `https://x.com/${profile.twitter_username}`
+              result.github_url = profile.html_url
+              return
+            }
+          }
+        }
+      } catch { /* noop */ }
+
+      // Fallback: Exa Twitter search
+      try {
+        const hits = await exaFetch(`${name} ${companyName} crypto blockchain`, ['twitter.com', 'x.com'], 3)
         for (const h of hits) {
           const handle = h.url?.match(/(?:twitter|x)\.com\/([A-Za-z0-9_]+)/)?.[1]
-          if (!handle || ['search', 'home', 'explore', 'i', 'intent'].includes(handle.toLowerCase())) continue
-          // Name check: at least one part of name appears in title
+          if (!handle || ['search', 'home', 'explore', 'i', 'intent', 'settings'].includes(handle.toLowerCase())) continue
           const titleLower = (h.title || '').toLowerCase()
           const nameParts = name.toLowerCase().split(' ')
           if (nameParts.some(p => p.length > 2 && titleLower.includes(p))) {
@@ -62,32 +122,33 @@ async function enrichPersonSocials(name: string, companyName: string): Promise<{
         }
       } catch { /* noop */ }
     })(),
-    // LinkedIn search
+
+    // LinkedIn
     (async () => {
       try {
-        const hits = await exaSearch(`${name} ${companyName}`, ['linkedin.com'], 3)
+        const hits = await exaFetch(`${name} ${companyName}`, ['linkedin.com'], 3)
         for (const h of hits) {
-          if (h.url?.includes('/in/') && !h.url.includes('/search/')) {
-            result.linkedin_url = h.url.split('?')[0]
+          const url = h.url || ''
+          if (url.includes('/in/') && !url.includes('/search/') && !url.includes('/posts/') && !url.includes('/pulse/')) {
+            result.linkedin_url = url.split('?')[0]
             break
           }
         }
       } catch { /* noop */ }
     })(),
   ])
+
   return result
 }
 
-// ── Apollo: verified emails + real names ─────────────────────
+// ── Apollo: verified emails ────────────────────────────────────
 async function fromApollo(companyName: string, domain: string): Promise<FoundContact[]> {
   if (!apolloConfigured()) return []
   try {
     const results = await apolloSearchPeople(companyName, domain)
     return results.map(p => ({
-      name: p.name,
-      role: p.title || '',
-      email: p.email || undefined,
-      linkedin_url: p.linkedin_url || undefined,
+      name: p.name, role: p.title || '',
+      email: p.email || undefined, linkedin_url: p.linkedin_url || undefined,
       source: 'apollo' as const,
       confidence: p.email ? 'high' : 'medium',
       why_contact: `${p.title || 'Team member'} at ${companyName} — verified via Apollo`,
@@ -95,149 +156,7 @@ async function fromApollo(companyName: string, domain: string): Promise<FoundCon
   } catch { return [] }
 }
 
-// ── Exa LinkedIn: find real profiles by role + company ───────
-async function fromExaLinkedIn(companyName: string, roles: string[]): Promise<FoundContact[]> {
-  const results: FoundContact[] = []
-  for (const role of roles.slice(0, 4)) {
-    try {
-      const hits = await exaSearch(`${role} at ${companyName} blockchain crypto`, ['linkedin.com'], 3)
-      for (const h of hits) {
-        if (!h.url?.includes('/in/') || h.url.includes('/search/')) continue
-        const name = h.title?.replace(/[|(].*$/, '').replace(/\s*-\s*LinkedIn.*$/i, '').trim() || ''
-        if (!name || name.length < 3) continue
-        results.push({
-          name,
-          role,
-          linkedin_url: h.url.split('?')[0],
-          source: 'exa_linkedin',
-          confidence: 'medium',
-          why_contact: (Array.isArray(h.highlights) ? h.highlights.join(' ') : '').slice(0, 120) || `Found on LinkedIn`,
-        })
-      }
-    } catch { /* noop */ }
-  }
-  return results
-}
-
-// ── Exa Twitter: DeFi founders active on Twitter ─────────────
-async function fromExaTwitter(companyName: string): Promise<FoundContact[]> {
-  try {
-    const hits = await exaSearch(
-      `${companyName} founder CEO head of partnerships DeFi blockchain`,
-      ['twitter.com', 'x.com'], 5
-    )
-    return hits.flatMap(h => {
-      const handle = h.url?.match(/(?:twitter|x)\.com\/([A-Za-z0-9_]+)/)?.[1]
-      if (!handle || ['search', 'home', 'explore', 'i'].includes(handle.toLowerCase())) return []
-      const name = h.title?.replace(/[|((@].*$/, '').trim() || handle
-      if (!name || name.length < 2) return []
-      return [{
-        name,
-        role: 'Founder / Leadership',
-        twitter_url: `https://x.com/${handle}`,
-        source: 'exa_twitter' as const,
-        confidence: 'medium' as const,
-        why_contact: (Array.isArray(h.highlights) ? h.highlights.join(' ') : '').slice(0, 120),
-      }]
-    })
-  } catch { return [] }
-}
-
-// ── GitHub: find org via Exa, get members, auto-enrich each ──
-async function fromGitHub(companyName: string, website: string): Promise<FoundContact[]> {
-  try {
-    let orgsToTry: string[] = []
-
-    // 1. Exa finds the real org (catches polytope-labs for Hyperbridge etc.)
-    if (exaConfigured()) {
-      try {
-        const hits = await exaSearch(
-          `${companyName} GitHub organization repository`,
-          ['github.com'], 8
-        )
-        const exaOrgs = hits
-          .map(h => h.url?.match(/github\.com\/([A-Za-z0-9_-]+)/)?.[1])
-          .filter((o): o is string =>
-            !!o && !['topics', 'orgs', 'sponsors', 'features', 'about', 'marketplace', 'search'].includes(o)
-          )
-        orgsToTry.push(...[...new Set(exaOrgs)])
-      } catch { /* fall through */ }
-    }
-
-    // 2. Fallback name/domain guesses
-    const nameGuess = companyName.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
-    const domainGuess = website?.replace(/^https?:\/\//, '').split('.')[0].replace(/[^a-z0-9-]/g, '-')
-    orgsToTry.push(nameGuess, domainGuess, `${nameGuess}-labs`, `${nameGuess}-network`, `${nameGuess}-protocol`)
-    orgsToTry = [...new Set(orgsToTry.filter(Boolean))]
-
-    // 3. Collect members from ALL valid orgs
-    const allProfiles: Array<{
-      name: string; bio?: string; html_url: string
-      twitter_username?: string; company?: string; org: string; login: string
-    }> = []
-
-    await Promise.all(orgsToTry.slice(0, 6).map(async org => {
-      try {
-        const res = await fetch(`https://api.github.com/orgs/${org}/members?per_page=20`, {
-          headers: { Accept: 'application/vnd.github.v3+json' },
-          signal: AbortSignal.timeout(6000),
-        })
-        if (!res.ok) return
-        const members = await res.json()
-        if (!Array.isArray(members)) return
-
-        const profiles = await Promise.all(
-          members.slice(0, 15).map(async (m: { login: string }) => {
-            try {
-              const r = await fetch(`https://api.github.com/users/${m.login}`, {
-                headers: { Accept: 'application/vnd.github.v3+json' },
-                signal: AbortSignal.timeout(4000),
-              })
-              const p = r.ok ? await r.json() : null
-              return p?.name ? { ...p, org, login: m.login } : null
-            } catch { return null }
-          })
-        )
-        allProfiles.push(...profiles.filter(Boolean))
-      } catch { /* one org failing is fine */ }
-    }))
-
-    if (!allProfiles.length) return []
-
-    // 4. Score: founders/leadership first, pure devs last
-    const LEADER_RE = /founder|ceo|cto|co-founder|chief|head|lead|director|partner|president/i
-    const scored = allProfiles
-      .filter(p => p.name)
-      .map(p => ({ profile: p, score: LEADER_RE.test(p.bio || '') ? 2 : p.twitter_username ? 1 : 0 }))
-      .sort((a, b) => b.score - a.score)
-
-    // 5. For each top person — auto-enrich with Twitter + LinkedIn via Exa
-    const topProfiles = scored.slice(0, 5)
-    const enriched = await Promise.all(topProfiles.map(async ({ profile: p }) => {
-      // If GitHub already gave us Twitter, skip Exa
-      const twitterFromGitHub = p.twitter_username ? `https://x.com/${p.twitter_username}` : undefined
-      let socials: { twitter_url?: string; linkedin_url?: string } = {}
-      if (!twitterFromGitHub) {
-        socials = await enrichPersonSocials(p.name, companyName)
-      }
-      return {
-        name: p.name,
-        role: p.bio?.slice(0, 80) || 'Core Team',
-        github_url: p.html_url,
-        twitter_url: twitterFromGitHub || socials.twitter_url,
-        linkedin_url: socials.linkedin_url,
-        source: 'github' as const,
-        confidence: 'medium' as const,
-        why_contact: `GitHub org member (${p.org}) — ${p.bio?.slice(0, 80) || p.company || 'core team'}`,
-        raw_snippet: p.bio,
-      } as FoundContact
-    }))
-
-    return enriched
-  } catch { return [] }
-}
-
-// ── Hunter.io: email database ─────────────────────────────────
+// ── Hunter.io ──────────────────────────────────────────────────
 async function fromHunter(website: string): Promise<FoundContact[]> {
   if (!process.env.HUNTER_API_KEY || !website) return []
   try {
@@ -252,8 +171,7 @@ async function fromHunter(website: string): Promise<FoundContact[]> {
     return data.data.emails.filter((e: any) => e.confidence >= 70).map((e: any) => ({
       name: `${e.first_name || ''} ${e.last_name || ''}`.trim() || 'Unknown',
       role: e.position || e.department || 'Team member',
-      email: e.value,
-      linkedin_url: e.linkedin || undefined,
+      email: e.value, linkedin_url: e.linkedin || undefined,
       source: 'hunter' as const,
       confidence: e.confidence >= 90 ? 'high' : 'medium',
       why_contact: `Found in Hunter.io database (${e.confidence}% confidence)`,
@@ -261,49 +179,49 @@ async function fromHunter(website: string): Promise<FoundContact[]> {
   } catch { return [] }
 }
 
-// ── Deduplicate ───────────────────────────────────────────────
+// ── Dedup ──────────────────────────────────────────────────────
 function dedup(contacts: FoundContact[]): FoundContact[] {
   const seen = new Set<string>()
   const out: FoundContact[] = []
-  const order = ['apollo', 'hunter', 'github', 'exa_linkedin', 'exa_twitter', 'ai']
-  contacts.sort((a, b) => {
-    const confScore = { high: 2, medium: 1, low: 0 }
-    if (confScore[b.confidence] !== confScore[a.confidence]) return confScore[b.confidence] - confScore[a.confidence]
-    return order.indexOf(a.source) - order.indexOf(b.source)
-  })
   for (const c of contacts) {
     const key = (c.name || '').toLowerCase().replace(/\s+/g, '')
-    const emailKey = c.email?.toLowerCase() || ''
-    if (key.length > 1 && !seen.has(key) && !seen.has(emailKey)) {
-      seen.add(key)
-      if (emailKey) seen.add(emailKey)
-      out.push(c)
-    }
+    if (key.length > 1 && !seen.has(key)) { seen.add(key); out.push(c) }
   }
   return out
 }
 
-// ── Main entry point ──────────────────────────────────────────
-const BD_ROLES = ['Founder', 'Co-founder', 'CEO', 'Head of Partnerships', 'Head of Business Development', 'CTO']
-
+// ── Main ───────────────────────────────────────────────────────
 export async function findContacts(companyName: string, website: string): Promise<FoundContact[]> {
   const domain = website.replace(/^https?:\/\//, '').split('/')[0]
 
-  const [apollo, exaLinkedIn, exaTwitter, github, hunter] = await Promise.all([
+  // Run web search + Apollo + Hunter in parallel
+  const [teamFromWeb, apolloContacts, hunterContacts] = await Promise.all([
+    findTeamViaWebSearch(companyName, website),
     fromApollo(companyName, domain),
-    fromExaLinkedIn(companyName, BD_ROLES),
-    fromExaTwitter(companyName),
-    fromGitHub(companyName, website),
     fromHunter(website),
   ])
 
-  const all = [...apollo, ...exaLinkedIn, ...exaTwitter, ...github, ...hunter]
-  const deduped = dedup(all)
+  // Enrich each web-found person with Twitter + LinkedIn
+  const webContacts: FoundContact[] = await Promise.all(
+    teamFromWeb.map(async person => {
+      const socials = await enrichPerson(person.name, companyName)
+      return {
+        name: person.name,
+        role: person.role,
+        twitter_url: socials.twitter_url,
+        linkedin_url: socials.linkedin_url,
+        github_url: socials.github_url,
+        source: 'web_search' as const,
+        confidence: (socials.twitter_url || socials.linkedin_url) ? 'medium' : 'low',
+        why_contact: `${person.role} at ${companyName} — found via real-time web search`,
+      }
+    })
+  )
 
-  // Leaders first, devs last
   const LEADER_RE = /founder|ceo|cto|co-founder|chief|head|lead|director|partner|bd|business.dev/i
-  const named = deduped.filter(c => c.name && c.name !== 'Unknown' && c.name.length > 2)
-  named.sort((a, b) => (LEADER_RE.test(b.role || '') ? 1 : 0) - (LEADER_RE.test(a.role || '') ? 1 : 0))
+  const all = [...apolloContacts, ...webContacts, ...hunterContacts]
+  const deduped = dedup(all.filter(c => c.name && c.name.length > 2))
+  deduped.sort((a, b) => (LEADER_RE.test(b.role || '') ? 1 : 0) - (LEADER_RE.test(a.role || '') ? 1 : 0))
 
-  return named.slice(0, 6)
+  return deduped.slice(0, 6)
 }
