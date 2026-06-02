@@ -367,21 +367,33 @@ export async function POST(req: NextRequest) {
       })
     })
 
-    // 3. Get existing company names/websites to avoid duplicates
+    // 3. Get existing company names/websites/domains to avoid duplicates.
+    // We match on: exact lowercased name, lowercased domain (most reliable),
+    // and a slug version (removes spaces/punctuation) to catch "Gnosis Safe" vs "GnosisSafe".
     const { data: existingCompanies } = await supabase
       .from('leads')
       .select('company_name, website')
+
+    function nameSlug(s: string) {
+      return s.toLowerCase().replace(/[^a-z0-9]/g, '')
+    }
 
     const existingNames = new Set(
       (existingCompanies || []).map((l: { company_name?: string }) =>
         (l.company_name || '').toLowerCase().trim()
       )
     )
-    const existingWebsites = new Set(
+    const existingNameSlugs = new Set(
+      (existingCompanies || []).map((l: { company_name?: string }) =>
+        nameSlug(l.company_name || '')
+      ).filter(Boolean)
+    )
+    const existingDomains = new Set(
       (existingCompanies || [])
-        .map((l: { website?: string }) => (l.website || '').toLowerCase().trim())
+        .map((l: { website?: string }) => toDomain(l.website || ''))
         .filter(Boolean)
     )
+    const existingWebsites = existingDomains // keep alias for compatibility
 
     // 4. Get the company list — either straight from Apollo, or by crawling a URL/search.
     const sourceQuery = source.source_url_or_query.trim()
@@ -457,11 +469,14 @@ export async function POST(req: NextRequest) {
     // 6. Deep-research each company and save qualified ones
     for (const company of realCompanies) {
       const nameKey = (company.name || '').toLowerCase().trim()
-      const websiteKey = (company.website || '').toLowerCase().trim()
 
-      // Skip duplicates
+
+      // Skip duplicates — check name, name slug, and domain (most reliable).
+      const nameSlugKey = nameSlug(company.name || '')
+      const domainKey = toDomain(company.website || '')
       if (existingNames.has(nameKey)) { results.skipped_duplicate++; continue }
-      if (websiteKey && existingWebsites.has(websiteKey)) { results.skipped_duplicate++; continue }
+      if (nameSlugKey && existingNameSlugs.has(nameSlugKey)) { results.skipped_duplicate++; continue }
+      if (domainKey && existingDomains.has(domainKey)) { results.skipped_duplicate++; continue }
 
       // Enrich company context with real-time research before the main deep-dive.
       // Perplexity: grounded trigger research (recent news, funding, events).
@@ -616,7 +631,8 @@ export async function POST(req: NextRequest) {
           if (categoryCounts[cat] !== undefined) categoryCounts[cat]++
         })
         existingNames.add(nameKey)
-        if (websiteKey) existingWebsites.add(websiteKey)
+        if (nameSlugKey) existingNameSlugs.add(nameSlugKey)
+        if (domainKey) existingDomains.add(domainKey)
 
         results.saved++
         results.leads_saved.push(company.name)
