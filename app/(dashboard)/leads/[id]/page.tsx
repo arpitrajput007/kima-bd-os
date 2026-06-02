@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import {
-  ArrowLeft, ExternalLink, Star, Edit3 as Edit, Save, X, Loader2,
+  ArrowLeft, ArrowRight, ExternalLink, Star, Edit3 as Edit, Save, X, Loader2,
   Sparkles, Target, Shield, Users, MessageSquare, ThumbsUp,
   Copy, CheckCircle, CheckCircle2, AlertTriangle, Globe, Link2, Send,
   ChevronDown, ChevronUp, RefreshCw, Building2, Brain,
