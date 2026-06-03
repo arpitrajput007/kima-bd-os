@@ -102,6 +102,18 @@ export default function LeadsPage() {
     l.pain_point?.toLowerCase().includes(search.toLowerCase())
   )
 
+  // Per-category accent colors
+  const CAT_COLORS: Record<string, string> = {
+    'Agentic Payments Customer':           '#a78bfa',
+    'LayerZero Customer':                  '#22d3ee',
+    'Hacked Protocol':                     '#f87171',
+    'Needs On/Off Ramp':                   '#34d399',
+    'Fireblocks Customer':                 '#fb923c',
+    'Web2 Stablecoin Settlement Customer': '#60a5fa',
+    'Uncategorised':                       '#94a3b8',
+  }
+  const getCatColor = (cat: string) => CAT_COLORS[cat] ?? '#38bdf8'
+
   // Build category groups.
   // If a category pill is active → show ONLY that category (exclusive filter).
   // Each lead appears in each of its categories when no filter is active.
@@ -327,41 +339,45 @@ export default function LeadsPage() {
             </button>
             {allCatGroups.map(({ cat, leads: catLeads }) => {
               const isActive = activeCatFilter === cat
-              const dotColor = DEFINED_CATS.includes(cat) ? '#a78bfa' : '#38bdf8'
+              const col = getCatColor(cat)
               return (
                 <button key={cat}
                   onClick={() => setActiveCatFilter(isActive ? null : cat)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 13px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${isActive ? dotColor + '60' : 'rgba(255,255,255,0.08)'}`, background: isActive ? dotColor + '18' : 'rgba(255,255,255,0.03)', color: isActive ? dotColor : 'rgb(150,155,185)' }}>
-                  <span style={{ width: 7, height: 7, borderRadius: 999, flexShrink: 0, background: dotColor, display: 'inline-block' }} />
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 13px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${isActive ? col + '70' : 'rgba(255,255,255,0.08)'}`, background: isActive ? col + '22' : 'rgba(255,255,255,0.03)', color: isActive ? col : 'rgb(150,155,185)', transition: 'all 0.15s' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: 999, flexShrink: 0, background: col, display: 'inline-block' }} />
                   {cat.replace(' Customer', '')}
-                  <span style={{ fontWeight: 700, color: isActive ? dotColor : '#a78bfa' }}>{catLeads.length}</span>
+                  <span style={{ fontWeight: 700, color: isActive ? col : 'rgb(140,145,175)' }}>{catLeads.length}</span>
                 </button>
               )
             })}
           </div>
 
           {/* When a category is active and has sub-groups, show sub-category header */}
-          {activeCatFilter && subCategoryGroups.length > 0 && (
-            <div style={{ marginBottom: 12, padding: '10px 16px', borderRadius: 12, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.15)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{activeCatFilter.replace(' Customer', '')} sub-categories:</span>
-              {subCategoryGroups.map(({ sub, leads: sl }) => (
-                <span key={sub} style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 8, background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', color: 'rgb(196,167,252)' }}>
-                  {sub} · {sl.length}
-                </span>
-              ))}
-            </div>
-          )}
+          {activeCatFilter && subCategoryGroups.length > 0 && (() => {
+            const col = getCatColor(activeCatFilter)
+            return (
+              <div style={{ marginBottom: 12, padding: '10px 16px', borderRadius: 12, background: col + '10', border: `1px solid ${col}30`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: col, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{activeCatFilter.replace(' Customer', '')} sub-categories:</span>
+                {subCategoryGroups.map(({ sub, leads: sl }) => (
+                  <span key={sub} style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: col + '18', border: `1px solid ${col}40`, color: col }}>
+                    {sub} · {sl.length}
+                  </span>
+                ))}
+              </div>
+            )
+          })()}
 
           {categoryGroups.map(({ cat, leads: catLeads }) => {
             const collapsed = collapsedCats[cat]
+            const col = getCatColor(cat)
             const statusColors: Record<string, string> = { new: '#a78bfa', contacted: '#38bdf8', replied: '#fbbf24', meeting_booked: '#34d399', approved: '#34d399' }
             // When filtered, render sub-category sections inside
             const useSubGroups = activeCatFilter === cat && subCategoryGroups.length > 0
             return (
-              <div key={cat} className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(22,22,34,0.8)' }}>
+              <div key={cat} className="rounded-xl overflow-hidden" style={{ border: `1px solid ${col}30`, background: 'rgba(22,22,34,0.8)', borderLeft: `3px solid ${col}` }}>
                 {/* Category header */}
-                <button onClick={() => toggleCat(cat)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '13px 18px', background: 'rgba(255,255,255,0.02)', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-                  {collapsed ? <ChevronRight size={14} color="rgb(120,127,160)" /> : <ChevronDown size={14} color="rgb(120,127,160)" />}
+                <button onClick={() => toggleCat(cat)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '13px 18px', background: `linear-gradient(90deg, ${col}10 0%, transparent 60%)`, border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                  {collapsed ? <ChevronRight size={14} color={col} /> : <ChevronDown size={14} color={col} />}
                   <div style={{ flex: 1 }}>
                     <span style={{ fontSize: 13, fontWeight: 700, color: 'white' }}>{cat.replace(' Customer', '')}</span>
                     <span style={{ marginLeft: 10, fontSize: 12, color: 'rgb(130,135,165)' }}>{catLeads.length} lead{catLeads.length !== 1 ? 's' : ''}</span>
@@ -382,9 +398,10 @@ export default function LeadsPage() {
                       // Render sub-category sections
                       subCategoryGroups.map(({ sub, leads: subLeads }) => (
                         <div key={sub}>
-                          <div style={{ padding: '8px 18px 6px', background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, color: 'rgb(196,167,252)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{sub}</span>
-                            <span style={{ fontSize: 10, color: 'rgb(120,127,160)' }}>{subLeads.length} lead{subLeads.length !== 1 ? 's' : ''}</span>
+                          <div style={{ padding: '8px 18px 6px', background: `linear-gradient(90deg, ${col}12 0%, transparent 70%)`, borderTop: `1px solid ${col}20`, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ width: 3, height: 14, borderRadius: 2, background: col, display: 'inline-block', flexShrink: 0 }} />
+                            <span style={{ fontSize: 11, fontWeight: 700, color: col, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{sub}</span>
+                            <span style={{ fontSize: 10, color: 'rgb(120,127,160)', fontWeight: 500 }}>{subLeads.length} lead{subLeads.length !== 1 ? 's' : ''}</span>
                           </div>
                           <table className="w-full data-table" style={{ marginBottom: 0 }}>
                             <thead><tr style={{ background: 'rgba(255,255,255,0.01)' }}>
