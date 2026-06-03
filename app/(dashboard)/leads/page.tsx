@@ -38,6 +38,7 @@ export default function LeadsPage() {
   const [viewMode, setViewMode] = useState<'list' | 'category'>('category')
   const [collapsedCats, setCollapsedCats] = useState<Record<string, boolean>>({})
   const toggleCat = (cat: string) => setCollapsedCats(p => ({ ...p, [cat]: !p[cat] }))
+  const [activeCatFilter, setActiveCatFilter] = useState<string | null>(null)
   const [cleaning, setCleaning] = useState(false)
 
   // Archive existing leads whose name is a generic category, not a real company.
@@ -101,24 +102,47 @@ export default function LeadsPage() {
     l.pain_point?.toLowerCase().includes(search.toLowerCase())
   )
 
-  // Build category groups — each lead can appear in multiple categories.
+  // Build category groups.
+  // If a category pill is active → show ONLY that category (exclusive filter).
+  // Each lead appears in each of its categories when no filter is active.
   const DEFINED_CATS: string[] = [...CUSTOMER_CATEGORIES]
-  const categoryGroups: { cat: string; leads: Lead[] }[] = (() => {
+
+  // All unique top-level categories (for the pill strip)
+  const allCatGroups: { cat: string; leads: Lead[] }[] = (() => {
     const map: Record<string, Lead[]> = {}
     filteredLeads.forEach(l => {
       const cats = (l.customer_category || []).filter(Boolean)
-      if (cats.length === 0) {
-        (map['Uncategorised'] ??= []).push(l)
-      } else {
-        cats.forEach(c => { (map[c] ??= []).push(l) })
-      }
+      if (cats.length === 0) { (map['Uncategorised'] ??= []).push(l) }
+      else { cats.forEach(c => { (map[c] ??= []).push(l) }) }
     })
-    // Sort: defined categories first (in their canonical order), then the rest, then Uncategorised last.
-    const defined = DEFINED_CATS.filter(c => map[c as string])
+    const defined = DEFINED_CATS.filter(c => map[c as string]) as string[]
     const extra = Object.keys(map).filter(c => !DEFINED_CATS.includes(c) && c !== 'Uncategorised').sort()
-    const groups = [...defined as string[], ...extra]
+    const groups = [...defined, ...extra]
     if (map['Uncategorised']) groups.push('Uncategorised')
-    return groups.map(cat => ({ cat, leads: map[cat as string] }))
+    return groups.map(cat => ({ cat, leads: map[cat] }))
+  })()
+
+  // Visible groups — if a pill is selected, show only that one category.
+  // Within a selected category, group by industry_category (sub-categories).
+  const categoryGroups = activeCatFilter
+    ? allCatGroups.filter(g => g.cat === activeCatFilter)
+    : allCatGroups
+
+  // Sub-category groups for a selected category (grouped by industry_category)
+  const subCategoryGroups: { sub: string; leads: Lead[] }[] = (() => {
+    if (!activeCatFilter) return []
+    const inCategory = filteredLeads.filter(l =>
+      (l.customer_category || []).includes(activeCatFilter) ||
+      (activeCatFilter === 'Uncategorised' && !(l.customer_category || []).length)
+    )
+    const map: Record<string, Lead[]> = {}
+    inCategory.forEach(l => {
+      const sub = l.industry_category?.trim() || 'Other'
+      ;(map[sub] ??= []).push(l)
+    })
+    return Object.entries(map)
+      .sort((a, b) => b[1].length - a[1].length)
+      .map(([sub, leads]) => ({ sub, leads }))
   })()
 
   const updateLeadStatus = async (id: string, status: string) => {
@@ -294,20 +318,45 @@ export default function LeadsPage() {
             <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 999, background: '#a78bfa', display: 'inline-block' }} /> Kima target category</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 999, background: '#38bdf8', display: 'inline-block' }} /> Other category</span>
           </div>
-          {/* Summary strip */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-            {categoryGroups.map(({ cat, leads: catLeads }) => (
-              <button key={cat} onClick={() => toggleCat(cat)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgb(170,175,200)' }}>
-                <span style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: DEFINED_CATS.includes(cat) ? '#a78bfa' : '#38bdf8', display: 'inline-block' }} />
-                {cat.replace(' Customer', '')} <span style={{ color: '#a78bfa', fontWeight: 700 }}>{catLeads.length}</span>
-              </button>
-            ))}
+          {/* Category pill strip — click to filter exclusively to that category */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+            <button
+              onClick={() => setActiveCatFilter(null)}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 13px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${!activeCatFilter ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.08)'}`, background: !activeCatFilter ? 'rgba(167,139,250,0.15)' : 'rgba(255,255,255,0.03)', color: !activeCatFilter ? '#a78bfa' : 'rgb(150,155,185)' }}>
+              All
+            </button>
+            {allCatGroups.map(({ cat, leads: catLeads }) => {
+              const isActive = activeCatFilter === cat
+              const dotColor = DEFINED_CATS.includes(cat) ? '#a78bfa' : '#38bdf8'
+              return (
+                <button key={cat}
+                  onClick={() => setActiveCatFilter(isActive ? null : cat)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 13px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${isActive ? dotColor + '60' : 'rgba(255,255,255,0.08)'}`, background: isActive ? dotColor + '18' : 'rgba(255,255,255,0.03)', color: isActive ? dotColor : 'rgb(150,155,185)' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: 999, flexShrink: 0, background: dotColor, display: 'inline-block' }} />
+                  {cat.replace(' Customer', '')}
+                  <span style={{ fontWeight: 700, color: isActive ? dotColor : '#a78bfa' }}>{catLeads.length}</span>
+                </button>
+              )
+            })}
           </div>
+
+          {/* When a category is active and has sub-groups, show sub-category header */}
+          {activeCatFilter && subCategoryGroups.length > 0 && (
+            <div style={{ marginBottom: 12, padding: '10px 16px', borderRadius: 12, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.15)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{activeCatFilter.replace(' Customer', '')} sub-categories:</span>
+              {subCategoryGroups.map(({ sub, leads: sl }) => (
+                <span key={sub} style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 8, background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', color: 'rgb(196,167,252)' }}>
+                  {sub} · {sl.length}
+                </span>
+              ))}
+            </div>
+          )}
 
           {categoryGroups.map(({ cat, leads: catLeads }) => {
             const collapsed = collapsedCats[cat]
             const statusColors: Record<string, string> = { new: '#a78bfa', contacted: '#38bdf8', replied: '#fbbf24', meeting_booked: '#34d399', approved: '#34d399' }
+            // When filtered, render sub-category sections inside
+            const useSubGroups = activeCatFilter === cat && subCategoryGroups.length > 0
             return (
               <div key={cat} className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(22,22,34,0.8)' }}>
                 {/* Category header */}
@@ -329,6 +378,55 @@ export default function LeadsPage() {
 
                 {!collapsed && (
                   <div className="overflow-x-auto">
+                    {useSubGroups ? (
+                      // Render sub-category sections
+                      subCategoryGroups.map(({ sub, leads: subLeads }) => (
+                        <div key={sub}>
+                          <div style={{ padding: '8px 18px 6px', background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: 'rgb(196,167,252)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{sub}</span>
+                            <span style={{ fontSize: 10, color: 'rgb(120,127,160)' }}>{subLeads.length} lead{subLeads.length !== 1 ? 's' : ''}</span>
+                          </div>
+                          <table className="w-full data-table" style={{ marginBottom: 0 }}>
+                            <thead><tr style={{ background: 'rgba(255,255,255,0.01)' }}>
+                              <th className="text-left">Company</th><th className="text-left">Pain Point</th>
+                              <th className="text-left">Product</th><th className="text-left">Score</th>
+                              <th className="text-left">Status</th><th className="text-left">Actions</th>
+                            </tr></thead>
+                            <tbody>
+                              {subLeads.sort((a, b) => (b.lead_score || 0) - (a.lead_score || 0)).map(lead => (
+                                <tr key={lead.id}>
+                                  <td>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                      {lead.priority === 'excellent' && <span title="Excellent priority — score 85+"><Star size={11} style={{ color: '#a78bfa' }} /></span>}
+                                      <div>
+                                        <Link href={`/leads/${lead.id}`} className="text-sm font-medium text-white hover:text-violet-300 transition-colors">{lead.company_name}</Link>
+                                        {lead.website && <a href={lead.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs mt-0.5" style={{ color: 'rgb(100,100,120)' }} onClick={e => e.stopPropagation()}>{lead.website.replace(/^https?:\/\//, '').slice(0, 25)}<ExternalLink size={9} /></a>}
+                                        <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+                                          {lead.twitter_url && <a href={lead.twitter_url} target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8' }}><AtSign size={11} /></a>}
+                                          {lead.telegram_url && <a href={lead.telegram_url} target="_blank" rel="noopener noreferrer" style={{ color: '#22d3ee' }}><Send size={11} /></a>}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td><span className="text-xs" style={{ color: 'rgb(140,140,160)' }}>{lead.pain_point ? truncate(lead.pain_point, 55) : '—'}</span></td>
+                                  <td><span className="text-xs" style={{ color: 'rgb(160,160,180)' }}>{lead.product_to_sell ? truncate(lead.product_to_sell, 22) : '—'}</span></td>
+                                  <td>{lead.lead_score != null ? <span className={cn('badge', getScoreBg(lead.lead_score))}>{lead.lead_score}</span> : '—'}</td>
+                                  <td><span className={cn('badge', getStatusColor(lead.status))}>{getStatusLabel(lead.status)}</span></td>
+                                  <td>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                      <Link href={`/leads/${lead.id}`} className="btn btn-ghost p-1.5" title="View" style={{ padding: 5 }}><Eye size={13} /></Link>
+                                      {lead.status !== 'approved' && <button onClick={() => updateLeadStatus(lead.id, 'approved')} disabled={actionLoading === lead.id + 'approved'} className="btn btn-ghost p-1.5" title="Approve" style={{ padding: 5, color: '#34d399' }}>{actionLoading === lead.id + 'approved' ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle size={13} />}</button>}
+                                      {lead.status !== 'rejected' && <button onClick={() => updateLeadStatus(lead.id, 'rejected')} disabled={actionLoading === lead.id + 'rejected'} className="btn btn-ghost p-1.5" title="Reject" style={{ padding: 5, color: '#f87171' }}>{actionLoading === lead.id + 'rejected' ? <Loader2 size={13} className="animate-spin" /> : <XCircle size={13} />}</button>}
+                                      {lead.status !== 'reserved' && <button onClick={() => updateLeadStatus(lead.id, 'reserved')} disabled={actionLoading === lead.id + 'reserved'} className="btn btn-ghost p-1.5" title="Reserve for later" style={{ padding: 5, color: '#818cf8' }}>{actionLoading === lead.id + 'reserved' ? <Loader2 size={13} className="animate-spin" /> : <Clock size={13} />}</button>}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ))
+                    ) : (
                     <table className="w-full data-table" style={{ marginBottom: 0 }}>
                       <thead>
                         <tr style={{ background: 'rgba(255,255,255,0.015)' }}>
