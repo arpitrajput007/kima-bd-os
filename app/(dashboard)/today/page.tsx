@@ -20,7 +20,7 @@ type LeadWithContacts = Lead & { contacts?: Contact[] }
 
 // Statuses that mean "ready to reach out" — agent has researched, you haven't contacted yet
 const READY_STATUSES = ['new', 'researching', 'qualified', 'approved', 'needs_more_research']
-const DAILY_GOAL = 5
+const DAILY_GOAL_CAP = 30
 
 function bestContact(contacts?: Contact[]): Contact | null {
   if (!contacts || contacts.length === 0) return null
@@ -440,9 +440,15 @@ export default function TodayPage() {
 
   // ── Build today's plan ────────────────────────────────────────────────────
   const today = new Date(); today.setHours(0, 0, 0, 0)
+  const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
   // All researched leads you haven't reached out to yet (sorted by score from the query).
   const readyLeads = leads.filter(l => READY_STATUSES.includes(l.status))
+
+  // Leads that arrived in the last 24 hours — drives the dynamic daily goal.
+  const freshLeads = readyLeads.filter(l => new Date(l.created_at) >= last24h)
+  // Goal = however many fresh leads came in, capped at DAILY_GOAL_CAP. Never forced.
+  const DAILY_GOAL = Math.min(freshLeads.length, DAILY_GOAL_CAP)
   // Reserved leads (saved for later — too big right now)
   const reservedLeads = leads.filter(l => l.status === 'reserved')
   // Group EVERY un-contacted lead by the day it came in, newest day first — this is
@@ -539,14 +545,18 @@ export default function TodayPage() {
             </div>
             <div className="flex-1">
               <div className="text-[15px] font-bold text-white mb-1">
-                {goalHit
-                  ? `Daily goal smashed — ${contactedToday} reached out today 🔥`
-                  : `Reach out to ${DAILY_GOAL} leads today`}
+                {DAILY_GOAL === 0
+                  ? 'No fresh leads in the last 24h — run discovery'
+                  : goalHit
+                    ? `Daily goal smashed — ${contactedToday} reached out today 🔥`
+                    : `Reach out to ${DAILY_GOAL} fresh lead${DAILY_GOAL !== 1 ? 's' : ''} today`}
               </div>
               <div className="text-[12px] mb-3" style={{ color: 'rgb(130,135,165)' }}>
-                {goalHit
-                  ? 'You hit your target. Anything more is a bonus.'
-                  : `${contactedToday} of ${DAILY_GOAL} done · ${DAILY_GOAL - contactedToday} to go. The agent already did the research — you just hit send.`}
+                {DAILY_GOAL === 0
+                  ? 'Hit "Fetch fresh leads" above to pull new prospects from your sources.'
+                  : goalHit
+                    ? 'You cleared every fresh lead from the last 24h. Anything more is a bonus.'
+                    : `${contactedToday} of ${DAILY_GOAL} done · ${DAILY_GOAL - contactedToday} to go · based on last 24h of discovery`}
               </div>
               <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
                 <div className="h-full rounded-full transition-all duration-700"
