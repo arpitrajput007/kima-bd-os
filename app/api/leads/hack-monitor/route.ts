@@ -7,6 +7,11 @@ import { toDomain } from '@/lib/apollo'
 import { extractSocials } from '@/lib/utils'
 import Exa from 'exa-js'
 
+// Scraping rekt.news + Exa + OpenAI extraction takes well over 10s.
+// Without this the function is killed before saving any hacked-protocol leads.
+export const maxDuration = 300
+export const dynamic = 'force-dynamic'
+
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
