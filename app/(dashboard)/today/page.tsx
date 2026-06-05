@@ -291,7 +291,7 @@ export default function TodayPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [fetching, setFetching] = useState(false)
   const [hackFetching, setHackFetching] = useState(false)
-  const [bgJob, setBgJob] = useState<{ status: string; sources_done: number; sources_total: number; leads_saved: number } | null>(null)
+  const [bgJob, setBgJob] = useState<{ status: string; sources_done: number; sources_total: number; leads_saved: number; current_source?: string } | null>(null)
   const [contactingLead, setContactingLead] = useState<LeadWithContacts | null>(null)
 
   // Poll for background job status (runs even if user navigates away and comes back).
@@ -312,18 +312,46 @@ export default function TodayPage() {
   // On mount: check if a job is already running from a previous session.
   useEffect(() => { pollJob() }, [pollJob])
 
-  // Fire server-side discovery — returns immediately, runs in background.
+  // Chain discover calls source-by-source from the frontend.
+  // Each /api/ai/discover call = 1 source = fits within Vercel's 60s limit.
+  // Total run time scales with number of sources but quality is never sacrificed.
   const fetchFreshLeads = async () => {
     setFetching(true)
     try {
-      const res = await fetch('/api/leads/run-all-sources', { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) { toast.error(data.error || 'Failed to start'); return }
-      toast.success(`Discovery started across ${data.sources} sources — you can navigate away, it runs in the background`)
-      setBgJob({ status: 'running', sources_done: 0, sources_total: data.sources, leads_saved: 0 })
-      pollJob() // start polling
+      const { data: sources, error } = await supabase
+        .from('sources')
+        .select('id, source_name')
+        .eq('status', 'active')
+        .not('source_url_or_query', 'is', null)
+      if (error || !sources?.length) {
+        toast.error('No active sources. Add some in Discovery Sources.')
+        return
+      }
+      setBgJob({ status: 'running', sources_done: 0, sources_total: sources.length, leads_saved: 0, current_source: sources[0].source_name })
+      let totalSaved = 0
+      for (let i = 0; i < sources.length; i++) {
+        const src = sources[i]
+        setBgJob({ status: 'running', sources_done: i, sources_total: sources.length, leads_saved: totalSaved, current_source: src.source_name })
+        try {
+          const res = await fetch('/api/ai/discover', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source_id: src.id }),
+          })
+          const data = await res.json()
+          totalSaved += data.saved || 0
+        } catch { /* one failing source should not abort the rest */ }
+        setBgJob({ status: 'running', sources_done: i + 1, sources_total: sources.length, leads_saved: totalSaved, current_source: src.source_name })
+      }
+      setBgJob(null)
+      if (totalSaved > 0) {
+        toast.success(`Discovery complete — ${totalSaved} new lead${totalSaved !== 1 ? 's' : ''} added`)
+        loadData()
+      } else {
+        toast('Discovery complete — no new leads found (all already in pipeline or below quality threshold)')
+      }
     } catch {
-      toast.error('Failed to start discovery')
+      toast.error('Discovery failed')
     } finally {
       setFetching(false)
     }
@@ -492,8 +520,11 @@ export default function TodayPage() {
       {bgJob && bgJob.status === 'running' && (
         <div style={{ margin: '0 36px', padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(56,189,248,0.25)', background: 'rgba(56,189,248,0.06)', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
           <Loader2 size={14} className="animate-spin" color="#38bdf8" style={{ flexShrink: 0 }} />
-          <span style={{ color: '#38bdf8', fontWeight: 600 }}>Discovery running in background</span>
-          <span style={{ color: 'rgb(150,155,185)' }}>· {bgJob.sources_done}/{bgJob.sources_total} sources · {bgJob.leads_saved} leads found — you can switch tabs freely</span>
+          <span style={{ color: '#38bdf8', fontWeight: 600 }}>Discovery running</span>
+          <span style={{ color: 'rgb(150,155,185)' }}>
+            {bgJob.current_source ? ` · ${bgJob.current_source}` : ''}
+            {' '}· {bgJob.sources_done}/{bgJob.sources_total} sources · {bgJob.leads_saved} leads found
+          </span>
         </div>
       )}
 

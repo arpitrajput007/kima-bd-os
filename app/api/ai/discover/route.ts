@@ -311,47 +311,63 @@ Return ONLY valid JSON. No markdown.${learnedIntelligence || ''}`,
         },
         {
           role: 'user',
-          content: `Do a full BD research on this company for Kima/Aeredium:
+          content: `Do a deep BD research on this company for Kima/Aeredium:
 
 Company: ${company.name}
 Website: ${company.website || 'unknown'}
 Description: ${company.description}${hunterContext}
 
+PAIN POINT RULES — be specific, not generic:
+- Do NOT write "they need faster settlement" or "they face cross-chain challenges". Anyone can write that.
+- DO write the SPECIFIC pain: what exact product/feature breaks, what exact cost/risk/delay they face, what specific incident or architecture choice creates the vulnerability. Cite real facts about this company.
+- For hacked protocols: name the exploit type, the amount lost, the exact vulnerability (bridge verifier set, oracle, relayer, smart-contract bug).
+- For LayerZero users: explain what specific cross-chain flows they run and why bridge failure is existential for them.
+- For Fireblocks users: what custody/signing limitation blocks their growth.
+- pain_point_severity = critical only if there is a real incident or a blocking architectural dependency.
+
+CONTACT RULES — find the REAL decision maker, not a generic title:
+- Priority 1: Head of BD / VP Partnerships / Head of Growth — this person signs integration deals.
+- Priority 2: CTO / VP Engineering / Head of Protocol — needs to evaluate technical fit.
+- Priority 3: CEO / Co-Founder — for companies < 100 people, this person often owns BD.
+- For each contact: if you know their real name (from public LinkedIn, press releases, Twitter) use it. Otherwise say null — do NOT fabricate names.
+- linkedin_hint must be specific enough to find the exact person: "FirstName LastName CompanyName Title" — NOT just "Head of BD at CompanyName".
+- why_this_person must explain the specific buying authority, not just the title.
+
 Return this exact JSON:
 {
   "is_specific_real_company": true,
-  "industry_category": "one industry category",
+  "industry_category": "one specific industry category",
   "customer_category": ["array — pick from: Agentic Payments Customer, LayerZero Customer, Hacked Protocol, Needs On/Off Ramp, Fireblocks Customer, Web2 Stablecoin Settlement Customer, Other"],
-  "product_to_sell": "best Kima product pitch for this company",
+  "product_to_sell": "the single most relevant Kima/Aeredium product for this company and WHY",
   "region": "their primary market region",
-  "company_summary": "2-3 sentence summary of what they do",
-  "business_model": "how they make money",
-  "supported_chains_or_rails": "blockchains or payment rails they use",
-  "current_providers": "known payment/bridge/settlement providers they currently use",
-  "pain_point": "single most important pain point Kima solves for them",
+  "company_summary": "3-4 sentence summary: what they do, how big, what stack they use, what stage they're at",
+  "business_model": "how they specifically make money",
+  "supported_chains_or_rails": "exact blockchains or payment rails they currently use",
+  "current_providers": "specific known payment/bridge/settlement providers they currently use (Fireblocks, LayerZero, Wormhole, etc.)",
+  "pain_point": "THE specific pain point — one crisp sentence with a concrete fact, not a generic statement",
   "pain_point_severity": "critical|high|medium|low",
-  "pain_point_evidence": "specific evidence/quote/reasoning. If from a real article, paste the exact quote. If inferred from their tech stack or category, explain the reasoning.",
-  "pain_point_source_url": "EXACT URL to the article, blog post, tweet, hack report, or official announcement that proves this pain point. Empty string if no real URL exists (i.e. evidence is reasoning only).",
-  "pain_point_evidence_type": "verified_source if pain_point_source_url is a real article/news/post that explicitly mentions this pain | agent_analysis if you reasoned from publicly known facts (their tech stack, business model, hack history) | inferred if it's general industry knowledge with no specific backing",
-  "kima_fit": "exactly how Kima helps this company",
-  "suggested_use_case": "specific Kima use case to pitch",
-  "aeredium_fit": "how Aeredium strengthens the pitch",
-  "trigger_reason": "why is NOW a good time to reach out? funding, expansion, hack, etc.",
-  "source_url": "the exact, specific URL (news article, funding announcement, blog post, tweet) that best evidences the trigger_reason — must be a full link to a specific page, NOT a homepage. Use null if you don't have a specific real URL.",
-  "settlement_angle": "how Kima improves their settlement",
-  "integration_feasibility": "high|medium|low",
-  "revenue_potential": "estimated business impact for them",
+  "pain_point_evidence": "concrete evidence: exact quote, hack amount + date, specific architectural dependency, or named product limitation. Must reference a real, specific fact about THIS company.",
+  "pain_point_source_url": "EXACT full URL to the article/post/announcement proving the pain point. Empty string only if no real URL exists.",
+  "pain_point_evidence_type": "verified_source|agent_analysis|inferred",
+  "kima_fit": "exactly how Kima's specific product solves their specific pain — not generic, tie it to their stack",
+  "suggested_use_case": "the precise Kima integration to pitch (e.g. 'replace LayerZero bridge with Kima UPR for cross-chain USDC settlement between Arbitrum and Solana')",
+  "aeredium_fit": "how Aeredium's TEE validators / AERKey / AERLink specifically addresses their trust or compliance gap",
+  "trigger_reason": "why reach out NOW — a specific recent event (funding announced, product launch, hire, hack, regulatory news, conference). Must be datable and real.",
+  "source_url": "exact URL to the trigger event (news article, blog post, funding announcement). NOT a homepage. null if no specific URL.",
+  "settlement_angle": "the exact settlement improvement Kima delivers for their specific flow",
+  "integration_feasibility": "high|medium|low — with one sentence of reasoning",
+  "revenue_potential": "realistic ARR estimate for Kima based on their volume/scale",
   "lead_score": 0,
   "priority": "excellent|qualified|needs_research|low_priority",
-  "score_reasoning": "why this exact score",
+  "score_reasoning": "2-3 sentences explaining the exact score: what drives it up and what limits it",
   "contacts": [
     {
-      "role": "ideal title to contact (e.g. Head of Partnerships, CTO, CEO)",
-      "name": "real name if publicly known, or null",
-      "linkedin_hint": "search query to find them on LinkedIn (e.g. John Smith Acme DeFi Head of BD)",
-      "twitter_hint": "their Twitter/X handle or a search term to find them",
+      "role": "exact title of the ideal person to contact",
+      "name": "real full name if publicly known (from LinkedIn/press/Twitter), or null — never fabricate",
+      "linkedin_hint": "FirstName LastName CompanyName Title — specific enough to find one person",
+      "twitter_hint": "their exact @handle if known, or null",
       "email_pattern": "firstname@${domain || 'company.com'}",
-      "why_this_person": "why this is the right person to contact",
+      "why_this_person": "specific reason they own the buying decision for a Kima/Aeredium integration",
       "contact_confidence": "high|medium|low"
     }
   ]
@@ -359,8 +375,8 @@ Return this exact JSON:
         },
       ],
       response_format: { type: 'json_object' },
-      temperature: 0.3,
-      max_tokens: 3000,
+      temperature: 0.2,
+      max_tokens: 4000,
     })
     return JSON.parse(completion.choices[0].message.content || '{}')
   } catch (e) {
@@ -445,7 +461,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Apollo API key not configured. Add APOLLO_API_KEY to your environment.' }, { status: 400 })
       }
       const q = sourceQuery.replace(/^apollo:/i, '').trim()
-      companies = await apolloSearchCompanies(q, 8)
+      companies = await apolloSearchCompanies(q, 12)
       if (!companies.length) {
         return NextResponse.json({ error: 'Apollo returned no companies for that query — try different keywords.' }, { status: 400 })
       }
@@ -455,16 +471,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'EXA_API_KEY not configured.' }, { status: 400 })
       }
       const { exaFindSimilar } = await import('@/lib/exa')
-      const similar = await exaFindSimilar(sourceQuery, 8)
+      const similar = await exaFindSimilar(sourceQuery, 12)
       companies = similar
       if (!companies.length) {
         return NextResponse.json({ error: 'Exa could not find similar companies for that URL.' }, { status: 400 })
       }
     } else if (source.source_type === 'exa_search' || (!sourceQuery.startsWith('http') && exaConfigured())) {
       // Exa neural search — semantically finds real companies matching the query.
-      // Returns companies directly (no page-scraping + AI extraction needed).
-      // Cap at 8 so deep-research finishes within Vercel Hobby's 60s timeout.
-      companies = await exaSearchCompanies(sourceQuery, 8)
+      companies = await exaSearchCompanies(sourceQuery, 12)
       if (!companies.length) {
         return NextResponse.json({ error: 'Exa returned no companies for that query — try different keywords.' }, { status: 400 })
       }
@@ -630,31 +644,68 @@ export async function POST(req: NextRequest) {
         .single()
 
       if (!leadErr && newLead) {
-        // Verify the AI's named contacts against Apollo to attach REAL titles,
-        // LinkedIn and verified work emails (no personal-email reveal → credit-safe).
+        // Contact strategy (quality-first, three-tier):
+        //
+        // Tier 1 — Apollo people search by domain + seniority (real people, real titles,
+        //          verified emails). Best quality; works even when we don't know names.
+        // Tier 2 — Apollo person-match on AI-suggested names (enriches known names with
+        //          verified email + LinkedIn).
+        // Tier 3 — AI-guessed contacts (LinkedIn search URL + email pattern). Fallback only.
+        const { apolloSearchPeople } = await import('@/lib/apollo')
         const domain = toDomain(website)
         const aiContacts = (research.contacts as Record<string, string>[]) || []
-        const apolloContacts = domain
-          ? await apolloEnrichContacts(domain, company.name, aiContacts.map(c => ({ name: c.name, role: c.role })))
-          : []
 
-        if (apolloContacts.length > 0) {
-          for (const c of apolloContacts.slice(0, 3)) {
-            await supabase.from('contacts').insert({
+        // BD-relevant seniority signals to filter Apollo results
+        const BD_ROLES = ['partnerships', 'business development', 'bd ', 'growth', 'cto', 'coo', 'chief technology', 'chief operating', 'vp eng', 'head of eng', 'founder', 'co-founder', 'ceo', 'chief executive']
+
+        let contactsSaved = 0
+
+        // Tier 1: Apollo people search
+        if (domain && contactsSaved === 0) {
+          const apolloPeople = await apolloSearchPeople(company.name, domain)
+          const bdPeople = apolloPeople
+            .filter(p => BD_ROLES.some(r => p.title?.toLowerCase().includes(r)))
+            .slice(0, 3)
+          const toInsert = bdPeople.length > 0 ? bdPeople : apolloPeople.slice(0, 2)
+          for (const c of toInsert) {
+            const { error: ce } = await supabase.from('contacts').insert({
               lead_id: newLead.id,
               name: c.name,
               role: c.title || 'Decision maker',
               company: company.name,
-              linkedin_url: c.linkedin_url,
-              email: c.email,
+              linkedin_url: c.linkedin_url || null,
+              email: c.email || null,
               contact_confidence: c.email ? 'high' : 'medium',
-              reason_this_person: `Verified via Apollo${c.seniority ? ` · ${c.seniority}` : ''}${c.title ? ` · ${c.title}` : ''}`,
+              reason_this_person: `Found via Apollo people search${c.seniority ? ` · ${c.seniority}` : ''}${c.title ? ` · ${c.title}` : ''}`,
             })
+            if (!ce) contactsSaved++
           }
-        } else {
-          // Fallback: AI-suggested contacts (guessed patterns).
-          const contacts = (research.contacts as Record<string, string>[]) || []
-          for (const contact of contacts.slice(0, 3)) {
+        }
+
+        // Tier 2: Enrich AI-named contacts via Apollo (adds email + LinkedIn to known names)
+        if (contactsSaved === 0 && domain) {
+          const namedAiContacts = aiContacts.filter(c => c.name && !/^null$/i.test(String(c.name)))
+          const apolloEnriched = namedAiContacts.length > 0
+            ? await apolloEnrichContacts(domain, company.name, namedAiContacts.map(c => ({ name: c.name, role: c.role })))
+            : []
+          for (const c of apolloEnriched.slice(0, 3)) {
+            const { error: ce } = await supabase.from('contacts').insert({
+              lead_id: newLead.id,
+              name: c.name,
+              role: c.title || 'Decision maker',
+              company: company.name,
+              linkedin_url: c.linkedin_url || null,
+              email: c.email || null,
+              contact_confidence: c.email ? 'high' : 'medium',
+              reason_this_person: `Verified via Apollo name-match${c.seniority ? ` · ${c.seniority}` : ''}`,
+            })
+            if (!ce) contactsSaved++
+          }
+        }
+
+        // Tier 3: AI-suggested contacts (LinkedIn search URL + guessed email pattern)
+        if (contactsSaved === 0) {
+          for (const contact of aiContacts.slice(0, 3)) {
             const linkedinUrl = contact.linkedin_hint
               ? `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(contact.linkedin_hint)}`
               : null
@@ -663,15 +714,15 @@ export async function POST(req: NextRequest) {
                 ? contact.twitter_hint
                 : `https://x.com/search?q=${encodeURIComponent(contact.twitter_hint)}`
               : null
-
             await supabase.from('contacts').insert({
               lead_id: newLead.id,
               name: contact.name || null,
               role: contact.role,
+              company: company.name,
               linkedin_url: linkedinUrl,
               twitter_url: twitterUrl,
               email: contact.email_pattern || null,
-              contact_confidence: contact.contact_confidence,
+              contact_confidence: contact.contact_confidence || 'low',
               reason_this_person: contact.why_this_person,
             })
           }
