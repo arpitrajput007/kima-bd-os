@@ -1,9 +1,8 @@
-import OpenAI from 'openai'
+import { claudeJSON, claudeText, CLAUDE_RESEARCH } from "@/lib/claude"
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { PRODUCT_BRAIN } from '@/lib/kima-knowledge'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -63,18 +62,7 @@ Return JSON:
 }`
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.4,
-      max_tokens: 3000,
-    })
-
-    const result = JSON.parse(completion.choices[0].message.content || '{}')
+    const result = await claudeJSON({ model: CLAUDE_RESEARCH, system: systemPrompt, user: userPrompt, maxTokens: 3000, temperature: 0.4 })
 
     // Save report to DB
     const { data: report } = await supabase.from('learning_reports').insert({

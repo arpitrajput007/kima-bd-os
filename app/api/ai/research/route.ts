@@ -1,8 +1,7 @@
-import OpenAI from 'openai'
+import { claudeJSON, claudeText, CLAUDE_RESEARCH } from "@/lib/claude"
 import { NextRequest, NextResponse } from 'next/server'
 import { PRODUCT_BRAIN } from '@/lib/kima-knowledge'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 async function getHunterContacts(website: string): Promise<string> {
   if (!process.env.HUNTER_API_KEY || !website) return ''
@@ -218,18 +217,7 @@ Return JSON:
 }`
     }
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.3,
-      max_tokens: 2000,
-    })
-
-    const result = JSON.parse(completion.choices[0].message.content || '{}')
+    const result = await claudeJSON({ model: CLAUDE_RESEARCH, system: systemPrompt, user: userPrompt, maxTokens: 2000, temperature: 0.3 })
     return NextResponse.json({ success: true, data: result })
 
   } catch (err: unknown) {

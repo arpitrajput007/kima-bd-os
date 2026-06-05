@@ -1,9 +1,8 @@
-import OpenAI from 'openai'
+import { claudeJSON, claudeText, CLAUDE_RESEARCH } from "@/lib/claude"
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { FULL_BRAIN } from '@/lib/kima-knowledge'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -107,29 +106,23 @@ function chunkText(text: string, chunkSize = 12000): string[] {
   return chunks.filter(c => c.length > 50)
 }
 
-// Analyze image via GPT-4o vision
+// Analyze image via Claude vision
 async function analyzeImage(base64Image: string, mimeType: string): Promise<string> {
   try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image_url',
-              image_url: { url: `data:${mimeType};base64,${base64Image}`, detail: 'high' },
-            },
-            {
-              type: 'text',
-              text: 'Please extract and describe ALL text, data, tables, charts, and visual information in this image in full detail. This will be used for BD intelligence analysis. Include every company name, metric, product feature, market data, pricing, or competitive information visible. Be exhaustive.',
-            },
-          ],
-        },
-      ],
+    const Anthropic = (await import('@anthropic-ai/sdk')).default
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    const response = await client.messages.create({
+      model: 'claude-opus-4-5',
       max_tokens: 4096,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp', data: base64Image } },
+          { type: 'text', text: 'Please extract and describe ALL text, data, tables, charts, and visual information in this image in full detail. This will be used for BD intelligence analysis. Include every company name, metric, product feature, market data, pricing, or competitive information visible. Be exhaustive.' },
+        ],
+      }],
     })
-    return completion.choices[0].message.content || ''
+    return response.content[0].type === 'text' ? response.content[0].text : ''
   } catch (e) {
     console.error('[analyzeImage]', e)
     return ''
@@ -142,28 +135,19 @@ async function analyzeImage(base64Image: string, mimeType: string): Promise<stri
 // 2. Merge summaries into a final synthesis
 async function summarizeChunk(chunk: string, chunkIndex: number, totalChunks: number, sourceName: string): Promise<string> {
   try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a BD intelligence extractor for Kima (cross-chain settlement) and Aeredium (TEE blockchain). 
+    return await claudeText({
+      model: CLAUDE_RESEARCH,
+      maxTokens: 2000,
+      temperature: 0.2,
+      system: `You are a BD intelligence extractor for Kima (cross-chain settlement) and Aeredium (TEE blockchain).
 Extract all BD-relevant information: company names, pain points, market data, competitive signals, funding info, product details, payment/settlement needs.
 This is chunk ${chunkIndex + 1} of ${totalChunks} from "${sourceName}".
 Be thorough and specific. Return plain text, no JSON.`,
-        },
-        {
-          role: 'user',
-          content: `Extract all BD-relevant intelligence from this section:\n\n${chunk}`,
-        },
-      ],
-      temperature: 0.2,
-      max_tokens: 2000,
+      user: `Extract all BD-relevant intelligence from this section:\n\n${chunk}`,
     })
-    return completion.choices[0].message.content || ''
   } catch (e) {
     console.error(`[summarizeChunk ${chunkIndex}]`, e)
-    return chunk.slice(0, 1000) // fallback: raw text
+    return chunk.slice(0, 1000)
   }
 }
 
@@ -183,24 +167,19 @@ async function synthesizeKnowledge(
   new_sources: Array<{ source_name: string; source_type: string; source_url_or_query: string; target_industry_category: string; target_customer_category: string; notes: string }>
   raw_knowledge: string
 }> {
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [
-      {
-        role: 'system',
-        content: `You are the intelligence synthesis engine for the Kima BD OS. 
+  try {
+    return await claudeJSON({
+      model: CLAUDE_RESEARCH,
+      maxTokens: 4000,
+      temperature: 0.3,
+      system: `You are the intelligence synthesis engine for the Kima BD OS.
 Your job is to extract actionable BD intelligence from any content and convert it into structured knowledge, agent rules, and discovery sources.
 
 ${KIMA_CONTEXT}
 
 EXISTING AGENT RULES (do not duplicate these):
-${existingRules || 'None yet.'}
-
-Return ONLY valid JSON. No markdown. Be specific and actionable.`,
-      },
-      {
-        role: 'user',
-        content: `Analyze this content from "${sourceName}" (type: ${sourceType}) and extract BD intelligence for Kima/Aeredium:
+${existingRules || 'None yet.'}`,
+      user: `Analyze this content from "${sourceName}" (type: ${sourceType}) and extract BD intelligence for Kima/Aeredium:
 
 CONTENT:
 ${content}
@@ -210,47 +189,13 @@ Extract and return this exact JSON structure:
   "title": "Short descriptive title for what was learned (max 10 words)",
   "summary": "2-3 sentence summary of the key BD intelligence extracted",
   "knowledge_type": "one of: icp_signal | competitor_intel | market_trend | product_context | outreach_strategy | source_directory | general",
-  "tags": ["array of 2-5 relevant tags like: 'icp', 'competitor', 'outreach', 'market', 'product', 'ramp', 'defi', 'web2', etc"],
+  "tags": ["array of 2-5 relevant tags"],
   "insights": ["array of 3-8 specific, actionable insight strings extracted"],
-  "new_rules": [
-    {
-      "rule_type": "prioritize | reject | score_boost | score_penalty | outreach_style | source_preference",
-      "rule": "specific rule text based on insights from this content",
-      "weight": 0
-    }
-  ],
-  "new_sources": [
-    {
-      "source_name": "descriptive name for this source",
-      "source_type": "website | google_search | twitter_profile | linkedin_company | telegram_group | rss_feed | defillama_category | crunchbase_list | ecosystem_directory | hackathon_directory | news_source | manual_list",
-      "source_url_or_query": "exact URL or search query string",
-      "target_industry_category": "comma-separated industry categories",
-      "target_customer_category": "comma-separated customer categories from our ICP list",
-      "notes": "why this source is relevant"
-    }
-  ],
-  "raw_knowledge": "Full synthesis of all BD-relevant knowledge from this content, written as detailed notes for the agent. Be thorough — 200-500 words."
-}
-
-Rules for new_rules:
-- Only create rules that add NEW value not already in existing rules
-- Weight: prioritize/score_boost use +5 to +25, reject/score_penalty use -5 to -25, outreach_style/source_preference use 0
-- Be specific and actionable, not generic
-- Create 1-4 rules maximum
-
-Rules for new_sources:
-- Only include if the content references specific URLs, directories, or search patterns worth monitoring
-- Leave empty array [] if no new sources are evident
-- Maximum 3 new sources`,
-      },
-    ],
-    response_format: { type: 'json_object' },
-    temperature: 0.3,
-    max_tokens: 4000,
-  })
-
-  try {
-    return JSON.parse(completion.choices[0].message.content || '{}')
+  "new_rules": [{ "rule_type": "prioritize | reject | score_boost | score_penalty | outreach_style | source_preference", "rule": "specific rule text", "weight": 0 }],
+  "new_sources": [{ "source_name": "name", "source_type": "exa_search|exa_similar|website", "source_url_or_query": "URL or query", "target_industry_category": "categories", "target_customer_category": "categories", "notes": "why relevant" }],
+  "raw_knowledge": "Full synthesis — 200-500 words of BD-relevant notes for the agent."
+}`,
+    })
   } catch (e) {
     console.error('[synthesizeKnowledge parse error]', e)
     return {

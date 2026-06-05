@@ -1,8 +1,8 @@
-import OpenAI from 'openai'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { PRODUCT_BRAIN_COMPACT } from '@/lib/kima-knowledge'
 import { exaConfigured, exaCompanyNews } from '@/lib/exa'
+import { claudeJSON, CLAUDE_RESEARCH } from '@/lib/claude'
 import { toDomain } from '@/lib/apollo'
 import { extractSocials } from '@/lib/utils'
 import Exa from 'exa-js'
@@ -12,7 +12,6 @@ import Exa from 'exa-js'
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -70,19 +69,14 @@ async function extractHacks(content: string): Promise<Array<{
 }>> {
   try {
     const since = new Date(Date.now() - HACK_DAYS * 86400000).toISOString().split('T')[0]
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a DeFi security analyst extracting hacked protocol leads for Kima/Aeredium BD.
+    const result = await claudeJSON<{ hacks: Array<{ name: string; website: string; hack_date: string; amount_lost: string; hack_type: string; description: string; source_url: string }> }>({
+      model: CLAUDE_RESEARCH,
+      maxTokens: 2000,
+      temperature: 0.1,
+      system: `You are a DeFi security analyst extracting hacked protocol leads for Kima/Aeredium BD.
 ${PRODUCT_BRAIN_COMPACT}
-Kima is positioned as a secure, TEE-backed settlement layer — the antidote to bridge exploits and cross-chain security failures.
-Return ONLY valid JSON.`,
-        },
-        {
-          role: 'user',
-          content: `Extract hacked DeFi protocols from this content. Only include hacks that happened AFTER ${since}.
+Kima is positioned as a secure, TEE-backed settlement layer — the antidote to bridge exploits and cross-chain security failures.`,
+      user: `Extract hacked DeFi protocols from this content. Only include hacks that happened AFTER ${since}.
 Focus on: bridge exploits, cross-chain hacks, payment rail vulnerabilities, settlement failures, custody breaches.
 Skip: purely NFT/GameFi hacks with no payment/bridge angle, rug pulls, scams (not hacks).
 
@@ -103,13 +97,7 @@ Return JSON:
     }
   ]
 }`,
-        },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.1,
-      max_tokens: 2000,
     })
-    const result = JSON.parse(completion.choices[0].message.content || '{"hacks":[]}')
     return Array.isArray(result.hacks) ? result.hacks : []
   } catch { return [] }
 }

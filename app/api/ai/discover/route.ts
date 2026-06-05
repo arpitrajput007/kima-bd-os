@@ -1,4 +1,3 @@
-import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { PRODUCT_BRAIN, PRODUCT_BRAIN_COMPACT } from '@/lib/kima-knowledge'
@@ -7,8 +6,7 @@ import { apolloConfigured, apolloEnrichContacts, apolloSearchCompanies, toDomain
 import { isGenericName } from '@/lib/leadQuality'
 import { exaConfigured, exaSearchCompanies, exaCompanyNews } from '@/lib/exa'
 import { perplexityConfigured, researchCompanyTrigger } from '@/lib/perplexity'
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+import { claudeJSON, claudeConfigured, CLAUDE_RESEARCH, CLAUDE_FAST } from '@/lib/claude'
 
 // Deep research (OpenAI + Exa + crawling) per company is slow. Without this the
 // function hits Vercel's default timeout and gets killed before saving leads.
@@ -194,12 +192,11 @@ async function extractCompanies(
   sourceContext: string
 ): Promise<Array<{ name: string; website: string; description: string; source_url: string }>> {
   try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a BD researcher for Kima and Aeredium.
+    const result = await claudeJSON<{ companies: Array<{ name: string; website: string; description: string; source_url: string }> }>({
+      model: CLAUDE_FAST,
+      maxTokens: 2000,
+      temperature: 0.2,
+      system: `You are a BD researcher for Kima and Aeredium.
 
 ${PRODUCT_BRAIN_COMPACT}
 
@@ -209,43 +206,31 @@ CRITICAL — every "name" MUST be a single real company you could google and lan
 - GOOD (real companies): "Bybit", "Coinbase", "Binance", "Circle", "MetaMask", "Fireblocks", "JPMorgan", "Revolut", "Stripe", "Ripple".
 - BANNED (categories / segments / groupings — NEVER output these as a name): "Crypto Exchanges", "Banks", "Exchanges", "Stablecoin Issuers", "Lending Platforms", "Custody", "Wallets", "DEXs", "Payment Companies", "RWA Platforms", "Neobanks", "Bridges", "Cross-border Payment Providers", "Fintechs".
 
-EXPAND CATEGORIES INTO REAL COMPANIES (very important):
-- If the content (or the source/search topic) points at a CATEGORY like "crypto exchanges" or "banks", DO NOT return the category. Instead, name the specific, real, well-known companies in that segment that best fit Kima/Aeredium's ICP.
-  · "crypto exchanges" → Binance, Bybit, OKX, Kraken, Bitget, KuCoin, Coinbase
-  · "banks" → JPMorgan, Standard Chartered, DBS Bank, BBVA, Santander, HSBC
+EXPAND CATEGORIES INTO REAL COMPANIES:
+- If the content points at a CATEGORY, expand it into specific real companies that best fit Kima/Aeredium's ICP.
+  · "crypto exchanges" → Binance, Bybit, OKX, Kraken, Bitget, KuCoin
+  · "banks" → JPMorgan, Standard Chartered, DBS Bank, BBVA, HSBC
   · "wallets" → MetaMask, Trust Wallet, Phantom, Rabby
   · "stablecoin issuers" → Circle, Tether, Paxos, Ethena
-- Only name companies that genuinely exist. Each must be a real brand with a findable website.
-
-Quality bar: it is far better to return 5 real, correctly-named companies than 15 vague ones. If you truly cannot name any real company, return an empty list — but prefer naming the real market leaders/best-fit players in the relevant segment.
-
-Return ONLY valid JSON. No markdown.`,
-        },
-        {
-          role: 'user',
-          content: `Source: ${sourceContext}
+- Only name companies that genuinely exist with a findable website.
+- Return 5 high-quality real companies rather than 15 vague ones.`,
+      user: `Source: ${sourceContext}
 
 Content:
 ${content}
 
-Return up to 15 SPECIFIC, REAL, NAMED companies. If the source points at a category, expand it into the actual best-fit named companies (see rules above). Never output a category/segment as a name. Return JSON:
+Return up to 15 SPECIFIC, REAL, NAMED companies. Never output a category/segment as a name. Return JSON:
 {
   "companies": [
     {
-      "name": "The specific company's real brand name (a proper noun like 'Bybit' or 'JPMorgan', NEVER a category like 'Crypto Exchanges')",
-      "website": "https://<the company's real domain> — required; give your best real guess (e.g. https://www.bybit.com) rather than leaving blank",
-      "description": "1-2 sentence description of what this specific company actually does",
-      "source_url": "the EXACT link from the content that is specifically about THIS company, copied verbatim. Empty string if none."
+      "name": "Real brand name (e.g. 'Bybit', 'JPMorgan') — NEVER a category",
+      "website": "https://<real domain>",
+      "description": "1-2 sentence description of what this company does",
+      "source_url": "EXACT link from content about this company, or empty string"
     }
   ]
 }`,
-        },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.2,
-      max_tokens: 2000,
     })
-    const result = JSON.parse(completion.choices[0].message.content || '{"companies":[]}')
     return Array.isArray(result.companies) ? result.companies : []
   } catch (e) {
     console.error('[extractCompanies]', e)
@@ -291,27 +276,22 @@ async function deepResearch(
     const hunterData = await getHunterContacts(company.website)
     const hunterContext = hunterData ? `\nVerified emails from Hunter.io database:\n${hunterData}\nSelect the most relevant BD contacts from this list if any, otherwise guess patterns.` : ''
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a senior BD researcher for Kima and Aeredium.
+    return await claudeJSON({
+      model: CLAUDE_RESEARCH,
+      maxTokens: 4000,
+      temperature: 0.2,
+      system: `You are a senior BD researcher for Kima and Aeredium.
 
 ${PRODUCT_BRAIN}
 
-FIRST, validate the input is a REAL, SPECIFIC company (a brand you can google to one company's site like "Bybit", "JPMorgan", "Circle") and NOT a generic category/segment ("Crypto Exchanges", "Banks", "Fintechs", "Infrastructure", "AI", "RWA Platforms", "Analytics Platforms", "Payments", "Wallets"). If it is a category and not a real single company, set "is_specific_real_company": false and you may leave other fields minimal.
+FIRST, validate the input is a REAL, SPECIFIC company (a brand you can google to one company's site like "Bybit", "JPMorgan", "Circle") and NOT a generic category/segment ("Crypto Exchanges", "Banks", "Fintechs", "Infrastructure", "AI", "RWA Platforms"). If it is a category, set "is_specific_real_company": false and leave other fields minimal.
 
 SCORING (0-100):
 High score (70+): clear pain point, active product, matches a target category, decision maker findable
 Medium (40-69): possible fit but unclear pain point or no direct match
 Low (<40): no clear use case for Kima/Aeredium
-
-Return ONLY valid JSON. No markdown.${learnedIntelligence || ''}`,
-        },
-        {
-          role: 'user',
-          content: `Do a deep BD research on this company for Kima/Aeredium:
+${learnedIntelligence || ''}`,
+      user: `Do a deep BD research on this company for Kima/Aeredium:
 
 Company: ${company.name}
 Website: ${company.website || 'unknown'}
@@ -329,8 +309,8 @@ CONTACT RULES — find the REAL decision maker, not a generic title:
 - Priority 1: Head of BD / VP Partnerships / Head of Growth — this person signs integration deals.
 - Priority 2: CTO / VP Engineering / Head of Protocol — needs to evaluate technical fit.
 - Priority 3: CEO / Co-Founder — for companies < 100 people, this person often owns BD.
-- For each contact: if you know their real name (from public LinkedIn, press releases, Twitter) use it. Otherwise say null — do NOT fabricate names.
-- linkedin_hint must be specific enough to find the exact person: "FirstName LastName CompanyName Title" — NOT just "Head of BD at CompanyName".
+- If you know their real name (from public LinkedIn, press releases, Twitter) use it. Otherwise null — never fabricate names.
+- linkedin_hint must be specific: "FirstName LastName CompanyName Title"
 - why_this_person must explain the specific buying authority, not just the title.
 
 Return this exact JSON:
@@ -343,42 +323,36 @@ Return this exact JSON:
   "company_summary": "3-4 sentence summary: what they do, how big, what stack they use, what stage they're at",
   "business_model": "how they specifically make money",
   "supported_chains_or_rails": "exact blockchains or payment rails they currently use",
-  "current_providers": "specific known payment/bridge/settlement providers they currently use (Fireblocks, LayerZero, Wormhole, etc.)",
-  "pain_point": "THE specific pain point — one crisp sentence with a concrete fact, not a generic statement",
+  "current_providers": "specific known payment/bridge/settlement providers they currently use",
+  "pain_point": "THE specific pain point — one crisp sentence with a concrete fact",
   "pain_point_severity": "critical|high|medium|low",
-  "pain_point_evidence": "concrete evidence: exact quote, hack amount + date, specific architectural dependency, or named product limitation. Must reference a real, specific fact about THIS company.",
-  "pain_point_source_url": "EXACT full URL to the article/post/announcement proving the pain point. Empty string only if no real URL exists.",
+  "pain_point_evidence": "concrete evidence: exact quote, hack amount + date, specific architectural dependency, or named product limitation",
+  "pain_point_source_url": "EXACT full URL to the article/post proving the pain point. Empty string if none.",
   "pain_point_evidence_type": "verified_source|agent_analysis|inferred",
-  "kima_fit": "exactly how Kima's specific product solves their specific pain — not generic, tie it to their stack",
-  "suggested_use_case": "the precise Kima integration to pitch (e.g. 'replace LayerZero bridge with Kima UPR for cross-chain USDC settlement between Arbitrum and Solana')",
-  "aeredium_fit": "how Aeredium's TEE validators / AERKey / AERLink specifically addresses their trust or compliance gap",
-  "trigger_reason": "why reach out NOW — a specific recent event (funding announced, product launch, hire, hack, regulatory news, conference). Must be datable and real.",
-  "source_url": "exact URL to the trigger event (news article, blog post, funding announcement). NOT a homepage. null if no specific URL.",
+  "kima_fit": "exactly how Kima's specific product solves their specific pain — tied to their actual stack",
+  "suggested_use_case": "the precise Kima integration to pitch",
+  "aeredium_fit": "how Aeredium's TEE validators / AERKey / AERLink addresses their trust or compliance gap",
+  "trigger_reason": "why reach out NOW — a specific recent event (funding, product launch, hire, hack). Must be datable and real.",
+  "source_url": "exact URL to the trigger event. NOT a homepage. null if none.",
   "settlement_angle": "the exact settlement improvement Kima delivers for their specific flow",
   "integration_feasibility": "high|medium|low — with one sentence of reasoning",
   "revenue_potential": "realistic ARR estimate for Kima based on their volume/scale",
   "lead_score": 0,
   "priority": "excellent|qualified|needs_research|low_priority",
-  "score_reasoning": "2-3 sentences explaining the exact score: what drives it up and what limits it",
+  "score_reasoning": "2-3 sentences: what drives the score up and what limits it",
   "contacts": [
     {
       "role": "exact title of the ideal person to contact",
-      "name": "real full name if publicly known (from LinkedIn/press/Twitter), or null — never fabricate",
-      "linkedin_hint": "FirstName LastName CompanyName Title — specific enough to find one person",
-      "twitter_hint": "their exact @handle if known, or null",
+      "name": "real full name if publicly known, or null — never fabricate",
+      "linkedin_hint": "FirstName LastName CompanyName Title",
+      "twitter_hint": "exact @handle if known, or null",
       "email_pattern": "firstname@${domain || 'company.com'}",
-      "why_this_person": "specific reason they own the buying decision for a Kima/Aeredium integration",
+      "why_this_person": "specific reason they own the buying decision",
       "contact_confidence": "high|medium|low"
     }
   ]
 }`,
-        },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.2,
-      max_tokens: 4000,
     })
-    return JSON.parse(completion.choices[0].message.content || '{}')
   } catch (e) {
     console.error('[deepResearch]', e)
     return null

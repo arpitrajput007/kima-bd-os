@@ -1,9 +1,8 @@
-import OpenAI from 'openai'
+import { claudeJSON, claudeText, CLAUDE_RESEARCH } from "@/lib/claude"
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { FULL_BRAIN } from '@/lib/kima-knowledge'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -155,33 +154,26 @@ async function distill(leadId: string, transcript: { role: string; content: stri
     .map(m => `${m.role === 'user' ? 'BD (Arpit)' : 'Agent'}: ${m.content}`)
     .join('\n\n')
 
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [
-      {
-        role: 'system',
-        content: `You are the memory engine for the Kima BD OS. Read a discussion between the BD person and the agent about a specific lead, and extract ONLY durable, reusable intelligence worth remembering. Skip pleasantries and obvious facts. Return ONLY valid JSON.`,
-      },
-      {
-        role: 'user',
-        content: `Discussion about "${company}":\n\n${convo}\n\nExtract what's worth saving to long-term memory. Return JSON:
+  const parsed = await claudeJSON<{
+    worth_saving?: boolean; title?: string; content?: string
+    knowledge_type?: string; tags?: string[]
+    new_rules?: Array<{ rule_type: string; rule: string; weight: number }>
+  }>({
+    model: CLAUDE_RESEARCH,
+    maxTokens: 1200,
+    temperature: 0.3,
+    system: `You are the memory engine for the Kima BD OS. Read a discussion between the BD person and the agent about a specific lead, and extract ONLY durable, reusable intelligence worth remembering. Skip pleasantries and obvious facts.`,
+    user: `Discussion about "${company}":\n\n${convo}\n\nExtract what's worth saving to long-term memory. Return JSON:
 {
   "worth_saving": true/false,
   "title": "short title (max 10 words)",
-  "content": "150-350 words of specific, reusable insight: their tech, real objections raised and how to handle them, angles that resonated, competitive context, decision dynamics. Write as notes the agent can reuse later.",
+  "content": "150-350 words of specific, reusable insight: their tech, real objections raised and how to handle them, angles that resonated, competitive context, decision dynamics.",
   "knowledge_type": "one of: icp_signal | competitor_intel | market_trend | product_context | outreach_strategy | general",
   "tags": ["2-5 tags"],
-  "new_rules": [{ "rule_type": "prioritize|reject|score_boost|score_penalty|outreach_style|source_preference", "rule": "only if a GENERAL, broadly-applicable lesson emerged (not just about this one company)", "weight": 0 }]
+  "new_rules": [{ "rule_type": "prioritize|reject|score_boost|score_penalty|outreach_style|source_preference", "rule": "GENERAL lesson only", "weight": 0 }]
 }
-Set worth_saving=false if nothing durable came up. Create new_rules ONLY for genuinely general lessons — usually [].`,
-      },
-    ],
-    response_format: { type: 'json_object' },
-    temperature: 0.3,
-    max_tokens: 1200,
+Set worth_saving=false if nothing durable came up.`,
   })
-
-  const parsed = JSON.parse(completion.choices[0].message.content || '{}')
   if (!parsed.worth_saving || !parsed.content) return { saved: false }
 
   const tags = [...(parsed.tags || []), `lead:${leadId}`]
@@ -265,18 +257,17 @@ ${agentContext}`
 
     const historyMessages: { role: 'user' | 'assistant'; content: string }[] = Array.isArray(history) ? history : []
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...historyMessages.slice(-16),
-        { role: 'user', content: message },
-      ],
+    const { claudeText: ct } = await import('@/lib/claude')
+    const reply = await ct({
+      model: CLAUDE_RESEARCH,
+      maxTokens: 1100,
       temperature: 0.5,
-      max_tokens: 1100,
-    })
-
-    const reply = completion.choices[0].message.content || 'I had trouble with that — try rephrasing?'
+      system: systemPrompt,
+      user: [
+        ...historyMessages.slice(-16).map(m => `${m.role === 'user' ? 'BD' : 'Agent'}: ${m.content}`),
+        `BD: ${message}`,
+      ].join('\n\n'),
+    }) || 'I had trouble with that — try rephrasing?'
     return NextResponse.json({ reply, dossier })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Discussion failed'

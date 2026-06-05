@@ -1,9 +1,8 @@
-import OpenAI from 'openai'
+import { claudeJSON, claudeText, CLAUDE_RESEARCH } from "@/lib/claude"
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { PRODUCT_BRAIN_COMPACT } from '@/lib/kima-knowledge'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -175,18 +174,7 @@ Return JSON:
   ]
 }`
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.6,
-      max_tokens: 1600,
-    })
-
-    const parsed = JSON.parse(completion.choices[0].message.content || '{"suggestions":[]}')
+    const parsed = await claudeJSON({ model: CLAUDE_RESEARCH, system: systemPrompt, user: userPrompt, maxTokens: 1600, temperature: 0.6 })
     const raw = (Array.isArray(parsed.suggestions) ? parsed.suggestions : [])
       .filter((s: { source_url_or_query?: string }) =>
         !existingUrls.has((s.source_url_or_query || '').toLowerCase().trim()))
