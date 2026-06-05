@@ -6,6 +6,12 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
+// This fans out to /api/ai/discover for every source and awaits each, so it needs
+// the longest allowed runtime. Without it the cron is killed at the default
+// timeout and only the first source (if any) gets processed.
+export const maxDuration = 300
+export const dynamic = 'force-dynamic'
+
 // This route is called by Vercel Cron every day at 06:00 IST (00:30 UTC)
 // It loops through all active sources and triggers the discover pipeline for each
 export async function GET(req: NextRequest) {

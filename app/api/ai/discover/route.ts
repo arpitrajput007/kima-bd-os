@@ -10,6 +10,12 @@ import { perplexityConfigured, researchCompanyTrigger } from '@/lib/perplexity'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
+// Deep research (OpenAI + Exa + crawling) per company is slow. Without this the
+// function hits Vercel's default timeout and gets killed before saving leads.
+// 300s = Vercel Pro cap; on Hobby it's silently clamped to the plan max.
+export const maxDuration = 300
+export const dynamic = 'force-dynamic'
+
 async function getHunterContacts(website: string): Promise<string> {
   if (!process.env.HUNTER_API_KEY || !website) return ''
   try {
@@ -42,7 +48,12 @@ const CUSTOMER_CATEGORIES = [
   'Fireblocks Customer',
   'Web2 Stablecoin Settlement Customer',
 ]
-const CATEGORY_CAP = 5
+// Cap = how many *unworked* prospects we allow to sit in a category at once.
+// Only leads still in the top-of-funnel (see CAP_BLOCKING_STATUSES) count toward
+// this. Once you contact/reserve/qualify a lead it stops blocking new discovery,
+// so the daily pipeline keeps surfacing fresh leads instead of clogging.
+const CATEGORY_CAP = 8
+const CAP_BLOCKING_STATUSES = ['new', 'researching', 'needs_more_research']
 
 // Read any URL as clean text via Jina.ai (free, no key needed)
 async function readUrl(url: string): Promise<string> {
@@ -379,11 +390,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Source has no URL or query configured' }, { status: 400 })
     }
 
-    // 2. Check current category counts (only non-rejected, non-archived leads)
+    // 2. Check current category counts. Only count *unworked* leads — once a lead
+    // is contacted/reserved/qualified it's "in play" and should NOT block new
+    // discovery, otherwise categories permanently clog and no fresh leads appear.
     const { data: existingLeads } = await supabase
       .from('leads')
       .select('customer_category')
-      .not('status', 'in', '("rejected","archived")')
+      .in('status', CAP_BLOCKING_STATUSES)
 
     const categoryCounts: Record<string, number> = {}
     CUSTOMER_CATEGORIES.forEach(c => { categoryCounts[c] = 0 })
@@ -545,7 +558,7 @@ export async function POST(req: NextRequest) {
         .filter(c => CUSTOMER_CATEGORIES.includes(c))
       if (categories.length === 0) categories.push('Other')
 
-      // Check if any matching category has room (cap = 3)
+      // Check if any matching category has room (CATEGORY_CAP unworked leads)
       const hasRoom = categories.some(cat => (categoryCounts[cat] || 0) < CATEGORY_CAP)
       if (!hasRoom) { results.skipped_cap++; continue }
 
