@@ -445,7 +445,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Apollo API key not configured. Add APOLLO_API_KEY to your environment.' }, { status: 400 })
       }
       const q = sourceQuery.replace(/^apollo:/i, '').trim()
-      companies = await apolloSearchCompanies(q, 20)
+      companies = await apolloSearchCompanies(q, 8)
       if (!companies.length) {
         return NextResponse.json({ error: 'Apollo returned no companies for that query — try different keywords.' }, { status: 400 })
       }
@@ -455,7 +455,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'EXA_API_KEY not configured.' }, { status: 400 })
       }
       const { exaFindSimilar } = await import('@/lib/exa')
-      const similar = await exaFindSimilar(sourceQuery, 20)
+      const similar = await exaFindSimilar(sourceQuery, 8)
       companies = similar
       if (!companies.length) {
         return NextResponse.json({ error: 'Exa could not find similar companies for that URL.' }, { status: 400 })
@@ -463,7 +463,8 @@ export async function POST(req: NextRequest) {
     } else if (source.source_type === 'exa_search' || (!sourceQuery.startsWith('http') && exaConfigured())) {
       // Exa neural search — semantically finds real companies matching the query.
       // Returns companies directly (no page-scraping + AI extraction needed).
-      companies = await exaSearchCompanies(sourceQuery, 25)
+      // Cap at 8 so deep-research finishes within Vercel Hobby's 60s timeout.
+      companies = await exaSearchCompanies(sourceQuery, 8)
       if (!companies.length) {
         return NextResponse.json({ error: 'Exa returned no companies for that query — try different keywords.' }, { status: 400 })
       }

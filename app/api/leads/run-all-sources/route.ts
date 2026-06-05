@@ -41,27 +41,24 @@ export async function POST() {
       (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : null) ||
       'https://kima-bd-os.vercel.app'
 
-    // Process each source sequentially and await it — the response is held
-    // open until all sources are done (maxDuration = 300s keeps us alive).
-    let totalSaved = 0
-    let done = 0
-    for (const source of sources) {
-      try {
-        const res = await fetch(`${appUrl}/api/ai/discover`, {
+    // Fire all sources in PARALLEL so total time ≈ slowest single source
+    // (~40s with 8 companies each), not sum of all sources. This keeps us
+    // within Vercel Hobby's 60s per-function timeout.
+    const settled = await Promise.allSettled(
+      sources.map(source =>
+        fetch(`${appUrl}/api/ai/discover`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ source_id: source.id }),
         })
-        const data = await res.json()
-        totalSaved += data.saved || 0
-      } catch { /* one source failing shouldn't stop the rest */ }
-      done++
-      if (jobId) {
-        await supabase.from('discovery_jobs')
-          .update({ sources_done: done, leads_saved: totalSaved })
-          .eq('id', jobId)
-      }
-    }
+          .then(r => r.json())
+          .catch(() => ({ saved: 0, error: 'fetch failed' }))
+      )
+    )
+
+    const totalSaved = settled.reduce((sum, r) =>
+      sum + (r.status === 'fulfilled' ? (r.value?.saved || 0) : 0), 0)
+    const done = sources.length
 
     if (jobId) {
       await supabase.from('discovery_jobs')
