@@ -37,7 +37,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: 'No active sources to process', processed: 0 })
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://kima-bd-os.vercel.app'
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+    'https://kima-bd-os.vercel.app'
   const results = []
 
   // Process each source one by one (sequential to avoid rate limits)

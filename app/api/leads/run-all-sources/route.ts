@@ -33,7 +33,13 @@ export async function POST() {
       .single()
 
     const jobId = job?.id
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://kima-bd-os.vercel.app'
+    // Resolve the correct base URL so the self-call to /api/ai/discover works
+    // whether we're on Vercel production, a preview deploy, or local dev.
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+      (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : null) ||
+      'https://kima-bd-os.vercel.app'
 
     // Process each source sequentially and await it — the response is held
     // open until all sources are done (maxDuration = 300s keeps us alive).
