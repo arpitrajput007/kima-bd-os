@@ -1,10 +1,8 @@
-import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { PRODUCT_BRAIN, SINGLE_API_LINE } from '@/lib/kima-knowledge'
 import { MAX_FOLLOWUPS, getOutreachLearnings } from '@/lib/outreach'
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+import { routeJSONWithBanGuard, type AIProvider } from '@/lib/ai-router'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -49,35 +47,24 @@ function findBannedPhrases(text: string): string[] {
   return BANNED_PHRASES.filter(p => t.includes(p))
 }
 
-// Run a JSON completion, then scan the extracted text for banned phrases. If any
-// appear, retry ONCE with the offenders called out explicitly.
+// Thin wrapper — delegates to the provider-aware routeJSONWithBanGuard in ai-router.
+// provider is set per-request from the user's drafting_ai preference.
 async function completeWithBanGuard(
   systemPrompt: string,
   userPrompt: string,
   opts: { temperature: number; max_tokens: number },
   extractTexts: (parsed: Record<string, unknown>) => string[],
+  provider: AIProvider = 'openai',
 ): Promise<Record<string, unknown>> {
-  const run = async (user: string) => {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: user },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: opts.temperature,
-      max_tokens: opts.max_tokens,
-    })
-    return JSON.parse(completion.choices[0].message.content || '{}') as Record<string, unknown>
-  }
-
-  let parsed = await run(userPrompt)
-  const banned = [...new Set(extractTexts(parsed).flatMap(findBannedPhrases))]
-  if (banned.length > 0) {
-    const fixUser = `${userPrompt}\n\nYOUR PREVIOUS ATTEMPT USED THESE BANNED PHRASES: ${banned.map(b => `"${b}"`).join(', ')}. Rewrite everything so NONE of these — or any phrase from the HARD BANS — appears anywhere. Keep it specific, human, and tailored to this exact lead.`
-    parsed = await run(fixUser)
-  }
-  return parsed
+  return routeJSONWithBanGuard({
+    provider,
+    system: systemPrompt,
+    user: userPrompt,
+    maxTokens: opts.max_tokens,
+    temperature: opts.temperature,
+    extractTexts,
+    bannedPhrases: BANNED_PHRASES,
+  })
 }
 
 interface LeadRow {
@@ -163,7 +150,7 @@ function leadContextBlock(lead: LeadRow): string {
 }
 
 // ── AUTO MODE: agent writes 2-3 ready-to-send human drafts on its own ──
-async function generateAutoDrafts(leadId: string) {
+async function generateAutoDrafts(leadId: string, draftingProvider: AIProvider = 'openai') {
   const { data: lead, error } = await supabase
     .from('leads')
     .select('*, contacts(id, name, role, email, linkedin_url, twitter_url, telegram)')
@@ -209,6 +196,7 @@ Return JSON exactly:
       { temperature: 0.85, max_tokens: 2200 },
       (p) => ((p.drafts as { subject?: string; text?: string }[]) || [])
         .map(d => `${d.subject || ''} ${d.text || ''}`),
+      draftingProvider,
     )
     return NextResponse.json({
       success: true,
@@ -222,7 +210,7 @@ Return JSON exactly:
 }
 
 // ── FOLLOW-UP MODE: one short, fresh-angle nudge for a no-reply lead ──
-async function generateFollowup(leadId: string, stage: number) {
+async function generateFollowup(leadId: string, stage: number, draftingProvider: AIProvider = 'openai') {
   const { data: lead, error } = await supabase
     .from('leads')
     .select('*, contacts(id, name, role, email, linkedin_url, twitter_url, telegram)')
@@ -287,6 +275,7 @@ Return JSON exactly:
         const d = p.draft as { subject?: string; text?: string } | undefined
         return [`${d?.subject || ''} ${d?.text || ''}`]
       },
+      draftingProvider,
     )
     return NextResponse.json({
       success: true,
@@ -305,13 +294,15 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
+  // drafting_ai: 'openai' (default) | 'claude' — user preference from Settings.
+  const draftingProvider: AIProvider = body.drafting_ai === 'claude' ? 'claude' : 'openai'
 
   // Auto mode — the agent drafts on its own from the saved research.
   if (body.mode === 'auto') {
     if (!body.lead_id) {
       return NextResponse.json({ error: 'lead_id is required for auto mode' }, { status: 400 })
     }
-    return generateAutoDrafts(body.lead_id)
+    return generateAutoDrafts(body.lead_id, draftingProvider)
   }
 
   // Follow-up mode — one short, different-angle nudge for a no-reply lead.
@@ -319,7 +310,7 @@ export async function POST(req: NextRequest) {
     if (!body.lead_id) {
       return NextResponse.json({ error: 'lead_id is required for followup mode' }, { status: 400 })
     }
-    return generateFollowup(body.lead_id, typeof body.stage === 'number' ? body.stage : 0)
+    return generateFollowup(body.lead_id, typeof body.stage === 'number' ? body.stage : 0, draftingProvider)
   }
 
   // ── CUSTOM MODE: user-configured full sequence ──
@@ -402,6 +393,7 @@ Return JSON:
       { temperature: 0.7, max_tokens: 2000 },
       (p) => ['message', 'followup_1', 'followup_2', 'objection_reply', 'call_opening', 'meeting_agenda']
         .map(k => String(p[k] || '')),
+      draftingProvider,
     )
     return NextResponse.json({ success: true, data: result })
 

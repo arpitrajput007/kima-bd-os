@@ -1,13 +1,44 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { Save, Eye, EyeOff, Key, ExternalLink } from 'lucide-react'
+import { Save, Eye, EyeOff, Key, Brain, MessageSquare, Check, ExternalLink } from 'lucide-react'
+
+type AIProvider = 'claude' | 'openai'
+
+const MODEL_INFO: Record<AIProvider, { label: string; desc: string; color: string }> = {
+  claude: {
+    label: 'Claude (Anthropic)',
+    desc: 'Better at nuanced analysis, specific pain-point extraction, reading tech stacks. Recommended for research.',
+    color: '#a78bfa',
+  },
+  openai: {
+    label: 'GPT-4o (OpenAI)',
+    desc: 'Strong at natural tone, message variation, and conversational drafting. Recommended for outreach.',
+    color: '#60a5fa',
+  },
+}
 
 export default function SettingsPage() {
   const [showKey, setShowKey] = useState(false)
   const [openaiKey, setOpenaiKey] = useState('')
   const [saved, setSaved] = useState(false)
+  const [researchAI, setResearchAI] = useState<AIProvider>('claude')
+  const [draftingAI, setDraftingAI] = useState<AIProvider>('openai')
+
+  // Load saved prefs from localStorage on mount
+  useEffect(() => {
+    const r = localStorage.getItem('bd_research_ai') as AIProvider | null
+    const d = localStorage.getItem('bd_drafting_ai') as AIProvider | null
+    if (r === 'claude' || r === 'openai') setResearchAI(r)
+    if (d === 'claude' || d === 'openai') setDraftingAI(d)
+  }, [])
+
+  const saveModelPrefs = () => {
+    localStorage.setItem('bd_research_ai', researchAI)
+    localStorage.setItem('bd_drafting_ai', draftingAI)
+    toast.success('AI model preferences saved')
+  }
 
   const handleSave = () => {
     toast.info('To update API keys, edit the .env.local file in your project root and restart the dev server.')
@@ -115,8 +146,67 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* AI Model Preferences */}
+        <div className="rounded-xl p-5" style={{ background: 'rgba(22,22,34,0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="flex items-center gap-2 mb-1">
+            <Brain size={15} style={{ color: '#a78bfa' }} />
+            <h2 className="text-sm font-semibold text-white">AI Model Preferences</h2>
+          </div>
+          <p className="text-xs mb-5" style={{ color: 'rgb(100,100,120)' }}>
+            Choose which AI handles research vs message drafting. Both models read the same saved research — OpenAI for drafting sees everything Claude discovered, and vice versa.
+          </p>
+
+          {(['research', 'drafting'] as const).map(task => {
+            const current = task === 'research' ? researchAI : draftingAI
+            const setter  = task === 'research' ? setResearchAI : setDraftingAI
+            const Icon    = task === 'research' ? Brain : MessageSquare
+            const defaultVal: AIProvider = task === 'research' ? 'claude' : 'openai'
+            return (
+              <div key={task} className="mb-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Icon size={13} style={{ color: 'rgb(160,160,180)' }} />
+                  <span className="text-xs font-semibold" style={{ color: 'rgb(200,200,220)' }}>
+                    {task === 'research' ? 'Research & Analysis' : 'Message Drafting'}
+                  </span>
+                  {current === defaultVal && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(52,211,153,0.1)', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }}>recommended</span>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  {(['claude', 'openai'] as AIProvider[]).map(provider => {
+                    const info = MODEL_INFO[provider]
+                    const active = current === provider
+                    return (
+                      <button
+                        key={provider}
+                        onClick={() => setter(provider)}
+                        className="flex-1 text-left p-3 rounded-xl transition-all"
+                        style={{
+                          background: active ? `rgba(${provider === 'claude' ? '167,139,250' : '96,165,250'},0.1)` : 'rgba(255,255,255,0.03)',
+                          border: `1px solid ${active ? info.color : 'rgba(255,255,255,0.08)'}`,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-semibold" style={{ color: active ? info.color : 'rgb(180,180,200)' }}>{info.label}</span>
+                          {active && <Check size={12} style={{ color: info.color }} />}
+                        </div>
+                        <p className="text-[11px] leading-relaxed" style={{ color: 'rgb(120,120,140)' }}>{info.desc}</p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+
+          <button onClick={saveModelPrefs} className="btn btn-primary text-xs" style={{ padding: '7px 18px' }}>
+            <Save size={13} /> Save preferences
+          </button>
+        </div>
+
         <div className="rounded-xl p-4 text-xs" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)', color: 'rgb(160,140,200)' }}>
-          <strong style={{ color: '#a78bfa' }}>About Kima BD OS:</strong> This is a private, internal BD tool built for Arpit to manage Kima and Aeredium business development. All data is stored in your private Supabase instance. The AI agent uses OpenAI GPT-4o for research, scoring, and outreach generation.
+          <strong style={{ color: '#a78bfa' }}>About Kima BD OS:</strong> This is a private, internal BD tool built for Arpit to manage Kima and Aeredium business development. All data is stored in your private Supabase instance. Research uses Claude Opus 4.5 by default; outreach drafting uses GPT-4o. Both can be changed above.
         </div>
       </div>
     </div>

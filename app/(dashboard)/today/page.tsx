@@ -327,6 +327,7 @@ export default function TodayPage() {
         toast.error('No active sources. Add some in Discovery Sources.')
         return
       }
+      const researchAI = (typeof window !== 'undefined' ? localStorage.getItem('bd_research_ai') : null) || 'claude'
       setBgJob({ status: 'running', sources_done: 0, sources_total: sources.length, leads_saved: 0, current_source: sources[0].source_name })
       let totalSaved = 0
       for (let i = 0; i < sources.length; i++) {
@@ -336,7 +337,7 @@ export default function TodayPage() {
           const res = await fetch('/api/ai/discover', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ source_id: src.id }),
+            body: JSON.stringify({ source_id: src.id, research_ai: researchAI }),
           })
           const data = await res.json()
           totalSaved += data.saved || 0

@@ -6,7 +6,8 @@ import { apolloConfigured, apolloEnrichContacts, apolloSearchCompanies, toDomain
 import { isGenericName } from '@/lib/leadQuality'
 import { exaConfigured, exaSearchCompanies, exaCompanyNews } from '@/lib/exa'
 import { perplexityConfigured, researchCompanyTrigger } from '@/lib/perplexity'
-import { claudeJSON, claudeConfigured, CLAUDE_RESEARCH, CLAUDE_FAST } from '@/lib/claude'
+import { routeJSON, type AIProvider } from '@/lib/ai-router'
+import { CLAUDE_RESEARCH, CLAUDE_FAST } from '@/lib/claude'
 
 // Deep research (OpenAI + Exa + crawling) per company is slow. Without this the
 // function hits Vercel's default timeout and gets killed before saving leads.
@@ -189,11 +190,13 @@ async function searchWeb(query: string): Promise<string> {
 // Extract company mentions from raw page content
 async function extractCompanies(
   content: string,
-  sourceContext: string
+  sourceContext: string,
+  provider: AIProvider = 'claude'
 ): Promise<Array<{ name: string; website: string; description: string; source_url: string }>> {
   try {
-    const result = await claudeJSON<{ companies: Array<{ name: string; website: string; description: string; source_url: string }> }>({
-      model: CLAUDE_FAST,
+    const result = await routeJSON<{ companies: Array<{ name: string; website: string; description: string; source_url: string }> }>({
+      provider,
+      model: provider === 'claude' ? CLAUDE_FAST : 'gpt-4o',
       maxTokens: 2000,
       temperature: 0.2,
       system: `You are a BD researcher for Kima and Aeredium.
@@ -265,7 +268,8 @@ async function deepResearch(
   website: string
   description: string
 },
-  learnedIntelligence?: string
+  learnedIntelligence?: string,
+  provider: AIProvider = 'claude'
 ): Promise<Record<string, unknown> | null> {
   const domain = (company.website || '')
     .replace(/https?:\/\//, '')
@@ -276,8 +280,9 @@ async function deepResearch(
     const hunterData = await getHunterContacts(company.website)
     const hunterContext = hunterData ? `\nVerified emails from Hunter.io database:\n${hunterData}\nSelect the most relevant BD contacts from this list if any, otherwise guess patterns.` : ''
 
-    return await claudeJSON({
-      model: CLAUDE_RESEARCH,
+    return await routeJSON({
+      provider,
+      model: provider === 'claude' ? CLAUDE_RESEARCH : 'gpt-4o',
       maxTokens: 4000,
       temperature: 0.2,
       system: `You are a senior BD researcher for Kima and Aeredium.
@@ -361,10 +366,12 @@ Return this exact JSON:
 
 export async function POST(req: NextRequest) {
   try {
-    const { source_id } = await req.json()
+    const { source_id, research_ai = 'claude' } = await req.json()
     if (!source_id) {
       return NextResponse.json({ error: 'source_id is required' }, { status: 400 })
     }
+    // research_ai: 'claude' (default) | 'openai' — set by the user in Settings.
+    const researchProvider: 'claude' | 'openai' = research_ai === 'openai' ? 'openai' : 'claude'
 
     // 1. Load the source
     const { data: source, error: srcError } = await supabase
@@ -476,7 +483,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Extract company list from the page
-      companies = await extractCompanies(content, `${source.source_name} (${source.source_type})`)
+      companies = await extractCompanies(content, `${source.source_name} (${source.source_type})`, researchProvider)
     }
 
     // 5b. Load learned intelligence to inject into all deepResearch calls
@@ -528,7 +535,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Full research — inject learned intelligence + live context
-      const research = await deepResearch(enrichedCompany, learnedIntelligence)
+      const research = await deepResearch(enrichedCompany, learnedIntelligence, researchProvider)
       if (!research) continue
 
       // If Perplexity found citation URLs, prefer them as source_url.
