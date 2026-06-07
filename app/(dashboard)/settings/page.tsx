@@ -205,7 +205,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000`
                           {v.label}
                         </span>
                         {v.critical && (
-                          <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
+                          <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: 'rgb(160,165,195)', border: '1px solid rgba(255,255,255,0.1)' }}>
                             required
                           </span>
                         )}
