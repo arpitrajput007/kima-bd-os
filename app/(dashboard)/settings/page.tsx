@@ -145,8 +145,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000`
           </button>
         </div>
       </div>
-
-      <div style={{ padding: '16px 32px', maxWidth: 900, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ padding: '16px 32px', width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* ── Critical warning banner ─────────────────────────────────── */}
         {missingCritical.length > 0 && (
