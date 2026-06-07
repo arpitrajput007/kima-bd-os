@@ -21,6 +21,7 @@ import {
   Kanban,
   Bot,
   Shield,
+  CreditCard,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -38,7 +39,8 @@ const navGroups: {
       { href: '/dashboard',    label: 'BD Command Center', icon: LayoutDashboard },
       { href: '/leads',        label: 'Lead Inbox',         icon: Inbox },
       { href: '/crm',          label: 'CRM',                icon: Kanban },
-      { href: '/aeredium',     label: 'Aeredium Targets',   icon: Shield, glow: true },
+      { href: '/aeredium',        label: 'Aeredium Targets',   icon: Shield, glow: true },
+      { href: '/agentic-payments', label: 'Agentic Payments',   icon: CreditCard, glow: true },
       { href: '/reports',      label: 'Weekly Reports',     icon: BarChart3 },
       { href: '/learn',        label: 'Make Agent Learn',   icon: BookOpen, glow: true },
       { href: '/voice',        label: 'Voice Chat',         icon: Mic, voice: true },
