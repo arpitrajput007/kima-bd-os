@@ -22,6 +22,7 @@ import {
   Bot,
   Shield,
   CreditCard,
+  LineChart,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -36,7 +37,8 @@ const navGroups: {
     items: [
       { href: '/copilot',      label: 'AI Co-Pilot',        icon: Bot, glow: true },
       { href: '/today',        label: "Today's Plan",       icon: Sun },
-      { href: '/dashboard',    label: 'BD Command Center', icon: LayoutDashboard },
+      { href: '/dashboard',      label: 'BD Command Center',  icon: LayoutDashboard },
+      { href: '/my-performance', label: 'My Performance',    icon: LineChart, glow: false },
       { href: '/leads',        label: 'Lead Inbox',         icon: Inbox },
       { href: '/crm',          label: 'CRM',                icon: Kanban },
       { href: '/aeredium',        label: 'Aeredium Targets',   icon: Shield, glow: true },
