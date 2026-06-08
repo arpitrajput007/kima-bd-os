@@ -10,7 +10,8 @@ import {
   Loader2, ArrowRight, AlertCircle, TrendingUp,
   StickyNote, Bell, Check, Send, AtSign, Globe,
   RefreshCw, ExternalLink, Trophy, XCircle,
-  Flame, Target,
+  Flame, Target, Link2, FileText, Upload, Sparkles,
+  BookOpen, Zap, ShieldCheck,
 } from 'lucide-react'
 import { cn, getScoreBg, truncate } from '@/lib/utils'
 import type { Lead } from '@/lib/types'
@@ -199,79 +200,412 @@ function AddActivityModal({ lead, onClose, onSaved }: {
   )
 }
 
-// ── Add Lead Modal ──────────────────────────────────────────────
+// ── Add Lead Modal (redesigned) ────────────────────────────────
+// Stages that unlock the proposal attachment section
+const PROPOSAL_STAGES: LeadStatus[] = ['proposal_sent', 'negotiating', 'integration']
+
+type LearnResult = {
+  title: string
+  insights: string[]
+  rules_created: number
+  sources_created: number
+  summary: string
+}
+
 function AddLeadModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const supabase = createClient()
-  const [name, setName] = useState('')
-  const [website, setWebsite] = useState('')
-  const [status, setStatus] = useState<LeadStatus>('new')
-  const [note, setNote] = useState('')
-  const [saving, setSaving] = useState(false)
 
-  const ADD_LEAD_STAGES = PIPELINE_STAGES.filter(s =>
-    ['new', 'contacted', 'replied', 'meeting_booked'].includes(s.status)
+  // Core fields
+  const [name,    setName]    = useState('')
+  const [website, setWebsite] = useState('')
+  const [status,  setStatus]  = useState<LeadStatus>('new')
+  const [note,    setNote]    = useState('')
+
+  // Proposal attachment
+  const [proposalTab,  setProposalTab]  = useState<'url' | 'file'>('url')
+  const [proposalUrl,  setProposalUrl]  = useState('')
+  const [proposalFile, setProposalFile] = useState<File | null>(null)
+  const [learnToggle,  setLearnToggle]  = useState(true)
+
+  // Save / learn states
+  const [saving,      setSaving]      = useState(false)
+  const [learning,    setLearning]    = useState(false)
+  const [learnResult, setLearnResult] = useState<LearnResult | null>(null)
+  const [savedName,   setSavedName]   = useState('')
+
+  const showProposal = PROPOSAL_STAGES.includes(status)
+  const hasProposal  = showProposal && (
+    (proposalTab === 'url'  && proposalUrl.trim().startsWith('http')) ||
+    (proposalTab === 'file' && proposalFile != null)
   )
+  const canSave = !!name.trim() && !saving && !learning
 
   const save = async () => {
     if (!name.trim()) { toast.error('Company name is required'); return }
     setSaving(true)
-    const { error } = await supabase.from('leads').insert({
-      company_name: name.trim(), website: website.trim() || null,
-      status, priority: 'needs_research', lead_score: 50,
-      updated_at: new Date().toISOString(),
-    })
-    if (error) { toast.error('Failed to add lead'); setSaving(false); return }
+
+    // 1 — Insert the lead
+    const { data: lead, error } = await supabase
+      .from('leads')
+      .insert({
+        company_name: name.trim(),
+        website:      website.trim() || null,
+        status,
+        priority:     'needs_research',
+        lead_score:   50,
+        updated_at:   new Date().toISOString(),
+      })
+      .select('id')
+      .single()
+
+    if (error || !lead) { toast.error('Failed to add lead'); setSaving(false); return }
+
+    // 2 — Log initial note
     if (note.trim()) {
-      const { data: lead } = await supabase.from('leads').select('id').eq('company_name', name.trim()).single()
-      if (lead) await supabase.from('lead_activities').insert({ lead_id: lead.id, type: 'note', content: note.trim() })
+      await supabase.from('lead_activities').insert({
+        lead_id: lead.id, type: 'note', content: note.trim(),
+      })
     }
-    toast.success(`${name} added to CRM`)
-    onSaved(); onClose(); setSaving(false)
+
+    setSavedName(name.trim())
+    toast.success(`${name.trim()} added to CRM`)
+    onSaved()
+    setSaving(false)
+
+    // 3 — Learn from proposal (non-blocking — keep modal open to show progress)
+    if (hasProposal && learnToggle) {
+      setLearning(true)
+      try {
+        let res: Response
+        const srcName = `Proposal — ${name.trim()}`
+
+        if (proposalTab === 'file' && proposalFile) {
+          const fd = new FormData()
+          fd.append('file', proposalFile)
+          fd.append('type', 'file')
+          fd.append('source_name', srcName)
+          res = await fetch('/api/ai/learn', { method: 'POST', body: fd })
+        } else {
+          res = await fetch('/api/ai/learn', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ type: 'url', content: proposalUrl.trim(), source_name: srcName }),
+          })
+        }
+
+        const data = await res.json()
+        if (res.ok) {
+          setLearnResult({
+            title:           data.title   || srcName,
+            insights:        data.insights || [],
+            rules_created:   data.rules_created   || 0,
+            sources_created: data.sources_created || 0,
+            summary:         data.summary || '',
+          })
+        } else {
+          toast.error(`Proposal read failed: ${data.error || 'Unknown error'}`)
+          onClose()
+        }
+      } catch {
+        toast.error('Failed to process proposal')
+        onClose()
+      } finally {
+        setLearning(false)
+      }
+      return // keep modal open to show learn result
+    }
+
+    onClose()
   }
 
+  // ── Post-learn result screen ────────────────────────────────
+  if (learnResult) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(4,4,10,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <div className="section-card fade-in" style={{ width: '100%', maxWidth: 460, background: 'rgb(var(--bg-surface-2))', boxShadow: '0 40px 80px rgba(0,0,0,0.7)', borderRadius: 18, overflow: 'hidden' }}>
+          {/* Green accent top bar */}
+          <div style={{ height: 3, background: 'linear-gradient(90deg, #34d399, #22d3ee)' }} />
+
+          <div style={{ padding: '24px 24px 20px' }}>
+            {/* Lead added row */}
+            <div className="flex items-center gap-3 mb-5">
+              <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <ShieldCheck size={18} style={{ color: '#34d399' }} />
+              </div>
+              <div>
+                <div className="text-[14px] font-bold text-white">{savedName} added to CRM</div>
+                <div className="text-[11px] text-muted mt-0.5">Proposal processed · agent intelligence updated</div>
+              </div>
+            </div>
+
+            {/* Learn result card */}
+            <div style={{ borderRadius: 12, border: '1px solid rgba(124,58,237,0.2)', background: 'rgba(124,58,237,0.05)', padding: '16px 18px', marginBottom: 16 }}>
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles size={13} style={{ color: '#a78bfa' }} />
+                <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#a78bfa' }}>Agent learned from proposal</span>
+              </div>
+              <div className="text-[13px] font-semibold text-white mb-2" style={{ lineHeight: 1.4 }}>{learnResult.title}</div>
+              {learnResult.summary && (
+                <div className="text-[12px] text-muted mb-3" style={{ lineHeight: 1.6 }}>{learnResult.summary}</div>
+              )}
+
+              {/* Stats */}
+              <div className="flex gap-3">
+                <div style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.15)', textAlign: 'center' }}>
+                  <div className="text-[20px] font-bold tabular-nums" style={{ color: '#a78bfa' }}>{learnResult.insights.length}</div>
+                  <div className="text-[10px] text-muted mt-0.5">Insights</div>
+                </div>
+                <div style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.15)', textAlign: 'center' }}>
+                  <div className="text-[20px] font-bold tabular-nums" style={{ color: '#34d399' }}>{learnResult.rules_created}</div>
+                  <div className="text-[10px] text-muted mt-0.5">New rules</div>
+                </div>
+                <div style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'rgba(34,211,238,0.08)', border: '1px solid rgba(34,211,238,0.15)', textAlign: 'center' }}>
+                  <div className="text-[20px] font-bold tabular-nums" style={{ color: '#22d3ee' }}>{learnResult.sources_created}</div>
+                  <div className="text-[10px] text-muted mt-0.5">New sources</div>
+                </div>
+              </div>
+
+              {/* Top insights preview */}
+              {learnResult.insights.length > 0 && (
+                <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {learnResult.insights.slice(0, 3).map((ins, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <div style={{ width: 4, height: 4, borderRadius: 999, background: '#a78bfa', marginTop: 6, flexShrink: 0 }} />
+                      <span className="text-[11px] text-muted" style={{ lineHeight: 1.5 }}>{ins}</span>
+                    </div>
+                  ))}
+                  {learnResult.insights.length > 3 && (
+                    <div className="text-[10px] text-muted" style={{ paddingLeft: 10 }}>+{learnResult.insights.length - 3} more insights saved to agent memory</div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <button onClick={onClose} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+              <Check size={14} /> Done
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Learning in progress screen ─────────────────────────────
+  if (learning) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(4,4,10,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <div className="section-card fade-in" style={{ width: '100%', maxWidth: 400, background: 'rgb(var(--bg-surface-2))', boxShadow: '0 40px 80px rgba(0,0,0,0.7)', borderRadius: 18, padding: '36px 28px', textAlign: 'center' }}>
+          <div className="ai-loading" style={{ width: 56, height: 56, borderRadius: 18, background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+            <BookOpen size={22} style={{ color: '#a78bfa' }} />
+          </div>
+          <div className="text-[15px] font-bold text-white mb-2">Reading proposal…</div>
+          <div className="text-[13px] text-muted mb-4" style={{ lineHeight: 1.6 }}>
+            Agent is extracting value propositions,<br />use cases &amp; ICP signals to find similar leads
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {['Parsing document content', 'Extracting BD intelligence', 'Updating agent rules & sources'].map((step, i) => (
+              <div key={i} className="flex items-center gap-2.5" style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.12)' }}>
+                <Loader2 size={11} className="animate-spin flex-shrink-0" style={{ color: '#a78bfa' }} />
+                <span className="text-[12px] text-muted">{step}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Main form ───────────────────────────────────────────────
+  const selectedStage = PIPELINE_STAGES.find(s => s.status === status)
+
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(4,4,10,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} className="section-card fade-in" style={{ width: '100%', maxWidth: 440, background: 'rgb(var(--bg-surface-2))', boxShadow: '0 40px 80px rgba(0,0,0,0.7)', borderRadius: 18 }}>
-        <div className="section-card-header">
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(4,4,10,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className="section-card fade-in"
+        style={{ width: '100%', maxWidth: 500, background: 'rgb(var(--bg-surface-2))', boxShadow: '0 40px 80px rgba(0,0,0,0.7)', borderRadius: 18, maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+
+        {/* Header */}
+        <div className="section-card-header" style={{ flexShrink: 0 }}>
           <div>
             <div className="text-[15px] font-bold text-white">Add lead manually</div>
-            <div className="text-[11px] text-muted mt-0.5">Manually add a company to your pipeline</div>
+            <div className="text-[11px] text-muted mt-0.5">Track a deal you're already working</div>
           </div>
           <button onClick={onClose} className="btn btn-ghost" style={{ padding: '6px' }}><X size={15} /></button>
         </div>
-        <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <label className="text-[11px] font-semibold text-muted block mb-1.5 uppercase tracking-wide">Company name *</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Binance, LayerZero"
-              autoFocus className="input-dark" />
+
+        {/* Scrollable body */}
+        <div style={{ overflowY: 'auto', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Company + Website row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted block mb-1.5">Company name *</label>
+              <input value={name} onChange={e => setName(e.target.value)}
+                placeholder="e.g. Binance, LayerZero" autoFocus className="input-dark" style={{ fontSize: 13 }} />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted block mb-1.5">Website</label>
+              <input value={website} onChange={e => setWebsite(e.target.value)}
+                placeholder="https://..." className="input-dark" style={{ fontSize: 13 }} />
+            </div>
           </div>
+
+          {/* Pipeline stage — ALL stages */}
           <div>
-            <label className="text-[11px] font-semibold text-muted block mb-1.5 uppercase tracking-wide">Website</label>
-            <input value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://..."
-              className="input-dark" />
-          </div>
-          <div>
-            <label className="text-[11px] font-semibold text-muted block mb-1.5 uppercase tracking-wide">Initial stage</label>
-            <div className="flex gap-1.5 flex-wrap">
-              {ADD_LEAD_STAGES.map(s => (
+            <label className="text-[10px] font-bold uppercase tracking-widest text-muted block mb-2">Pipeline stage</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {PIPELINE_STAGES.filter(s => !s.terminal).map(s => (
                 <button key={s.status} onClick={() => setStatus(s.status)}
-                  className="text-[12px] font-semibold"
-                  style={{ padding: '6px 13px', borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s', border: `1px solid ${status === s.status ? s.color + '55' : 'var(--border)'}`, background: status === s.status ? s.color + '18' : 'rgba(255,255,255,0.03)', color: status === s.status ? s.color : 'var(--text-3)' }}>
+                  style={{
+                    padding: '5px 12px', borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s', fontSize: 12, fontWeight: 600,
+                    border:      `1px solid ${status === s.status ? s.color + '60' : 'var(--border)'}`,
+                    background:  status === s.status ? s.color + '18' : 'rgba(255,255,255,0.03)',
+                    color:       status === s.status ? s.color : 'var(--text-3)',
+                    boxShadow:   status === s.status ? `0 0 12px ${s.color}20` : 'none',
+                  }}>
+                  {s.status === 'proposal_sent' && <span style={{ marginRight: 4, fontSize: 10 }}>📄</span>}
                   {s.label}
+                  {status === s.status && <span style={{ display: 'inline-block', width: 5, height: 5, borderRadius: 999, background: s.color, boxShadow: `0 0 4px ${s.color}`, marginLeft: 6, verticalAlign: 'middle' }} />}
+                </button>
+              ))}
+              {/* Terminal stages: won / lost */}
+              {PIPELINE_STAGES.filter(s => s.terminal).map(s => (
+                <button key={s.status} onClick={() => setStatus(s.status)}
+                  style={{
+                    padding: '5px 12px', borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s', fontSize: 12, fontWeight: 600,
+                    border:     `1px solid ${status === s.status ? s.color + '60' : 'var(--border)'}`,
+                    background: status === s.status ? s.color + '18' : 'rgba(255,255,255,0.02)',
+                    color:      status === s.status ? s.color : 'var(--text-3)',
+                    opacity:    0.75,
+                  }}>
+                  {s.emoji} {s.label}
                 </button>
               ))}
             </div>
+            {selectedStage && (
+              <div className="text-[10px] text-muted mt-1.5" style={{ paddingLeft: 2 }}>
+                Stage: <span style={{ color: selectedStage.color, fontWeight: 600 }}>{selectedStage.label}</span>
+                {PROPOSAL_STAGES.includes(status) && <span style={{ color: '#a78bfa' }}> · Proposal attachment available below</span>}
+              </div>
+            )}
           </div>
+
+          {/* ── Proposal section (only for proposal/negotiating/integration) ── */}
+          {showProposal && (
+            <div style={{ borderRadius: 12, border: '1px solid rgba(124,58,237,0.28)', background: 'rgba(124,58,237,0.04)', overflow: 'hidden' }}>
+              {/* Section header */}
+              <div style={{ padding: '12px 16px 10px', borderBottom: '1px solid rgba(124,58,237,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div className="flex items-center gap-2">
+                  <Sparkles size={13} style={{ color: '#a78bfa' }} />
+                  <span className="text-[12px] font-bold" style={{ color: '#a78bfa' }}>Proposal document</span>
+                </div>
+                {/* Learn toggle */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <span className="text-[11px] text-muted">Let agent learn</span>
+                  <div onClick={() => setLearnToggle(p => !p)}
+                    style={{
+                      width: 32, height: 18, borderRadius: 999, cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0,
+                      background: learnToggle ? 'rgba(124,58,237,0.7)' : 'rgba(255,255,255,0.1)',
+                      border: `1px solid ${learnToggle ? 'rgba(124,58,237,0.9)' : 'var(--border)'}`,
+                      position: 'relative',
+                    }}>
+                    <div style={{
+                      width: 12, height: 12, borderRadius: 999, background: 'white',
+                      position: 'absolute', top: 2, transition: 'left 0.2s',
+                      left: learnToggle ? 16 : 2,
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+                    }} />
+                  </div>
+                </label>
+              </div>
+
+              <div style={{ padding: '12px 16px 14px' }}>
+                {/* Tab selector */}
+                <div className="flex gap-1.5 mb-3">
+                  <button onClick={() => setProposalTab('url')}
+                    className="flex items-center gap-1.5 text-[11px] font-semibold"
+                    style={{ padding: '5px 12px', borderRadius: 7, cursor: 'pointer', transition: 'all 0.15s', border: `1px solid ${proposalTab === 'url' ? 'rgba(124,58,237,0.5)' : 'var(--border)'}`, background: proposalTab === 'url' ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)', color: proposalTab === 'url' ? '#a78bfa' : 'var(--text-3)' }}>
+                    <Link2 size={11} /> Doc link
+                  </button>
+                  <button onClick={() => setProposalTab('file')}
+                    className="flex items-center gap-1.5 text-[11px] font-semibold"
+                    style={{ padding: '5px 12px', borderRadius: 7, cursor: 'pointer', transition: 'all 0.15s', border: `1px solid ${proposalTab === 'file' ? 'rgba(124,58,237,0.5)' : 'var(--border)'}`, background: proposalTab === 'file' ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.03)', color: proposalTab === 'file' ? '#a78bfa' : 'var(--text-3)' }}>
+                    <Upload size={11} /> Upload file
+                  </button>
+                </div>
+
+                {proposalTab === 'url' ? (
+                  <div>
+                    <input
+                      value={proposalUrl}
+                      onChange={e => setProposalUrl(e.target.value)}
+                      placeholder="Google Docs, Notion, Dropbox, any public PDF URL…"
+                      className="input-dark"
+                      style={{ fontSize: 12 }}
+                    />
+                    <div className="text-[10px] text-muted mt-1.5">
+                      Works with Google Docs, Notion pages, Dropbox, Docsend, direct PDF links
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      gap: 6, padding: '18px 14px', borderRadius: 10, cursor: 'pointer',
+                      border: `1px dashed ${proposalFile ? 'rgba(124,58,237,0.5)' : 'rgba(255,255,255,0.12)'}`,
+                      background: proposalFile ? 'rgba(124,58,237,0.06)' : 'rgba(255,255,255,0.02)',
+                      transition: 'all 0.15s',
+                    }}>
+                      <input type="file" accept=".pdf,.doc,.docx,.txt" style={{ display: 'none' }}
+                        onChange={e => setProposalFile(e.target.files?.[0] || null)} />
+                      {proposalFile ? (
+                        <>
+                          <FileText size={18} style={{ color: '#a78bfa' }} />
+                          <span className="text-[12px] font-semibold" style={{ color: '#a78bfa' }}>{proposalFile.name}</span>
+                          <span className="text-[10px] text-muted">{(proposalFile.size / 1024).toFixed(0)} KB · click to change</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload size={18} style={{ color: 'var(--text-3)' }} />
+                          <span className="text-[12px] text-muted">Drop PDF, DOCX, or DOC here</span>
+                          <span className="text-[10px] text-muted">or click to browse</span>
+                        </>
+                      )}
+                    </label>
+                  </div>
+                )}
+
+                {/* Learn from proposal info box */}
+                {learnToggle && (
+                  <div className="flex items-start gap-2 mt-3" style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.15)' }}>
+                    <Zap size={11} style={{ color: '#a78bfa', marginTop: 1, flexShrink: 0 }} />
+                    <span className="text-[10px] text-muted" style={{ lineHeight: 1.55 }}>
+                      Agent will read the proposal, extract value propositions &amp; use cases, update discovery rules, and surface similar companies automatically.
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Note */}
           <div>
-            <label className="text-[11px] font-semibold text-muted block mb-1.5 uppercase tracking-wide">Note (optional)</label>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-muted block mb-1.5">Note (optional)</label>
             <textarea value={note} onChange={e => setNote(e.target.value)}
-              placeholder="Why are you adding this lead? What do you know so far?"
-              rows={2} className="input-dark" style={{ resize: 'none' }} />
+              placeholder="What do you know about this deal so far?"
+              rows={2} className="input-dark" style={{ resize: 'none', fontSize: 13 }} />
           </div>
+
+          {/* Actions */}
           <div className="flex gap-2 pt-1">
             <button onClick={onClose} className="btn btn-secondary" style={{ flex: 1 }}>Cancel</button>
-            <button onClick={save} disabled={saving || !name.trim()} className="btn btn-primary" style={{ flex: 2 }}>
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add to CRM
+            <button onClick={save} disabled={!canSave}
+              className="btn btn-primary" style={{ flex: 2, justifyContent: 'center' }}>
+              {saving
+                ? <><Loader2 size={14} className="animate-spin" /> Saving…</>
+                : hasProposal && learnToggle
+                  ? <><Sparkles size={14} /> Add &amp; learn from proposal</>
+                  : <><Plus size={14} /> Add to CRM</>}
             </button>
           </div>
         </div>

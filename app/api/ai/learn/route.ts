@@ -227,6 +227,10 @@ export async function POST(req: NextRequest) {
 
       if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
 
+      // Allow caller to pass a custom source_name (e.g. "Proposal — Binance")
+      const customSourceName = formData.get('source_name') as string | null
+      if (customSourceName) sourceName = customSourceName
+
       const arrayBuffer = await file.arrayBuffer()
       const buffer = Buffer.from(arrayBuffer)
       mimeType = file.type || 'application/octet-stream'
