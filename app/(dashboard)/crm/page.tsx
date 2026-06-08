@@ -556,7 +556,7 @@ export default function CRMPage() {
   const [leads, setLeads] = useState<LeadWithActivity[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<LeadWithActivity | null>(null)
-  const [view, setView] = useState<'pipeline' | 'followups'>('pipeline')
+  const [view, setView] = useState<'pipeline' | 'followups' | 'wins'>('pipeline')
   const [showAddLead, setShowAddLead] = useState(false)
 
   const loadData = useCallback(async () => {
@@ -648,6 +648,10 @@ export default function CRMPage() {
             <Bell size={12} style={{ display: 'inline', marginRight: 5 }} />Follow-ups
             {overdue.length > 0 && <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 999, background: '#fb7185', color: 'white', fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{overdue.length}</span>}
           </button>
+          <button onClick={() => setView('wins')} style={{ padding: '7px 14px', borderRadius: 9, fontSize: 12, fontWeight: 600, cursor: 'pointer', position: 'relative', border: `1px solid ${view === 'wins' ? 'rgba(74,222,128,0.45)' : 'rgba(255,255,255,0.08)'}`, background: view === 'wins' ? 'rgba(74,222,128,0.1)' : 'rgba(255,255,255,0.04)', color: view === 'wins' ? '#4ade80' : 'rgb(160,165,195)' }}>
+            <Trophy size={12} style={{ display: 'inline', marginRight: 5 }} />Integrations
+            {wonCount > 0 && <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 999, background: '#4ade80', color: '#052e16', fontSize: 9, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{wonCount}</span>}
+          </button>
           <button onClick={() => setShowAddLead(true)}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 9, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: 'linear-gradient(135deg,rgba(124,58,237,0.8),rgba(56,189,248,0.8))', border: 'none', color: 'white' }}>
             <Plus size={13} /> Add lead
@@ -702,7 +706,7 @@ export default function CRMPage() {
               })}
             </div>
           </div>
-        ) : (
+        ) : view === 'followups' ? (
           /* Follow-ups view */
           <div style={{ maxWidth: 680 }}>
             {allFollowUps.length === 0 ? (
@@ -753,6 +757,151 @@ export default function CRMPage() {
                       style={{ flexShrink: 0, padding: '6px 14px', borderRadius: 9, border: '1px solid rgba(52,211,153,0.25)', background: 'rgba(52,211,153,0.08)', color: '#34d399', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
                       <CheckCircle2 size={13} /> Done
                     </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* ── Integrations (Won) view — Trophy wall ── */
+          <div>
+            {/* Section hero */}
+            <div style={{
+              marginBottom: 32,
+              padding: '28px 32px',
+              background: 'linear-gradient(135deg, rgba(74,222,128,0.07) 0%, rgba(34,211,238,0.05) 50%, rgba(129,140,248,0.05) 100%)',
+              border: '1px solid rgba(74,222,128,0.15)',
+              borderRadius: 20,
+              display: 'flex', alignItems: 'center', gap: 24,
+            }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: 18, flexShrink: 0,
+                background: 'linear-gradient(135deg, rgba(74,222,128,0.2), rgba(34,211,238,0.15))',
+                border: '1px solid rgba(74,222,128,0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 0 32px rgba(74,222,128,0.15)',
+              }}>
+                <Trophy size={28} style={{ color: '#4ade80' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 18, fontWeight: 800, color: 'white', letterSpacing: '-0.01em', marginBottom: 4 }}>
+                  Successfully Integrated Partners
+                </div>
+                <div style={{ fontSize: 13, color: 'rgb(120,127,160)', lineHeight: 1.6, maxWidth: 540 }}>
+                  Every partner here is live on Kima. Volume tracking coming soon — for now, take a moment to appreciate what you've built. 💚
+                </div>
+              </div>
+              <div style={{
+                textAlign: 'center', flexShrink: 0,
+                padding: '12px 24px',
+                background: 'rgba(74,222,128,0.08)',
+                border: '1px solid rgba(74,222,128,0.2)',
+                borderRadius: 14,
+              }}>
+                <div style={{ fontSize: 36, fontWeight: 900, color: '#4ade80', lineHeight: 1 }}>{wonCount}</div>
+                <div style={{ fontSize: 11, color: 'rgb(120,127,160)', marginTop: 4, fontWeight: 600 }}>Live integrations</div>
+              </div>
+            </div>
+
+            {wonCount === 0 ? (
+              /* Empty state */
+              <div style={{
+                textAlign: 'center', padding: '80px 20px',
+                background: 'rgba(255,255,255,0.015)',
+                border: '1px dashed rgba(74,222,128,0.15)',
+                borderRadius: 20,
+              }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>🚀</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'white', marginBottom: 8 }}>Your first win is coming</div>
+                <div style={{ fontSize: 13, color: 'rgb(100,107,140)', lineHeight: 1.7, maxWidth: 360, margin: '0 auto' }}>
+                  Once a deal closes and the integration goes live, it'll appear here as a permanent record of your work.
+                </div>
+                <button onClick={() => setView('pipeline')}
+                  style={{ marginTop: 24, padding: '10px 22px', borderRadius: 11, border: '1px solid rgba(74,222,128,0.3)', background: 'rgba(74,222,128,0.08)', color: '#4ade80', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                  Go close a deal →
+                </button>
+              </div>
+            ) : (
+              /* Trophy grid */
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+                {leads.filter(l => l.status === 'won').map((lead, idx) => (
+                  <div
+                    key={lead.id}
+                    onClick={() => setSelectedLead(lead)}
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(74,222,128,0.06) 0%, rgba(34,211,238,0.04) 100%)',
+                      border: '1px solid rgba(74,222,128,0.2)',
+                      borderRadius: 16, padding: '20px 22px',
+                      cursor: 'pointer', transition: 'all 0.2s',
+                      boxShadow: '0 0 20px rgba(74,222,128,0.04)',
+                      position: 'relative', overflow: 'hidden',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(74,222,128,0.45)'; e.currentTarget.style.boxShadow = '0 0 32px rgba(74,222,128,0.1)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(74,222,128,0.2)'; e.currentTarget.style.boxShadow = '0 0 20px rgba(74,222,128,0.04)'; e.currentTarget.style.transform = 'translateY(0)' }}
+                  >
+                    {/* Background number watermark */}
+                    <div style={{ position: 'absolute', top: 12, right: 16, fontSize: 48, fontWeight: 900, color: 'rgba(74,222,128,0.06)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>#{idx + 1}</div>
+
+                    {/* Header row */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: 'white', letterSpacing: '-0.01em', marginBottom: 3 }}>{lead.company_name}</div>
+                        {lead.website && (
+                          <a href={lead.website} target="_blank" rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            style={{ fontSize: 11, color: 'rgba(74,222,128,0.6)', textDecoration: 'none' }}>
+                            {lead.website.replace(/^https?:\/\//, '')}
+                          </a>
+                        )}
+                      </div>
+                      <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Trophy size={14} style={{ color: '#4ade80' }} />
+                      </div>
+                    </div>
+
+                    {/* Tags row */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 14 }}>
+                      {lead.industry_category && (
+                        <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(34,211,238,0.9)', background: 'rgba(34,211,238,0.08)', border: '1px solid rgba(34,211,238,0.2)', padding: '3px 8px', borderRadius: 6 }}>
+                          {lead.industry_category}
+                        </span>
+                      )}
+                      {lead.product_to_sell && (
+                        <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(129,140,248,0.9)', background: 'rgba(129,140,248,0.08)', border: '1px solid rgba(129,140,248,0.2)', padding: '3px 8px', borderRadius: 6 }}>
+                          {lead.product_to_sell}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Pain point / use case */}
+                    {lead.suggested_use_case && (
+                      <div style={{ fontSize: 12, color: 'rgb(150,160,195)', lineHeight: 1.6, marginBottom: 14, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {lead.suggested_use_case}
+                      </div>
+                    )}
+
+                    {/* Volume placeholder */}
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '10px 12px',
+                      background: 'rgba(0,0,0,0.2)',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                      borderRadius: 10,
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <TrendingUp size={12} style={{ color: 'rgba(74,222,128,0.5)' }} />
+                        <span style={{ fontSize: 11, color: 'rgb(100,107,140)', fontWeight: 600 }}>Volume</span>
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(74,222,128,0.4)', background: 'rgba(74,222,128,0.06)', padding: '2px 8px', borderRadius: 6, border: '1px dashed rgba(74,222,128,0.2)' }}>
+                        Coming soon
+                      </span>
+                    </div>
+
+                    {/* Won date */}
+                    <div style={{ marginTop: 10, fontSize: 10, color: 'rgb(80,87,115)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <CheckCircle2 size={9} style={{ color: 'rgba(74,222,128,0.4)' }} />
+                      Integration live · {new Date(lead.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </div>
                   </div>
                 ))}
               </div>
