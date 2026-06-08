@@ -217,7 +217,7 @@ Return JSON:
 }`
     }
 
-    const result = await claudeJSON({ model: CLAUDE_RESEARCH, system: systemPrompt, user: userPrompt, maxTokens: 2000, temperature: 0.3 })
+    const result = await claudeJSON({ model: CLAUDE_RESEARCH, system: systemPrompt, user: userPrompt, maxTokens: 2000 })
     return NextResponse.json({ success: true, data: result })
 
   } catch (err: unknown) {

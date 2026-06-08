@@ -138,7 +138,6 @@ async function summarizeChunk(chunk: string, chunkIndex: number, totalChunks: nu
     return await claudeText({
       model: CLAUDE_RESEARCH,
       maxTokens: 2000,
-      temperature: 0.2,
       system: `You are a BD intelligence extractor for Kima (cross-chain settlement) and Aeredium (TEE blockchain).
 Extract all BD-relevant information: company names, pain points, market data, competitive signals, funding info, product details, payment/settlement needs.
 This is chunk ${chunkIndex + 1} of ${totalChunks} from "${sourceName}".
@@ -171,7 +170,6 @@ async function synthesizeKnowledge(
     return await claudeJSON({
       model: CLAUDE_RESEARCH,
       maxTokens: 4000,
-      temperature: 0.3,
       system: `You are the intelligence synthesis engine for the Kima BD OS.
 Your job is to extract actionable BD intelligence from any content and convert it into structured knowledge, agent rules, and discovery sources.
 

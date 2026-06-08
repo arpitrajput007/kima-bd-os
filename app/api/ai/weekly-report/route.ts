@@ -62,7 +62,7 @@ Return JSON:
 }`
 
   try {
-    const result = await claudeJSON({ model: CLAUDE_RESEARCH, system: systemPrompt, user: userPrompt, maxTokens: 3000, temperature: 0.4 })
+    const result = await claudeJSON({ model: CLAUDE_RESEARCH, system: systemPrompt, user: userPrompt, maxTokens: 3000 })
 
     // Save report to DB
     const { data: report } = await supabase.from('learning_reports').insert({

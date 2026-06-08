@@ -174,7 +174,7 @@ Return JSON:
   ]
 }`
 
-    const parsed = await claudeJSON({ model: CLAUDE_RESEARCH, system: systemPrompt, user: userPrompt, maxTokens: 1600, temperature: 0.6 })
+    const parsed = await claudeJSON({ model: CLAUDE_RESEARCH, system: systemPrompt, user: userPrompt, maxTokens: 1600 })
     const raw = (Array.isArray(parsed.suggestions) ? parsed.suggestions : [])
       .filter((s: { source_url_or_query?: string }) =>
         !existingUrls.has((s.source_url_or_query || '').toLowerCase().trim()))

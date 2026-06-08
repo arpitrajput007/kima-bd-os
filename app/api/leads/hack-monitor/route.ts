@@ -72,7 +72,6 @@ async function extractHacks(content: string): Promise<Array<{
     const result = await claudeJSON<{ hacks: Array<{ name: string; website: string; hack_date: string; amount_lost: string; hack_type: string; description: string; source_url: string }> }>({
       model: CLAUDE_RESEARCH,
       maxTokens: 2000,
-      temperature: 0.1,
       system: `You are a DeFi security analyst extracting hacked protocol leads for Kima/Aeredium BD.
 ${PRODUCT_BRAIN_COMPACT}
 Kima is positioned as a secure, TEE-backed settlement layer — the antidote to bridge exploits and cross-chain security failures.`,

@@ -161,7 +161,6 @@ async function distill(leadId: string, transcript: { role: string; content: stri
   }>({
     model: CLAUDE_RESEARCH,
     maxTokens: 1200,
-    temperature: 0.3,
     system: `You are the memory engine for the Kima BD OS. Read a discussion between the BD person and the agent about a specific lead, and extract ONLY durable, reusable intelligence worth remembering. Skip pleasantries and obvious facts.`,
     user: `Discussion about "${company}":\n\n${convo}\n\nExtract what's worth saving to long-term memory. Return JSON:
 {
@@ -261,7 +260,6 @@ ${agentContext}`
     const reply = await ct({
       model: CLAUDE_RESEARCH,
       maxTokens: 1100,
-      temperature: 0.5,
       system: systemPrompt,
       user: [
         ...historyMessages.slice(-16).map(m => `${m.role === 'user' ? 'BD' : 'Agent'}: ${m.content}`),

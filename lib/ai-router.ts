@@ -52,10 +52,11 @@ export async function routeJSON<T = Record<string, unknown>>(params: {
   }
 
   // Default: Claude
+  // NOTE: No temperature param — claude-opus-4-8 with thinking: adaptive
+  // does not accept temperature. Omitting it is correct.
   return claudeJSON<T>({
-    model:       params.model       ?? CLAUDE_RESEARCH,
-    maxTokens:   params.maxTokens   ?? 4000,
-    temperature: params.temperature ?? 0.2,
+    model:     params.model     ?? CLAUDE_RESEARCH,
+    maxTokens: params.maxTokens ?? 4000,
     system: params.system,
     user:   params.user,
   })
@@ -84,10 +85,10 @@ export async function routeText(params: {
     return completion.choices[0].message.content || ''
   }
 
+  // NOTE: No temperature param — same reason as claudeJSON above.
   return claudeText({
-    model:       params.model       ?? CLAUDE_RESEARCH,
-    maxTokens:   params.maxTokens   ?? 4000,
-    temperature: params.temperature ?? 0.3,
+    model:     params.model     ?? CLAUDE_RESEARCH,
+    maxTokens: params.maxTokens ?? 4000,
     system: params.system,
     user:   params.user,
   })
