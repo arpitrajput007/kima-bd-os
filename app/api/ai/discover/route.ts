@@ -7,7 +7,7 @@ import { isGenericName } from '@/lib/leadQuality'
 import { exaConfigured, exaSearchCompanies, exaCompanyNews } from '@/lib/exa'
 import { perplexityConfigured, researchCompanyTrigger } from '@/lib/perplexity'
 import { routeJSON, type AIProvider } from '@/lib/ai-router'
-import { CLAUDE_RESEARCH, CLAUDE_FAST } from '@/lib/claude'
+import { claudeJSON, CLAUDE_THINK, CLAUDE_FAST } from '@/lib/claude'
 
 // Deep research (OpenAI + Exa + crawling) per company is slow. Without this the
 // function hits Vercel's default timeout and gets killed before saving leads.
@@ -34,9 +34,11 @@ async function getHunterContacts(website: string): Promise<string> {
   }
 }
 
+// Use service role key on the server so RLS doesn't block lead INSERT/SELECT ops.
+// NEXT_PUBLIC_SUPABASE_ANON_KEY is for client-side browser use only.
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 const CUSTOMER_CATEGORIES = [
@@ -280,12 +282,11 @@ async function deepResearch(
     const hunterData = await getHunterContacts(company.website)
     const hunterContext = hunterData ? `\nVerified emails from Hunter.io database:\n${hunterData}\nSelect the most relevant BD contacts from this list if any, otherwise guess patterns.` : ''
 
-    return await routeJSON({
-      provider,
-      model: provider === 'claude' ? CLAUDE_RESEARCH : 'gpt-4o',
-      maxTokens: 4000,
-      temperature: 0.2,
-      system: `You are a senior BD researcher for Kima and Aeredium.
+    // For Claude: Opus + extended thinking — the ONE place in the whole codebase
+    // where Opus earns its cost. Extended thinking reasons through company-specific
+    // pain points and finds real contacts rather than generic ones.
+    // For OpenAI: standard gpt-4o via routeJSON.
+    const deepResearchSystem = `You are a senior BD researcher for Kima and Aeredium.
 
 ${PRODUCT_BRAIN}
 
@@ -295,8 +296,9 @@ SCORING (0-100):
 High score (70+): clear pain point, active product, matches a target category, decision maker findable
 Medium (40-69): possible fit but unclear pain point or no direct match
 Low (<40): no clear use case for Kima/Aeredium
-${learnedIntelligence || ''}`,
-      user: `Do a deep BD research on this company for Kima/Aeredium:
+${learnedIntelligence || ''}`
+
+    const deepResearchUser = `Do a deep BD research on this company for Kima/Aeredium:
 
 Company: ${company.name}
 Website: ${company.website || 'unknown'}
@@ -356,7 +358,25 @@ Return this exact JSON:
       "contact_confidence": "high|medium|low"
     }
   ]
-}`,
+}`
+
+    if (provider === 'claude') {
+      // Opus + extended thinking: the one place where it earns the cost.
+      return await claudeJSON({
+        model: CLAUDE_THINK,
+        maxTokens: 4000,
+        thinking: true,
+        system: deepResearchSystem,
+        user: deepResearchUser,
+      })
+    }
+    return await routeJSON({
+      provider,
+      model: 'gpt-4o',
+      maxTokens: 4000,
+      temperature: 0.2,
+      system: deepResearchSystem,
+      user: deepResearchUser,
     })
   } catch (e) {
     console.error('[deepResearch]', e)
@@ -372,6 +392,24 @@ export async function POST(req: NextRequest) {
     }
     // research_ai: 'claude' (default) | 'openai' — set by the user in Settings.
     const researchProvider: 'claude' | 'openai' = research_ai === 'openai' ? 'openai' : 'claude'
+
+    // Pre-flight: make sure the selected AI provider is actually configured.
+    // Without this check, auth errors get swallowed deep in extractCompanies/deepResearch
+    // and the pipeline silently returns 0 leads with no visible error.
+    if (researchProvider === 'claude') {
+      const { claudeConfigured } = await import('@/lib/claude')
+      if (!claudeConfigured()) {
+        return NextResponse.json({
+          error: 'ANTHROPIC_API_KEY is not configured. Add it to your .env.local (local) or Render environment (production). Get a key at https://console.anthropic.com',
+        }, { status: 503 })
+      }
+    } else {
+      if (!process.env.OPENAI_API_KEY) {
+        return NextResponse.json({
+          error: 'OPENAI_API_KEY is not configured. Add it to your .env.local (local) or Render environment (production).',
+        }, { status: 503 })
+      }
+    }
 
     // 1. Load the source
     const { data: source, error: srcError } = await supabase

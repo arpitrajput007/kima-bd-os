@@ -12,7 +12,7 @@
 // ============================================================
 
 import OpenAI from 'openai'
-import { claudeJSON, claudeText, CLAUDE_RESEARCH, CLAUDE_FAST } from './claude'
+import { claudeJSON, claudeText, CLAUDE_FAST } from './claude'
 
 export type AIProvider = 'claude' | 'openai'
 
@@ -55,7 +55,7 @@ export async function routeJSON<T = Record<string, unknown>>(params: {
   // NOTE: No temperature param — claude-opus-4-8 with thinking: adaptive
   // does not accept temperature. Omitting it is correct.
   return claudeJSON<T>({
-    model:     params.model     ?? CLAUDE_RESEARCH,
+    model:     params.model     ?? CLAUDE_FAST,
     maxTokens: params.maxTokens ?? 4000,
     system: params.system,
     user:   params.user,
@@ -87,7 +87,7 @@ export async function routeText(params: {
 
   // NOTE: No temperature param — same reason as claudeJSON above.
   return claudeText({
-    model:     params.model     ?? CLAUDE_RESEARCH,
+    model:     params.model     ?? CLAUDE_FAST,
     maxTokens: params.maxTokens ?? 4000,
     system: params.system,
     user:   params.user,

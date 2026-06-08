@@ -12,10 +12,12 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 
-// Models — pick the right tier per task.
-// Research quality matters more than cost, so default to Opus for deep work.
-export const CLAUDE_RESEARCH  = 'claude-opus-4-5'   // deep company research, analysis
-export const CLAUDE_FAST      = 'claude-sonnet-4-5' // fast extraction, lighter tasks
+// Models — tiered by cost/quality trade-off.
+// Use CLAUDE_THINK only when extended reasoning genuinely helps (e.g. deepResearch).
+// For everything else, Sonnet is faster and ~5× cheaper.
+export const CLAUDE_THINK    = 'claude-opus-4-8'   // Opus + thinking — deepResearch ONLY
+export const CLAUDE_RESEARCH = 'claude-sonnet-4-6' // solid research, reports, analysis
+export const CLAUDE_FAST     = 'claude-sonnet-4-6' // fast extraction, lighter tasks
 
 export function claudeConfigured(): boolean {
   return !!process.env.ANTHROPIC_API_KEY
@@ -46,22 +48,29 @@ export async function claudeJSON<T = Record<string, unknown>>(params: {
   user: string
   model?: string
   maxTokens?: number
-  temperature?: number
+  // Set to true only for deep research calls (deepResearch) where extra reasoning
+  // improves quality. Leave false (default) for fast extraction tasks.
+  thinking?: boolean
 }): Promise<T> {
   const client = _client()
+  const model = params.model ?? CLAUDE_RESEARCH
   const systemPrompt =
     params.system.trimEnd() +
     '\n\nCRITICAL: Return ONLY valid JSON — no markdown, no code fences, no explanatory text before or after the JSON.'
 
   const response = await client.messages.create({
-    model: params.model ?? CLAUDE_RESEARCH,
+    model,
     max_tokens: params.maxTokens ?? 4000,
-    temperature: params.temperature ?? 0.2,
+    // Note: temperature/top_p/top_k are removed on Opus 4.7+ — do not add them back.
+    // Enable adaptive thinking only for deep research — not fast extraction.
+    ...(params.thinking ? { thinking: { type: 'adaptive' } } : {}),
     system: systemPrompt,
     messages: [{ role: 'user', content: params.user }],
   })
 
-  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  // When thinking is enabled, content[0] is a thinking block — find the text block explicitly.
+  const textBlock = response.content.find((b): b is Anthropic.TextBlock => b.type === 'text')
+  const text = textBlock?.text ?? ''
   const json = extractJson(text)
   return JSON.parse(json) as T
 }
@@ -73,19 +82,22 @@ export async function claudeText(params: {
   user: string
   model?: string
   maxTokens?: number
-  temperature?: number
+  thinking?: boolean
 }): Promise<string> {
   const client = _client()
 
   const response = await client.messages.create({
     model: params.model ?? CLAUDE_RESEARCH,
     max_tokens: params.maxTokens ?? 4000,
-    temperature: params.temperature ?? 0.3,
+    // Note: temperature/top_p/top_k are removed on Opus 4.7+ — do not add them back.
+    ...(params.thinking ? { thinking: { type: 'adaptive' } } : {}),
     system: params.system,
     messages: [{ role: 'user', content: params.user }],
   })
 
-  return response.content[0].type === 'text' ? response.content[0].text : ''
+  // When thinking is enabled, content[0] may be a thinking block — find text explicitly.
+  const textBlock = response.content.find((b): b is Anthropic.TextBlock => b.type === 'text')
+  return textBlock?.text ?? ''
 }
 
 // ── Streaming text — for routes that stream back to the UI ──────────────────
@@ -94,14 +106,13 @@ export async function claudeStream(params: {
   messages: Array<{ role: 'user' | 'assistant'; content: string }>
   model?: string
   maxTokens?: number
-  temperature?: number
 }): Promise<ReadableStream<Uint8Array>> {
   const client = _client()
 
   const stream = client.messages.stream({
     model: params.model ?? CLAUDE_RESEARCH,
     max_tokens: params.maxTokens ?? 4000,
-    temperature: params.temperature ?? 0.3,
+    // Note: temperature/top_p/top_k are removed on Opus 4.7+ — do not add them back.
     system: params.system,
     messages: params.messages,
   })
