@@ -425,13 +425,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Source has no URL or query configured' }, { status: 400 })
     }
 
-    // 2. Check current category counts. Only count *unworked* leads — once a lead
-    // is contacted/reserved/qualified it's "in play" and should NOT block new
-    // discovery, otherwise categories permanently clog and no fresh leads appear.
+    // 2. Check current category counts. Only count *recent* unworked leads — once a
+    // lead is contacted/reserved/qualified it stops counting (it's "in play").
+    // Also exclude leads older than 7 days: a backlog from last week should never
+    // permanently block fresh discovery. Stale leads are still in the DB and visible;
+    // they just don't occupy a cap slot so the pipeline keeps flowing.
+    const capCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
     const { data: existingLeads } = await supabase
       .from('leads')
       .select('customer_category')
       .in('status', CAP_BLOCKING_STATUSES)
+      .gte('created_at', capCutoff)
 
     const categoryCounts: Record<string, number> = {}
     CUSTOMER_CATEGORIES.forEach(c => { categoryCounts[c] = 0 })
