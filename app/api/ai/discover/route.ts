@@ -7,7 +7,7 @@ import { isGenericName } from '@/lib/leadQuality'
 import { exaConfigured, exaSearchCompanies, exaCompanyNews } from '@/lib/exa'
 import { perplexityConfigured, researchCompanyTrigger } from '@/lib/perplexity'
 import { routeJSON, type AIProvider } from '@/lib/ai-router'
-import { claudeJSON, CLAUDE_THINK, CLAUDE_FAST } from '@/lib/claude'
+import { CLAUDE_FAST } from '@/lib/claude'
 
 // Deep research (OpenAI + Exa + crawling) per company is slow. Without this the
 // function hits Vercel's default timeout and gets killed before saving leads.
@@ -224,7 +224,7 @@ EXPAND CATEGORIES INTO REAL COMPANIES:
 Content:
 ${content}
 
-Return up to 15 SPECIFIC, REAL, NAMED companies. Never output a category/segment as a name. Return JSON:
+Return up to 8 SPECIFIC, REAL, NAMED companies (quality over quantity — 8 great picks beats 15 mediocre ones). Never output a category/segment as a name. Return JSON:
 {
   "companies": [
     {
@@ -479,7 +479,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Apollo API key not configured. Add APOLLO_API_KEY to your environment.' }, { status: 400 })
       }
       const q = sourceQuery.replace(/^apollo:/i, '').trim()
-      companies = await apolloSearchCompanies(q, 12)
+      companies = await apolloSearchCompanies(q, 8)
       if (!companies.length) {
         return NextResponse.json({ error: 'Apollo returned no companies for that query — try different keywords.' }, { status: 400 })
       }
@@ -489,14 +489,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'EXA_API_KEY not configured.' }, { status: 400 })
       }
       const { exaFindSimilar } = await import('@/lib/exa')
-      const similar = await exaFindSimilar(sourceQuery, 12)
+      const similar = await exaFindSimilar(sourceQuery, 8)
       companies = similar
       if (!companies.length) {
         return NextResponse.json({ error: 'Exa could not find similar companies for that URL.' }, { status: 400 })
       }
     } else if (source.source_type === 'exa_search' || (!sourceQuery.startsWith('http') && exaConfigured())) {
       // Exa neural search — semantically finds real companies matching the query.
-      companies = await exaSearchCompanies(sourceQuery, 12)
+      companies = await exaSearchCompanies(sourceQuery, 8)
       if (!companies.length) {
         return NextResponse.json({ error: 'Exa returned no companies for that query — try different keywords.' }, { status: 400 })
       }
