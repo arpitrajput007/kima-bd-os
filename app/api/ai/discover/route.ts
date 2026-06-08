@@ -360,19 +360,14 @@ Return this exact JSON:
   ]
 }`
 
-    if (provider === 'claude') {
-      // Opus + extended thinking: the one place where it earns the cost.
-      return await claudeJSON({
-        model: CLAUDE_THINK,
-        maxTokens: 4000,
-        thinking: true,
-        system: deepResearchSystem,
-        user: deepResearchUser,
-      })
-    }
+    // Sonnet for Claude, gpt-4o for OpenAI.
+    // NOTE: Do NOT use Opus + thinking here — on Vercel Hobby (60s hard cap),
+    // Opus takes ~20-25s per company × 8 companies = ~200s → timeout → 0 leads.
+    // Sonnet takes ~3-5s per company × 8 = ~30-40s → fits comfortably within 60s.
+    // Sonnet quality is more than sufficient for company pain-point research.
     return await routeJSON({
       provider,
-      model: 'gpt-4o',
+      model: provider === 'claude' ? CLAUDE_FAST : 'gpt-4o',
       maxTokens: 4000,
       temperature: 0.2,
       system: deepResearchSystem,
