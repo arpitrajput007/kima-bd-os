@@ -9,7 +9,8 @@ import {
   MessageSquare, Phone, Mail, Calendar,
   Loader2, ArrowRight, AlertCircle, TrendingUp,
   StickyNote, Bell, Check, Send, AtSign, Globe,
-  RefreshCw, ExternalLink,
+  RefreshCw, ExternalLink, Trophy, XCircle,
+  FileText, Handshake, Zap, ChevronLeft, ChevronDown,
 } from 'lucide-react'
 import { cn, getScoreBg, truncate } from '@/lib/utils'
 import type { Lead } from '@/lib/types'
@@ -33,11 +34,17 @@ interface LeadWithActivity extends Lead {
   activities?: Activity[]
 }
 
-const PIPELINE_STAGES: { status: LeadStatus; label: string; color: string; bg: string }[] = [
-  { status: 'new',            label: 'New',       color: '#a78bfa', bg: 'rgba(167,139,250,0.1)' },
-  { status: 'contacted',      label: 'Contacted', color: '#38bdf8', bg: 'rgba(56,189,248,0.1)'  },
-  { status: 'replied',        label: 'Replied',   color: '#fbbf24', bg: 'rgba(251,191,36,0.1)'  },
-  { status: 'meeting_booked', label: 'Meeting',   color: '#34d399', bg: 'rgba(52,211,153,0.1)'  },
+// ── Pipeline stages — full lifecycle ─────────────────────────
+const PIPELINE_STAGES: { status: LeadStatus; label: string; color: string; bg: string; emoji?: string; terminal?: boolean }[] = [
+  { status: 'new',            label: 'New',          color: '#a78bfa', bg: 'rgba(167,139,250,0.1)' },
+  { status: 'contacted',      label: 'Contacted',    color: '#38bdf8', bg: 'rgba(56,189,248,0.1)'  },
+  { status: 'replied',        label: 'Replied',      color: '#fbbf24', bg: 'rgba(251,191,36,0.1)'  },
+  { status: 'meeting_booked', label: 'Meeting',      color: '#34d399', bg: 'rgba(52,211,153,0.1)'  },
+  { status: 'proposal_sent',  label: 'Proposal',     color: '#fb923c', bg: 'rgba(251,146,60,0.1)'  },
+  { status: 'negotiating',    label: 'Negotiating',  color: '#818cf8', bg: 'rgba(129,140,248,0.1)' },
+  { status: 'integration',    label: 'Integrating',  color: '#22d3ee', bg: 'rgba(34,211,238,0.1)'  },
+  { status: 'won',            label: 'Won',          color: '#4ade80', bg: 'rgba(74,222,128,0.12)', emoji: '🎉', terminal: true },
+  { status: 'lost',           label: 'Lost',         color: '#f43f5e', bg: 'rgba(244,63,94,0.1)',   emoji: '✗',  terminal: true },
 ]
 
 // Channel → icon + label + color
@@ -62,7 +69,6 @@ const TYPE_META: Record<ActivityType, { label: string; color: string; icon: LIco
 }
 
 function getActivityMeta(a: Activity) {
-  // If it has a channel (from "Mark Contacted"), show channel info instead of type
   if (a.channel && CHANNEL_META[a.channel]) return CHANNEL_META[a.channel]
   return TYPE_META[a.type] || TYPE_META.note
 }
@@ -197,6 +203,9 @@ function AddLeadModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // Only show top-of-funnel stages for adding new leads
+  const ADD_LEAD_STAGES = PIPELINE_STAGES.filter(s => ['new', 'contacted', 'replied', 'meeting_booked'].includes(s.status))
+
   const save = async () => {
     if (!name.trim()) { toast.error('Company name is required'); return }
     setSaving(true)
@@ -240,7 +249,7 @@ function AddLeadModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
           <div>
             <label style={{ fontSize: 11, fontWeight: 600, color: 'rgb(150,155,185)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Initial stage</label>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {PIPELINE_STAGES.map(s => (
+              {ADD_LEAD_STAGES.map(s => (
                 <button key={s.status} onClick={() => setStatus(s.status)}
                   style={{ padding: '6px 13px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${status === s.status ? s.color + '60' : 'rgba(255,255,255,0.08)'}`, background: status === s.status ? s.color + '18' : 'rgba(255,255,255,0.03)', color: status === s.status ? s.color : 'rgb(150,155,185)' }}>
                   {s.label}
@@ -261,6 +270,38 @@ function AddLeadModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add to CRM
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Stage Rail ─────────────────────────────────────────────────
+function StageRail({ currentStatus, onMove }: { currentStatus: LeadStatus; onMove: (s: LeadStatus) => void }) {
+  const currentIdx = PIPELINE_STAGES.findIndex(s => s.status === currentStatus)
+
+  return (
+    <div style={{ overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
+      <div style={{ display: 'flex', gap: 4, minWidth: 'max-content' }}>
+        {PIPELINE_STAGES.map((s, idx) => {
+          const isActive = s.status === currentStatus
+          const isPast = idx < currentIdx && !s.terminal
+          return (
+            <button key={s.status} onClick={() => onMove(s.status)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                whiteSpace: 'nowrap', transition: 'all 0.15s',
+                border: `1px solid ${isActive ? s.color + '70' : isPast ? s.color + '25' : 'rgba(255,255,255,0.07)'}`,
+                background: isActive ? s.color + '22' : isPast ? s.color + '0a' : 'rgba(255,255,255,0.02)',
+                color: isActive ? s.color : isPast ? s.color + 'aa' : 'rgb(120,127,160)',
+                opacity: isPast ? 0.7 : 1,
+              }}>
+              {s.emoji && <span style={{ fontSize: 10 }}>{s.emoji}</span>}
+              {s.label}
+              {isActive && <span style={{ width: 5, height: 5, borderRadius: 999, background: s.color, display: 'inline-block', boxShadow: `0 0 6px ${s.color}` }} />}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
@@ -292,11 +333,27 @@ function LeadFlyout({ lead, onClose, onActivityAdded, onStatusChange }: {
   const timeline = activities.filter(a => !(a.type === 'follow_up' && !a.completed_at))
 
   const stage = PIPELINE_STAGES.find(s => s.status === lead.status)
+  const isWon = lead.status === 'won'
+  const isLost = lead.status === 'lost'
 
   return (
     <>
       <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(4,4,10,0.5)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
       <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 201, width: 'min(500px,100vw)', background: 'linear-gradient(180deg,rgb(16,17,27),rgb(11,11,18))', borderLeft: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', boxShadow: '-40px 0 80px rgba(0,0,0,0.7)' }}>
+
+        {/* Won/Lost banner */}
+        {(isWon || isLost) && (
+          <div style={{
+            padding: '10px 22px', display: 'flex', alignItems: 'center', gap: 8,
+            background: isWon ? 'rgba(74,222,128,0.08)' : 'rgba(244,63,94,0.08)',
+            borderBottom: `1px solid ${isWon ? 'rgba(74,222,128,0.2)' : 'rgba(244,63,94,0.2)'}`,
+          }}>
+            {isWon
+              ? <><Trophy size={14} style={{ color: '#4ade80', flexShrink: 0 }} /><span style={{ fontSize: 12, fontWeight: 700, color: '#4ade80' }}>Deal Won 🎉 — Integration live</span></>
+              : <><XCircle size={14} style={{ color: '#f43f5e', flexShrink: 0 }} /><span style={{ fontSize: 12, fontWeight: 700, color: '#f43f5e' }}>Deal Lost — Marked closed</span></>
+            }
+          </div>
+        )}
 
         {/* Header */}
         <div style={{ padding: '20px 22px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
@@ -307,7 +364,9 @@ function LeadFlyout({ lead, onClose, onActivityAdded, onStatusChange }: {
               </Link>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
                 {stage && (
-                  <span style={{ fontSize: 10, fontWeight: 700, color: stage.color, background: stage.bg, border: `1px solid ${stage.color}40`, padding: '2px 8px', borderRadius: 999 }}>{stage.label}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: stage.color, background: stage.bg, border: `1px solid ${stage.color}40`, padding: '2px 8px', borderRadius: 999 }}>
+                    {stage.emoji ? `${stage.emoji} ` : ''}{stage.label}
+                  </span>
                 )}
                 {lead.lead_score != null && (
                   <span className={cn('badge', getScoreBg(lead.lead_score))} style={{ fontSize: 10 }}>{lead.lead_score}</span>
@@ -322,16 +381,9 @@ function LeadFlyout({ lead, onClose, onActivityAdded, onStatusChange }: {
             <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: 'rgb(150,155,185)', cursor: 'pointer', padding: '5px 6px', flexShrink: 0, display: 'flex' }}><X size={14} /></button>
           </div>
 
-          {/* Move stage */}
+          {/* Stage rail — scrollable */}
           <div style={{ fontSize: 10, fontWeight: 600, color: 'rgb(100,107,140)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>Move stage</div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {PIPELINE_STAGES.map(s => (
-              <button key={s.status} onClick={() => onStatusChange(lead.id, s.status)}
-                style={{ flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s', border: `1px solid ${lead.status === s.status ? s.color + '70' : 'rgba(255,255,255,0.07)'}`, background: lead.status === s.status ? s.color + '22' : 'rgba(255,255,255,0.03)', color: lead.status === s.status ? s.color : 'rgb(130,135,165)' }}>
-                {s.label}
-              </button>
-            ))}
-          </div>
+          <StageRail currentStatus={lead.status} onMove={(s) => onStatusChange(lead.id, s)} />
         </div>
 
         {/* Pending follow-ups */}
@@ -430,28 +482,42 @@ function LeadFlyout({ lead, onClose, onActivityAdded, onStatusChange }: {
 }
 
 // ── Pipeline card ─────────────────────────────────────────────
-function PipelineCard({ lead, stageColor, onClick }: { lead: LeadWithActivity; stageColor: string; onClick: () => void }) {
+function PipelineCard({ lead, stage, onClick }: { lead: LeadWithActivity; stage: typeof PIPELINE_STAGES[number]; onClick: () => void }) {
   const lastActivity = (lead.activities || []).find(a => a.type !== 'status_change')
   const pendingFollowUp = (lead.activities || []).find(a => a.type === 'follow_up' && !a.completed_at)
   const isOverdue = pendingFollowUp?.scheduled_at && new Date(pendingFollowUp.scheduled_at) < new Date()
+  const isWon = stage.status === 'won'
+  const isLost = stage.status === 'lost'
 
   return (
     <div onClick={onClick}
-      style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '14px 15px', cursor: 'pointer', transition: 'all 0.15s' }}
-      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = stageColor + '40' }}
-      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.025)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)' }}>
+      style={{
+        background: isWon ? 'rgba(74,222,128,0.04)' : isLost ? 'rgba(244,63,94,0.03)' : 'rgba(255,255,255,0.025)',
+        border: isWon ? '1px solid rgba(74,222,128,0.25)' : isLost ? '1px solid rgba(244,63,94,0.15)' : '1px solid rgba(255,255,255,0.07)',
+        borderRadius: 12, padding: '14px 15px', cursor: 'pointer', transition: 'all 0.15s',
+        boxShadow: isWon ? '0 0 16px rgba(74,222,128,0.06)' : 'none',
+        opacity: isLost ? 0.65 : 1,
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = isWon ? 'rgba(74,222,128,0.08)' : isLost ? 'rgba(244,63,94,0.07)' : 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = stage.color + '40' }}
+      onMouseLeave={e => { e.currentTarget.style.background = isWon ? 'rgba(74,222,128,0.04)' : isLost ? 'rgba(244,63,94,0.03)' : 'rgba(255,255,255,0.025)'; e.currentTarget.style.borderColor = isWon ? 'rgba(74,222,128,0.25)' : isLost ? 'rgba(244,63,94,0.15)' : 'rgba(255,255,255,0.07)' }}>
 
       {/* Company + score */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 7 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'white', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{lead.company_name}</div>
-        {lead.lead_score != null && (
+        <div style={{
+          fontSize: 13, fontWeight: 700, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+          color: isLost ? 'rgb(150,155,185)' : 'white',
+          textDecoration: isLost ? 'line-through' : 'none',
+        }}>{lead.company_name}</div>
+        {isWon && <Trophy size={12} style={{ color: '#4ade80', flexShrink: 0 }} />}
+        {isLost && <XCircle size={12} style={{ color: '#f43f5e', flexShrink: 0, opacity: 0.6 }} />}
+        {!isWon && !isLost && lead.lead_score != null && (
           <span className={cn('badge', getScoreBg(lead.lead_score))} style={{ fontSize: 9, flexShrink: 0 }}>{lead.lead_score}</span>
         )}
       </div>
 
       {/* Pain point */}
       {lead.pain_point && (
-        <div style={{ fontSize: 11, color: 'rgb(140,145,175)', lineHeight: 1.5, marginBottom: 10, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        <div style={{ fontSize: 11, color: isLost ? 'rgb(100,105,130)' : 'rgb(140,145,175)', lineHeight: 1.5, marginBottom: 10, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {lead.pain_point}
         </div>
       )}
@@ -498,7 +564,7 @@ export default function CRMPage() {
     const { data: leadsData } = await supabase
       .from('leads')
       .select('*')
-      .not('status', 'in', '("rejected","archived","reserved")')
+      .not('status', 'in', '(\"rejected\",\"archived\",\"reserved\")')
       .order('lead_score', { ascending: false, nullsFirst: false })
 
     const { data: activitiesData } = await supabase
@@ -542,8 +608,20 @@ export default function CRMPage() {
     toast.success('Follow-up marked done'); loadData()
   }
 
-  const stats = PIPELINE_STAGES.map(s => ({ ...s, count: leads.filter(l => l.status === s.status).length }))
-  const totalContacted = leads.filter(l => l.status !== 'new').length
+  // Stats: one per stage + overdue
+  const stageCounts = PIPELINE_STAGES.map(s => ({ ...s, count: leads.filter(l => l.status === s.status).length }))
+  const totalActive = leads.filter(l => !['won', 'lost'].includes(l.status)).length
+  const wonCount = leads.filter(l => l.status === 'won').length
+  const lostCount = leads.filter(l => l.status === 'lost').length
+
+  // Stats strip items — show early stages + terminal + overdue
+  const statsItems = [
+    ...PIPELINE_STAGES.slice(0, 4).map(s => ({ label: s.label, count: stageCounts.find(x => x.status === s.status)?.count || 0, color: s.color, border: s.color + '22' })),
+    { label: 'Proposal+', count: stageCounts.filter(x => ['proposal_sent','negotiating','integration'].includes(x.status)).reduce((a,b) => a + b.count, 0), color: '#fb923c', border: 'rgba(251,146,60,0.2)' },
+    { label: 'Won 🎉', count: wonCount, color: '#4ade80', border: 'rgba(74,222,128,0.25)' },
+    { label: 'Lost', count: lostCount, color: '#f43f5e', border: 'rgba(244,63,94,0.2)' },
+    { label: 'Overdue', count: overdue.length, color: '#fb7185', border: 'rgba(251,113,133,0.2)' },
+  ]
 
   return (
     <div className="fade-in">
@@ -554,7 +632,7 @@ export default function CRMPage() {
             <Kanban size={18} style={{ color: '#a78bfa' }} /> CRM Pipeline
           </h1>
           <p className="text-[12px] mt-1 font-medium" style={{ color: 'rgb(100,106,135)' }}>
-            {totalContacted} leads in progress · {overdue.length > 0 ? `${overdue.length} overdue follow-ups` : 'All follow-ups on track'}
+            {totalActive} active · {wonCount} won · {lostCount} lost · {overdue.length > 0 ? `${overdue.length} overdue` : 'All follow-ups on track'}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -579,17 +657,13 @@ export default function CRMPage() {
 
       <div style={{ padding: '20px 36px' }}>
         {/* Stats strip */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, marginBottom: 24 }}>
-          {stats.map(s => (
-            <div key={s.status} style={{ background: 'rgba(255,255,255,0.025)', border: `1px solid ${s.color}22`, borderRadius: 12, padding: '14px 16px' }}>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 24, overflowX: 'auto', paddingBottom: 2 }}>
+          {statsItems.map(s => (
+            <div key={s.label} style={{ background: 'rgba(255,255,255,0.025)', border: `1px solid ${s.border}`, borderRadius: 12, padding: '14px 20px', flexShrink: 0, minWidth: 90 }}>
               <div style={{ fontSize: 26, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.count}</div>
-              <div style={{ fontSize: 11, color: 'rgb(120,127,160)', marginTop: 5 }}>{s.label}</div>
+              <div style={{ fontSize: 11, color: 'rgb(120,127,160)', marginTop: 5, whiteSpace: 'nowrap' }}>{s.label}</div>
             </div>
           ))}
-          <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(251,113,133,0.2)', borderRadius: 12, padding: '14px 16px' }}>
-            <div style={{ fontSize: 26, fontWeight: 800, color: '#fb7185', lineHeight: 1 }}>{overdue.length}</div>
-            <div style={{ fontSize: 11, color: 'rgb(120,127,160)', marginTop: 5 }}>Overdue</div>
-          </div>
         </div>
 
         {loading ? (
@@ -598,30 +672,35 @@ export default function CRMPage() {
             <div style={{ fontSize: 13 }}>Loading CRM…</div>
           </div>
         ) : view === 'pipeline' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, alignItems: 'start' }}>
-            {PIPELINE_STAGES.map(stage => {
-              const stageLeads = leads.filter(l => l.status === stage.status)
-              return (
-                <div key={stage.status}>
-                  {/* Column header */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '0 2px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: 999, background: stage.color, boxShadow: `0 0 6px ${stage.color}80` }} />
-                      <span style={{ fontSize: 12, fontWeight: 700, color: 'white' }}>{stage.label}</span>
+          /* Horizontal-scrolling Kanban — 9 fixed-width columns */
+          <div style={{ overflowX: 'auto', paddingBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 14, minWidth: 'max-content', alignItems: 'start' }}>
+              {PIPELINE_STAGES.map(stage => {
+                const stageLeads = leads.filter(l => l.status === stage.status)
+                return (
+                  <div key={stage.status} style={{ width: 230, flexShrink: 0 }}>
+                    {/* Column header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '0 2px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: 999, background: stage.color, boxShadow: `0 0 6px ${stage.color}80` }} />
+                        <span style={{ fontSize: 12, fontWeight: 700, color: 'white' }}>
+                          {stage.emoji ? `${stage.emoji} ` : ''}{stage.label}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: stage.color, background: stage.bg, border: `1px solid ${stage.color}30`, padding: '2px 8px', borderRadius: 999 }}>{stageLeads.length}</span>
                     </div>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: stage.color, background: stage.bg, border: `1px solid ${stage.color}30`, padding: '2px 8px', borderRadius: 999 }}>{stageLeads.length}</span>
+                    {/* Cards */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {stageLeads.length === 0 ? (
+                        <div style={{ padding: '24px 14px', background: 'rgba(255,255,255,0.015)', border: '1px dashed rgba(255,255,255,0.07)', borderRadius: 12, textAlign: 'center', fontSize: 11, color: 'rgb(80,85,110)' }}>No leads yet</div>
+                      ) : stageLeads.map(lead => (
+                        <PipelineCard key={lead.id} lead={lead} stage={stage} onClick={() => setSelectedLead(lead)} />
+                      ))}
+                    </div>
                   </div>
-                  {/* Cards */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {stageLeads.length === 0 ? (
-                      <div style={{ padding: '24px 14px', background: 'rgba(255,255,255,0.015)', border: '1px dashed rgba(255,255,255,0.07)', borderRadius: 12, textAlign: 'center', fontSize: 11, color: 'rgb(80,85,110)' }}>No leads yet</div>
-                    ) : stageLeads.map(lead => (
-                      <PipelineCard key={lead.id} lead={lead} stageColor={stage.color} onClick={() => setSelectedLead(lead)} />
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
         ) : (
           /* Follow-ups view */
