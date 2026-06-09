@@ -443,8 +443,22 @@ export default function TodayPage() {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
+  // Build set of company names that have already been touched (any non-READY status,
+  // or contacted_at is set). Used to exclude duplicates where the same company got
+  // re-qualified as 'new' after already being contacted through a different path.
+  const touchedCompanyNames = new Set(
+    leads
+      .filter(l => !READY_STATUSES.includes(l.status) || !!l.contacted_at)
+      .map(l => l.company_name.toLowerCase().trim())
+  )
+
   // All researched leads you haven't reached out to yet (sorted by score from the query).
-  const readyLeads = leads.filter(l => READY_STATUSES.includes(l.status))
+  // Exclude: non-READY status · contacted_at set · same company already touched elsewhere.
+  const readyLeads = leads.filter(l =>
+    READY_STATUSES.includes(l.status) &&
+    !l.contacted_at &&
+    !touchedCompanyNames.has(l.company_name.toLowerCase().trim())
+  )
 
   // Leads that arrived in the last 24 hours — drives the dynamic daily goal.
   const freshLeads = readyLeads.filter(l => new Date(l.created_at) >= last24h)
