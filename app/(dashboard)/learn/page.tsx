@@ -7,10 +7,11 @@ import {
   Zap, Loader2, CheckCircle, AlertCircle, Archive, Trash2,
   Tag, Clock, Brain, Sparkles, ChevronDown, ChevronUp, X,
   Plus, Globe, FileUp, MessageSquare, Database, Activity,
+  ThumbsUp, ThumbsDown, Bell, Lightbulb, ShieldCheck,
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 import { toast } from 'sonner'
-import type { AgentKnowledge } from '@/lib/types'
+import type { AgentKnowledge, AgentRule } from '@/lib/types'
 
 type InputMode = 'url' | 'text' | 'file' | 'image'
 
@@ -102,8 +103,11 @@ export default function LearnPage() {
   const [knowledgeItems, setKnowledgeItems] = useState<AgentKnowledge[]>([])
   const [loadingKnowledge, setLoadingKnowledge] = useState(true)
   const [expandedId, setExpandedId]   = useState<string | null>(null)
+  const [pendingSuggestions, setPendingSuggestions] = useState<AgentRule[]>([])
+  const [approvingId, setApprovingId] = useState<string | null>(null)
   const fileInputRef  = useRef<HTMLInputElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const suggestionsRef = useRef<HTMLDivElement>(null)
 
   const loadKnowledge = async () => {
     setLoadingKnowledge(true)
@@ -115,7 +119,35 @@ export default function LearnPage() {
     setLoadingKnowledge(false)
   }
 
-  useEffect(() => { loadKnowledge() }, []) // eslint-disable-line
+  const loadPendingSuggestions = async () => {
+    const { data } = await supabase
+      .from('agent_rules')
+      .select('*')
+      .eq('status', 'pending_approval')
+      .order('created_at', { ascending: false })
+    setPendingSuggestions((data as AgentRule[]) || [])
+  }
+
+  const approveSuggestion = async (rule: AgentRule) => {
+    setApprovingId(rule.id)
+    const { error } = await supabase
+      .from('agent_rules')
+      .update({ status: 'active', updated_at: new Date().toISOString() })
+      .eq('id', rule.id)
+    if (error) { toast.error('Failed to approve'); setApprovingId(null); return }
+    toast.success('Rule saved to memory ✓')
+    setPendingSuggestions(prev => prev.filter(r => r.id !== rule.id))
+    setApprovingId(null)
+  }
+
+  const dismissSuggestion = async (id: string) => {
+    const { error } = await supabase.from('agent_rules').delete().eq('id', id)
+    if (error) { toast.error('Failed to dismiss'); return }
+    toast.success('Suggestion dismissed')
+    setPendingSuggestions(prev => prev.filter(r => r.id !== id))
+  }
+
+  useEffect(() => { loadKnowledge(); loadPendingSuggestions() }, []) // eslint-disable-line
 
   const activeItems   = knowledgeItems.filter(k => k.status === 'active')
   const archivedItems = knowledgeItems.filter(k => k.status === 'archived')
@@ -159,7 +191,14 @@ export default function LearnPage() {
       const data: LearnResult = await res.json()
       setSteps(stepLabels.map(label => ({ label, done: true, active: false })))
       if (data.error) { toast.error(data.error); setResult({ ...data, success: false }) }
-      else { toast.success(`Learned! Created ${data.rules_created} rules & ${data.sources_created} sources`); setResult(data); loadKnowledge() }
+      else {
+        toast.success(`Learned! ${data.rules_created} suggestions pending approval`)
+        setResult(data)
+        loadKnowledge()
+        await loadPendingSuggestions()
+        // scroll to suggestions panel after a brief delay
+        setTimeout(() => suggestionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400)
+      }
     } catch (e) {
       stepTimers.forEach(clearTimeout)
       toast.error('Learning failed — check console'); console.error(e)
@@ -200,6 +239,15 @@ export default function LearnPage() {
           </p>
         </div>
         <div className="flex items-center gap-2.5">
+          {pendingSuggestions.length > 0 && (
+            <button
+              onClick={() => suggestionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-semibold"
+              style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)', color: '#fbbf24', cursor: 'pointer' }}>
+              <Bell size={12} />
+              {pendingSuggestions.length} suggestion{pendingSuggestions.length > 1 ? 's' : ''} pending
+            </button>
+          )}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-semibold"
             style={{ background: 'rgba(52,211,153,0.07)', border: '1px solid rgba(52,211,153,0.18)', color: '#34d399' }}>
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 status-pulse" />
@@ -611,6 +659,126 @@ export default function LearnPage() {
             </div>
 
           </div>
+        </div>
+
+        {/* ── Agent Suggestions (pending approval) ───────── */}
+        <div ref={suggestionsRef}>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="text-[11px] font-bold tracking-widest uppercase" style={{ color: 'rgb(100,106,135)' }}>
+              Agent Suggestions
+            </div>
+            {pendingSuggestions.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}>
+                {pendingSuggestions.length} pending
+              </span>
+            )}
+          </div>
+
+          {pendingSuggestions.length === 0 ? (
+            <div className="section-card">
+              <div className="p-8 text-center">
+                <Lightbulb size={32} className="mx-auto mb-3 opacity-15" style={{ color: 'rgb(251,191,36)' }} />
+                <div className="text-[13px] font-semibold text-white mb-1.5">No pending suggestions</div>
+                <div className="text-[11px]" style={{ color: 'rgb(90,95,115)', lineHeight: '1.7' }}>
+                  When the agent learns something that should update your rules —<br />
+                  especially around outreach quality — it will ask for your approval here.
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 14 }}>
+              {pendingSuggestions.map((rule) => {
+                const ruleColor = rule.rule_type === 'outreach_style' ? { bg: 'rgba(251,191,36,0.09)', border: 'rgba(251,191,36,0.25)', badge: 'rgba(251,191,36,0.12)', badgeText: '#fbbf24', icon: '#fbbf24' }
+                  : rule.rule_type === 'prioritize' ? { bg: 'rgba(52,211,153,0.06)', border: 'rgba(52,211,153,0.2)', badge: 'rgba(52,211,153,0.1)', badgeText: '#34d399', icon: '#34d399' }
+                  : rule.rule_type === 'reject'     ? { bg: 'rgba(248,113,113,0.07)', border: 'rgba(248,113,113,0.22)', badge: 'rgba(248,113,113,0.1)', badgeText: '#f87171', icon: '#f87171' }
+                  : rule.rule_type === 'score_boost'  ? { bg: 'rgba(96,165,250,0.07)', border: 'rgba(96,165,250,0.2)', badge: 'rgba(96,165,250,0.1)', badgeText: '#60a5fa', icon: '#60a5fa' }
+                  : rule.rule_type === 'score_penalty'? { bg: 'rgba(248,113,113,0.07)', border: 'rgba(248,113,113,0.2)', badge: 'rgba(248,113,113,0.1)', badgeText: '#f87171', icon: '#f87171' }
+                  : { bg: 'rgba(167,139,250,0.07)', border: 'rgba(167,139,250,0.2)', badge: 'rgba(167,139,250,0.1)', badgeText: '#a78bfa', icon: '#a78bfa' }
+                const isApproving = approvingId === rule.id
+                return (
+                  <div key={rule.id} style={{
+                    borderRadius: 16, border: `1px solid ${ruleColor.border}`,
+                    background: ruleColor.bg, overflow: 'hidden',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+                  }}>
+                    {/* Card header */}
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '14px 18px', borderBottom: `1px solid ${ruleColor.border}`,
+                    }}>
+                      <div className="flex items-center gap-2.5">
+                        <div style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: ruleColor.badge }}>
+                          <Zap size={13} color={ruleColor.icon} />
+                        </div>
+                        <div>
+                          <div className="text-[11px] font-bold uppercase tracking-widest" style={{ color: ruleColor.badgeText }}>
+                            {rule.rule_type?.replace(/_/g, ' ')}
+                          </div>
+                          <div className="text-[10px]" style={{ color: 'rgb(80,85,110)' }}>
+                            {formatDate(rule.created_at)}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full"
+                        style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.25)' }}>
+                        Pending Approval
+                      </span>
+                    </div>
+
+                    {/* Rule text */}
+                    <div style={{ padding: '14px 18px 0' }}>
+                      <div className="text-[13px] font-medium leading-relaxed" style={{ color: 'rgb(210,215,240)' }}>
+                        {rule.rule}
+                      </div>
+                    </div>
+
+                    {/* Reason why */}
+                    {rule.suggestion_reason && (
+                      <div style={{ margin: '12px 18px 0', padding: '10px 14px', borderRadius: 10, background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <div className="flex items-start gap-2">
+                          <Lightbulb size={12} color="rgb(251,191,36)" style={{ flexShrink: 0, marginTop: 1 }} />
+                          <p className="text-[11px] leading-relaxed" style={{ color: 'rgb(160,155,110)' }}>
+                            {rule.suggestion_reason}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div style={{ display: 'flex', gap: 8, padding: '14px 18px' }}>
+                      <button
+                        onClick={() => approveSuggestion(rule)}
+                        disabled={isApproving}
+                        style={{
+                          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                          padding: '9px 16px', borderRadius: 9, fontSize: 13, fontWeight: 600,
+                          cursor: isApproving ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                          opacity: isApproving ? 0.6 : 1,
+                          background: 'linear-gradient(135deg, rgba(52,211,153,0.22), rgba(16,185,129,0.14))',
+                          border: '1px solid rgba(52,211,153,0.35)', color: '#34d399',
+                        }}>
+                        {isApproving
+                          ? <><Loader2 size={13} className="animate-spin" />Saving...</>
+                          : <><ThumbsUp size={13} />Approve → Save to Memory</>}
+                      </button>
+                      <button
+                        onClick={() => dismissSuggestion(rule.id)}
+                        disabled={isApproving}
+                        style={{
+                          padding: '9px 14px', borderRadius: 9, fontSize: 12, fontWeight: 500,
+                          cursor: 'pointer', fontFamily: 'inherit',
+                          background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)',
+                          color: '#f87171', display: 'flex', alignItems: 'center', gap: 6,
+                        }}>
+                        <ThumbsDown size={12} />Dismiss
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* ── Knowledge Library ──────────────────────────── */}

@@ -266,6 +266,7 @@ export interface AgentRule {
   rule: string
   weight: number
   status: 'active' | 'inactive' | 'pending_approval'
+  suggestion_reason?: string   // set when status = 'pending_approval'
   created_at: string
   updated_at: string
 }

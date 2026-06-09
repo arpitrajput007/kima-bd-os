@@ -162,7 +162,7 @@ async function synthesizeKnowledge(
   knowledge_type: string
   tags: string[]
   insights: string[]
-  new_rules: Array<{ rule_type: string; rule: string; weight: number }>
+  new_rules: Array<{ rule_type: string; rule: string; weight: number; reason?: string }>
   new_sources: Array<{ source_name: string; source_type: string; source_url_or_query: string; target_industry_category: string; target_customer_category: string; notes: string }>
   raw_knowledge: string
 }> {
@@ -189,7 +189,7 @@ Extract and return this exact JSON structure:
   "knowledge_type": "one of: icp_signal | competitor_intel | market_trend | product_context | outreach_strategy | source_directory | general",
   "tags": ["array of 2-5 relevant tags"],
   "insights": ["array of 3-8 specific, actionable insight strings extracted"],
-  "new_rules": [{ "rule_type": "prioritize | reject | score_boost | score_penalty | outreach_style | source_preference", "rule": "specific rule text", "weight": 0 }],
+  "new_rules": [{ "rule_type": "prioritize | reject | score_boost | score_penalty | outreach_style | source_preference", "rule": "specific rule text", "weight": 0, "reason": "1-2 sentences explaining WHY this rule is needed based on what was just learned — will be shown to the human for approval" }],
   "new_sources": [{ "source_name": "name", "source_type": "exa_search|exa_similar|website", "source_url_or_query": "URL or query", "target_industry_category": "categories", "target_customer_category": "categories", "notes": "why relevant" }],
   "raw_knowledge": "Full synthesis — 200-500 words of BD-relevant notes for the agent."
 }`,
@@ -335,8 +335,11 @@ export async function POST(req: NextRequest) {
       for (const rule of synthesis.new_rules.slice(0, 4)) {
         if (!rule.rule || rule.rule.length < 10) continue
         const { error } = await supabase.from('agent_rules').insert({
-          rule_type: rule.rule_type || 'prioritize', rule: rule.rule,
-          weight: rule.weight || 0, status: 'active',
+          rule_type: rule.rule_type || 'prioritize',
+          rule: rule.rule,
+          weight: rule.weight || 0,
+          status: 'pending_approval',
+          suggestion_reason: rule.reason || null,
         })
         if (!error) { rulesCreated++; createdRules.push(rule.rule) }
       }
