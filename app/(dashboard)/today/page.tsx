@@ -16,7 +16,8 @@ import {
   MAX_FOLLOWUPS, FOLLOWUP_GAP_DAYS, type OutreachMeta,
 } from '@/lib/outreach'
 
-type LeadWithContacts = Lead & { contacts?: Contact[] }
+type LeadActivity = { id: string; type: string; channel?: string }
+type LeadWithContacts = Lead & { contacts?: Contact[]; lead_activities?: LeadActivity[] }
 
 // Statuses that mean "ready to reach out" — agent has researched, you haven't contacted yet
 const READY_STATUSES = ['new', 'researching', 'qualified', 'approved', 'needs_more_research']
@@ -382,7 +383,7 @@ export default function TodayPage() {
     setLoading(true)
     const { data, error } = await supabase
       .from('leads')
-      .select('*, contacts(*)')
+      .select('*, contacts(*), lead_activities(id, type, channel)')
       .order('lead_score', { ascending: false, nullsFirst: false })
       .limit(300)
     if (error) toast.error('Failed to load leads')
@@ -443,20 +444,29 @@ export default function TodayPage() {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
-  // Build set of company names that have already been touched (any non-READY status,
-  // or contacted_at is set). Used to exclude duplicates where the same company got
-  // re-qualified as 'new' after already being contacted through a different path.
+  // Activity types that mean "we've already reached out" — CRM can log these
+  // independently without updating lead.status or lead.contacted_at.
+  const CONTACT_ACTIVITY_TYPES = new Set(['email', 'call', 'meeting', 'follow_up'])
+
+  const hasContactActivity = (l: LeadWithContacts) =>
+    (l.lead_activities || []).some(a => CONTACT_ACTIVITY_TYPES.has(a.type))
+
+  // Build set of company names that have already been touched:
+  //   – non-READY status (e.g. 'contacted', 'replied', 'meeting_booked')
+  //   – contacted_at is set (any path that sets this field)
+  //   – has a CRM activity of a contact type logged
   const touchedCompanyNames = new Set(
     leads
-      .filter(l => !READY_STATUSES.includes(l.status) || !!l.contacted_at)
+      .filter(l => !READY_STATUSES.includes(l.status) || !!l.contacted_at || hasContactActivity(l))
       .map(l => l.company_name.toLowerCase().trim())
   )
 
-  // All researched leads you haven't reached out to yet (sorted by score from the query).
-  // Exclude: non-READY status · contacted_at set · same company already touched elsewhere.
+  // All researched leads not yet reached out to.
+  // Exclude: non-READY status · contacted_at set · has contact activities · same company name already touched.
   const readyLeads = leads.filter(l =>
     READY_STATUSES.includes(l.status) &&
     !l.contacted_at &&
+    !hasContactActivity(l) &&
     !touchedCompanyNames.has(l.company_name.toLowerCase().trim())
   )
 
