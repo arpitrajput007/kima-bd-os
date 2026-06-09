@@ -6,11 +6,14 @@
 //   1. Infers the company name from the domain.
 //   2. Calls gpt-4o-search-preview to pull live web intelligence.
 //   3. Passes that intel to Claude (CLAUDE_RESEARCH) for a single,
-//      comprehensive JSON analysis covering all BD form fields +
-//      a verdict (good_lead | not_a_lead).
+//      comprehensive JSON analysis that fills EVERY Lead field in
+//      the database — including the "gap" fields that the manual form
+//      never populated: risk_angle, settlement_angle, security_angle,
+//      revenue_potential, integration_feasibility, competitor context,
+//      social links, facts[], assumptions[], evidence_type, etc.
 //
 // Returns:
-//   { success: true, data: QualifyResult }
+//   { success: true, data: QualifyResult, web_research_used: boolean }
 // ============================================================
 
 import { claudeJSON, CLAUDE_RESEARCH } from '@/lib/claude'
@@ -22,13 +25,9 @@ function guessCompanyName(url: string): string {
   try {
     const clean = url.replace(/^https?:\/\//i, '').replace(/^www\./i, '')
     const domain = clean.split('/')[0].split('?')[0]
-    // Take first label before the first dot
-    const label = domain.split('.')[0]
+    const label  = domain.split('.')[0]
     if (!label || label.length < 2) return 'Unknown'
-    // Capitalise first letter of each word-part (handles kebab-case domains)
-    return label
-      .replace(/-/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase())
+    return label.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
   } catch {
     return 'Unknown Company'
   }
@@ -50,7 +49,7 @@ async function webResearchCompany(url: string, companyName: string): Promise<str
         messages: [
           {
             role: 'user',
-            content: `Research this company for B2B fintech / Web3 business development:
+            content: `Research this company thoroughly for B2B fintech / Web3 BD qualification:
 
 Company: ${companyName}
 Website: ${url}
@@ -58,13 +57,17 @@ Website: ${url}
 Find and summarize:
 1. What exactly does this company do? (product, tech stack, business model, target customers)
 2. What blockchain networks, payment rails, bridges, or settlement infra do they use?
-3. What payment / custody / bridge providers are they currently using? (e.g. Fireblocks, LayerZero, Wormhole, SWIFT)
-4. Recent news: fundraising rounds, product launches, security hacks/exploits, chain expansions, partnerships?
-5. What potential pain points might they have around cross-chain settlement, on/off-ramp, bridge security, or payment rails?
+3. What payment / custody / bridge / settlement providers are they currently using?
+   (e.g. Fireblocks, LayerZero, Wormhole, SWIFT, Circle, Stripe, Transak)
+4. Recent news: fundraising, product launches, security hacks/exploits, chain expansions, partnerships?
+5. What pain points might they have around cross-chain settlement, on/off-ramp, bridge security, payment rails?
 6. Who are the founders and key leadership team?
 7. What is their primary geographic market / region?
+8. Do they have a Twitter/X account? Telegram? Discord?
+9. Are they experiencing any growth friction or scaling challenges?
+10. Any compliance, regulatory, or security pressures they face?
 
-Be specific and factual. Include URLs to relevant news articles, press releases, or data sources you found.`,
+Be specific and factual. Include URLs to relevant news, press releases, or data sources.`,
           },
         ],
         max_tokens: 2000,
@@ -88,84 +91,116 @@ export async function POST(req: NextRequest) {
 
   const companyName = guessCompanyName(url)
 
-  // Step 1 — live web research (runs in parallel with the prompt being built)
+  // Live web research first
   const webResearch = await webResearchCompany(url, companyName)
 
-  // Step 2 — comprehensive Claude analysis in one shot
   const systemPrompt = `You are a senior BD researcher for Kima and Aeredium — financial infrastructure companies.
 
 ${PRODUCT_BRAIN}
 
-Your job is to qualify a company as a potential Kima/Aeredium lead. You will be given live web research about the company. Use that research PLUS your own training knowledge to fill out a complete BD qualification form.
+Your job is to qualify a company as a potential Kima/Aeredium lead and fill EVERY field in the BD database — including the deeper analytical fields (risk_angle, settlement_angle, security_angle, revenue_potential, integration_feasibility, competitive positioning, social links, verified facts vs assumptions).
 
-Return ONLY valid JSON. No markdown, no prose outside JSON. Separate FACTS from ASSUMPTIONS where relevant.`
+Return ONLY valid JSON. No markdown, no prose outside JSON.`
 
-  const userPrompt = `Qualify this company as a Kima/Aeredium lead:
+  const userPrompt = `Qualify this company as a Kima/Aeredium lead and fill EVERY field below:
 
 Company: ${companyName}
 Website: ${url}
 
-LIVE WEB RESEARCH (use this as ground truth when it contradicts your training data):
+LIVE WEB RESEARCH (treat as ground truth over training data):
 ---
-${webResearch || 'No live web research available — use your training knowledge.'}
+${webResearch || 'No live web research available — use training knowledge.'}
 ---
 
 Return a single JSON object with ALL of these fields:
 
 {
-  "company_name": "The real company name (may differ from the domain-derived guess)",
+  // ── Core identity ──────────────────────────────────────────
+  "company_name": "The real company name (correct the domain-derived guess if needed)",
   "description": "2-3 sentence summary of what this company does",
-  "business_model": "How they make money",
-  "product_summary": "What their main product does, in one paragraph",
-  "supported_chains_or_rails": "Blockchains, payment rails, or fiat corridors they support (comma-separated)",
-  "current_providers": "Known payment, bridge, settlement, or custody providers they use today (e.g. Fireblocks, LayerZero, SWIFT)",
+  "business_model": "How they make money — be specific (B2B SaaS, transaction fees, AUM, etc.)",
+  "product_summary": "What their main product does in 2-3 sentences",
+  "supported_chains_or_rails": "Blockchains, fiat corridors, or payment rails they support (comma-separated)",
+  "current_providers": "Payment, bridge, custody, settlement providers they use today",
 
+  // ── Competitive intelligence ───────────────────────────────
+  "competitor_or_current_provider": "The single most relevant competitor or incumbent provider they use that Kima/Aeredium displaces (e.g. LayerZero, Fireblocks, Wormhole, Stripe, SWIFT, Circle)",
+  "competitor_context": "Why they chose that provider and what limitations that choice creates for them — this is the wedge for Kima's pitch",
+
+  // ── Classification ─────────────────────────────────────────
   "industry_category": "Exactly one of: Cross-border payment company | PSP/payment gateway | On/off-ramp provider | Stablecoin payment company | Wallet | DEX | Perp DEX | Launchpad | RWA platform | iGaming/payment-heavy platform | Neobank | Fintech | Exchange | Chain ecosystem | AI commerce/payment agent | Treasury management platform | Custody/payment infrastructure company | Web2 company with payment/settlement friction | Other",
-  "customer_category": ["Array of matching categories: Agentic Payments Customer | LayerZero Customer | Hacked Protocol | Needs On/Off Ramp | Fireblocks Customer | Web2 Stablecoin Settlement Customer | Other"],
+  "customer_category": ["Array — pick all that apply: Agentic Payments Customer | LayerZero Customer | Hacked Protocol | Needs On/Off Ramp | Fireblocks Customer | Web2 Stablecoin Settlement Customer | Other"],
   "product_to_sell": "Exactly one of: Agentic payment rails | Cross-chain settlement | Stablecoin settlement | Fiat on/off-ramp | Treasury movement | DvP settlement | iGaming payments | RWA settlement | PSP settlement | Wallet onboarding | Launchpad participation | Payment orchestration | Cross-border USDT/USDC settlement",
-  "region": "Their primary market region — one of: Global | North America | Europe | Asia | Middle East | Africa | Southeast Asia | South Asia | Latin America | MENA | EU-India corridor | UAE-India corridor | US-India corridor",
+  "region": "Primary market — one of: Global | North America | Europe | Asia | Middle East | Africa | Southeast Asia | South Asia | Latin America | MENA | EU-India corridor | UAE-India corridor | US-India corridor",
 
+  // ── Pain point ─────────────────────────────────────────────
   "pain_point": "The single most important pain point Kima/Aeredium can solve for this specific company",
   "pain_point_severity": "critical | high | medium | low",
-  "pain_point_evidence": "Specific evidence. If from a real article/news/hack report, quote it. If reasoned from their tech stack, explain the reasoning.",
-  "pain_point_source_url": "Exact URL to an article/news/tweet/hack report that proves this pain — empty string if none found, NEVER invent URLs",
+  "pain_point_evidence": "Specific evidence — quote a real article/hack report if found, or explain the reasoning from their tech stack",
+  "pain_point_source_url": "Exact URL proving this pain — empty string if none, NEVER invent a URL",
+  "pain_point_evidence_type": "verified_source (real article explicitly mentions this pain) | agent_analysis (reasoned from public facts) | inferred (general industry knowledge)",
 
-  "trigger_reason": "Why is NOW a good time to reach out? (recent funding, hack, chain expansion, product launch, regulatory change, etc.)",
-  "trigger_source_url": "URL to the trigger event article/press release — empty string if not found",
+  // ── Trigger ────────────────────────────────────────────────
+  "trigger_reason": "Why reach out NOW — recent funding, hack, expansion, product launch, regulatory change, etc.",
+  "trigger_source_url": "URL to the trigger event — empty string if not found",
 
-  "kima_fit": "Exactly how Kima can help this company — be specific about the use case and integration angle",
+  // ── Kima / Aeredium fit ────────────────────────────────────
+  "kima_fit": "Exactly how Kima helps this company — specific use case and integration angle",
+  "suggested_use_case": "The single best Kima use case to pitch",
+  "settlement_angle": "How Kima's atomic cross-chain settlement specifically improves their current setup",
   "aeredium_fit": "How Aeredium's TEE/trust layer strengthens the pitch for this company",
-  "suggested_use_case": "The single best Kima use case to pitch to them",
+  "security_angle": "The specific TEE / MPC / compliance / execution-integrity angle for Aeredium",
+  "risk_angle": "What specific risks (bridge exploits, custody failure, settlement failure) Aeredium mitigates for them",
 
-  "lead_score": 0-100 integer,
-  "confidence_score": 0-100 integer (how confident are you in this analysis),
+  // ── Commercial ─────────────────────────────────────────────
+  "revenue_potential": "Estimated revenue/business impact for them if they integrate Kima (be specific — transaction volume, cost savings, new markets)",
+  "integration_feasibility": "high | medium | low — and one sentence explaining why",
+
+  // ── Social links (research from web) ──────────────────────
+  "twitter_url": "Full https://x.com/... or https://twitter.com/... URL if found — empty string if not",
+  "telegram_url": "Full https://t.me/... URL if found — empty string if not",
+  "discord_url": "Full https://discord.gg/... or discord.com/invite/... URL if found — empty string if not",
+
+  // ── Verified facts vs assumptions ──────────────────────────
+  "facts": [
+    {"label": "short label", "value": "verified fact from web research or public source"}
+  ],
+  "assumptions": [
+    {"label": "short label", "value": "inferred/assumed — not directly verified"}
+  ],
+
+  // ── Scoring ────────────────────────────────────────────────
+  "lead_score": 0-100,
+  "confidence_score": 0-100,
   "priority": "excellent | qualified | needs_research | low_priority",
 
+  // ── Verdict ────────────────────────────────────────────────
   "verdict": "good_lead | not_a_lead",
-  "verdict_reasoning": "3-5 sentences explaining why this is or isn't a good lead for Kima/Aeredium",
-  "verdict_flags": ["Array of concerns or red flags — empty array if none"],
-  "verdict_strengths": ["Array of positive signals — things that make this a strong lead"],
+  "verdict_reasoning": "3-5 sentences on why this is or isn't a good Kima/Aeredium lead",
+  "verdict_flags": ["concerns or red flags — empty array if none"],
+  "verdict_strengths": ["positive signals — things that make this a strong lead"],
 
-  "source_url": "The single most useful URL found during research (news article, funding post, etc.)",
+  // ── Source ─────────────────────────────────────────────────
+  "source_url": "The single most useful URL found (news article, funding post, etc.)",
   "source_summary": "One sentence describing what that source reveals"
 }
 
-SCORING GUIDANCE:
-- Score 85-100 (excellent): perfect ICP fit, clear pain, verified trigger, easy integration
-- Score 70-84 (qualified): good fit, real pain, some trigger signals
-- Score 50-69 (needs_research): possible fit but unclear pain or missing key info
-- Score 0-49 (low_priority): poor fit, speculative pain, or not really a Kima customer
+SCORING:
+- 85-100 (excellent): perfect ICP fit, clear pain, verified trigger, easy integration
+- 70-84 (qualified): good fit, real pain, some trigger signals
+- 50-69 (needs_research): possible fit but missing key info
+- 0-49 (low_priority): poor fit, speculative pain, not really a Kima customer
 
-VERDICT GUIDANCE:
-- good_lead: score ≥ 55 AND there is at least one concrete, specific pain Kima/Aeredium can solve
-- not_a_lead: score < 55 OR the company clearly doesn't need cross-chain settlement / payment rails`
+VERDICT:
+- good_lead: score ≥ 55 AND at least one concrete pain Kima/Aeredium can solve
+- not_a_lead: score < 55 OR company clearly doesn't need our infrastructure`
 
   try {
     const result = await claudeJSON({
       model: CLAUDE_RESEARCH,
       system: systemPrompt,
       user: userPrompt,
-      maxTokens: 3000,
+      maxTokens: 4000,
     })
 
     return NextResponse.json({
