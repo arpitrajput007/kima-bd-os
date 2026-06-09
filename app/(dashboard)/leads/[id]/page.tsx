@@ -558,8 +558,16 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   }
 
   const updateStatus = async (status: string) => {
-    const { error } = await supabase.from('leads')
-      .update({ status, updated_at: new Date().toISOString() }).eq('id', id)
+    const now = new Date().toISOString()
+    const contactedStatuses = ['contacted', 'replied', 'meeting_booked', 'proposal_sent', 'negotiating', 'integration', 'won']
+    const patch: Record<string, string | null> = { status, updated_at: now }
+    // Whenever status advances to a "contacted or beyond" state, stamp contacted_at
+    // so Today's Plan always filters it out regardless of which path set the status.
+    if (contactedStatuses.includes(status)) {
+      patch.contacted_at = now
+      patch.last_contacted_at = now
+    }
+    const { error } = await supabase.from('leads').update(patch).eq('id', id)
     if (error) toast.error('Update failed')
     else { toast.success(`Status: ${getStatusLabel(status as Lead['status'])}`); loadLead() }
   }

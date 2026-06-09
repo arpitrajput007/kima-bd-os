@@ -287,8 +287,9 @@ function PlanLeadCard({ lead, rank, actionLoading, onContacted, onReserved }: {
 
 export default function TodayPage() {
   const supabase = createClient()
-  const [leads, setLeads] = useState<LeadWithContacts[]>([])
-  const [loading, setLoading] = useState(true)
+  const [leads, setLeads]       = useState<LeadWithContacts[]>([])  // all leads (followups, reserved, etc.)
+  const [planLeads, setPlanLeads] = useState<LeadWithContacts[]>([]) // server-filtered for the plan
+  const [loading, setLoading]   = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [fetching, setFetching] = useState(false)
   const [hackFetching, setHackFetching] = useState(false)
@@ -381,13 +382,26 @@ export default function TodayPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('leads')
-      .select('*, contacts(*), lead_activities(id, type, channel)')
-      .order('lead_score', { ascending: false, nullsFirst: false })
-      .limit(300)
-    if (error) toast.error('Failed to load leads')
-    else setLeads((data as LeadWithContacts[]) || [])
+    // Run both queries in parallel:
+    // 1. All leads — used for followups, reserved, contacts-today count (needs all statuses)
+    // 2. Plan leads — server-side filtered so the DB itself excludes anything contacted/non-ready
+    const [allRes, planRes] = await Promise.all([
+      supabase
+        .from('leads')
+        .select('*, contacts(*), lead_activities(id, type, channel)')
+        .order('lead_score', { ascending: false, nullsFirst: false })
+        .limit(300),
+      supabase
+        .from('leads')
+        .select('*, contacts(*)')
+        .in('status', READY_STATUSES)          // DB-level: only ready statuses
+        .is('contacted_at', null)               // DB-level: never contacted
+        .order('lead_score', { ascending: false, nullsFirst: false })
+        .limit(300),
+    ])
+    if (allRes.error) toast.error('Failed to load leads')
+    else setLeads((allRes.data as LeadWithContacts[]) || [])
+    if (!planRes.error) setPlanLeads((planRes.data as LeadWithContacts[]) || [])
     setLoading(false)
   }, []) // eslint-disable-line
 
@@ -444,30 +458,19 @@ export default function TodayPage() {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
-  // Activity types that mean "we've already reached out" — CRM can log these
-  // independently without updating lead.status or lead.contacted_at.
-  const CONTACT_ACTIVITY_TYPES = new Set(['email', 'call', 'meeting', 'follow_up'])
-
-  const hasContactActivity = (l: LeadWithContacts) =>
-    (l.lead_activities || []).some(a => CONTACT_ACTIVITY_TYPES.has(a.type))
-
-  // Build set of company names that have already been touched:
-  //   – non-READY status (e.g. 'contacted', 'replied', 'meeting_booked')
-  //   – contacted_at is set (any path that sets this field)
-  //   – has a CRM activity of a contact type logged
+  // Company names already touched in any way (non-ready status OR contacted_at set).
+  // Used to deduplicate: if "Acme" is 'contacted' in one row and 'new' in another,
+  // the 'new' row is also excluded.
   const touchedCompanyNames = new Set(
     leads
-      .filter(l => !READY_STATUSES.includes(l.status) || !!l.contacted_at || hasContactActivity(l))
+      .filter(l => !READY_STATUSES.includes(l.status) || !!l.contacted_at)
       .map(l => l.company_name.toLowerCase().trim())
   )
 
-  // All researched leads not yet reached out to.
-  // Exclude: non-READY status · contacted_at set · has contact activities · same company name already touched.
-  const readyLeads = leads.filter(l =>
-    READY_STATUSES.includes(l.status) &&
-    !l.contacted_at &&
-    !hasContactActivity(l) &&
-    !touchedCompanyNames.has(l.company_name.toLowerCase().trim())
+  // planLeads is already server-side filtered (READY status + contacted_at IS NULL).
+  // Client-side: also remove company-name duplicates against the touched set.
+  const readyLeads = planLeads.filter(
+    l => !touchedCompanyNames.has(l.company_name.toLowerCase().trim())
   )
 
   // Leads that arrived in the last 24 hours — drives the dynamic daily goal.
