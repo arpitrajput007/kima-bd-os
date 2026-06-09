@@ -120,20 +120,28 @@ export interface ApolloPersonResult {
   name: string; title: string; email?: string; linkedin_url?: string; seniority?: string
 }
 
-// Search Apollo for people at a company by domain. Uses the mixed_people/search endpoint.
-// Returns verified contacts with real names, titles, and emails where available.
+// Search Apollo for people at a company by domain + org name.
+// Sends both q_organization_domains AND q_organization_name so small/niche
+// Web3 companies (thin domain coverage) still match.
 export async function apolloSearchPeople(companyName: string, domain: string): Promise<ApolloPersonResult[]> {
-  if (!apolloConfigured() || !domain) return []
+  if (!apolloConfigured()) return []
+  if (!domain && !companyName) return []
+
+  const body: Record<string, unknown> = {
+    person_seniorities: ['owner', 'founder', 'c_suite', 'vp', 'director', 'manager', 'partner'],
+    page: 1,
+    per_page: 10,
+  }
+  if (domain)      body.q_organization_domains = [domain]
+  if (companyName) body.q_organization_name    = companyName
+
   try {
     const res = await fetch(`${APOLLO_BASE}/mixed_people/search`, {
       method: 'POST', headers: headers(),
-      body: JSON.stringify({
-        q_organization_domains: [domain],
-        person_seniorities: ['owner', 'founder', 'c_suite', 'vp', 'director', 'manager'],
-        page: 1, per_page: 10,
-      }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(15000),
     })
+    // 401/403 → API key tier doesn't include people search — fail soft
     if (!res.ok) return []
     const data = await res.json()
     interface ApolloPeopleResult { name?: string; title?: string; email?: string; linkedin_url?: string; seniority?: string; email_status?: string }

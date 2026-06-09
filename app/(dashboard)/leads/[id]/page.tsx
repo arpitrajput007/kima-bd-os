@@ -657,8 +657,15 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
-      if (json.verified > 0) { toast.success(`Apollo verified ${json.verified} contact${json.verified > 1 ? 's' : ''} with real emails`); loadLead() }
-      else toast(json.message || 'Apollo found nothing new to verify')
+      if ((json.total ?? 0) > 0) {
+        const parts = []
+        if (json.discovered > 0) parts.push(`${json.discovered} new contact${json.discovered > 1 ? 's' : ''} found`)
+        if (json.verified   > 0) parts.push(`${json.verified} email${json.verified > 1 ? 's' : ''} verified`)
+        toast.success(`Apollo: ${parts.join(' · ')}`)
+        loadLead()
+      } else {
+        toast(json.message || 'Apollo found nothing for this company')
+      }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Apollo lookup failed')
     } finally { setApolloLoading(false) }

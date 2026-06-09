@@ -42,8 +42,34 @@ async function exaFetch(query: string, domains: string[], numResults = 4) {
   } catch { return [] }
 }
 
+// ── JSON extraction helper ────────────────────────────────────
+function extractJsonArray(raw: string): Array<{ name: string; role: string }> {
+  // Strip markdown fences (```json … ``` or ``` … ```)
+  let s = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim()
+  // Find outermost [ … ] (last ] to handle trailing citations from search model)
+  const start = s.indexOf('[')
+  const end   = s.lastIndexOf(']')
+  if (start === -1 || end <= start) return []
+  try {
+    const parsed = JSON.parse(s.slice(start, end + 1))
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (p: { name?: string }) =>
+        p.name && typeof p.name === 'string' &&
+        p.name.trim().length > 2 &&
+        !/unknown|n\/a|none/i.test(p.name)
+    ).slice(0, 6)
+  } catch { return [] }
+}
+
 // ── Stage 1: real-time web search for team members ────────────
 async function findTeamViaWebSearch(companyName: string, website: string): Promise<Array<{ name: string; role: string }>> {
+  const prompt = `Who are the founders and key BD/partnerships/leadership team at "${companyName}"${website ? ` (${website})` : ''}?
+List only REAL, verifiable named people with their exact titles. Focus on founders, CEO, CTO, Head of Partnerships, BD Lead.
+Return ONLY a JSON array — no prose, no markdown fences:
+[{"name":"Full Name","role":"exact title"}]`
+
+  // ── Try 1: gpt-4o-search-preview (live web search) ───────────
   try {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -51,28 +77,48 @@ async function findTeamViaWebSearch(companyName: string, website: string): Promi
       body: JSON.stringify({
         model: 'gpt-4o-search-preview',
         web_search_options: {},
-        messages: [{
-          role: 'user',
-          content: `Who are the founders and key BD/partnerships/leadership team at "${companyName}" (${website})?
-List only real, named people with their exact titles. Focus on founders, CEO, CTO, Head of Partnerships/BD.
-Return only a JSON array: [{"name":"Full Name","role":"exact title"}]
-No explanation, just the JSON array.`,
-        }],
-        max_tokens: 400,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 500,
       }),
       signal: AbortSignal.timeout(25000),
     })
-    if (!res.ok) return []
-    const data = await res.json()
-    const content = data.choices?.[0]?.message?.content || ''
-    // Extract JSON array from the response
-    const match = content.match(/\[[\s\S]*\]/)
-    if (!match) return []
-    const parsed = JSON.parse(match[0])
-    return Array.isArray(parsed)
-      ? parsed.filter((p: { name?: string }) => p.name && p.name.length > 2 && !p.name.includes('Unknown')).slice(0, 6)
-      : []
-  } catch { return [] }
+    if (res.ok) {
+      const data = await res.json()
+      const content: string = data.choices?.[0]?.message?.content || ''
+      const parsed = extractJsonArray(content)
+      if (parsed.length > 0) return parsed
+      // search model returned prose/citations but no parseable array — fall through
+    }
+  } catch { /* fall through */ }
+
+  // ── Try 2: gpt-4o from training knowledge (no web search) ────
+  // Reliable for well-known Web3 / DeFi founders already in training data.
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a Web3/crypto BD researcher with deep knowledge of DeFi teams. Return ONLY a valid JSON array — no markdown, no prose.',
+          },
+          { role: 'user', content: prompt },
+        ],
+        max_tokens: 400,
+        temperature: 0,
+      }),
+      signal: AbortSignal.timeout(20000),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      const content: string = data.choices?.[0]?.message?.content || ''
+      return extractJsonArray(content)
+    }
+  } catch { /* noop */ }
+
+  return []
 }
 
 // ── Stage 2: find each person's social links ──────────────────
