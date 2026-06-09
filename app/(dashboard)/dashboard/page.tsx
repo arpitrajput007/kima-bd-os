@@ -5,7 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import {
   TrendingUp, Star, CheckCircle, XCircle, Mail, MessageCircle,
   Calendar, Inbox, Clock, AlertCircle, Users, Target, Zap,
-  ArrowUpRight, RefreshCw, Plus, Activity, Database, BookOpen
+  ArrowUpRight, RefreshCw, Plus, Activity, Database, BookOpen,
+  X, Send, AtSign, ExternalLink, Phone, Globe, MessageSquare,
 } from 'lucide-react'
 
 import { cn, getScoreBg } from '@/lib/utils'
@@ -22,6 +23,16 @@ const CUSTOMER_CATEGORIES = [
 ]
 const CATEGORY_CAP = 5
 
+const CHANNEL_META: Record<string, { label: string; color: string; icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }> }> = {
+  telegram: { label: 'Telegram',  color: '#22d3ee', icon: Send         },
+  twitter:  { label: 'Twitter/X', color: '#38bdf8', icon: AtSign       },
+  linkedin: { label: 'LinkedIn',  color: '#60a5fa', icon: ExternalLink  },
+  email:    { label: 'Email',     color: '#a78bfa', icon: Mail         },
+  discord:  { label: 'Discord',   color: '#818cf8', icon: MessageSquare },
+  call:     { label: 'Call',      color: '#34d399', icon: Phone        },
+  other:    { label: 'Outreach',  color: '#fbbf24', icon: Globe        },
+}
+
 interface DashboardStats {
   new_leads: number; qualified: number; excellent: number; approved: number
   rejected: number; contacted: number; replied: number; meetings: number
@@ -29,12 +40,182 @@ interface DashboardStats {
 }
 interface CategoryStat { category: string; count: number }
 
-function StatCard({ label, value, icon: Icon, color, bg, border, loading, sub }: {
+// ── Card Detail Modal ──────────────────────────────────────────────
+interface CardModalProps {
+  title: string
+  subtitle: string
+  leads: Lead[]
+  color: string
+  showChannel?: boolean
+  onClose: () => void
+}
+
+function CardModal({ title, subtitle, leads, color, showChannel, onClose }: CardModalProps) {
+  const getStatusColor = (s: string) => {
+    const map: Record<string, string> = { new:'#60a5fa', qualified:'#34d399', approved:'#a78bfa', contacted:'#22d3ee', replied:'#34d399', meeting_booked:'#fbbf24', rejected:'#f87171' }
+    return map[s] || '#555'
+  }
+  const getStatusLabel = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(4,4,10,0.65)', backdropFilter: 'blur(6px)' }}
+        onClick={onClose}
+      />
+      {/* Slide-over panel */}
+      <div className="slide-in" style={{
+        position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 301,
+        width: 'min(520px, 100vw)',
+        background: 'rgb(var(--bg-surface-2))',
+        borderLeft: '1px solid var(--border-strong)',
+        display: 'flex', flexDirection: 'column',
+        boxShadow: '-40px 0 100px rgba(0,0,0,0.7)',
+      }}>
+        {/* Accent top bar */}
+        <div style={{ height: 3, background: `linear-gradient(90deg, ${color}, ${color}88)`, flexShrink: 0 }} />
+
+        {/* Header */}
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-[16px] font-bold text-white">{title}</div>
+              <div className="text-[12px] mt-0.5" style={{ color: 'rgb(100,106,135)' }}>{subtitle}</div>
+            </div>
+            <button onClick={onClose} className="btn btn-secondary" style={{ padding: '5px 7px', flexShrink: 0 }}>
+              <X size={14} />
+            </button>
+          </div>
+          {/* Count badge */}
+          <div className="flex items-center gap-2 mt-3">
+            <span className="text-[28px] font-bold tabular-nums" style={{ color }}>{leads.length}</span>
+            <span className="text-[13px] font-medium" style={{ color: 'rgb(110,115,145)' }}>lead{leads.length !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
+
+        {/* List */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
+          {leads.length === 0 ? (
+            <div className="text-center py-16 text-[13px]" style={{ color: 'rgb(100,106,135)' }}>
+              No leads in this category yet.
+            </div>
+          ) : (
+            leads.map(lead => {
+              const channelKey = lead.last_channel || ''
+              const channelMeta = CHANNEL_META[channelKey]
+
+              return (
+                <Link
+                  key={lead.id}
+                  href={`/leads/${lead.id}`}
+                  style={{ textDecoration: 'none', display: 'block' }}
+                  onClick={onClose}
+                >
+                  <div
+                    className="flex items-center gap-3 transition-colors"
+                    style={{
+                      padding: '11px 24px',
+                      borderBottom: '1px solid rgba(255,255,255,0.03)',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    {/* Avatar */}
+                    <div style={{
+                      width: 36, height: 36, borderRadius: 10,
+                      background: `${color}18`, border: `1px solid ${color}35`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 13, fontWeight: 700, color, flexShrink: 0,
+                    }}>
+                      {lead.company_name.charAt(0).toUpperCase()}
+                    </div>
+
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="text-[13px] font-semibold text-white truncate">{lead.company_name}</div>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        {lead.product_to_sell && (
+                          <span className="text-[11px]" style={{ color: 'rgb(110,115,145)' }}>{lead.product_to_sell}</span>
+                        )}
+                        {lead.industry_category && !lead.product_to_sell && (
+                          <span className="text-[11px]" style={{ color: 'rgb(110,115,145)' }}>{lead.industry_category}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right side */}
+                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                      {/* Score */}
+                      {lead.lead_score != null && (
+                        <span className={cn('badge', getScoreBg(lead.lead_score))} style={{ fontSize: '10px' }}>
+                          {lead.lead_score}
+                        </span>
+                      )}
+
+                      {/* Channel (for contacted/replied) */}
+                      {showChannel && channelMeta ? (
+                        <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md"
+                          style={{ background: `${channelMeta.color}18`, color: channelMeta.color, border: `1px solid ${channelMeta.color}35` }}>
+                          <channelMeta.icon size={10} style={{ color: channelMeta.color }} />
+                          {channelMeta.label}
+                        </span>
+                      ) : showChannel && channelKey ? (
+                        <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold"
+                          style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.25)' }}>
+                          {channelKey}
+                        </span>
+                      ) : null}
+
+                      {/* Status dot */}
+                      {!showChannel && (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full" style={{ background: getStatusColor(lead.status) }} />
+                          <span className="text-[10px]" style={{ color: 'rgb(110,115,145)' }}>{getStatusLabel(lead.status)}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Arrow */}
+                    <ArrowUpRight size={13} style={{ color: 'rgb(90,95,120)', flexShrink: 0 }} />
+                  </div>
+                </Link>
+              )
+            })
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '12px 24px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+          <Link
+            href="/leads"
+            onClick={onClose}
+            className="btn btn-secondary w-full justify-center"
+            style={{ fontSize: 12 }}
+          >
+            View all leads →
+          </Link>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── Stat Card ──────────────────────────────────────────────────────
+function StatCard({ label, value, icon: Icon, color, bg, border, loading, sub, onClick }: {
   label: string; value: number; icon: React.ComponentType<{size?: number; color?: string}>
   color: string; bg: string; border: string; loading: boolean; sub?: string
+  onClick?: () => void
 }) {
   return (
-    <div className="stat-card" style={{ borderColor: border }}>
+    <div
+      className="stat-card"
+      style={{ borderColor: border, cursor: onClick ? 'pointer' : 'default', transition: 'all 0.18s' }}
+      onClick={onClick}
+      onMouseEnter={e => { if (onClick) { (e.currentTarget as HTMLDivElement).style.borderColor = color + '55'; (e.currentTarget as HTMLDivElement).style.background = bg + '22' } }}
+      onMouseLeave={e => { if (onClick) { (e.currentTarget as HTMLDivElement).style.borderColor = border; (e.currentTarget as HTMLDivElement).style.background = '' } }}
+    >
       <div className="flex items-start justify-between mb-4">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: bg }}>
           <Icon size={18} color={color} />
@@ -51,6 +232,9 @@ function StatCard({ label, value, icon: Icon, color, bg, border, loading, sub }:
       </div>
       <div className="text-[12px] font-medium" style={{ color: 'rgb(110,115,145)' }}>{label}</div>
       {sub && <div className="text-[11px] mt-0.5" style={{ color }}>{sub}</div>}
+      {onClick && value > 0 && (
+        <div className="text-[10px] mt-2 font-semibold" style={{ color: color + 'aa' }}>Click to view →</div>
+      )}
     </div>
   )
 }
@@ -58,11 +242,21 @@ function StatCard({ label, value, icon: Icon, color, bg, border, loading, sub }:
 export default function DashboardPage() {
   const supabase = createClient()
   const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [allLeads, setAllLeads] = useState<Lead[]>([])
   const [recentLeads, setRecentLeads] = useState<Lead[]>([])
   const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([])
   const [productStats, setProductStats] = useState<CategoryStat[]>([])
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
+
+  // Modal state
+  const [modal, setModal] = useState<{
+    title: string
+    subtitle: string
+    leads: Lead[]
+    color: string
+    showChannel?: boolean
+  } | null>(null)
 
   const loadData = async () => {
     setLoading(true)
@@ -83,6 +277,7 @@ export default function DashboardPage() {
         needs_review: leads.filter(l => l.status === 'new' || l.status === 'researching').length,
         high_score: leads.filter(l => (l.lead_score || 0) >= 70).length,
       })
+      setAllLeads(leads)
       setRecentLeads(leads.slice(0, 10))
 
       const counts: Record<string, number> = {}
@@ -104,15 +299,43 @@ export default function DashboardPage() {
 
   useEffect(() => { loadData() }, []) // eslint-disable-line
 
+  const openModal = (title: string, subtitle: string, leads: Lead[], color: string, showChannel?: boolean) => {
+    setModal({ title, subtitle, leads, color, showChannel })
+  }
+
   const statCards = [
-    { label: 'New Today',  value: stats?.new_leads ?? 0, icon: Inbox,        color: '#60a5fa', bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.18)'  },
-    { label: 'Excellent',  value: stats?.excellent  ?? 0, icon: Star,         color: '#a78bfa', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.18)' },
-    { label: 'Approved',   value: stats?.approved   ?? 0, icon: CheckCircle,  color: '#34d399', bg: 'rgba(52,211,153,0.1)',  border: 'rgba(52,211,153,0.18)'  },
-    { label: 'Contacted',  value: stats?.contacted  ?? 0, icon: Mail,         color: '#22d3ee', bg: 'rgba(34,211,238,0.1)',  border: 'rgba(34,211,238,0.18)'  },
-    { label: 'Replied',    value: stats?.replied    ?? 0, icon: MessageCircle,color: '#34d399', bg: 'rgba(52,211,153,0.1)',  border: 'rgba(52,211,153,0.18)'  },
-    { label: 'Meetings',   value: stats?.meetings   ?? 0, icon: Calendar,     color: '#fbbf24', bg: 'rgba(251,191,36,0.1)',  border: 'rgba(251,191,36,0.18)'  },
-    { label: 'Rejected',   value: stats?.rejected   ?? 0, icon: XCircle,      color: '#f87171', bg: 'rgba(248,113,113,0.1)', border: 'rgba(248,113,113,0.18)' },
-    { label: 'Total Leads',value: stats?.total      ?? 0, icon: TrendingUp,   color: '#a78bfa', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.18)' },
+    {
+      label: 'New Today',  value: stats?.new_leads ?? 0, icon: Inbox,        color: '#60a5fa', bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.18)',
+      onClick: () => openModal('New Today', 'Leads discovered today', allLeads.filter(l => { const t = new Date(); t.setHours(0,0,0,0); return new Date(l.created_at) >= t }), '#60a5fa'),
+    },
+    {
+      label: 'Excellent',  value: stats?.excellent  ?? 0, icon: Star,         color: '#a78bfa', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.18)',
+      onClick: () => openModal('Excellent Leads', 'Leads with excellent priority', allLeads.filter(l => l.priority === 'excellent'), '#a78bfa'),
+    },
+    {
+      label: 'Approved',   value: stats?.approved   ?? 0, icon: CheckCircle,  color: '#34d399', bg: 'rgba(52,211,153,0.1)',  border: 'rgba(52,211,153,0.18)',
+      onClick: () => openModal('Approved Leads', 'Leads approved for outreach', allLeads.filter(l => l.status === 'approved'), '#34d399'),
+    },
+    {
+      label: 'Contacted',  value: stats?.contacted  ?? 0, icon: Mail,         color: '#22d3ee', bg: 'rgba(34,211,238,0.1)',  border: 'rgba(34,211,238,0.18)',
+      onClick: () => openModal('Contacted Leads', 'Projects you\'ve reached out to & which platform', allLeads.filter(l => l.status === 'contacted'), '#22d3ee', true),
+    },
+    {
+      label: 'Replied',    value: stats?.replied    ?? 0, icon: MessageCircle,color: '#34d399', bg: 'rgba(52,211,153,0.1)',  border: 'rgba(52,211,153,0.18)',
+      onClick: () => openModal('Replied Leads', 'Leads that have responded to outreach', allLeads.filter(l => l.status === 'replied'), '#34d399', true),
+    },
+    {
+      label: 'Meetings',   value: stats?.meetings   ?? 0, icon: Calendar,     color: '#fbbf24', bg: 'rgba(251,191,36,0.1)',  border: 'rgba(251,191,36,0.18)',
+      onClick: () => openModal('Meetings Booked', 'Leads with a meeting scheduled', allLeads.filter(l => l.status === 'meeting_booked'), '#fbbf24'),
+    },
+    {
+      label: 'Rejected',   value: stats?.rejected   ?? 0, icon: XCircle,      color: '#f87171', bg: 'rgba(248,113,113,0.1)', border: 'rgba(248,113,113,0.18)',
+      onClick: () => openModal('Rejected Leads', 'Leads that didn\'t qualify', allLeads.filter(l => l.status === 'rejected'), '#f87171'),
+    },
+    {
+      label: 'Total Leads',value: stats?.total      ?? 0, icon: TrendingUp,   color: '#a78bfa', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.18)',
+      onClick: () => openModal('All Leads', 'Your entire lead pipeline', allLeads, '#a78bfa'),
+    },
   ]
 
   const getStatusColor = (s: string) => {
@@ -413,6 +636,18 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Card Detail Modal ─────────────────────────── */}
+      {modal && (
+        <CardModal
+          title={modal.title}
+          subtitle={modal.subtitle}
+          leads={modal.leads}
+          color={modal.color}
+          showChannel={modal.showChannel}
+          onClose={() => setModal(null)}
+        />
+      )}
     </div>
   )
 }
