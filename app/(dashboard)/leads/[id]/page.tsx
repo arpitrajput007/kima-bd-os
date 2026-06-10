@@ -476,7 +476,7 @@ function ContactedModal({ lead, onClose, onSaved }: {
   const supabase = createClient()
   const [channel, setChannel] = useState('')
   const [note, setNote] = useState('')
-  const [followUpDays, setFollowUpDays] = useState('7')
+  const [followUpDays, setFollowUpDays] = useState('3')
   const [saving, setSaving] = useState(false)
   const [prevActivities, setPrevActivities] = useState<Array<{ channel: string; created_at: string }>>([])
 
@@ -603,7 +603,7 @@ function ContactedModal({ lead, onClose, onSaved }: {
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'rgb(150,155,185)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Follow-up reminder</div>
           <div style={{ display: 'flex', gap: 8 }}>
-            {['3', '5', '7', '14'].map(d => (
+            {['1', '3', '5', '7', '14'].map(d => (
               <button key={d} onClick={() => setFollowUpDays(d)}
                 style={{ flex: 1, padding: '8px 0', borderRadius: 9, fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
                   border: `1px solid ${followUpDays === d ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.08)'}`,

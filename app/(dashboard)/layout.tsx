@@ -1,5 +1,6 @@
 import { Sidebar } from '@/components/sidebar'
 import AgentActivityLog from '@/components/AgentActivityLog'
+import FollowUpNotifications from '@/components/FollowUpNotifications'
 
 export default function DashboardLayout({
   children,
@@ -26,6 +27,7 @@ export default function DashboardLayout({
         </main>
       </div>
       <AgentActivityLog />
+      <FollowUpNotifications />
     </div>
   )
 }
