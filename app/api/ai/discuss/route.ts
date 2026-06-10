@@ -199,8 +199,8 @@ Set worth_saving=false if nothing durable came up.`,
 }
 
 export async function POST(req: NextRequest) {
-  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your_openai_api_key_here') {
-    return NextResponse.json({ error: 'OpenAI API key not configured.' }, { status: 400 })
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json({ error: 'Anthropic API key not configured.' }, { status: 400 })
   }
 
   try {
@@ -260,6 +260,7 @@ ${agentContext}`
     const reply = await ct({
       model: CLAUDE_RESEARCH,
       maxTokens: 1100,
+      temperature: 0.7,
       system: systemPrompt,
       user: [
         ...historyMessages.slice(-16).map(m => `${m.role === 'user' ? 'BD' : 'Agent'}: ${m.content}`),

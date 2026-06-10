@@ -226,23 +226,27 @@ ${PRODUCT_BRAIN}
 
 ${HUMAN_RULES}
 ${learnings.hasData ? `\n${learnings.block}\n` : ''}
-You will produce THREE drafts for the SAME lead. They must NOT feel like the same message resized — each uses a DIFFERENT hook/angle from the research and a different length and channel:
-1. "short"  → a Telegram / X DM. 2-3 sentences. Punchy, one sharp hook.
-2. "medium" → a LinkedIn message. ~4-5 sentences. A different angle than the short one.
-3. "long"   → an email (include a subject line). ~6-8 sentences, a bit more context and proof, yet still tight and human.
+You will produce SIX drafts for the SAME lead — 2 variations per channel. Each variation within a channel MUST use a completely different hook, evidence point, and angle. They cannot feel like the same message reworded.
+
+Channel 1 — Telegram / X DM (short_1, short_2): 2–3 sentences each. Punchy, one sharp hook. Each version starts from a different specific fact about this lead.
+Channel 2 — LinkedIn (medium_1, medium_2): 4–5 sentences each. Different angle per version — e.g. one leads with their pain, one leads with a news hook.
+Channel 3 — Email (long_1, long_2): 6–8 sentences each, include a subject line. Different angle and evidence point per version. Subject lines must also be distinct.
 
 Return JSON only.`
 
-  const userPrompt = `Here is everything I researched on this lead. Write the 3 drafts so they could ONLY have been written for this specific company.
+  const userPrompt = `Here is everything I researched on this lead. Write all 6 drafts so they could ONLY have been written for this specific company.
 
 ${leadContextBlock(lead as LeadRow)}
 
 Return JSON exactly:
 {
   "drafts": [
-    { "id": "short",  "label": "Short — Telegram / X DM", "channel": "telegram", "text": "..." },
-    { "id": "medium", "label": "Medium — LinkedIn",        "channel": "linkedin", "text": "..." },
-    { "id": "long",   "label": "Longer — Email",           "channel": "email", "subject": "...", "text": "..." }
+    { "id": "short_1",  "label": "Telegram / X DM", "channel": "telegram", "version": 1, "text": "..." },
+    { "id": "short_2",  "label": "Telegram / X DM", "channel": "telegram", "version": 2, "text": "..." },
+    { "id": "medium_1", "label": "LinkedIn",         "channel": "linkedin", "version": 1, "text": "..." },
+    { "id": "medium_2", "label": "LinkedIn",         "channel": "linkedin", "version": 2, "text": "..." },
+    { "id": "long_1",   "label": "Email",            "channel": "email",    "version": 1, "subject": "...", "text": "..." },
+    { "id": "long_2",   "label": "Email",            "channel": "email",    "version": 2, "subject": "...", "text": "..." }
   ]
 }`
 
@@ -250,7 +254,7 @@ Return JSON exactly:
     const result = await completeWithBanGuard(
       systemPrompt,
       userPrompt,
-      { temperature: 0.95, max_tokens: 2200 },
+      { temperature: 0.95, max_tokens: 3800 },
       (p) => ((p.drafts as { subject?: string; text?: string }[]) || [])
         .map(d => `${d.subject || ''} ${d.text || ''}`),
       draftingProvider,
