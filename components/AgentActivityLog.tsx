@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { agentActivity, TOOL_META, type ActivityEvent } from '@/lib/agent-activity'
 import {
   Activity, ChevronDown, ChevronUp, X, Trash2,
-  Loader2, CheckCircle2, AlertCircle, GripHorizontal,
+  Loader2, CheckCircle2, AlertCircle, GripHorizontal, FlaskConical,
 } from 'lucide-react'
 
 /* ── helpers ─────────────────────────────────────────────────── */
@@ -215,6 +215,16 @@ export default function AgentActivityLog() {
         )}
 
         <div style={{ display: 'flex', gap: 2, marginLeft: 2 }}>
+          <button
+            onClick={() => {
+              const id = agentActivity.start({ tool: 'System', action: 'Test ping', page: 'Activity Panel', timestamp: Date.now() })
+              setTimeout(() => agentActivity.finish(id, 'success', 'Panel is working ✓', 42), 600)
+            }}
+            title="Send test event"
+            style={{ display: 'flex', padding: '4px 6px', borderRadius: 5, background: 'none', border: 'none', color: 'rgb(90,97,130)', cursor: 'pointer' }}
+          >
+            <FlaskConical size={11} />
+          </button>
           <button
             onClick={() => agentActivity.clear()}
             title="Clear log"

@@ -1,8 +1,11 @@
 // ============================================================
 // Agent Activity Log — global singleton event store
-// Pinned to window.__agentActivity so all Next.js code-split
-// chunks share the SAME instance (module-level singleton alone
-// is not enough because each route chunk gets its own copy).
+//
+// KEY DESIGN: agentActivity is a Proxy that resolves EVERY method
+// call to window.__agentActivity at invocation time (not module-load
+// time). This is immune to Next.js code-splitting — each route chunk
+// may evaluate this module independently, but all method calls
+// always hit the same window object.
 // ============================================================
 
 export type ToolName =
@@ -18,13 +21,13 @@ export type ToolName =
 
 export interface ActivityEvent {
   id: string
-  timestamp: number          // Date.now()
+  timestamp: number
   tool: ToolName
-  action: string             // e.g. "Research Company"
-  page: string               // e.g. "Lead — Hyperbridge"
+  action: string
+  page: string
   status: 'pending' | 'success' | 'error'
-  duration?: number          // ms
-  detail?: string            // brief outcome or error snippet
+  duration?: number
+  detail?: string
 }
 
 type Listener = (events: ActivityEvent[]) => void
@@ -48,7 +51,7 @@ class AgentActivityStore {
     this._notify()
   }
 
-  log(event: Omit<ActivityEvent, 'id' | 'status'> & { status?: ActivityEvent['status']; detail?: string }) {
+  log(event: Omit<ActivityEvent, 'id' | 'status'> & { status?: ActivityEvent['status'] }) {
     const id = Math.random().toString(36).slice(2, 10)
     const newEvent: ActivityEvent = { ...event, id, status: event.status ?? 'success' }
     this._events = [newEvent, ...this._events].slice(0, 100)
@@ -62,36 +65,51 @@ class AgentActivityStore {
 
   subscribe(listener: Listener) {
     this._listeners.add(listener)
-    listener(this.events)          // immediate snapshot on subscribe
+    listener(this.events)
     return () => { this._listeners.delete(listener) }
   }
 
   private _notify() {
     const snapshot = this.events
     this._listeners.forEach(l => l(snapshot))
-    // Broadcast via window event so ANY chunk (different code-split bundle)
-    // can receive updates — this is immune to module-singleton identity issues
+    // Also broadcast via window event — panel listens to this,
+    // guaranteeing delivery even if subscription is on a different instance
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('__bd_activity_update', { detail: snapshot }))
+      window.dispatchEvent(
+        new CustomEvent('__bd_activity_update', { detail: snapshot })
+      )
     }
   }
 }
 
-// ── Cross-chunk singleton via window ──────────────────────────
-// Next.js splits each route into its own JS chunk. Without this,
-// leads/[id]/page.tsx and AgentActivityLog.tsx each create a
-// separate AgentActivityStore and never share events.
+// ── Always-fresh singleton via window ────────────────────────
 declare global {
   interface Window { __agentActivity?: AgentActivityStore }
 }
 
-function getStore(): AgentActivityStore {
-  if (typeof window === 'undefined') return new AgentActivityStore() // SSR: throwaway
-  if (!window.__agentActivity) window.__agentActivity = new AgentActivityStore()
+function liveStore(): AgentActivityStore {
+  if (typeof window === 'undefined') {
+    // SSR path — return a silent no-op store (events are never shown server-side)
+    return new AgentActivityStore()
+  }
+  if (!window.__agentActivity) {
+    window.__agentActivity = new AgentActivityStore()
+  }
   return window.__agentActivity
 }
 
-export const agentActivity = getStore()
+// Proxy: every property access resolves to window.__agentActivity at
+// CALL TIME, not at module-evaluation time. This means:
+//   agentActivity.start(...)  →  liveStore().start(...)
+//   agentActivity.subscribe() →  liveStore().subscribe()
+// No stale reference possible, regardless of chunk load order.
+export const agentActivity = new Proxy({} as AgentActivityStore, {
+  get(_target, prop: string) {
+    const store = liveStore()
+    const val = (store as unknown as Record<string, unknown>)[prop]
+    return typeof val === 'function' ? (val as Function).bind(store) : val
+  },
+})
 
 // ── Tool metadata ─────────────────────────────────────────────
 
