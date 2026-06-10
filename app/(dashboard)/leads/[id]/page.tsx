@@ -854,6 +854,67 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [saving, setSaving] = useState(false)
   const [aiAction, setAiAction] = useState<AIAction>(null)
   const [apolloLoading, setApolloLoading] = useState(false)
+
+  // ── Activity log: write directly to window.__bda so the panel's
+  //    250ms poller always sees it regardless of module bundling ──
+  const actRef = useRef<Record<string, string>>({})
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!window.__bda) window.__bda = { events: [], v: 0 }
+    const toolMap: Record<string, string> = {
+      research: 'Claude', classify: 'Claude', kima_fit: 'Claude',
+      aeredium_fit: 'Claude', score: 'Claude', contacts: 'ContactFinder', pain_points: 'Claude',
+    }
+    const labelMap: Record<string, string> = {
+      research: 'Research Company', classify: 'Classify Lead', kima_fit: 'Kima Fit Analysis',
+      aeredium_fit: 'Aeredium Fit Analysis', score: 'Score Lead',
+      contacts: 'Find Contacts', pain_points: 'Identify Pain Points',
+    }
+    if (aiAction) {
+      const id = Math.random().toString(36).slice(2, 10)
+      actRef.current[aiAction] = id
+      window.__bda.events = [
+        { id, timestamp: Date.now(), tool: (toolMap[aiAction] ?? 'Claude') as import('@/lib/agent-activity').ToolName,
+          action: labelMap[aiAction] ?? aiAction,
+          page: `Lead — ${lead?.company_name ?? ''}`, status: 'pending' as const },
+        ...window.__bda.events,
+      ].slice(0, 100)
+      window.__bda.v++
+    } else {
+      // aiAction cleared — resolve all pending
+      Object.values(actRef.current).forEach(id => {
+        window.__bda!.events = window.__bda!.events.map(e =>
+          e.id === id ? { ...e, status: 'success' as const } : e
+        )
+        window.__bda!.v++
+      })
+      actRef.current = {}
+    }
+  }, [aiAction]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!window.__bda) window.__bda = { events: [], v: 0 }
+    if (apolloLoading) {
+      const id = Math.random().toString(36).slice(2, 10)
+      actRef.current['apollo'] = id
+      window.__bda.events = [
+        { id, timestamp: Date.now(), tool: 'Apollo' as import('@/lib/agent-activity').ToolName,
+          action: 'Find Decision-Makers',
+          page: `Lead — ${lead?.company_name ?? ''}`, status: 'pending' as const },
+        ...window.__bda.events,
+      ].slice(0, 100)
+      window.__bda.v++
+    } else if (actRef.current['apollo']) {
+      const id = actRef.current['apollo']
+      window.__bda!.events = window.__bda!.events.map(e =>
+        e.id === id ? { ...e, status: 'success' as const } : e
+      )
+      window.__bda!.v++
+      delete actRef.current['apollo']
+    }
+  }, [apolloLoading]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const [discussOpen, setDiscussOpen] = useState(false)
   const [contactedModalOpen, setContactedModalOpen] = useState(false)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
