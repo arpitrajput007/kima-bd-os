@@ -35,7 +35,8 @@ class AgentActivityStore {
   /** Emit a pending event, returns its id so you can resolve it later */
   start(event: Omit<ActivityEvent, 'id' | 'status'>): string {
     const id = Math.random().toString(36).slice(2, 10)
-    this._events = [{ ...event, id, status: 'pending' }, ...this._events].slice(0, 100)
+    const newEvent: ActivityEvent = { ...event, id, status: 'pending' }
+    this._events = [newEvent, ...this._events].slice(0, 100)
     this._notify()
     return id
   }
@@ -51,7 +52,8 @@ class AgentActivityStore {
   /** Shorthand: emit + immediately resolve (for synchronous or fire-and-forget events) */
   log(event: Omit<ActivityEvent, 'id' | 'status'> & { status?: ActivityEvent['status']; detail?: string }) {
     const id = Math.random().toString(36).slice(2, 10)
-    this._events = [{ ...event, id, status: event.status ?? 'success' }, ...this._events].slice(0, 100)
+    const newEvent: ActivityEvent = { ...event, id, status: event.status ?? 'success' }
+    this._events = [newEvent, ...this._events].slice(0, 100)
     this._notify()
     return id
   }

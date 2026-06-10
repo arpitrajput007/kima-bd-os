@@ -88,7 +88,7 @@ export default function AgentActivityLog() {
   // Subscribe to activity store
   useEffect(() => {
     const unsub = agentActivity.subscribe(setEvents)
-    return unsub
+    return () => { unsub() }
   }, [])
 
   if (!enabled) return null
