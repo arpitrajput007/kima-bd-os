@@ -1,11 +1,13 @@
 // ============================================================
-// Agent Activity Log — global singleton event store
+// Agent Activity Log
 //
-// KEY DESIGN: agentActivity is a Proxy that resolves EVERY method
-// call to window.__agentActivity at invocation time (not module-load
-// time). This is immune to Next.js code-splitting — each route chunk
-// may evaluate this module independently, but all method calls
-// always hit the same window object.
+// Architecture: every call (start / finish / clear) dispatches a
+// CustomEvent on window. The panel listens to window events ONLY —
+// zero dependency on module identity or singleton sharing.
+//
+// This is immune to Next.js code-splitting because window is always
+// the single global object in the browser, regardless of how many
+// JS chunks import this module.
 // ============================================================
 
 export type ToolName =
@@ -30,86 +32,87 @@ export interface ActivityEvent {
   detail?: string
 }
 
-type Listener = (events: ActivityEvent[]) => void
+// ── Event names ───────────────────────────────────────────────
+const EV_ADD    = '__bda_add'    // new / updated event
+const EV_FINISH = '__bda_finish' // resolve pending → success/error
+const EV_CLEAR  = '__bda_clear'  // wipe all events
 
-class AgentActivityStore {
-  private _events: ActivityEvent[] = []
-  private _listeners: Set<Listener> = new Set()
+function dispatch(name: string, detail: unknown) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(name, { detail }))
+}
 
-  start(event: Omit<ActivityEvent, 'id' | 'status'>): string {
-    const id = Math.random().toString(36).slice(2, 10)
-    const newEvent: ActivityEvent = { ...event, id, status: 'pending' }
-    this._events = [newEvent, ...this._events].slice(0, 100)
-    this._notify()
-    return id
-  }
+// ── Public API ────────────────────────────────────────────────
 
-  finish(id: string, status: 'success' | 'error', detail?: string, durationMs?: number) {
-    this._events = this._events.map(e =>
-      e.id === id ? { ...e, status, detail, duration: durationMs } : e
-    )
-    this._notify()
-  }
+/** Emit a pending event. Returns id so you can resolve it later. */
+export function actStart(event: Omit<ActivityEvent, 'id' | 'status'>): string {
+  const id = Math.random().toString(36).slice(2, 10)
+  const ev: ActivityEvent = { ...event, id, status: 'pending' }
+  dispatch(EV_ADD, ev)
+  return id
+}
 
-  log(event: Omit<ActivityEvent, 'id' | 'status'> & { status?: ActivityEvent['status'] }) {
-    const id = Math.random().toString(36).slice(2, 10)
-    const newEvent: ActivityEvent = { ...event, id, status: event.status ?? 'success' }
-    this._events = [newEvent, ...this._events].slice(0, 100)
-    this._notify()
-    return id
-  }
+/** Resolve a pending event to success or error. */
+export function actFinish(
+  id: string,
+  status: 'success' | 'error',
+  detail?: string,
+  durationMs?: number
+) {
+  dispatch(EV_FINISH, { id, status, detail, duration: durationMs })
+}
 
-  clear() { this._events = []; this._notify() }
+/** Wipe all events from the panel. */
+export function actClear() {
+  dispatch(EV_CLEAR, null)
+}
 
-  get events() { return [...this._events] }
+// ── Keep the old agentActivity object for the test-ping button ─
+// (the panel calls agentActivity.start() for its own test button)
+export const agentActivity = { start: actStart, finish: actFinish, clear: actClear }
 
-  subscribe(listener: Listener) {
-    this._listeners.add(listener)
-    listener(this.events)
-    return () => { this._listeners.delete(listener) }
-  }
+// ── useActivityLog hook — used ONLY in AgentActivityLog.tsx ───
+// Manages the in-panel event list by listening to window events.
+export function subscribeToActivityLog(
+  onUpdate: (events: ActivityEvent[]) => void
+): () => void {
+  if (typeof window === 'undefined') return () => {}
 
-  private _notify() {
-    const snapshot = this.events
-    this._listeners.forEach(l => l(snapshot))
-    // Also broadcast via window event — panel listens to this,
-    // guaranteeing delivery even if subscription is on a different instance
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('__bd_activity_update', { detail: snapshot })
-      )
+  // Local event list (lives only in the panel's closure)
+  let events: ActivityEvent[] = []
+
+  const onAdd = (e: Event) => {
+    const ev = (e as CustomEvent<ActivityEvent>).detail
+    // Update existing (finish called before panel processes add) or prepend
+    const idx = events.findIndex(x => x.id === ev.id)
+    if (idx >= 0) {
+      events = events.map((x, i) => i === idx ? ev : x)
+    } else {
+      events = [ev, ...events].slice(0, 100)
     }
+    onUpdate([...events])
+  }
+
+  const onFinish = (e: Event) => {
+    const { id, status, detail, duration } = (e as CustomEvent<{
+      id: string; status: 'success' | 'error'; detail?: string; duration?: number
+    }>).detail
+    events = events.map(x => x.id === id ? { ...x, status, detail, duration } : x)
+    onUpdate([...events])
+  }
+
+  const onClear = () => { events = []; onUpdate([]) }
+
+  window.addEventListener(EV_ADD,    onAdd)
+  window.addEventListener(EV_FINISH, onFinish)
+  window.addEventListener(EV_CLEAR,  onClear)
+
+  return () => {
+    window.removeEventListener(EV_ADD,    onAdd)
+    window.removeEventListener(EV_FINISH, onFinish)
+    window.removeEventListener(EV_CLEAR,  onClear)
   }
 }
-
-// ── Always-fresh singleton via window ────────────────────────
-declare global {
-  interface Window { __agentActivity?: AgentActivityStore }
-}
-
-function liveStore(): AgentActivityStore {
-  if (typeof window === 'undefined') {
-    // SSR path — return a silent no-op store (events are never shown server-side)
-    return new AgentActivityStore()
-  }
-  if (!window.__agentActivity) {
-    window.__agentActivity = new AgentActivityStore()
-  }
-  return window.__agentActivity
-}
-
-// Proxy: every property access resolves to window.__agentActivity at
-// CALL TIME, not at module-evaluation time. This means:
-//   agentActivity.start(...)  →  liveStore().start(...)
-//   agentActivity.subscribe() →  liveStore().subscribe()
-// No stale reference possible, regardless of chunk load order.
-export const agentActivity = new Proxy({} as AgentActivityStore, {
-  get(_target, prop: string) {
-    const store = liveStore()
-    const val = (store as unknown as Record<string, unknown>)[prop]
-    return typeof val === 'function' ? (val as Function).bind(store) : val
-  },
-})
 
 // ── Tool metadata ─────────────────────────────────────────────
 

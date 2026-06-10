@@ -25,7 +25,7 @@ import {
 } from '@/lib/outreach'
 import type { Lead, Contact, ContactTouch, OutreachMessage, UseCase } from '@/lib/types'
 import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL, REGIONS } from '@/lib/types'
-import { agentActivity, ACTION_TOOL, ACTION_LABEL } from '@/lib/agent-activity'
+import { actStart, actFinish, ACTION_TOOL, ACTION_LABEL } from '@/lib/agent-activity'
 
 type AIAction = 'research' | 'pain_points' | 'kima_fit' | 'aeredium_fit' | 'classify' | 'score' | 'contacts' | null
 
@@ -287,7 +287,7 @@ function ContactCard({ contact, onRefresh, onUpdate, refreshing }: {
   const enrichContact = async () => {
     if (!contact.name) return
     setEnriching(true)
-    const actId = agentActivity.start({ tool: 'Exa', action: `Find handles — ${contact.name}`, page: 'Lead Detail · Contacts', timestamp: Date.now() })
+    const actId = actStart({ tool: 'Exa', action: `Find handles — ${contact.name}`, page: 'Lead Detail · Contacts', timestamp: Date.now() })
     const t0 = Date.now()
     try {
       const res = await fetch('/api/ai/enrich-contact', {
@@ -304,15 +304,15 @@ function ContactCard({ contact, onRefresh, onUpdate, refreshing }: {
           email: data.email || contact.email,
         }).eq('id', contact.id)
         const found = [data.twitter_url && 'Twitter', data.linkedin_url && 'LinkedIn', data.github_url && 'GitHub', data.email && 'Email'].filter(Boolean).join(', ')
-        agentActivity.finish(actId, 'success', `Found: ${found}`, Date.now() - t0)
+        actFinish(actId, 'success', `Found: ${found}`, Date.now() - t0)
         toast.success(`Found: ${found}`)
         onRefresh()
       } else {
-        agentActivity.finish(actId, 'success', 'No new handles found', Date.now() - t0)
+        actFinish(actId, 'success', 'No new handles found', Date.now() - t0)
         toast('No new handles found for this person')
       }
     } catch {
-      agentActivity.finish(actId, 'error', 'Enrichment failed', Date.now() - t0)
+      actFinish(actId, 'error', 'Enrichment failed', Date.now() - t0)
       toast.error('Enrichment failed')
     }
     finally { setEnriching(false) }
@@ -640,7 +640,7 @@ function UseCasesSection({ lead, onGenerated }: { lead: Lead; onGenerated: (case
 
   const generate = async () => {
     setGenerating(true)
-    const actId = agentActivity.start({ tool: 'Claude', action: 'Generate Use Cases', page: `Lead — ${lead.company_name}`, timestamp: Date.now() })
+    const actId = actStart({ tool: 'Claude', action: 'Generate Use Cases', page: `Lead — ${lead.company_name}`, timestamp: Date.now() })
     const t0 = Date.now()
     try {
       const res = await fetch('/api/ai/use-cases', {
@@ -650,10 +650,10 @@ function UseCasesSection({ lead, onGenerated }: { lead: Lead; onGenerated: (case
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
       onGenerated(json.use_cases)
-      agentActivity.finish(actId, 'success', `${json.use_cases.length} use cases generated`, Date.now() - t0)
+      actFinish(actId, 'success', `${json.use_cases.length} use cases generated`, Date.now() - t0)
       toast.success(`${json.use_cases.length} use cases generated`)
     } catch (err: unknown) {
-      agentActivity.finish(actId, 'error', err instanceof Error ? err.message : 'Generation failed', Date.now() - t0)
+      actFinish(actId, 'error', err instanceof Error ? err.message : 'Generation failed', Date.now() - t0)
       toast.error(err instanceof Error ? err.message : 'Generation failed')
     } finally { setGenerating(false) }
   }
@@ -911,7 +911,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     setAiAction(action)
     const tool = ACTION_TOOL[action] ?? 'Claude'
     const label = ACTION_LABEL[action] ?? action
-    const actId = agentActivity.start({ tool, action: label, page: `Lead — ${lead.company_name}`, timestamp: Date.now() })
+    const actId = actStart({ tool, action: label, page: `Lead — ${lead.company_name}`, timestamp: Date.now() })
     const t0 = Date.now()
     try {
       const res = await fetch('/api/ai/research', {
@@ -986,11 +986,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         }
         loadLead()
       }
-      agentActivity.finish(actId, 'success', `${label} complete`, Date.now() - t0)
+      actFinish(actId, 'success', `${label} complete`, Date.now() - t0)
       toast.success(`AI ${action.replace('_', ' ')} complete`)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'AI action failed'
-      agentActivity.finish(actId, 'error', msg, Date.now() - t0)
+      actFinish(actId, 'error', msg, Date.now() - t0)
       toast.error(msg)
     } finally { setAiAction(null) }
   }
@@ -999,7 +999,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const findApolloContacts = async () => {
     if (!lead) return
     setApolloLoading(true)
-    const actId = agentActivity.start({ tool: 'Apollo', action: 'Find Decision-Makers', page: `Lead — ${lead.company_name}`, timestamp: Date.now() })
+    const actId = actStart({ tool: 'Apollo', action: 'Find Decision-Makers', page: `Lead — ${lead.company_name}`, timestamp: Date.now() })
     const t0 = Date.now()
     try {
       const res = await fetch('/api/leads/apollo-enrich', {
@@ -1012,16 +1012,16 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         const parts = []
         if (json.discovered > 0) parts.push(`${json.discovered} new contact${json.discovered > 1 ? 's' : ''} found`)
         if (json.verified   > 0) parts.push(`${json.verified} email${json.verified > 1 ? 's' : ''} verified`)
-        agentActivity.finish(actId, 'success', parts.join(' · '), Date.now() - t0)
+        actFinish(actId, 'success', parts.join(' · '), Date.now() - t0)
         toast.success(`Apollo: ${parts.join(' · ')}`)
         loadLead()
       } else {
-        agentActivity.finish(actId, 'success', json.message || 'No results', Date.now() - t0)
+        actFinish(actId, 'success', json.message || 'No results', Date.now() - t0)
         toast(json.message || 'Apollo found nothing for this company')
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Apollo lookup failed'
-      agentActivity.finish(actId, 'error', msg, Date.now() - t0)
+      actFinish(actId, 'error', msg, Date.now() - t0)
       toast.error(msg)
     } finally { setApolloLoading(false) }
   }

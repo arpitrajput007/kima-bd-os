@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { agentActivity, TOOL_META, type ActivityEvent } from '@/lib/agent-activity'
+import {
+  agentActivity, subscribeToActivityLog, TOOL_META,
+  type ActivityEvent,
+} from '@/lib/agent-activity'
 import {
   Activity, ChevronDown, ChevronUp, X, Trash2,
   Loader2, CheckCircle2, AlertCircle, GripHorizontal, FlaskConical,
 } from 'lucide-react'
-
-/* ── helpers ─────────────────────────────────────────────────── */
 
 function timeAgo(ts: number) {
   const d = Date.now() - ts
@@ -16,8 +17,6 @@ function timeAgo(ts: number) {
   if (d < 3600000) return `${Math.round(d / 60000)}m ago`
   return `${Math.round(d / 3600000)}h ago`
 }
-
-/* ── single event row ────────────────────────────────────────── */
 
 function EventRow({ ev }: { ev: ActivityEvent }) {
   const meta = TOOL_META[ev.tool]
@@ -76,20 +75,18 @@ function EventRow({ ev }: { ev: ActivityEvent }) {
   )
 }
 
-/* ── main panel ──────────────────────────────────────────────── */
-
 export default function AgentActivityLog() {
   const [enabled,   setEnabled]   = useState(false)
   const [minimised, setMinimised] = useState(false)
   const [events,    setEvents]    = useState<ActivityEvent[]>([])
 
-  // drag state
-  const panelRef   = useRef<HTMLDivElement>(null)
+  // drag
+  const panelRef = useRef<HTMLDivElement>(null)
   const [pos,      setPos]      = useState<{ x: number; y: number } | null>(null)
   const [dragging, setDragging] = useState(false)
-  const dragOff    = useRef({ x: 0, y: 0 })
+  const dragOff = useRef({ x: 0, y: 0 })
 
-  // ── localStorage toggle ──────────────────────────────────────
+  // ── toggle visibility from settings ─────────────────────────
   useEffect(() => {
     setEnabled(localStorage.getItem('bd_show_activity_log') === 'true')
     const handler = () => setEnabled(localStorage.getItem('bd_show_activity_log') === 'true')
@@ -97,41 +94,23 @@ export default function AgentActivityLog() {
     return () => window.removeEventListener('bd_activity_log_toggle', handler)
   }, [])
 
-  // ── store subscription + window event (dual approach) ────────
-  // The store subscription handles same-chunk updates.
-  // The window event handles cross-chunk updates (Next.js code-splitting
-  // can cause separate module instances; window is always the same object).
+  // ── subscribe to activity via window events ──────────────────
+  // subscribeToActivityLog listens ONLY to window CustomEvents so it
+  // receives updates from any JS chunk, regardless of module identity.
   useEffect(() => {
-    // Seed with whatever is already in the store
-    setEvents(agentActivity.events)
-
-    // Window event: fired by AgentActivityStore._notify() in ANY chunk
-    const onWindowEvent = (e: Event) => {
-      setEvents((e as CustomEvent<ActivityEvent[]>).detail)
-    }
-    window.addEventListener('__bd_activity_update', onWindowEvent)
-
-    // Also subscribe via store in case same instance
-    const unsub = agentActivity.subscribe(setEvents)
-
-    return () => {
-      window.removeEventListener('__bd_activity_update', onWindowEvent)
-      unsub()
-    }
+    return subscribeToActivityLog(setEvents)
   }, [])
 
-  // ── drag: start ───────────────────────────────────────────────
+  // ── drag ─────────────────────────────────────────────────────
   const onHeaderMouseDown = useCallback((e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('button')) return // don't drag if clicking a button
+    if ((e.target as HTMLElement).closest('button')) return
     e.preventDefault()
     const rect = panelRef.current!.getBoundingClientRect()
     dragOff.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
-    // Snap to absolute top/left on first drag
     setPos({ x: rect.left, y: rect.top })
     setDragging(true)
   }, [])
 
-  // ── drag: move + release ──────────────────────────────────────
   useEffect(() => {
     if (!dragging) return
     const onMove = (e: MouseEvent) => {
@@ -151,8 +130,6 @@ export default function AgentActivityLog() {
   if (!enabled) return null
 
   const pendingCount = events.filter(e => e.status === 'pending').length
-
-  // position: default bottom-right, dragged to absolute pos
   const posStyle: React.CSSProperties = pos
     ? { left: pos.x, top: pos.y }
     : { bottom: 20, right: 20 }
@@ -161,21 +138,15 @@ export default function AgentActivityLog() {
     <div
       ref={panelRef}
       style={{
-        position: 'fixed',
-        ...posStyle,
-        zIndex: 9990,
-        width: 390,
-        borderRadius: 14,
-        border: '1px solid rgba(255,255,255,0.1)',
-        background: 'linear-gradient(180deg, rgba(14,16,28,0.98), rgba(9,10,18,0.99))',
-        boxShadow: '0 24px 60px rgba(0,0,0,0.75)',
-        backdropFilter: 'blur(18px)',
-        fontFamily: 'inherit',
-        overflow: 'hidden',
+        position: 'fixed', ...posStyle, zIndex: 9990, width: 390,
+        borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)',
+        background: 'linear-gradient(180deg,rgba(14,16,28,0.98),rgba(9,10,18,0.99))',
+        boxShadow: '0 24px 60px rgba(0,0,0,0.75)', backdropFilter: 'blur(18px)',
+        fontFamily: 'inherit', overflow: 'hidden',
         userSelect: dragging ? 'none' : 'auto',
       }}
     >
-      {/* ── header / drag handle ─────────────────────────────── */}
+      {/* header */}
       <div
         onMouseDown={onHeaderMouseDown}
         style={{
@@ -194,10 +165,9 @@ export default function AgentActivityLog() {
 
         {pendingCount > 0 && (
           <span style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            fontSize: 10, fontWeight: 700, color: '#fbbf24',
-            background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.3)',
-            borderRadius: 5, padding: '1px 7px',
+            display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700,
+            color: '#fbbf24', background: 'rgba(251,191,36,0.12)',
+            border: '1px solid rgba(251,191,36,0.3)', borderRadius: 5, padding: '1px 7px',
           }}>
             <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#fbbf24', display: 'inline-block' }} />
             {pendingCount} running
@@ -206,15 +176,15 @@ export default function AgentActivityLog() {
 
         {events.length > 0 && (
           <span style={{
-            fontSize: 10, color: 'rgb(100,107,140)',
-            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)',
-            borderRadius: 5, padding: '1px 7px',
+            fontSize: 10, color: 'rgb(100,107,140)', background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.09)', borderRadius: 5, padding: '1px 7px',
           }}>
             {events.length}
           </span>
         )}
 
         <div style={{ display: 'flex', gap: 2, marginLeft: 2 }}>
+          {/* test ping */}
           <button
             onClick={() => {
               const id = agentActivity.start({ tool: 'System', action: 'Test ping', page: 'Activity Panel', timestamp: Date.now() })
@@ -252,7 +222,7 @@ export default function AgentActivityLog() {
         </div>
       </div>
 
-      {/* ── event list ───────────────────────────────────────── */}
+      {/* event list */}
       {!minimised && (
         <div style={{ maxHeight: 420, overflowY: 'auto' }}>
           {events.length === 0 ? (
@@ -269,11 +239,10 @@ export default function AgentActivityLog() {
         </div>
       )}
 
-      {/* ── tool usage legend ────────────────────────────────── */}
+      {/* tool legend */}
       {!minimised && events.length > 0 && (
         <div style={{
-          padding: '8px 14px',
-          borderTop: '1px solid rgba(255,255,255,0.05)',
+          padding: '8px 14px', borderTop: '1px solid rgba(255,255,255,0.05)',
           display: 'flex', flexWrap: 'wrap', gap: 5,
         }}>
           {(Object.entries(TOOL_META) as [string, typeof TOOL_META[keyof typeof TOOL_META]][])
