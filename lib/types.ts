@@ -139,6 +139,20 @@ export type CustomerCategory = (typeof CUSTOMER_CATEGORIES)[number]
 export type ProductToSell = (typeof PRODUCTS_TO_SELL)[number]
 export type Region = (typeof REGIONS)[number]
 
+export interface UseCase {
+  id: string
+  title: string
+  category: string
+  scenario: string
+  kima_role: string
+  aeredium_role?: string
+  outcome_for_company: string
+  outcome_for_kima: string
+  feasibility: 'high' | 'medium' | 'low'
+  impact: 'transformative' | 'significant' | 'incremental'
+  why_now?: string
+}
+
 export interface Lead {
   id: string
   company_name: string
@@ -175,6 +189,7 @@ export interface Lead {
   discord_url?: string
   facts?: Record<string, unknown>[]
   assumptions?: Record<string, unknown>[]
+  use_cases?: UseCase[]
   lead_score?: number
   confidence_score?: number
   priority?: LeadPriority

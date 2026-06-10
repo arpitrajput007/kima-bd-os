@@ -23,7 +23,7 @@ import {
   buildTarget, channelDeepLink, logTouch, recordOutcome,
   type OutreachMeta, type OutreachOutcome,
 } from '@/lib/outreach'
-import type { Lead, Contact, OutreachMessage } from '@/lib/types'
+import type { Lead, Contact, OutreachMessage, UseCase } from '@/lib/types'
 import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL, REGIONS } from '@/lib/types'
 
 type AIAction = 'research' | 'pain_points' | 'kima_fit' | 'aeredium_fit' | 'classify' | 'score' | 'contacts' | null
@@ -501,6 +501,208 @@ function ContactedModal({ lead, onClose, onSaved }: {
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+/* ── Real Use Cases section ─────────────────────────────── */
+function UseCasesSection({ lead, onGenerated }: { lead: Lead; onGenerated: (cases: UseCase[]) => void }) {
+  const [generating, setGenerating] = useState(false)
+  const cases: UseCase[] = (lead.use_cases as UseCase[]) || []
+
+  const generate = async () => {
+    setGenerating(true)
+    try {
+      const res = await fetch('/api/ai/use-cases', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead_id: lead.id }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      onGenerated(json.use_cases)
+      toast.success(`${json.use_cases.length} use cases generated`)
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Generation failed')
+    } finally { setGenerating(false) }
+  }
+
+  const feasColor = (f: string) =>
+    f === 'high'   ? { bg: 'rgba(52,211,153,0.1)',  border: 'rgba(52,211,153,0.25)',  text: 'rgb(110,231,183)' } :
+    f === 'medium' ? { bg: 'rgba(251,191,36,0.1)',  border: 'rgba(251,191,36,0.25)',  text: 'rgb(253,224,71)'  } :
+                     { bg: 'rgba(252,165,165,0.1)', border: 'rgba(252,165,165,0.25)', text: 'rgb(252,165,165)' }
+
+  const impactColor = (i: string) =>
+    i === 'transformative' ? { bg: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.3)', text: 'rgb(196,167,252)' } :
+    i === 'significant'    ? { bg: 'rgba(96,165,250,0.1)',   border: 'rgba(96,165,250,0.25)', text: 'rgb(147,197,253)' } :
+                             { bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.1)', text: 'rgb(160,165,195)' }
+
+  const catColor = (c: string): string => ({
+    Settlement: 'rgb(52,211,153)', Payments: 'rgb(96,165,250)',
+    Treasury: 'rgb(251,191,36)', Security: 'rgb(252,165,165)',
+    'On/Off-ramp': 'rgb(167,139,250)', Agentic: 'rgb(34,211,238)',
+    DvP: 'rgb(110,231,183)', Other: 'rgb(160,165,195)',
+  }[c] ?? 'rgb(160,165,195)')
+
+  return (
+    <div style={{ padding: '0 24px 24px' }}>
+      {/* Section header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, paddingTop: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(99,102,241,0.2))', border: '1px solid rgba(124,58,237,0.35)' }}>
+            <Puzzle size={16} color="rgb(167,139,250)" />
+          </div>
+          <div>
+            <h2 style={{ fontSize: 17, fontWeight: 700, color: 'white', margin: 0, letterSpacing: '-0.02em' }}>Real Use Cases</h2>
+            <p style={{ fontSize: 11, color: 'rgb(100,107,140)', margin: '2px 0 0', letterSpacing: '0.04em' }}>
+              How Kima &amp; Aeredium work with {lead.company_name} · backed by research
+            </p>
+          </div>
+        </div>
+        <button onClick={generate} disabled={generating}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 10,
+            fontSize: 12, fontWeight: 600, cursor: generating ? 'not-allowed' : 'pointer',
+            opacity: generating ? 0.7 : 1, fontFamily: 'inherit',
+            background: cases.length > 0
+              ? 'rgba(124,58,237,0.08)' : 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(99,102,241,0.15))',
+            border: '1px solid rgba(124,58,237,0.3)', color: 'rgb(167,139,250)',
+          }}>
+          {generating
+            ? <><Loader2 size={13} className="animate-spin" />Researching...</>
+            : cases.length > 0
+              ? <><RefreshCw size={12} />Regenerate</>
+              : <><Sparkles size={12} />Generate Use Cases</>}
+        </button>
+      </div>
+
+      {/* Empty state */}
+      {cases.length === 0 && !generating && (
+        <div style={{
+          borderRadius: 16, border: '1px dashed rgba(124,58,237,0.2)', background: 'rgba(124,58,237,0.03)',
+          padding: '48px 24px', textAlign: 'center',
+        }}>
+          <Puzzle size={36} color="rgba(167,139,250,0.3)" style={{ margin: '0 auto 14px' }} />
+          <p style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 8 }}>No use cases yet</p>
+          <p style={{ fontSize: 13, color: 'rgb(100,107,140)', lineHeight: 1.65, maxWidth: 420, margin: '0 auto 20px' }}>
+            The agent will research {lead.company_name}&apos;s product, workflows, and pain points,
+            then build 2-3 concrete scenarios showing exactly how Kima/Aeredium fits.
+          </p>
+          <button onClick={generate} disabled={generating}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 22px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: 'white', border: 'none', boxShadow: '0 2px 14px rgba(124,58,237,0.3)' }}>
+            <Sparkles size={14} /> Generate Use Cases
+          </button>
+        </div>
+      )}
+
+      {/* Generating skeleton */}
+      {generating && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
+          {[0, 1, 2].map(i => (
+            <div key={i} style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', background: C.cardBg, padding: 22, opacity: 0.5 + i * 0.15 }}>
+              <div style={{ height: 16, borderRadius: 8, background: 'rgba(255,255,255,0.07)', marginBottom: 12, width: '60%' }} />
+              <div style={{ height: 12, borderRadius: 6, background: 'rgba(255,255,255,0.05)', marginBottom: 8, width: '100%' }} />
+              <div style={{ height: 12, borderRadius: 6, background: 'rgba(255,255,255,0.05)', marginBottom: 8, width: '85%' }} />
+              <div style={{ height: 12, borderRadius: 6, background: 'rgba(255,255,255,0.05)', width: '70%' }} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Use case cards */}
+      {cases.length > 0 && !generating && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 18 }}>
+          {cases.map((uc, idx) => {
+            const feas   = feasColor(uc.feasibility)
+            const impact = impactColor(uc.impact)
+            const cc     = catColor(uc.category)
+            return (
+              <div key={uc.id || idx} style={{
+                borderRadius: 18, border: '1px solid rgba(255,255,255,0.09)',
+                background: C.cardBg, overflow: 'hidden',
+                boxShadow: '0 8px 28px rgba(0,0,0,0.32)',
+                display: 'flex', flexDirection: 'column',
+              }}>
+                {/* Card header */}
+                <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: `${cc}18`, color: cc, border: `1px solid ${cc}30`, letterSpacing: '0.04em' }}>
+                        {uc.category}
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20, background: feas.bg, color: feas.text, border: `1px solid ${feas.border}` }}>
+                        {uc.feasibility} feasibility
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20, background: impact.bg, color: impact.text, border: `1px solid ${impact.border}` }}>
+                        {uc.impact}
+                      </span>
+                    </div>
+                  </div>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: 'white', margin: 0, lineHeight: 1.4, letterSpacing: '-0.01em' }}>
+                    {uc.title}
+                  </h3>
+                </div>
+
+                {/* Body */}
+                <div style={{ padding: '18px 20px', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+                  {/* Scenario */}
+                  <div>
+                    <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.18em', color: 'rgb(100,107,140)', marginBottom: 8 }}>
+                      📖 Scenario
+                    </p>
+                    <p style={{ fontSize: 13, lineHeight: 1.7, color: 'rgb(190,195,225)', margin: 0 }}>{uc.scenario}</p>
+                  </div>
+
+                  {/* Kima Role */}
+                  <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(124,58,237,0.07)', border: '1px solid rgba(124,58,237,0.18)' }}>
+                    <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgb(167,139,250)', marginBottom: 7 }}>
+                      ⚡ Kima&apos;s Role
+                    </p>
+                    <p style={{ fontSize: 12, lineHeight: 1.65, color: 'rgb(196,183,240)', margin: 0 }}>{uc.kima_role}</p>
+                  </div>
+
+                  {/* Aeredium Role — only if relevant */}
+                  {uc.aeredium_role && uc.aeredium_role.trim() && (
+                    <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(34,211,238,0.06)', border: '1px solid rgba(34,211,238,0.18)' }}>
+                      <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgb(103,232,249)', marginBottom: 7 }}>
+                        🛡 Aeredium&apos;s Role
+                      </p>
+                      <p style={{ fontSize: 12, lineHeight: 1.65, color: 'rgb(167,228,240)', margin: 0 }}>{uc.aeredium_role}</p>
+                    </div>
+                  )}
+
+                  {/* Outcomes */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div style={{ padding: '10px 12px', borderRadius: 11, background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)' }}>
+                      <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgb(52,211,153)', marginBottom: 6 }}>
+                        For {lead.company_name.split(' ')[0]}
+                      </p>
+                      <p style={{ fontSize: 12, lineHeight: 1.6, color: 'rgb(150,210,180)', margin: 0 }}>{uc.outcome_for_company}</p>
+                    </div>
+                    <div style={{ padding: '10px 12px', borderRadius: 11, background: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.18)' }}>
+                      <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgb(167,139,250)', marginBottom: 6 }}>
+                        For Kima
+                      </p>
+                      <p style={{ fontSize: 12, lineHeight: 1.6, color: 'rgb(185,170,235)', margin: 0 }}>{uc.outcome_for_kima}</p>
+                    </div>
+                  </div>
+
+                  {/* Why now — only if present */}
+                  {uc.why_now && uc.why_now.trim() && (
+                    <div style={{ display: 'flex', gap: 8, padding: '8px 12px', borderRadius: 9, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
+                      <Lightbulb size={13} color="rgb(251,191,36)" style={{ flexShrink: 0, marginTop: 1 }} />
+                      <p style={{ fontSize: 12, color: 'rgb(200,175,130)', margin: 0, lineHeight: 1.55 }}>
+                        <span style={{ fontWeight: 700, color: 'rgb(251,191,36)' }}>Why now: </span>
+                        {uc.why_now}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -1171,6 +1373,19 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
           </div>
         </div>
+
+        {/* ── Real Use Cases ─────────────────────────────────── */}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 4 }}>
+          <UseCasesSection
+            lead={lead}
+            onGenerated={(cases) => {
+              // Merge into local state so the cards appear without a full reload
+              loadLead()
+              void cases
+            }}
+          />
+        </div>
+
       </div>
 
       {discussOpen && <DiscussPanel lead={lead} onClose={() => setDiscussOpen(false)} />}
