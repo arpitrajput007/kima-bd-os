@@ -1374,18 +1374,14 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
 
-        {/* ── Real Use Cases ─────────────────────────────────── */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 4 }}>
-          <UseCasesSection
-            lead={lead}
-            onGenerated={(cases) => {
-              // Merge into local state so the cards appear without a full reload
-              loadLead()
-              void cases
-            }}
-          />
-        </div>
+      </div>
 
+      {/* ── Real Use Cases — outside overflow:hidden container ── */}
+      <div style={{ marginTop: 16, borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)', background: '#0B0F1A', boxShadow: '0 40px 80px rgba(0,0,0,0.6)' }}>
+        <UseCasesSection
+          lead={lead}
+          onGenerated={() => loadLead()}
+        />
       </div>
 
       {discussOpen && <DiscussPanel lead={lead} onClose={() => setDiscussOpen(false)} />}
