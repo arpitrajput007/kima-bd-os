@@ -1390,6 +1390,7 @@ export default function AgenticPaymentsPage() {
   const [sortAsc, setSortAsc] = useState(false)
   const [adding, setAdding] = useState<string | null>(null)
   const [added, setAdded] = useState<Set<string>>(new Set())
+  const [enriching, setEnriching] = useState<Set<string>>(new Set())
   const [bulkAdding, setBulkAdding] = useState<string | null>(null)
 
   const filtered = ALL_TARGETS.filter(t => {
@@ -1427,10 +1428,26 @@ export default function AgenticPaymentsPage() {
       ? (sortAsc ? <ChevronUp size={10} /> : <ChevronDown size={10} />)
       : <ChevronDown size={10} style={{ opacity: 0.3 }} />
 
+  const kickOffEnrichment = (leadId: string, companyName: string) => {
+    setEnriching(s => new Set([...s, companyName]))
+    fetch('/api/ai/enrich-lead', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lead_id: leadId }),
+    })
+      .then(r => r.json())
+      .then(res => {
+        if (res.success) toast.success(`✓ ${companyName} fully enriched — contacts, use cases & research ready`)
+        else toast.error(`Enrichment partial for ${companyName}`)
+      })
+      .catch(() => toast.error(`Enrichment failed for ${companyName}`))
+      .finally(() => setEnriching(s => { const n = new Set(s); n.delete(companyName); return n }))
+  }
+
   const addToPipeline = async (t: AgentTarget) => {
     setAdding(t.company)
     try {
-      const { error } = await supabase.from('leads').insert({
+      const { data: newLead, error } = await supabase.from('leads').insert({
         company_name: t.company,
         website: t.website,
         description: t.description,
@@ -1442,21 +1459,29 @@ export default function AgenticPaymentsPage() {
         pain_point_evidence: t.whyAeredium,
         pain_point_evidence_type: 'agent_analysis',
         kima_fit: t.whyAeredium,
-        trigger_reason: `${t.company}  -  ${t.governanceGap}`,
+        aeredium_fit: t.governanceGap,
+        trigger_reason: `${t.company} — ${t.governanceGap}`,
         integration_feasibility: t.accessibilityScore >= 8 ? 'high' : t.accessibilityScore >= 5 ? 'medium' : 'low',
         lead_score: Math.round(totalScore(t) / 30 * 100),
         priority: t.urgencyScore >= 9 ? 'excellent' : t.urgencyScore >= 7 ? 'qualified' : 'needs_research',
-        status: 'new',
+        status: 'approved',   // immediately visible in Today's Plan
         source_url: t.sourceLink,
         updated_at: new Date().toISOString(),
-      })
+      }).select('id').single()
+
       if (error) {
         if (error.code === '23505') { toast(`${t.company} already in pipeline`); setAdded(s => new Set([...s, t.company])) }
         else toast.error('Failed: ' + error.message)
-      } else {
-        toast.success(` ${t.company} added to BD pipeline`)
-        setAdded(s => new Set([...s, t.company]))
+        setAdding(null)
+        return
       }
+
+      setAdded(s => new Set([...s, t.company]))
+      toast(`${t.company} added — running full AI research in background…`, { icon: '🔬' })
+
+      // Fire-and-forget enrichment pipeline
+      if (newLead?.id) kickOffEnrichment(newLead.id, t.company)
+
     } catch { toast.error('Failed') }
     setAdding(null)
   }
@@ -1701,9 +1726,13 @@ export default function AgenticPaymentsPage() {
 
                 {/* Add to BD */}
                 <div style={{ paddingTop: 2 }}>
-                  {isAdded ? (
+                  {isAdded && !enriching.has(t.company) ? (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: '#34d399' }}>
-                      <CheckCircle size={12} /> Added
+                      <CheckCircle size={12} /> Ready
+                    </span>
+                  ) : isAdded && enriching.has(t.company) ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: '#fbbf24' }}>
+                      <Loader2 size={11} className="animate-spin" /> Enriching…
                     </span>
                   ) : (
                     <button onClick={() => addToPipeline(t)} disabled={adding === t.company}
