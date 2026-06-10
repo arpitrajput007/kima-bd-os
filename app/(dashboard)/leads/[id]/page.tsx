@@ -23,7 +23,7 @@ import {
   buildTarget, channelDeepLink, logTouch, recordOutcome,
   type OutreachMeta, type OutreachOutcome,
 } from '@/lib/outreach'
-import type { Lead, Contact, OutreachMessage, UseCase } from '@/lib/types'
+import type { Lead, Contact, ContactTouch, OutreachMessage, UseCase } from '@/lib/types'
 import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL, REGIONS } from '@/lib/types'
 
 type AIAction = 'research' | 'pain_points' | 'kima_fit' | 'aeredium_fit' | 'classify' | 'score' | 'contacts' | null
@@ -248,6 +248,28 @@ function ContactCard({ contact, onRefresh, refreshing }: { contact: Contact; onR
 
   const hasSocials = contact.email || contact.twitter_url || contact.linkedin_url || contact.github_url
 
+  // Per-person outreach tracking
+  const touchedChannels: ContactTouch[] = contact.contacted_channels || []
+  const touchedSet = new Set(touchedChannels.map(t => t.channel))
+
+  const availableContactChannels = [
+    contact.twitter_url  && { id: 'twitter',  label: 'X (Twitter)', color: '#38bdf8' },
+    contact.linkedin_url && { id: 'linkedin', label: 'LinkedIn',    color: '#60a5fa' },
+    contact.email        && { id: 'email',    label: 'Email',       color: '#a78bfa' },
+    contact.telegram     && { id: 'telegram', label: 'Telegram',    color: '#22d3ee' },
+  ].filter((x): x is { id: string; label: string; color: string } => !!x)
+
+  const toggleContactChannel = async (chId: string) => {
+    const alreadyTouched = touchedSet.has(chId)
+    const updated: ContactTouch[] = alreadyTouched
+      ? touchedChannels.filter(t => t.channel !== chId)
+      : [...touchedChannels, { channel: chId, contacted_at: new Date().toISOString() }]
+    await supabase.from('contacts').update({ contacted_channels: updated }).eq('id', contact.id)
+    const chLabel = availableContactChannels.find(c => c.id === chId)?.label || chId
+    toast.success(alreadyTouched ? 'Removed from log' : `✓ Contacted via ${chLabel}`)
+    onRefresh()
+  }
+
   // One-click enrich: search Exa for this person's profiles
   const enrichContact = async () => {
     if (!contact.name) return
@@ -358,6 +380,43 @@ function ContactCard({ contact, onRefresh, refreshing }: { contact: Contact; onR
           </button>
         )}
       </div>
+
+      {/* ── Per-person outreach log ── */}
+      {availableContactChannels.length > 0 && (
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgb(100,107,140)', textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 8 }}>
+            Contacted via
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {availableContactChannels.map(ch => {
+              const touched = touchedSet.has(ch.id)
+              const touchData = touchedChannels.find(t => t.channel === ch.id)
+              const whenStr = touchData
+                ? new Date(touchData.contacted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                : ''
+              return (
+                <button key={ch.id} onClick={() => toggleContactChannel(ch.id)}
+                  title={touched ? `Contacted ${whenStr} · click to undo` : `Mark as contacted via ${ch.label}`}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    padding: '5px 11px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+                    cursor: 'pointer', fontFamily: 'inherit',
+                    border: `1px solid ${touched ? ch.color + '55' : 'rgba(255,255,255,0.08)'}`,
+                    background: touched ? ch.color + '18' : 'rgba(255,255,255,0.03)',
+                    color: touched ? ch.color : 'rgb(120,127,160)',
+                    transition: 'all 0.15s',
+                  }}>
+                  {touched ? <CheckCircle2 size={11} /> : <Plus size={11} />}
+                  {ch.label}
+                  {touched && whenStr && (
+                    <span style={{ fontSize: 10, opacity: 0.7 }}>{whenStr}</span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -390,6 +449,8 @@ const CHANNELS: { id: string; label: string; icon: string; color: string }[] = [
   { id: 'call',      label: 'Call',      icon: '📞', color: '#34d399' },
 ]
 
+const CONTACTED_STATUSES_SET = new Set(['contacted', 'replied', 'meeting_booked', 'proposal_sent', 'negotiating', 'integration', 'won'])
+
 function ContactedModal({ lead, onClose, onSaved }: {
   lead: Lead; onClose: () => void; onSaved: () => void
 }) {
@@ -398,6 +459,23 @@ function ContactedModal({ lead, onClose, onSaved }: {
   const [note, setNote] = useState('')
   const [followUpDays, setFollowUpDays] = useState('7')
   const [saving, setSaving] = useState(false)
+  const [prevActivities, setPrevActivities] = useState<Array<{ channel: string; created_at: string }>>([])
+
+  useEffect(() => {
+    supabase
+      .from('lead_activities')
+      .select('channel, created_at')
+      .eq('lead_id', lead.id)
+      .not('channel', 'is', null)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setPrevActivities(data || []))
+  }, [lead.id]) // eslint-disable-line
+
+  const prevChannelCounts = prevActivities.reduce<Record<string, number>>((acc, a) => {
+    if (a.channel) acc[a.channel] = (acc[a.channel] || 0) + 1
+    return acc
+  }, {})
+  const isRecontact = CONTACTED_STATUSES_SET.has(lead.status)
 
   const save = async () => {
     if (!channel) { toast.error('Pick a channel'); return }
@@ -405,13 +483,12 @@ function ContactedModal({ lead, onClose, onSaved }: {
     const now = new Date()
     const followUpAt = new Date(now.getTime() + parseInt(followUpDays) * 86400000)
 
-    // 1. Update lead status + last_channel + follow-up
+    // 1. Update lead — never downgrade status if already in a contacted state
     await supabase.from('leads').update({
-      status: 'contacted',
-      contacted_at: now.toISOString(),
+      ...(isRecontact ? {} : { status: 'contacted' }),
+      contacted_at: lead.contacted_at || now.toISOString(),   // preserve first-contact time
       last_contacted_at: now.toISOString(),
       last_channel: channel,
-      follow_up_stage: 0,
       next_follow_up_at: followUpAt.toISOString(),
       updated_at: now.toISOString(),
     }).eq('id', lead.id)
@@ -441,26 +518,56 @@ function ContactedModal({ lead, onClose, onSaved }: {
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22 }}>
           <div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: 'white' }}>Mark as Contacted</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: 'white' }}>
+              {isRecontact ? 'Log Another Outreach' : 'Mark as Contacted'}
+            </div>
             <div style={{ fontSize: 12, color: 'rgb(120,127,160)', marginTop: 3 }}>{lead.company_name}</div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgb(120,127,160)', cursor: 'pointer' }}><X size={16} /></button>
         </div>
 
+        {/* Previous contact history */}
+        {prevActivities.length > 0 && (
+          <div style={{ marginBottom: 18, padding: '10px 14px', borderRadius: 10, background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.18)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#34d399', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <CheckCircle2 size={12} />
+              Previously contacted · {prevActivities.length} {prevActivities.length === 1 ? 'time' : 'times'}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {Object.entries(prevChannelCounts).map(([ch, count]) => {
+                const def = CHANNELS.find(c => c.id === ch)
+                if (!def) return null
+                return (
+                  <span key={ch} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 600, border: `1px solid ${def.color}40`, background: `${def.color}10`, color: def.color }}>
+                    {def.icon} {def.label} {count > 1 ? `×${count}` : ''}
+                  </span>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Channel picker */}
         <div style={{ marginBottom: 20 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'rgb(150,155,185)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Where did you reach out? *</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-            {CHANNELS.map(ch => (
-              <button key={ch.id} onClick={() => setChannel(ch.id)}
-                style={{ padding: '10px 8px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center',
-                  border: `1px solid ${channel === ch.id ? ch.color + '70' : 'rgba(255,255,255,0.08)'}`,
-                  background: channel === ch.id ? ch.color + '1a' : 'rgba(255,255,255,0.03)',
-                  color: channel === ch.id ? ch.color : 'rgb(150,155,185)' }}>
-                <div style={{ fontSize: 16, marginBottom: 4 }}>{ch.icon}</div>
-                {ch.label}
-              </button>
-            ))}
+            {CHANNELS.map(ch => {
+              const prevCount = prevChannelCounts[ch.id] || 0
+              const isSelected = channel === ch.id
+              return (
+                <button key={ch.id} onClick={() => setChannel(ch.id)}
+                  style={{ padding: '10px 8px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center', fontFamily: 'inherit',
+                    border: `1px solid ${isSelected ? ch.color + '70' : prevCount > 0 ? 'rgba(52,211,153,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                    background: isSelected ? ch.color + '1a' : prevCount > 0 ? 'rgba(52,211,153,0.07)' : 'rgba(255,255,255,0.03)',
+                    color: isSelected ? ch.color : prevCount > 0 ? '#34d399' : 'rgb(150,155,185)' }}>
+                  <div style={{ fontSize: 16, marginBottom: 4 }}>{ch.icon}</div>
+                  {ch.label}
+                  {prevCount > 0 && !isSelected && (
+                    <div style={{ fontSize: 9, marginTop: 2, opacity: 0.8 }}>✓ used ×{prevCount}</div>
+                  )}
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -890,6 +997,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
   const ic = 'input-dark'; const is = { fontSize: '13px', padding: '8px 11px' }
 
+  const isContacted = CONTACTED_STATUSES_SET.has(lead.status)
+
   /* status badge color */
   const statusBadgeStyle: React.CSSProperties = lead.status === 'approved'
     ? { border: '1px solid rgba(52,211,153,0.4)', background: 'rgba(52,211,153,0.1)', color: 'rgb(110,231,183)' }
@@ -965,15 +1074,18 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   <ActionBtn icon={X} label="Cancel" onClick={() => setEditing(false)} />
                 </>
               )}
-              {lead.status !== 'approved' && (
+              {!isContacted && lead.status !== 'approved' && (
                 <ActionBtn icon={CheckCircle} label="Approve" variant="green" onClick={() => updateStatus('approved')} />
               )}
-              {lead.status !== 'rejected' && (
+              {!isContacted && lead.status !== 'rejected' && (
                 <ActionBtn icon={X} label="Reject" variant="red" onClick={() => updateStatus('rejected')} />
               )}
-              {lead.status === 'approved' && (
-                <ActionBtn icon={Send} label="Mark Contacted" onClick={() => setContactedModalOpen(true)} />
-              )}
+              <ActionBtn
+                icon={isContacted ? CheckCircle2 : Send}
+                label={isContacted ? 'Log Another Contact' : 'Mark Contacted'}
+                variant={isContacted ? 'green' : 'default'}
+                onClick={() => setContactedModalOpen(true)}
+              />
               <ActionBtn icon={Brain} label="Discuss Lead" variant="cyan" onClick={() => setDiscussOpen(true)} />
               <ActionBtn icon={MessageSquare} label="Outreach Studio" variant="purple" href={`/outreach?lead=${lead.id}`} />
             </div>

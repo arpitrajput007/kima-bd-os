@@ -205,6 +205,12 @@ export interface Lead {
   outreach_messages?: OutreachMessage[]
 }
 
+export interface ContactTouch {
+  channel: string
+  contacted_at: string
+  note?: string
+}
+
 export interface Contact {
   id: string
   lead_id: string
@@ -219,6 +225,7 @@ export interface Contact {
   contact_confidence?: ContactConfidence
   reason_this_person?: string
   source_url?: string
+  contacted_channels?: ContactTouch[]
   created_at: string
 }
 
