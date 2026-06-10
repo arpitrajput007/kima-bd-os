@@ -1590,23 +1590,24 @@ export default function AgenticPaymentsPage() {
           </div>
         )}
 
-        {/* == MAIN TABLE  -  exact spreadsheet columns =============== */}
-        <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+        {/* == MAIN TABLE — horizontal scroll, full text, no truncation == */}
+        <div style={{ overflowX: 'auto', borderRadius: 14, border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ minWidth: 1860 }}>
 
-          {/* Column headers  -  matching spreadsheet exactly */}
-          <div style={{ display: 'grid', gridTemplateColumns: '180px 120px 1fr 1fr 1fr 110px 60px 60px 60px 50px 120px', gap: 0, background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '9px 14px', alignItems: 'center' }}>
+          {/* Column headers */}
+          <div style={{ display: 'grid', gridTemplateColumns: '210px 150px 290px 310px 290px 210px 100px 72px 72px 64px 116px', background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '11px 20px', alignItems: 'center', gap: 0, position: 'sticky', top: 0, zIndex: 10 }}>
             {([
-              { label: 'Company', key: 'company' as SortKey },
-              { label: 'Website', key: null },
-              { label: 'Desc', key: null },
-              { label: 'Why AEREDIUM', key: null },
+              { label: 'Company',        key: 'company' as SortKey },
+              { label: 'Website',        key: null },
+              { label: 'Description',    key: null },
+              { label: 'Why Aeredium',   key: null },
               { label: 'Governance Gap', key: null },
-              { label: 'Pain Points', key: null },
-              { label: 'Funding', key: null },
-              { label: 'Urgency', key: 'urgencyScore' as SortKey },
-              { label: 'Access', key: 'accessibilityScore' as SortKey },
-              { label: 'Total', key: 'total' as SortKey },
-              { label: 'Action', key: null },
+              { label: 'Pain Points',    key: null },
+              { label: 'Funding',        key: null },
+              { label: 'Urgency',        key: 'urgencyScore' as SortKey },
+              { label: 'Access',         key: 'accessibilityScore' as SortKey },
+              { label: 'Total',          key: 'total' as SortKey },
+              { label: 'Action',         key: null },
             ] as { label: string; key: SortKey | null }[]).map((col, i) => (
               <div key={i}
                 style={{ fontSize: 10, fontWeight: 700, color: 'rgb(120,127,160)', textTransform: 'uppercase', letterSpacing: '0.07em', display: 'flex', alignItems: 'center', gap: 3, cursor: col.key ? 'pointer' : 'default', userSelect: 'none' }}
@@ -1624,89 +1625,89 @@ export default function AgenticPaymentsPage() {
             const col = catMeta?.color ?? '#a78bfa'
             return (
               <div key={t.company + idx}
-                style={{ display: 'grid', gridTemplateColumns: '180px 120px 1fr 1fr 1fr 110px 60px 60px 60px 50px 120px', gap: 0, padding: '11px 14px', borderBottom: '1px solid rgba(255,255,255,0.035)', background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)', alignItems: 'start', transition: 'background 0.1s' }}
-                onMouseEnter={e => e.currentTarget.style.background = `${col}07`}
-                onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)'}
+                style={{ display: 'grid', gridTemplateColumns: '210px 150px 290px 310px 290px 210px 100px 72px 72px 64px 116px', gap: 0, padding: '18px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.012)', alignItems: 'start', transition: 'background 0.12s' }}
+                onMouseEnter={e => e.currentTarget.style.background = `${col}09`}
+                onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.012)'}
               >
                 {/* Company */}
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
-                    <span style={{ fontSize: 9, fontWeight: 800, padding: '1px 4px', borderRadius: 3, background: col + '22', color: col }}>{t.categoryCode}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: 'white' }}>{t.company}</span>
+                <div style={{ paddingRight: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: col + '22', color: col, flexShrink: 0 }}>{t.categoryCode}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'white', lineHeight: 1.3 }}>{t.company}</span>
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 600, color: col, background: col + '12', border: `1px solid ${col}25`, padding: '1px 6px', borderRadius: 5 }}>
-                    {t.category.length > 22 ? t.category.slice(0, 21) + '...' : t.category}
+                  <span style={{ fontSize: 10, fontWeight: 600, color: col, background: col + '12', border: `1px solid ${col}25`, padding: '2px 8px', borderRadius: 6, display: 'inline-block' }}>
+                    {t.category}
                   </span>
                 </div>
 
                 {/* Website */}
-                <div>
+                <div style={{ paddingRight: 12 }}>
                   <a href={t.website} target="_blank" rel="noopener noreferrer"
-                    style={{ fontSize: 11, color: '#38bdf8', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3 }}>
-                    <ExternalLink size={9} />
-                    {t.website.replace(/^https?:\/\//, '').replace(/\/$/, '').slice(0, 20)}
+                    style={{ fontSize: 11, color: '#38bdf8', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5, wordBreak: 'break-all' }}>
+                    <ExternalLink size={10} style={{ flexShrink: 0 }} />
+                    {t.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}
                   </a>
                   {t.linkedIn && (
                     <a href={t.linkedIn} target="_blank" rel="noopener noreferrer"
-                      style={{ fontSize: 10, color: '#818cf8', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3, marginTop: 3 }}>
-                      <ExternalLink size={8} /> LinkedIn
+                      style={{ fontSize: 11, color: '#818cf8', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <ExternalLink size={10} /> LinkedIn
                     </a>
                   )}
                 </div>
 
-                {/* Desc */}
-                <div style={{ paddingRight: 10 }}>
-                  <p style={{ fontSize: 11, color: 'rgb(155,160,195)', lineHeight: 1.5, margin: 0 }}>
-                    {t.description.slice(0, 130)}{t.description.length > 130 ? '...' : ''}
+                {/* Description — full text */}
+                <div style={{ paddingRight: 16 }}>
+                  <p style={{ fontSize: 12, color: 'rgb(175,180,210)', lineHeight: 1.65, margin: 0 }}>
+                    {t.description}
                   </p>
                 </div>
 
-                {/* Why AEREDIUM */}
-                <div style={{ paddingRight: 10 }}>
-                  <p style={{ fontSize: 11, color: 'rgb(167,139,250)', lineHeight: 1.5, margin: 0 }}>
-                    {t.whyAeredium.slice(0, 130)}{t.whyAeredium.length > 130 ? '...' : ''}
+                {/* Why AEREDIUM — full text */}
+                <div style={{ paddingRight: 16 }}>
+                  <p style={{ fontSize: 12, color: 'rgb(192,167,252)', lineHeight: 1.65, margin: 0 }}>
+                    {t.whyAeredium}
                   </p>
                 </div>
 
-                {/* Governance Gap */}
-                <div style={{ paddingRight: 10 }}>
-                  <p style={{ fontSize: 11, color: 'rgb(251,191,36)', lineHeight: 1.5, margin: 0 }}>
-                    {t.governanceGap.slice(0, 110)}{t.governanceGap.length > 110 ? '...' : ''}
+                {/* Governance Gap — full text */}
+                <div style={{ paddingRight: 16 }}>
+                  <p style={{ fontSize: 12, color: 'rgb(251,200,60)', lineHeight: 1.65, margin: 0 }}>
+                    {t.governanceGap}
                   </p>
                 </div>
 
-                {/* Pain Points */}
-                <div style={{ paddingRight: 8 }}>
-                  <p style={{ fontSize: 11, color: 'rgb(248,113,113)', lineHeight: 1.5, margin: 0 }}>
-                    {t.painPoints.slice(0, 90)}{t.painPoints.length > 90 ? '...' : ''}
+                {/* Pain Points — full text */}
+                <div style={{ paddingRight: 12 }}>
+                  <p style={{ fontSize: 12, color: 'rgb(252,135,135)', lineHeight: 1.65, margin: 0 }}>
+                    {t.painPoints}
                   </p>
                 </div>
 
                 {/* Funding */}
-                <div>
-                  <span style={{ fontSize: 11, color: 'rgb(52,211,153)', fontWeight: 600 }}>{t.funding}</span>
+                <div style={{ paddingTop: 2 }}>
+                  <span style={{ fontSize: 12, color: 'rgb(52,211,153)', fontWeight: 600 }}>{t.funding}</span>
                 </div>
 
                 {/* Urgency */}
-                <div style={{ textAlign: 'center' }}><ScorePill score={t.urgencyScore} /></div>
+                <div style={{ textAlign: 'center', paddingTop: 2 }}><ScorePill score={t.urgencyScore} /></div>
 
                 {/* Accessibility */}
-                <div style={{ textAlign: 'center' }}><ScorePill score={t.accessibilityScore} /></div>
+                <div style={{ textAlign: 'center', paddingTop: 2 }}><ScorePill score={t.accessibilityScore} /></div>
 
                 {/* Total */}
-                <div style={{ textAlign: 'center' }}>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: total >= 22 ? '#34d399' : total >= 18 ? '#fbbf24' : '#f87171' }}>{total}</span>
+                <div style={{ textAlign: 'center', paddingTop: 2 }}>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: total >= 22 ? '#34d399' : total >= 18 ? '#fbbf24' : '#f87171' }}>{total}</span>
                 </div>
 
                 {/* Add to BD */}
-                <div>
+                <div style={{ paddingTop: 2 }}>
                   {isAdded ? (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: '#34d399' }}>
                       <CheckCircle size={12} /> Added
                     </span>
                   ) : (
                     <button onClick={() => addToPipeline(t)} disabled={adding === t.company}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${col}50`, background: col + '14', color: col, opacity: adding === t.company ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${col}50`, background: col + '14', color: col, opacity: adding === t.company ? 0.6 : 1, whiteSpace: 'nowrap' }}>
                       {adding === t.company ? <Loader2 size={10} className="animate-spin" /> : <Plus size={10} />}
                       Add to BD
                     </button>
@@ -1722,7 +1723,9 @@ export default function AgenticPaymentsPage() {
               <div style={{ fontSize: 13, fontWeight: 600 }}>No companies match your filters</div>
             </div>
           )}
-        </div>
+
+          </div>{/* end minWidth wrapper */}
+        </div>{/* end overflow-x scroll container */}
 
         {/* == Category overview (shown only on All view) =========== */}
         {category === 'All' && !search && (
@@ -1744,7 +1747,7 @@ export default function AgenticPaymentsPage() {
                       <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: meta.color + '25', color: meta.color }}>{meta.code}</span>
                       <span style={{ fontSize: 12, fontWeight: 700, color: 'white' }}>{cat}</span>
                     </div>
-                    <p style={{ fontSize: 10, color: 'rgb(110,117,150)', marginBottom: 8, lineHeight: 1.4, margin: '0 0 8px' }}>{meta.description.slice(0, 55)}...</p>
+                    <p style={{ fontSize: 10, color: 'rgb(110,117,150)', marginBottom: 8, lineHeight: 1.4, margin: '0 0 8px' }}>{meta.description}</p>
                     <div style={{ display: 'flex', gap: 10 }}>
                       <span><span style={{ fontSize: 16, fontWeight: 800, color: meta.color }}>{cats.length}</span><span style={{ fontSize: 9, color: 'rgb(110,117,150)', marginLeft: 2 }}>cos</span></span>
                       <span><span style={{ fontSize: 16, fontWeight: 800, color: '#34d399' }}>{top}</span><span style={{ fontSize: 9, color: 'rgb(110,117,150)', marginLeft: 2 }}>top</span></span>
