@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import {
-  agentActivity, subscribeToActivityLog, TOOL_META,
+  agentActivity, TOOL_META,
   type ActivityEvent,
 } from '@/lib/agent-activity'
 import {
@@ -94,11 +94,19 @@ export default function AgentActivityLog() {
     return () => window.removeEventListener('bd_activity_log_toggle', handler)
   }, [])
 
-  // ── subscribe to activity via window events ──────────────────
-  // subscribeToActivityLog listens ONLY to window CustomEvents so it
-  // receives updates from any JS chunk, regardless of module identity.
+  // ── poll window.__bda every 250 ms ───────────────────────────
+  // Polling window.__bda is the simplest possible approach:
+  // actStart/actFinish write to window.__bda.events and bump .v
+  // The panel just reads it — no events, no subscriptions needed.
   useEffect(() => {
-    return subscribeToActivityLog(setEvents)
+    let lastV = -1
+    const id = setInterval(() => {
+      const bda = window.__bda
+      if (!bda || bda.v === lastV) return
+      lastV = bda.v
+      setEvents([...bda.events])
+    }, 250)
+    return () => clearInterval(id)
   }, [])
 
   // ── drag ─────────────────────────────────────────────────────
