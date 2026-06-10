@@ -346,13 +346,14 @@ Return JSON exactly:
 }
 
 export async function POST(req: NextRequest) {
-  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your_openai_api_key_here') {
-    return NextResponse.json({ error: 'OpenAI API key not configured. Please add OPENAI_API_KEY to your .env.local file.' }, { status: 400 })
-  }
-
   const body = await req.json()
   // drafting_ai: 'openai' (default) | 'claude' — user preference from Settings.
   const draftingProvider: AIProvider = body.drafting_ai === 'claude' ? 'claude' : 'openai'
+
+  // Only require the OpenAI key when actually routing to OpenAI.
+  if (draftingProvider === 'openai' && (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your_openai_api_key_here')) {
+    return NextResponse.json({ error: 'OpenAI API key not configured. Please add OPENAI_API_KEY to your .env.local file.' }, { status: 400 })
+  }
 
   // Auto mode — the agent drafts on its own from the saved research.
   if (body.mode === 'auto') {

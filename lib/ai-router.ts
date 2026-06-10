@@ -51,14 +51,13 @@ export async function routeJSON<T = Record<string, unknown>>(params: {
     return JSON.parse(completion.choices[0].message.content || '{}') as T
   }
 
-  // Default: Claude
-  // NOTE: No temperature param — claude-opus-4-8 with thinking: adaptive
-  // does not accept temperature. Omitting it is correct.
+  // Default: Claude (Sonnet 4.6 supports temperature — only Opus 4.8 + thinking rejects it)
   return claudeJSON<T>({
-    model:     params.model     ?? CLAUDE_FAST,
-    maxTokens: params.maxTokens ?? 4000,
-    system: params.system,
-    user:   params.user,
+    model:       params.model       ?? CLAUDE_FAST,
+    maxTokens:   params.maxTokens   ?? 4000,
+    system:      params.system,
+    user:        params.user,
+    temperature: params.temperature,
   })
 }
 
@@ -85,12 +84,12 @@ export async function routeText(params: {
     return completion.choices[0].message.content || ''
   }
 
-  // NOTE: No temperature param — same reason as claudeJSON above.
   return claudeText({
-    model:     params.model     ?? CLAUDE_FAST,
-    maxTokens: params.maxTokens ?? 4000,
-    system: params.system,
-    user:   params.user,
+    model:       params.model       ?? CLAUDE_FAST,
+    maxTokens:   params.maxTokens   ?? 4000,
+    system:      params.system,
+    user:        params.user,
+    temperature: params.temperature,
   })
 }
 

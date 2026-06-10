@@ -51,6 +51,10 @@ export async function claudeJSON<T = Record<string, unknown>>(params: {
   // Set to true only for deep research calls (deepResearch) where extra reasoning
   // improves quality. Leave false (default) for fast extraction tasks.
   thinking?: boolean
+  // Temperature: only pass for creative tasks (e.g. outreach drafting).
+  // Do NOT set when thinking=true — Opus 4.8 + thinking does not accept it.
+  // Sonnet 4.6 supports temperature normally.
+  temperature?: number
 }): Promise<T> {
   const client = _client()
   const model = params.model ?? CLAUDE_RESEARCH
@@ -61,9 +65,10 @@ export async function claudeJSON<T = Record<string, unknown>>(params: {
   const response = await client.messages.create({
     model,
     max_tokens: params.maxTokens ?? 4000,
-    // Note: temperature/top_p/top_k are removed on Opus 4.7+ — do not add them back.
-    // Enable adaptive thinking only for deep research — not fast extraction.
+    // temperature is supported on Sonnet 4.6 — only omit it when thinking is enabled
+    // (Opus 4.8 with thinking: adaptive rejects the temperature param).
     ...(params.thinking ? { thinking: { type: 'adaptive' } } : {}),
+    ...(params.temperature != null && !params.thinking ? { temperature: params.temperature } : {}),
     system: systemPrompt,
     messages: [{ role: 'user', content: params.user }],
   })
@@ -83,14 +88,15 @@ export async function claudeText(params: {
   model?: string
   maxTokens?: number
   thinking?: boolean
+  temperature?: number
 }): Promise<string> {
   const client = _client()
 
   const response = await client.messages.create({
     model: params.model ?? CLAUDE_RESEARCH,
     max_tokens: params.maxTokens ?? 4000,
-    // Note: temperature/top_p/top_k are removed on Opus 4.7+ — do not add them back.
     ...(params.thinking ? { thinking: { type: 'adaptive' } } : {}),
+    ...(params.temperature != null && !params.thinking ? { temperature: params.temperature } : {}),
     system: params.system,
     messages: [{ role: 'user', content: params.user }],
   })
