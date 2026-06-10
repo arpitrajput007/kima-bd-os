@@ -69,6 +69,11 @@ class AgentActivityStore {
   private _notify() {
     const snapshot = this.events
     this._listeners.forEach(l => l(snapshot))
+    // Broadcast via window event so ANY chunk (different code-split bundle)
+    // can receive updates — this is immune to module-singleton identity issues
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('__bd_activity_update', { detail: snapshot }))
+    }
   }
 }
 

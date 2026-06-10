@@ -97,10 +97,27 @@ export default function AgentActivityLog() {
     return () => window.removeEventListener('bd_activity_log_toggle', handler)
   }, [])
 
-  // ── store subscription ────────────────────────────────────────
+  // ── store subscription + window event (dual approach) ────────
+  // The store subscription handles same-chunk updates.
+  // The window event handles cross-chunk updates (Next.js code-splitting
+  // can cause separate module instances; window is always the same object).
   useEffect(() => {
+    // Seed with whatever is already in the store
+    setEvents(agentActivity.events)
+
+    // Window event: fired by AgentActivityStore._notify() in ANY chunk
+    const onWindowEvent = (e: Event) => {
+      setEvents((e as CustomEvent<ActivityEvent[]>).detail)
+    }
+    window.addEventListener('__bd_activity_update', onWindowEvent)
+
+    // Also subscribe via store in case same instance
     const unsub = agentActivity.subscribe(setEvents)
-    return () => { unsub() }
+
+    return () => {
+      window.removeEventListener('__bd_activity_update', onWindowEvent)
+      unsub()
+    }
   }, [])
 
   // ── drag: start ───────────────────────────────────────────────
