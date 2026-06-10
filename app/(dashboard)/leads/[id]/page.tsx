@@ -228,7 +228,16 @@ function StatStrip({ score, confidence, addedAt }: { score?: number | null; conf
   )
 }
 
-function ContactCard({ contact, onRefresh, refreshing }: { contact: Contact; onRefresh: () => void; refreshing: boolean }) {
+const ALL_OUTREACH_CHANNELS = [
+  { id: 'twitter',  label: 'X (Twitter)', color: '#38bdf8' },
+  { id: 'linkedin', label: 'LinkedIn',    color: '#60a5fa' },
+  { id: 'email',    label: 'Email',       color: '#a78bfa' },
+  { id: 'telegram', label: 'Telegram',    color: '#22d3ee' },
+]
+
+function ContactCard({ contact, onRefresh, onUpdate, refreshing }: {
+  contact: Contact; onRefresh: () => void; onUpdate: () => void; refreshing: boolean
+}) {
   const supabase = createClient()
   const [enriching, setEnriching] = useState(false)
   const initials = contact.name
@@ -252,22 +261,15 @@ function ContactCard({ contact, onRefresh, refreshing }: { contact: Contact; onR
   const touchedChannels: ContactTouch[] = contact.contacted_channels || []
   const touchedSet = new Set(touchedChannels.map(t => t.channel))
 
-  const availableContactChannels = [
-    contact.twitter_url  && { id: 'twitter',  label: 'X (Twitter)', color: '#38bdf8' },
-    contact.linkedin_url && { id: 'linkedin', label: 'LinkedIn',    color: '#60a5fa' },
-    contact.email        && { id: 'email',    label: 'Email',       color: '#a78bfa' },
-    contact.telegram     && { id: 'telegram', label: 'Telegram',    color: '#22d3ee' },
-  ].filter((x): x is { id: string; label: string; color: string } => !!x)
-
   const toggleContactChannel = async (chId: string) => {
     const alreadyTouched = touchedSet.has(chId)
     const updated: ContactTouch[] = alreadyTouched
       ? touchedChannels.filter(t => t.channel !== chId)
       : [...touchedChannels, { channel: chId, contacted_at: new Date().toISOString() }]
     await supabase.from('contacts').update({ contacted_channels: updated }).eq('id', contact.id)
-    const chLabel = availableContactChannels.find(c => c.id === chId)?.label || chId
+    const chLabel = ALL_OUTREACH_CHANNELS.find(c => c.id === chId)?.label || chId
     toast.success(alreadyTouched ? 'Removed from log' : `✓ Contacted via ${chLabel}`)
-    onRefresh()
+    onUpdate()   // lightweight reload — does NOT trigger AI re-generate
   }
 
   // One-click enrich: search Exa for this person's profiles
@@ -381,42 +383,40 @@ function ContactCard({ contact, onRefresh, refreshing }: { contact: Contact; onR
         )}
       </div>
 
-      {/* ── Per-person outreach log ── */}
-      {availableContactChannels.length > 0 && (
-        <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgb(100,107,140)', textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 8 }}>
-            Contacted via
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {availableContactChannels.map(ch => {
-              const touched = touchedSet.has(ch.id)
-              const touchData = touchedChannels.find(t => t.channel === ch.id)
-              const whenStr = touchData
-                ? new Date(touchData.contacted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                : ''
-              return (
-                <button key={ch.id} onClick={() => toggleContactChannel(ch.id)}
-                  title={touched ? `Contacted ${whenStr} · click to undo` : `Mark as contacted via ${ch.label}`}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
-                    padding: '5px 11px', borderRadius: 8, fontSize: 11, fontWeight: 600,
-                    cursor: 'pointer', fontFamily: 'inherit',
-                    border: `1px solid ${touched ? ch.color + '55' : 'rgba(255,255,255,0.08)'}`,
-                    background: touched ? ch.color + '18' : 'rgba(255,255,255,0.03)',
-                    color: touched ? ch.color : 'rgb(120,127,160)',
-                    transition: 'all 0.15s',
-                  }}>
-                  {touched ? <CheckCircle2 size={11} /> : <Plus size={11} />}
-                  {ch.label}
-                  {touched && whenStr && (
-                    <span style={{ fontSize: 10, opacity: 0.7 }}>{whenStr}</span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
+      {/* ── Per-person outreach log — always show all 4 channels ── */}
+      <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgb(100,107,140)', textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 8 }}>
+          Contacted via
         </div>
-      )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {ALL_OUTREACH_CHANNELS.map(ch => {
+            const touched = touchedSet.has(ch.id)
+            const touchData = touchedChannels.find(t => t.channel === ch.id)
+            const whenStr = touchData
+              ? new Date(touchData.contacted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+              : ''
+            return (
+              <button key={ch.id} onClick={() => toggleContactChannel(ch.id)}
+                title={touched ? `Contacted ${whenStr} · click to undo` : `Mark as contacted via ${ch.label}`}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '5px 11px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  border: `1px solid ${touched ? ch.color + '55' : 'rgba(255,255,255,0.08)'}`,
+                  background: touched ? ch.color + '18' : 'rgba(255,255,255,0.03)',
+                  color: touched ? ch.color : 'rgb(120,127,160)',
+                  transition: 'all 0.15s',
+                }}>
+                {touched ? <CheckCircle2 size={11} /> : <Plus size={11} />}
+                {ch.label}
+                {touched && whenStr && (
+                  <span style={{ fontSize: 10, opacity: 0.7 }}>{whenStr}</span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
@@ -509,8 +509,8 @@ function ContactedModal({ lead, onClose, onSaved }: {
     onClose()
   }
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(4,4,10,0.75)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+  const modalContent = (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(4,4,10,0.82)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={onClose}>
       <div onClick={e => e.stopPropagation()}
         style={{ width: '100%', maxWidth: 480, background: 'linear-gradient(180deg, rgb(18,19,30), rgb(13,13,21))', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: 28, boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
@@ -610,6 +610,8 @@ function ContactedModal({ lead, onClose, onSaved }: {
       </div>
     </div>
   )
+  if (typeof window === 'undefined') return null
+  return createPortal(modalContent, document.body)
 }
 
 /* ── Real Use Cases section ─────────────────────────────── */
@@ -1429,6 +1431,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   contacts.map(contact => (
                     <ContactCard key={contact.id} contact={contact}
                       onRefresh={() => runAI('contacts')}
+                      onUpdate={loadLead}
                       refreshing={aiAction === 'contacts'} />
                   ))
                 )}
