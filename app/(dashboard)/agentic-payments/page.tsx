@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { agentActivity } from '@/lib/agent-activity'
 import {
   CreditCard, Search, ExternalLink, Plus, ChevronUp, ChevronDown,
   Filter, Download, CheckCircle, Loader2, Zap, BarChart2,
@@ -1430,6 +1431,13 @@ export default function AgenticPaymentsPage() {
 
   const kickOffEnrichment = (leadId: string, companyName: string) => {
     setEnriching(s => new Set([...s, companyName]))
+
+    // Log each enrichment phase to the activity panel
+    const a1 = agentActivity.start({ tool: 'Claude',        action: 'Research + Classify + Fit Analysis', page: `Agentic Payments — ${companyName}`, timestamp: Date.now() })
+    const a2 = agentActivity.start({ tool: 'ContactFinder', action: 'Find Contacts',                      page: `Agentic Payments — ${companyName}`, timestamp: Date.now() })
+    const a3 = agentActivity.start({ tool: 'Claude',        action: 'Generate Use Cases',                 page: `Agentic Payments — ${companyName}`, timestamp: Date.now() })
+    const t0 = Date.now()
+
     fetch('/api/ai/enrich-lead', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1437,10 +1445,25 @@ export default function AgenticPaymentsPage() {
     })
       .then(r => r.json())
       .then(res => {
-        if (res.success) toast.success(`✓ ${companyName} fully enriched — contacts, use cases & research ready`)
-        else toast.error(`Enrichment partial for ${companyName}`)
+        const dur = Date.now() - t0
+        if (res.success) {
+          agentActivity.finish(a1, 'success', 'Research complete', Math.round(dur * 0.4))
+          agentActivity.finish(a2, 'success', 'Contacts saved',    Math.round(dur * 0.3))
+          agentActivity.finish(a3, 'success', 'Use cases ready',   Math.round(dur * 0.3))
+          toast.success(`✓ ${companyName} fully enriched — contacts, use cases & research ready`)
+        } else {
+          agentActivity.finish(a1, 'error', 'Partial enrichment')
+          agentActivity.finish(a2, 'error', 'Partial enrichment')
+          agentActivity.finish(a3, 'error', 'Partial enrichment')
+          toast.error(`Enrichment partial for ${companyName}`)
+        }
       })
-      .catch(() => toast.error(`Enrichment failed for ${companyName}`))
+      .catch(() => {
+        agentActivity.finish(a1, 'error', 'Pipeline failed')
+        agentActivity.finish(a2, 'error', 'Pipeline failed')
+        agentActivity.finish(a3, 'error', 'Pipeline failed')
+        toast.error(`Enrichment failed for ${companyName}`)
+      })
       .finally(() => setEnriching(s => { const n = new Set(s); n.delete(companyName); return n }))
   }
 

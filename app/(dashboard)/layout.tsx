@@ -1,4 +1,5 @@
 import { Sidebar } from '@/components/sidebar'
+import AgentActivityLog from '@/components/AgentActivityLog'
 
 export default function DashboardLayout({
   children,
@@ -24,6 +25,7 @@ export default function DashboardLayout({
           {children}
         </main>
       </div>
+      <AgentActivityLog />
     </div>
   )
 }

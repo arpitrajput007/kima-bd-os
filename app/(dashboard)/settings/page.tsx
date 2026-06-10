@@ -6,7 +6,7 @@ import {
   Save, Eye, EyeOff, Key, Brain, MessageSquare, Check,
   ExternalLink, AlertTriangle, CheckCircle2, XCircle,
   Settings2, Database, Globe, Zap, Copy, RefreshCw,
-  Shield, ChevronRight, Info,
+  Shield, ChevronRight, Info, Activity,
 } from 'lucide-react'
 
 type AIProvider = 'claude' | 'openai'
@@ -63,20 +63,29 @@ const QUICK_LINKS = [
 ]
 
 export default function SettingsPage() {
-  const [researchAI, setResearchAI]   = useState<AIProvider>('claude')
-  const [draftingAI, setDraftingAI]   = useState<AIProvider>('openai')
-  const [envStatus, setEnvStatus]     = useState<EnvStatus | null>(null)
-  const [checking, setChecking]       = useState(false)
-  const [copiedKey, setCopiedKey]     = useState<string | null>(null)
-  const [prefsSaved, setPrefsSaved]   = useState(false)
+  const [researchAI, setResearchAI]     = useState<AIProvider>('claude')
+  const [draftingAI, setDraftingAI]     = useState<AIProvider>('openai')
+  const [envStatus, setEnvStatus]       = useState<EnvStatus | null>(null)
+  const [checking, setChecking]         = useState(false)
+  const [copiedKey, setCopiedKey]       = useState<string | null>(null)
+  const [prefsSaved, setPrefsSaved]     = useState(false)
+  const [activityLog, setActivityLog]   = useState(false)
 
   useEffect(() => {
     const r = localStorage.getItem('bd_research_ai') as AIProvider | null
     const d = localStorage.getItem('bd_drafting_ai') as AIProvider | null
     if (r === 'claude' || r === 'openai') setResearchAI(r)
     if (d === 'claude' || d === 'openai') setDraftingAI(d)
+    setActivityLog(localStorage.getItem('bd_show_activity_log') === 'true')
     checkEnvStatus()
   }, [])
+
+  const toggleActivityLog = (val: boolean) => {
+    setActivityLog(val)
+    localStorage.setItem('bd_show_activity_log', val ? 'true' : 'false')
+    window.dispatchEvent(new Event('bd_activity_log_toggle'))
+    toast.success(val ? 'Agent Activity Log enabled' : 'Agent Activity Log hidden')
+  }
 
   const checkEnvStatus = async () => {
     setChecking(true)
@@ -399,6 +408,47 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000`
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: prefsSaved ? '1px solid rgba(52,211,153,0.4)' : '1px solid rgba(167,139,250,0.3)', background: prefsSaved ? 'rgba(52,211,153,0.1)' : 'rgba(167,139,250,0.1)', color: prefsSaved ? '#34d399' : '#a78bfa', transition: 'all 0.2s' }}>
               {prefsSaved ? <Check size={13} /> : <Save size={13} />}
               {prefsSaved ? 'Saved!' : 'Save preferences'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Developer Tools ──────────────────────────────────────────── */}
+        <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)', overflow: 'hidden' }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Activity size={13} style={{ color: '#a78bfa' }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'white' }}>Developer Tools</span>
+          </div>
+          <div style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Activity size={12} style={{ color: activityLog ? '#a78bfa' : 'rgb(100,107,140)' }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: activityLog ? 'white' : 'rgb(160,165,195)' }}>
+                  Agent Activity Log
+                </span>
+                {activityLog && (
+                  <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: 'rgba(52,211,153,0.1)', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }}>
+                    on
+                  </span>
+                )}
+              </div>
+              <p style={{ fontSize: 11, color: 'rgb(100,107,140)', margin: 0, lineHeight: 1.5 }}>
+                Show a floating panel that logs every API call the BD agent makes — Claude, Apollo, Hunter, Exa — with real-time status and timing. Useful for debugging and understanding tool usage.
+              </p>
+            </div>
+            {/* Toggle switch */}
+            <button
+              onClick={() => toggleActivityLog(!activityLog)}
+              style={{
+                flexShrink: 0, width: 44, height: 24, borderRadius: 12, cursor: 'pointer',
+                border: 'none', padding: 0, position: 'relative', transition: 'background 0.2s',
+                background: activityLog ? 'rgba(167,139,250,0.6)' : 'rgba(255,255,255,0.1)',
+              }}
+            >
+              <span style={{
+                position: 'absolute', top: 2, width: 20, height: 20, borderRadius: '50%',
+                background: 'white', transition: 'left 0.2s',
+                left: activityLog ? 22 : 2,
+              }} />
             </button>
           </div>
         </div>
