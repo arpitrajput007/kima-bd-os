@@ -257,19 +257,29 @@ function ContactCard({ contact, onRefresh, onUpdate, refreshing }: {
 
   const hasSocials = contact.email || contact.twitter_url || contact.linkedin_url || contact.github_url
 
-  // Per-person outreach tracking
-  const touchedChannels: ContactTouch[] = contact.contacted_channels || []
-  const touchedSet = new Set(touchedChannels.map(t => t.channel))
+  // Per-person outreach tracking — optimistic UI (turns green instantly)
+  const [localTouched, setLocalTouched] = useState<ContactTouch[]>(contact.contacted_channels || [])
+  useEffect(() => { setLocalTouched(contact.contacted_channels || []) }, [contact.contacted_channels])
+  const touchedSet = new Set(localTouched.map(t => t.channel))
 
   const toggleContactChannel = async (chId: string) => {
     const alreadyTouched = touchedSet.has(chId)
     const updated: ContactTouch[] = alreadyTouched
-      ? touchedChannels.filter(t => t.channel !== chId)
-      : [...touchedChannels, { channel: chId, contacted_at: new Date().toISOString() }]
-    await supabase.from('contacts').update({ contacted_channels: updated }).eq('id', contact.id)
-    const chLabel = ALL_OUTREACH_CHANNELS.find(c => c.id === chId)?.label || chId
-    toast.success(alreadyTouched ? 'Removed from log' : `✓ Contacted via ${chLabel}`)
-    onUpdate()   // lightweight reload — does NOT trigger AI re-generate
+      ? localTouched.filter(t => t.channel !== chId)
+      : [...localTouched, { channel: chId, contacted_at: new Date().toISOString() }]
+
+    // Optimistic: flip colour immediately, no waiting
+    setLocalTouched(updated)
+
+    const { error } = await supabase.from('contacts').update({ contacted_channels: updated }).eq('id', contact.id)
+    if (error) {
+      setLocalTouched(localTouched) // revert on failure
+      toast.error('Could not save — run the add-contact-channels.sql migration in Supabase')
+    } else {
+      const chLabel = ALL_OUTREACH_CHANNELS.find(c => c.id === chId)?.label || chId
+      toast.success(alreadyTouched ? 'Removed from log' : `✓ Contacted via ${chLabel}`)
+      onUpdate()
+    }
   }
 
   // One-click enrich: search Exa for this person's profiles
@@ -391,7 +401,7 @@ function ContactCard({ contact, onRefresh, onUpdate, refreshing }: {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {ALL_OUTREACH_CHANNELS.map(ch => {
             const touched = touchedSet.has(ch.id)
-            const touchData = touchedChannels.find(t => t.channel === ch.id)
+            const touchData = localTouched.find(t => t.channel === ch.id)
             const whenStr = touchData
               ? new Date(touchData.contacted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
               : ''
