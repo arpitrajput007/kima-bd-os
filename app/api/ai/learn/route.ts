@@ -23,17 +23,80 @@ RULE TYPES WE USE:
 
 // ── Document extraction helpers ──────────────────────────────────────────────
 
+// Detect & extract Google Doc / Sheet / Slide IDs from any Google Docs URL
+function parseGoogleDocsUrl(url: string): { type: 'doc' | 'sheet' | 'slide'; id: string } | null {
+  try {
+    const u = new URL(url)
+    if (!u.hostname.includes('docs.google.com') && !u.hostname.includes('drive.google.com')) return null
+    const docMatch   = u.pathname.match(/\/document\/d\/([a-zA-Z0-9_-]+)/)
+    const sheetMatch = u.pathname.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/)
+    const slideMatch = u.pathname.match(/\/presentation\/d\/([a-zA-Z0-9_-]+)/)
+    if (docMatch)   return { type: 'doc',   id: docMatch[1] }
+    if (sheetMatch) return { type: 'sheet', id: sheetMatch[1] }
+    if (slideMatch) return { type: 'slide', id: slideMatch[1] }
+    return null
+  } catch { return null }
+}
+
+// Fetch a Google Doc/Sheet/Slide as plain text using the export endpoint.
+// Works for any doc shared as "Anyone with the link can view" — no API key needed.
+async function readGoogleDoc(parsed: { type: 'doc' | 'sheet' | 'slide'; id: string }): Promise<string> {
+  const exportUrls: Record<string, string> = {
+    doc:   `https://docs.google.com/document/d/${parsed.id}/export?format=txt`,
+    sheet: `https://docs.google.com/spreadsheets/d/${parsed.id}/export?format=csv`,
+    slide: `https://docs.google.com/presentation/d/${parsed.id}/export/txt`,
+  }
+  const exportUrl = exportUrls[parsed.type]
+  console.log(`[readGoogleDoc] type=${parsed.type} id=${parsed.id}`)
+
+  const res = await fetch(exportUrl, {
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+    signal: AbortSignal.timeout(30000),
+    redirect: 'follow',
+  })
+
+  if (res.status === 401 || res.status === 403) {
+    throw new Error(
+      'Google Doc is private. Open it → Share → change to "Anyone with the link can view", then try again.'
+    )
+  }
+  if (!res.ok) throw new Error(`Google export failed: ${res.status}`)
+
+  const text = await res.text()
+
+  // If Google returned an HTML login/error page instead of content, detect it
+  if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+    throw new Error(
+      'Google Doc requires sign-in. Open it → Share → "Anyone with the link can view", then try again.'
+    )
+  }
+  return text
+}
+
 // Read any URL via Jina.ai (full content, no cap — chunked if needed)
+async function readUrlViaJina(url: string): Promise<string> {
+  const jinaUrl = `https://r.jina.ai/${url}`
+  const res = await fetch(jinaUrl, {
+    headers: { Accept: 'text/plain' },
+    signal: AbortSignal.timeout(30000),
+  })
+  if (!res.ok) throw new Error(`Jina fetch failed: ${res.status}`)
+  return await res.text()
+}
+
+// Master URL reader — routes Google Docs through export, everything else through Jina
 async function readUrl(url: string): Promise<string> {
   try {
-    const jinaUrl = `https://r.jina.ai/${url}`
-    const res = await fetch(jinaUrl, {
-      headers: { Accept: 'text/plain' },
-      signal: AbortSignal.timeout(30000),
-    })
-    if (!res.ok) throw new Error(`Jina fetch failed: ${res.status}`)
-    return await res.text() // no cap — chunked synthesis handles large content
+    const googleDoc = parseGoogleDocsUrl(url)
+    if (googleDoc) {
+      const text = await readGoogleDoc(googleDoc)
+      console.log(`[readUrl] Google Doc export: ${text.length} chars`)
+      return text
+    }
+    return await readUrlViaJina(url)
   } catch (e) {
+    // Re-throw Google Doc permission errors so the UI can show a clear message
+    if (e instanceof Error && e.message.includes('Google Doc')) throw e
     console.error('[readUrl]', e)
     return ''
   }
@@ -277,7 +340,14 @@ export async function POST(req: NextRequest) {
 
       if (inputType === 'url') {
         if (!inputContent.startsWith('http')) return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
-        const fetched = await readUrl(inputContent)
+        let fetched = ''
+        try {
+          fetched = await readUrl(inputContent)
+        } catch (e) {
+          // Surface Google Doc permission errors clearly
+          const msg = e instanceof Error ? e.message : 'Could not read URL'
+          return NextResponse.json({ error: msg }, { status: 400 })
+        }
         if (!fetched || fetched.length < 50) return NextResponse.json({ error: 'Could not read URL content. Try a different URL.' }, { status: 400 })
         inputContent = fetched
         docMeta = `${inputContent.length.toLocaleString()} chars fetched`
