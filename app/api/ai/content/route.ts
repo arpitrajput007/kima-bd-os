@@ -2,17 +2,47 @@ import { NextRequest, NextResponse } from 'next/server'
 import { claudeJSON } from '@/lib/claude'
 import { FULL_BRAIN } from '@/lib/kima-knowledge'
 
-// ── Twitter/X oEmbed — public API, no auth needed ────────────────────────────
-// Returns the tweet text for any public tweet URL.
-async function fetchTweetText(tweetUrl: string): Promise<string> {
+// ── Twitter/X API v2 — needs TWITTER_BEARER_TOKEN env var ────────────────────
+// Free tier: 500k reads/month. Setup: developer.twitter.com → create app → copy Bearer Token → add to Vercel.
+async function fetchTweetViaAPI(tweetUrl: string): Promise<string> {
+  const bearerToken = process.env.TWITTER_BEARER_TOKEN
+  if (!bearerToken) return ''
+
+  // Extract tweet ID from URL (twitter.com/*/status/ID or x.com/*/status/ID)
+  const match = tweetUrl.match(/\/status\/(\d+)/)
+  if (!match) return ''
+  const tweetId = match[1]
+
+  try {
+    const res = await fetch(
+      `https://api.twitter.com/2/tweets/${tweetId}?tweet.fields=text,created_at&expansions=author_id&user.fields=name,username`,
+      {
+        headers: { Authorization: `Bearer ${bearerToken}` },
+        signal: AbortSignal.timeout(12_000),
+      }
+    )
+    if (!res.ok) return ''
+    const json = await res.json() as {
+      data?: { text?: string }
+      includes?: { users?: Array<{ username: string; name: string }> }
+    }
+    const text   = json.data?.text || ''
+    const author = json.includes?.users?.[0]
+    return author ? `Tweet by @${author.username} (${author.name}):\n${text}` : text
+  } catch {
+    return ''
+  }
+}
+
+// ── Twitter/X oEmbed — public fallback, no auth needed ───────────────────────
+async function fetchTweetOEmbed(tweetUrl: string): Promise<string> {
   try {
     const api = `https://publish.twitter.com/oembed?url=${encodeURIComponent(tweetUrl)}&omit_script=true`
     const res = await fetch(api, { signal: AbortSignal.timeout(12_000) })
     if (!res.ok) return ''
     const json = await res.json() as { html?: string; author_name?: string }
-    // Strip HTML tags from the embed HTML to get raw text
-    const html = json.html || ''
-    const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+    const html   = json.html || ''
+    const text   = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
     const author = json.author_name ? `Tweet by @${json.author_name}:\n` : ''
     return author + text
   } catch {
@@ -20,14 +50,19 @@ async function fetchTweetText(tweetUrl: string): Promise<string> {
   }
 }
 
-// ── Fetch a URL via Jina reader, with Twitter oEmbed fallback ─────────────────
+// ── Fetch a URL — Twitter API → oEmbed fallback → Jina ───────────────────────
 async function readUrl(url: string, cap = 8000): Promise<string> {
   const isTwitter = /twitter\.com|x\.com/.test(url)
 
-  // For tweet URLs, oEmbed is more reliable than Jina (Twitter blocks scrapers)
   if (isTwitter) {
-    const tweet = await fetchTweetText(url)
-    if (tweet.length > 30) return tweet.slice(0, cap)
+    // Try official API first (if TWITTER_BEARER_TOKEN is set), then oEmbed fallback
+    const apiText = await fetchTweetViaAPI(url)
+    if (apiText.length > 20) return apiText.slice(0, cap)
+
+    const oembedText = await fetchTweetOEmbed(url)
+    if (oembedText.length > 20) return oembedText.slice(0, cap)
+
+    return '' // both failed — caller will ask user to paste manually
   }
 
   try {
