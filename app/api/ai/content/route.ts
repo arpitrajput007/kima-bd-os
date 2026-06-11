@@ -2,8 +2,34 @@ import { NextRequest, NextResponse } from 'next/server'
 import { claudeJSON } from '@/lib/claude'
 import { FULL_BRAIN } from '@/lib/kima-knowledge'
 
-// ── Fetch a URL via Jina reader (same helper as discuss route) ────────────────
+// ── Twitter/X oEmbed — public API, no auth needed ────────────────────────────
+// Returns the tweet text for any public tweet URL.
+async function fetchTweetText(tweetUrl: string): Promise<string> {
+  try {
+    const api = `https://publish.twitter.com/oembed?url=${encodeURIComponent(tweetUrl)}&omit_script=true`
+    const res = await fetch(api, { signal: AbortSignal.timeout(12_000) })
+    if (!res.ok) return ''
+    const json = await res.json() as { html?: string; author_name?: string }
+    // Strip HTML tags from the embed HTML to get raw text
+    const html = json.html || ''
+    const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+    const author = json.author_name ? `Tweet by @${json.author_name}:\n` : ''
+    return author + text
+  } catch {
+    return ''
+  }
+}
+
+// ── Fetch a URL via Jina reader, with Twitter oEmbed fallback ─────────────────
 async function readUrl(url: string, cap = 8000): Promise<string> {
+  const isTwitter = /twitter\.com|x\.com/.test(url)
+
+  // For tweet URLs, oEmbed is more reliable than Jina (Twitter blocks scrapers)
+  if (isTwitter) {
+    const tweet = await fetchTweetText(url)
+    if (tweet.length > 30) return tweet.slice(0, cap)
+  }
+
   try {
     const res = await fetch(`https://r.jina.ai/${url}`, {
       headers: { Accept: 'text/plain' },
@@ -110,14 +136,32 @@ export async function POST(req: NextRequest) {
 
   // Fetch URL content if provided
   let urlContent = ''
+  let urlFetchNote = ''
   if (url) {
-    urlContent = await readUrl(url.trim())
+    const trimmedUrl = url.trim()
+    urlContent = await readUrl(trimmedUrl)
+    if (!urlContent) {
+      // URL fetch failed — let the user know but still try with any provided news text
+      urlFetchNote = `(Note: could not fetch content from ${trimmedUrl} — if this is a tweet, paste the text below)`
+    }
   }
 
   const incidentText = [
     news ? `USER-PROVIDED NEWS:\n${news}` : '',
     urlContent ? `FETCHED PAGE CONTENT:\n${urlContent}` : '',
   ].filter(Boolean).join('\n\n')
+
+  // Guard: nothing to work with
+  if (incidentText.trim().length < 40) {
+    const isTwitter = url && /twitter\.com|x\.com/.test(url)
+    return NextResponse.json({
+      error: isTwitter
+        ? 'Could not read this tweet automatically. Please paste the tweet text into the news field and try again.'
+        : urlFetchNote
+          ? `Could not fetch the URL. Please paste the article text directly into the news field.`
+          : 'Please provide more context about the incident.',
+    }, { status: 400 })
+  }
 
   const systemPrompt = `You are Arpit, a Web3-native BD founder writing thought-leadership content about security failures in crypto/Web3 and how Kima and Aeredium solve them.
 

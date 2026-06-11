@@ -27,16 +27,18 @@ const _client = () => new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 // Strip any markdown fences Claude might add even when told not to, then
 // extract the outermost JSON object or array.
+// Handles preamble text like "I notice that..." before the JSON block.
 function extractJson(raw: string): string {
   let s = raw.trim()
-  // Remove ```json ... ``` or ``` ... ```
-  s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
+  // Remove ```json ... ``` or ``` ... ``` fences (may appear anywhere)
+  s = s.replace(/```(?:json)?\s*/gi, '').replace(/```\s*/g, '').trim()
   // Find the outermost { } or [ ]
   const start = s.search(/[{[]/)
   const lastCurly  = s.lastIndexOf('}')
   const lastSquare = s.lastIndexOf(']')
   const end = Math.max(lastCurly, lastSquare)
   if (start >= 0 && end > start) return s.slice(start, end + 1)
+  // Nothing found — return as-is so the caller gets a useful parse error
   return s
 }
 

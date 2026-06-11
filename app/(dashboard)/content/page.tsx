@@ -319,12 +319,12 @@ export default function ContentStudioPage() {
                     className="input-dark"
                     value={url}
                     onChange={e => setUrl(e.target.value)}
-                    placeholder="https://rekt.news/..."
+                    placeholder="https://rekt.news/... or paste a tweet URL"
                     style={{ paddingLeft: 30, fontSize: 12 }}
                   />
                 </div>
                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.18)', marginTop: 5 }}>
-                  The agent fetches and reads the full article
+                  Reads full articles automatically · For tweets, paste the text below too
                 </div>
               </div>
 
@@ -338,7 +338,7 @@ export default function ContentStudioPage() {
                   rows={7}
                   value={news}
                   onChange={e => setNews(e.target.value)}
-                  placeholder={"Paste the hack news, tweet, or any context here.\n\nE.g.: Humanity Protocol got hacked via compromised private keys — lost $X. The attacker drained the treasury through the bridge relayer…"}
+                  placeholder={"Paste the hack news, tweet text, or any context here.\n\nE.g.: Humanity Protocol got hacked via compromised private keys belonging to a foundation member. Lost $X. Attacker drained the treasury through the bridge relayer.\n\n(For Twitter links: paste the tweet text here since Twitter blocks auto-reading)"}
                   style={{ fontSize: 12, resize: 'vertical', lineHeight: 1.6 }}
                 />
               </div>
