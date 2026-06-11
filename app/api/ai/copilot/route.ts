@@ -3,6 +3,60 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { FULL_BRAIN } from '@/lib/kima-knowledge'
 
+// ── URL fetching (Google Docs + general) ─────────────────────────────────────
+
+function parseGoogleDocsUrl(url: string): { type: 'doc' | 'sheet' | 'slide'; id: string } | null {
+  try {
+    const u = new URL(url)
+    if (!u.hostname.includes('docs.google.com') && !u.hostname.includes('drive.google.com')) return null
+    const docMatch   = u.pathname.match(/\/document\/d\/([a-zA-Z0-9_-]+)/)
+    const sheetMatch = u.pathname.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/)
+    const slideMatch = u.pathname.match(/\/presentation\/d\/([a-zA-Z0-9_-]+)/)
+    if (docMatch)   return { type: 'doc',   id: docMatch[1] }
+    if (sheetMatch) return { type: 'sheet', id: sheetMatch[1] }
+    if (slideMatch) return { type: 'slide', id: slideMatch[1] }
+    return null
+  } catch { return null }
+}
+
+async function fetchUrl(url: string): Promise<{ content: string; source: string }> {
+  const google = parseGoogleDocsUrl(url)
+  if (google) {
+    const exportUrls = {
+      doc:   `https://docs.google.com/document/d/${google.id}/export?format=txt`,
+      sheet: `https://docs.google.com/spreadsheets/d/${google.id}/export?format=csv`,
+      slide: `https://docs.google.com/presentation/d/${google.id}/export/txt`,
+    }
+    const res = await fetch(exportUrls[google.type], {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(25000),
+      redirect: 'follow',
+    })
+    if (res.status === 401 || res.status === 403) {
+      throw new Error('Google Doc is private. Open it → Share → "Anyone with the link can view" → try again.')
+    }
+    const text = await res.text()
+    if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+      throw new Error('Google Doc requires sign-in. Set sharing to "Anyone with the link can view".')
+    }
+    return { content: text, source: `Google ${google.type} (${google.id})` }
+  }
+
+  // General URL via Jina reader
+  const res = await fetch(`https://r.jina.ai/${url}`, {
+    headers: { Accept: 'text/plain' },
+    signal: AbortSignal.timeout(25000),
+  })
+  if (!res.ok) throw new Error(`Could not fetch URL (${res.status})`)
+  return { content: await res.text(), source: url }
+}
+
+// Extract the first http/https URL from a message string
+function extractUrl(text: string): string | null {
+  const match = text.match(/https?:\/\/[^\s"'<>]+/)
+  return match ? match[0] : null
+}
+
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -168,14 +222,38 @@ export async function POST(req: NextRequest) {
 
     const sessionId = await getOrCreateSession(session_id)
     const history: { role: 'user' | 'assistant'; content: string }[] = clientMessages || []
-    const bdContext = await buildBDContext()
+
+    // Detect URL in message and fetch it in parallel with BD context
+    const urlInMessage = extractUrl(message)
+    const [bdContext, urlResult] = await Promise.all([
+      buildBDContext(),
+      urlInMessage
+        ? fetchUrl(urlInMessage).catch((e: unknown) => ({
+            content: null,
+            error: e instanceof Error ? e.message : 'Could not fetch URL',
+            source: urlInMessage,
+          }))
+        : Promise.resolve(null),
+    ])
+
+    // Build the final user message — inject fetched doc content if available
+    let userMessage = message
+    let urlNote = ''
+    if (urlResult) {
+      if ('error' in urlResult && urlResult.error) {
+        urlNote = `\n\n[Note: tried to fetch ${urlResult.source} but failed: ${urlResult.error}]`
+      } else if ('content' in urlResult && urlResult.content) {
+        const snippet = urlResult.content.slice(0, 14000) // cap at 14k chars — enough for most docs
+        userMessage = `${message}\n\n--- DOCUMENT CONTENT (fetched from ${urlResult.source}) ---\n${snippet}\n--- END DOCUMENT ---`
+      }
+    }
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: PERSONA + bdContext },
+        { role: 'system', content: PERSONA + bdContext + urlNote },
         ...history.slice(-16),
-        { role: 'user', content: message },
+        { role: 'user', content: userMessage },
       ],
       response_format: { type: 'json_object' },
       temperature: 0.6,
