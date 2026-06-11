@@ -220,10 +220,28 @@ This is where Kima or Aeredium comes in — but naturally, as the logical answer
 
 No hashtags. No call-to-action. No "retweet if you agree". End on a sharp factual statement.
 
+LINKEDIN FORMAT — same narrative discipline as the tweets, but long-form:
+
+Every LinkedIn post must follow this exact 4-part structure, with a blank line between each part:
+
+PART 1 — HOOK (1-3 lines)
+The single sharpest fact from the incident. Stated cold. No rhetorical question. No "I want to talk about". Just the fact — a number, a name, a specific failure. Something that makes someone stop scrolling in a feed.
+
+PART 2 — WHAT HAPPENED (3-5 short paragraphs)
+Tell the full story mechanically. Each paragraph = one distinct beat of the story. What was the system, what was the failure vector, what sequence of events led to the loss. Short sentences. Specific names and numbers. No moralizing — just the mechanics.
+
+PART 3 — WHY THIS KEEPS HAPPENING (1-2 paragraphs)
+The structural reason this is a recurring industry problem — not a one-off mistake. Explain the design assumption that gets exploited. No finger-pointing, just the mechanism.
+
+PART 4 — WHAT THE FIX LOOKS LIKE (1-2 paragraphs)
+Same rule as tweets: describe the mechanism of the solution first. Kima or Aeredium appears once, as the name for the thing you just described. End with one sharp factual closing line — no call to action, no "follow me for more".
+
+No bullet points. No bold text on random words. No emoji. No hashtag spam (0-1 max). Max 400 words total.
+
 You will produce:
 1. THREE tweet variations — same structure (hook → what happened → fix), each using a DIFFERENT angle or entry point from the incident
 2. ONE tweet thread (5 tweets — break the long-form story into connected parts, each tweet a standalone insight)
-3. TWO LinkedIn post variations (200–400 words each, different structure)
+3. TWO LinkedIn post variations — same 4-part structure, each starting from a DIFFERENT hook and using a different angle on the incident
 
 Return JSON only.`
 
@@ -231,7 +249,7 @@ Return JSON only.`
 
 ${incidentText}
 
-First extract the key facts. Then write the content following the 3-part structure exactly.
+First extract the key facts. Then write the content following the exact structures above.
 
 Return JSON exactly:
 {
@@ -251,8 +269,8 @@ Return JSON exactly:
     { "id": "thread_5", "text": "Closing — sharp takeaway or implication for the industry" }
   ],
   "linkedin": [
-    { "id": "linkedin_1", "text": "Full LinkedIn post variation 1" },
-    { "id": "linkedin_2", "text": "Full LinkedIn post variation 2" }
+    { "id": "linkedin_1", "text": "HOOK\\n\\nWHAT HAPPENED (multiple paragraphs, each separated by blank line)\\n\\nWHY THIS KEEPS HAPPENING\\n\\nFIX — variation 1" },
+    { "id": "linkedin_2", "text": "HOOK (different angle)\\n\\nWHAT HAPPENED\\n\\nWHY THIS KEEPS HAPPENING\\n\\nFIX — variation 2" }
   ]
 }`
 

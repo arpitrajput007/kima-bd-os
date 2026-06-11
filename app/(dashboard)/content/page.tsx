@@ -4,8 +4,8 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import {
   Sparkles, Copy, RefreshCw, Loader2,
-  Link2, CheckCheck, ChevronDown, ChevronUp,
-  Zap, Hash, AlignLeft, AtSign, MessageCircle,
+  Link2, CheckCheck, Image, Download,
+  Zap, Hash, AlignLeft, AtSign, MessageCircle, X,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -20,6 +20,12 @@ interface ContentResult {
 }
 
 type TabKey = 'tweets' | 'thread' | 'linkedin'
+type PostType = 'tweet' | 'linkedin'
+
+interface GraphicState {
+  loading: boolean
+  url: string | null
+}
 
 // ── Copy-with-flash hook ───────────────────────────────────────────────────────
 function useCopy() {
@@ -41,12 +47,163 @@ function CharBadge({ text }: { text: string }) {
   )
 }
 
+// ── Generate Graphic button ────────────────────────────────────────────────────
+function GraphicBtn({
+  postId, graphicState, onGenerate,
+}: {
+  postId: string
+  graphicState: GraphicState | undefined
+  onGenerate: (postId: string) => void
+}) {
+  const isLoading = graphicState?.loading
+  const hasUrl = !!graphicState?.url
+  return (
+    <button
+      onClick={() => onGenerate(postId)}
+      disabled={isLoading}
+      title="Generate graphic for this post"
+      style={{
+        background: hasUrl ? 'rgba(167,139,250,0.12)' : 'none',
+        border: hasUrl ? '1px solid rgba(167,139,250,0.25)' : 'none',
+        borderRadius: 6, padding: hasUrl ? '2px 8px' : '2px 4px',
+        cursor: isLoading ? 'default' : 'pointer',
+        color: hasUrl ? '#a78bfa' : 'rgba(255,255,255,0.2)',
+        display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600,
+        transition: 'all 0.15s',
+      }}
+    >
+      {isLoading
+        ? <Loader2 size={10} className="animate-spin" />
+        : <Image size={10} />}
+      {isLoading ? 'Generating…' : hasUrl ? 'Graphic ✓' : 'Graphic'}
+    </button>
+  )
+}
+
+// ── Graphic modal ──────────────────────────────────────────────────────────────
+function GraphicModal({
+  url, hook, onClose,
+}: { url: string; hook: string; onClose: () => void }) {
+  const [downloading, setDownloading] = useState(false)
+
+  const download = async () => {
+    try {
+      setDownloading(true)
+      const res = await fetch(url)
+      const blob = await res.blob()
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `kima-graphic-${Date.now()}.png`
+      a.click()
+    } catch {
+      toast.error('Download failed — try right-clicking the image')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9998,
+        background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          maxWidth: 780, width: '100%', borderRadius: 18,
+          background: 'rgba(14,15,24,0.95)', border: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.8)', overflow: 'hidden',
+        }}
+      >
+        {/* modal header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 24, height: 24, borderRadius: 7, background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Image size={11} color="#a78bfa" />
+            </div>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'white' }}>Generated Graphic</span>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>DALL-E 3 · HD</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={download}
+              disabled={downloading}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px',
+                borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)',
+                color: '#a78bfa',
+              }}
+            >
+              {downloading ? <Loader2 size={11} className="animate-spin" /> : <Download size={11} />}
+              Download
+            </button>
+            <button
+              onClick={onClose}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', display: 'flex', padding: 4 }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* image */}
+        <div style={{ position: 'relative', background: '#000' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={url}
+            alt="Generated graphic"
+            style={{ width: '100%', display: 'block', maxHeight: '60vh', objectFit: 'contain' }}
+          />
+          {/* text overlay — hook text in bottom-left */}
+          <div style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0,
+            background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)',
+            padding: '40px 24px 20px',
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'white', lineHeight: 1.55, maxWidth: '80%', whiteSpace: 'pre-wrap' }}>
+              {hook.slice(0, 200)}{hook.length > 200 ? '…' : ''}
+            </div>
+            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 16, height: 16, borderRadius: 4, background: 'rgba(167,139,250,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Zap size={9} color="white" fill="white" />
+              </div>
+              <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>Kima BD OS</span>
+            </div>
+          </div>
+        </div>
+
+        {/* footer tip */}
+        <div style={{ padding: '12px 18px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', lineHeight: 1.5 }}>
+            Tip: Download the image and add your own text/branding in Canva or Figma for the final post. The overlay above is a preview only.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Tweet card ─────────────────────────────────────────────────────────────────
 function TweetCard({
-  post, index, copied, onCopy,
-}: { post: ContentPost; index: number; copied: string | null; onCopy: (id: string, text: string) => void }) {
+  post, index, copied, onCopy, graphicState, onGenerateGraphic, onViewGraphic,
+}: {
+  post: ContentPost
+  index: number
+  copied: string | null
+  onCopy: (id: string, text: string) => void
+  graphicState: GraphicState | undefined
+  onGenerateGraphic: (postId: string) => void
+  onViewGraphic: (postId: string) => void
+}) {
   const isCopied = copied === post.id
-  // Split on double newlines to visually separate Hook / What Happened / Fix sections
   const sections = post.text.split(/\n\n+/)
 
   return (
@@ -73,6 +230,16 @@ function TweetCard({
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <CharBadge text={post.text} />
+          {graphicState?.url ? (
+            <button
+              onClick={() => onViewGraphic(post.id)}
+              style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.25)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600 }}
+            >
+              <Image size={10} /> View Graphic
+            </button>
+          ) : (
+            <GraphicBtn postId={post.id} graphicState={graphicState} onGenerate={onGenerateGraphic} />
+          )}
           <button
             onClick={() => onCopy(post.id, post.text)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: isCopied ? '#1da1f2' : 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600 }}
@@ -153,7 +320,7 @@ function ThreadView({
               {/* content */}
               <div style={{ flex: 1, paddingRight: 16, paddingTop: 4, paddingBottom: isLast ? 14 : 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace' }}>{post.text.length}/280</span>
+                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace' }}>{post.text.length} chars</span>
                   <button
                     onClick={() => onCopy(post.id, post.text)}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: isCopied ? '#1da1f2' : 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', gap: 3, fontSize: 10 }}
@@ -176,12 +343,18 @@ function ThreadView({
 
 // ── LinkedIn card ──────────────────────────────────────────────────────────────
 function LinkedInCard({
-  post, index, copied, onCopy,
-}: { post: ContentPost; index: number; copied: string | null; onCopy: (id: string, text: string) => void }) {
-  const [expanded, setExpanded] = useState(false)
+  post, index, copied, onCopy, graphicState, onGenerateGraphic, onViewGraphic,
+}: {
+  post: ContentPost
+  index: number
+  copied: string | null
+  onCopy: (id: string, text: string) => void
+  graphicState: GraphicState | undefined
+  onGenerateGraphic: (postId: string) => void
+  onViewGraphic: (postId: string) => void
+}) {
   const isCopied = copied === post.id
-  const preview = post.text.slice(0, 220)
-  const hasMore = post.text.length > 220
+  const sections = post.text.split(/\n\n+/)
 
   return (
     <div style={{
@@ -201,9 +374,22 @@ function LinkedInCard({
           <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', color: '#60a5fa', textTransform: 'uppercase' }}>
             LinkedIn Post V{index + 1}
           </span>
+          <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 4, background: 'rgba(10,102,194,0.12)', border: '1px solid rgba(10,102,194,0.25)', color: 'rgba(96,165,250,0.7)', fontWeight: 700 }}>
+            Long-form
+          </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <CharBadge text={post.text} />
+          {graphicState?.url ? (
+            <button
+              onClick={() => onViewGraphic(post.id)}
+              style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.25)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600 }}
+            >
+              <Image size={10} /> View Graphic
+            </button>
+          ) : (
+            <GraphicBtn postId={post.id} graphicState={graphicState} onGenerate={onGenerateGraphic} />
+          )}
           <button
             onClick={() => onCopy(post.id, post.text)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: isCopied ? '#60a5fa' : 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600 }}
@@ -213,19 +399,26 @@ function LinkedInCard({
           </button>
         </div>
       </div>
-      {/* body */}
-      <div style={{ padding: '16px 18px' }}>
-        <div style={{ fontSize: 13.5, lineHeight: 1.72, color: 'rgb(215,220,240)', fontFamily: 'Inter, sans-serif', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-          {expanded || !hasMore ? post.text : preview + '…'}
-        </div>
-        {hasMore && (
-          <button
-            onClick={() => setExpanded(e => !e)}
-            style={{ marginTop: 10, background: 'none', border: 'none', cursor: 'pointer', color: '#60a5fa', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
-          >
-            {expanded ? <><ChevronUp size={11} /> Show less</> : <><ChevronDown size={11} /> Read more</>}
-          </button>
-        )}
+      {/* body — hook bigger + dividers between parts */}
+      <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {sections.map((section, i) => (
+          <div key={i}>
+            {i > 0 && (
+              <div style={{ height: 1, background: 'rgba(10,102,194,0.1)', marginBottom: 14 }} />
+            )}
+            <div style={{
+              fontSize: i === 0 ? 15.5 : 13.5,
+              fontWeight: i === 0 ? 600 : 400,
+              lineHeight: i === 0 ? 1.6 : 1.78,
+              color: i === 0 ? 'rgb(235,240,255)' : 'rgb(200,208,232)',
+              fontFamily: 'Inter, sans-serif',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+            }}>
+              {section}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -268,12 +461,17 @@ const TABS: { key: TabKey; label: string; Icon: typeof Hash; color: string }[] =
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function ContentStudioPage() {
-  const [news, setNews]       = useState('')
-  const [url, setUrl]         = useState('')
-  const [loading, setLoading] = useState(false)
-  const [result, setResult]   = useState<ContentResult | null>(null)
-  const [tab, setTab]         = useState<TabKey>('tweets')
-  const { copied, copy }      = useCopy()
+  const [news, setNews]         = useState('')
+  const [url, setUrl]           = useState('')
+  const [loading, setLoading]   = useState(false)
+  const [result, setResult]     = useState<ContentResult | null>(null)
+  const [tab, setTab]           = useState<TabKey>('tweets')
+  const { copied, copy }        = useCopy()
+
+  // Graphic state: keyed by post.id
+  const [graphicStates, setGraphicStates] = useState<Record<string, GraphicState>>({})
+  // Which graphic is currently showing in the modal
+  const [graphicModal, setGraphicModal]   = useState<{ url: string; hook: string } | null>(null)
 
   const generate = async () => {
     if (!news.trim() && !url.trim()) {
@@ -282,6 +480,7 @@ export default function ContentStudioPage() {
     }
     setLoading(true)
     setResult(null)
+    setGraphicStates({})
     try {
       const res = await fetch('/api/ai/content', {
         method: 'POST',
@@ -299,14 +498,66 @@ export default function ContentStudioPage() {
     }
   }
 
+  const generateGraphic = async (postId: string, postType: PostType) => {
+    if (!result) return
+    const post = [
+      ...result.tweets, ...result.thread, ...result.linkedin,
+    ].find(p => p.id === postId)
+    if (!post) return
+
+    // Hook = first paragraph of the post
+    const hook = post.text.split(/\n\n+/)[0] || post.text.slice(0, 200)
+
+    setGraphicStates(prev => ({ ...prev, [postId]: { loading: true, url: null } }))
+    try {
+      const res = await fetch('/api/ai/content/graphic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          incident_summary: result.incident_summary,
+          root_cause: result.root_cause,
+          hook,
+          post_type: postType,
+          content_id: postId,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+
+      setGraphicStates(prev => ({ ...prev, [postId]: { loading: false, url: json.image_url } }))
+      setGraphicModal({ url: json.image_url, hook })
+      toast.success('Graphic ready')
+    } catch (err: unknown) {
+      setGraphicStates(prev => ({ ...prev, [postId]: { loading: false, url: null } }))
+      toast.error(err instanceof Error ? err.message : 'Graphic generation failed')
+    }
+  }
+
+  const viewGraphic = (postId: string) => {
+    const state = graphicStates[postId]
+    if (!state?.url || !result) return
+    const post = [...result.tweets, ...result.thread, ...result.linkedin].find(p => p.id === postId)
+    const hook = post ? post.text.split(/\n\n+/)[0] : ''
+    setGraphicModal({ url: state.url, hook })
+  }
+
   return (
     <div className="fade-in">
+      {/* Graphic modal */}
+      {graphicModal && (
+        <GraphicModal
+          url={graphicModal.url}
+          hook={graphicModal.hook}
+          onClose={() => setGraphicModal(null)}
+        />
+      )}
+
       {/* ── Page header ── */}
       <div className="page-header">
         <div>
           <h1 className="text-xl font-bold text-white">Content Studio</h1>
           <p className="text-xs mt-0.5" style={{ color: 'rgb(100,100,120)' }}>
-            Drop a hack/incident → agent writes tweets &amp; LinkedIn posts around Kima &amp; Aeredium solutions
+            Drop a hack/incident → agent writes tweets &amp; LinkedIn posts + generates graphics
           </p>
         </div>
       </div>
@@ -355,7 +606,7 @@ export default function ContentStudioPage() {
                   rows={7}
                   value={news}
                   onChange={e => setNews(e.target.value)}
-                  placeholder={"Paste the hack news, tweet text, or any context here.\n\nE.g.: Humanity Protocol got hacked via compromised private keys belonging to a foundation member. Lost $X. Attacker drained the treasury through the bridge relayer.\n\n(For Twitter links: paste the tweet text here since Twitter blocks auto-reading)"}
+                  placeholder={"Paste the hack news, tweet text, or any context here.\n\nE.g.: Protocol X got hacked via compromised private keys. Lost $5M. Attacker drained the treasury through the bridge relayer.\n\n(For Twitter links: paste the tweet text here too)"}
                   style={{ fontSize: 12, resize: 'vertical', lineHeight: 1.6 }}
                 />
               </div>
@@ -388,6 +639,16 @@ export default function ContentStudioPage() {
                   <span style={{ fontSize: 11, color: 'rgb(150,155,190)', lineHeight: 1.5 }}>{tip}</span>
                 </div>
               ))}
+              {/* Graphic tip */}
+              <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(167,139,250,0.1)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <Image size={9} color="rgba(167,139,250,0.6)" />
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(167,139,250,0.7)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Graphics</span>
+                </div>
+                <span style={{ fontSize: 11, color: 'rgb(130,135,170)', lineHeight: 1.5 }}>
+                  Each post has a &quot;Graphic&quot; button. Generates a DALL-E 3 cinematic illustration matched to the incident. Download + add text in Canva.
+                </span>
+              </div>
             </div>
           </div>
 
@@ -403,7 +664,7 @@ export default function ContentStudioPage() {
                 </div>
                 <p style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 6 }}>Paste an incident, get content</p>
                 <p style={{ fontSize: 12, color: 'rgb(90,95,130)', maxWidth: 320, textAlign: 'center', lineHeight: 1.6 }}>
-                  Drop a hack story, rekt.news URL, or any news about a Web3 security failure. The agent reads it, maps it to our solutions, and writes ready-to-post content.
+                  Drop a hack story, rekt.news URL, or any news about a Web3 security failure. The agent reads it, maps it to our solutions, and writes ready-to-post content — with graphics.
                 </p>
               </div>
             )}
@@ -475,7 +736,12 @@ export default function ContentStudioPage() {
                 {tab === 'tweets' && (
                   <div className="space-y-4">
                     {result.tweets.map((post, i) => (
-                      <TweetCard key={post.id} post={post} index={i} copied={copied} onCopy={copy} />
+                      <TweetCard
+                        key={post.id} post={post} index={i} copied={copied} onCopy={copy}
+                        graphicState={graphicStates[post.id]}
+                        onGenerateGraphic={id => generateGraphic(id, 'tweet')}
+                        onViewGraphic={viewGraphic}
+                      />
                     ))}
                   </div>
                 )}
@@ -489,7 +755,12 @@ export default function ContentStudioPage() {
                 {tab === 'linkedin' && (
                   <div className="space-y-4">
                     {result.linkedin.map((post, i) => (
-                      <LinkedInCard key={post.id} post={post} index={i} copied={copied} onCopy={copy} />
+                      <LinkedInCard
+                        key={post.id} post={post} index={i} copied={copied} onCopy={copy}
+                        graphicState={graphicStates[post.id]}
+                        onGenerateGraphic={id => generateGraphic(id, 'linkedin')}
+                        onViewGraphic={viewGraphic}
+                      />
                     ))}
                   </div>
                 )}
