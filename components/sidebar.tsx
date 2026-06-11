@@ -23,6 +23,7 @@ import {
   Shield,
   CreditCard,
   LineChart,
+  PenLine,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -52,6 +53,7 @@ const navGroups: {
     items: [
       { href: '/sources',      label: 'Discovery Sources',  icon: Database },
       { href: '/outreach',     label: 'Outreach Studio',    icon: MessageSquare },
+      { href: '/content',      label: 'Content Studio',     icon: PenLine, glow: true },
       { href: '/agent-rules',  label: 'Agent Rules',        icon: Settings2 },
       { href: '/feedback',     label: 'Feedback Memory',    icon: Brain },
     ],
