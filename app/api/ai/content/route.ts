@@ -204,16 +204,26 @@ ${FULL_BRAIN}
 
 ${CONTENT_VOICE_RULES}
 
-You will produce:
-1. THREE individual tweet variations (each ≤280 chars, different angles)
-2. ONE tweet thread (4–5 connected tweets that tell the full story: incident → root cause → structural problem → solution → closing shot)
-3. TWO LinkedIn post variations (each 150–350 words, different structure and angle)
+IMPORTANT — X PREMIUM POST FORMAT:
+Arpit has X Premium which allows posts up to 25,000 characters. Do NOT write short 280-char one-liners. Each tweet should be a complete narrative post — long enough to tell the full story with impact.
 
-Each piece must:
-- Lead with specific verified facts from the incident (name the protocol, name the amount if known, name the mechanism — bridge, private key, oracle, relayer, etc.)
-- Connect the failure to a structural gap that Kima or Aeredium directly addresses
-- Make the Kima/Aeredium mention feel like a logical conclusion to the analysis, not an advertisement
-- Sound like it was typed by a person who has seen this story before and has something specific to say about it
+Every tweet must follow this exact 3-part structure, with a blank line between each section:
+
+PART 1 — HOOK (2-4 lines max)
+The single most alarming or counterintuitive fact from the incident. Something that makes someone stop scrolling. Specific numbers, specific name. No generic opener. No question. State the fact cold.
+
+PART 2 — WHAT HAPPENED (4-8 lines)
+Walk through the incident mechanically. How did it happen step by step? Name the mechanism (private key, bridge, oracle, relayer, smart contract). What exactly did the attacker do? Use short sentences. Be specific. Cite numbers.
+
+PART 3 — WHAT THE FIX LOOKS LIKE (4-8 lines)
+This is where Kima or Aeredium comes in — but naturally, as the logical answer to the mechanism you just described. Explain specifically how the technology addresses the exact failure vector. Do not say "Kima solves this" or "Aeredium has a solution" — instead, describe the mechanism: "When signing authority is split across three separate TEE-attested enclaves on different cloud providers, there is no single key to steal." The product name can appear once, at the end, as the thing that does this.
+
+No hashtags. No call-to-action. No "retweet if you agree". End on a sharp factual statement.
+
+You will produce:
+1. THREE tweet variations — same structure (hook → what happened → fix), each using a DIFFERENT angle or entry point from the incident
+2. ONE tweet thread (5 tweets — break the long-form story into connected parts, each tweet a standalone insight)
+3. TWO LinkedIn post variations (200–400 words each, different structure)
 
 Return JSON only.`
 
@@ -221,7 +231,7 @@ Return JSON only.`
 
 ${incidentText}
 
-First, extract the key facts. Then write the content.
+First extract the key facts. Then write the content following the 3-part structure exactly.
 
 Return JSON exactly:
 {
@@ -229,16 +239,16 @@ Return JSON exactly:
   "root_cause": "One sentence: the technical root cause (e.g. bridge relayer compromise, private key theft, smart contract bug, oracle manipulation).",
   "kima_angle": "One sentence: which specific Kima/Aeredium capability directly addresses this root cause.",
   "tweets": [
-    { "id": "tweet_1", "text": "..." },
-    { "id": "tweet_2", "text": "..." },
-    { "id": "tweet_3", "text": "..." }
+    { "id": "tweet_1", "text": "HOOK\\n\\nWHAT HAPPENED\\n\\nFIX — variation 1" },
+    { "id": "tweet_2", "text": "HOOK\\n\\nWHAT HAPPENED\\n\\nFIX — variation 2, different angle" },
+    { "id": "tweet_3", "text": "HOOK\\n\\nWHAT HAPPENED\\n\\nFIX — variation 3, different entry point" }
   ],
   "thread": [
-    { "id": "thread_1", "text": "Tweet 1 of thread (the hook — the specific incident fact)" },
-    { "id": "thread_2", "text": "Tweet 2 — root cause + why it keeps happening" },
-    { "id": "thread_3", "text": "Tweet 3 — structural problem in the industry" },
-    { "id": "thread_4", "text": "Tweet 4 — what the real fix looks like (Kima/Aeredium angle)" },
-    { "id": "thread_5", "text": "Tweet 5 — sharp closing thought or CTA" }
+    { "id": "thread_1", "text": "Hook tweet — the most alarming single fact" },
+    { "id": "thread_2", "text": "The mechanics of what happened" },
+    { "id": "thread_3", "text": "Why this keeps happening (structural problem)" },
+    { "id": "thread_4", "text": "What the actual fix looks like (Kima/Aeredium angle)" },
+    { "id": "thread_5", "text": "Closing — sharp takeaway or implication for the industry" }
   ],
   "linkedin": [
     { "id": "linkedin_1", "text": "Full LinkedIn post variation 1" },
@@ -249,7 +259,7 @@ Return JSON exactly:
   try {
     let result = await claudeJSON<ContentResult>({
       model: 'claude-sonnet-4-6',
-      maxTokens: 4000,
+      maxTokens: 6000,
       temperature: 0.88,
       system: systemPrompt,
       user: userPrompt,
@@ -265,7 +275,7 @@ Return JSON exactly:
     if (found.length > 0) {
       result = await claudeJSON<ContentResult>({
         model: 'claude-sonnet-4-6',
-        maxTokens: 4000,
+        maxTokens: 6000,
         temperature: 0.92,
         system: systemPrompt,
         user: `${userPrompt}\n\nYOUR PREVIOUS ATTEMPT USED THESE BANNED PHRASES: ${found.map(b => `"${b}"`).join(', ')}. Rewrite ALL content so none of these phrases — or anything stylistically similar — appear anywhere. Keep it sharp, specific, and human.`,

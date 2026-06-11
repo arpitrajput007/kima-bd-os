@@ -33,15 +33,10 @@ function useCopy() {
 }
 
 // ── Character counter badge ────────────────────────────────────────────────────
-function CharBadge({ text, limit }: { text: string; limit?: number }) {
-  const len = text.length
-  const over = limit && len > limit
+function CharBadge({ text }: { text: string }) {
   return (
-    <span style={{
-      fontSize: 9, fontFamily: 'monospace', fontWeight: 600,
-      color: over ? '#f87171' : 'rgba(255,255,255,0.2)',
-    }}>
-      {len}{limit ? `/${limit}` : ''}
+    <span style={{ fontSize: 9, fontFamily: 'monospace', fontWeight: 600, color: 'rgba(255,255,255,0.2)' }}>
+      {text.length} chars
     </span>
   )
 }
@@ -51,11 +46,13 @@ function TweetCard({
   post, index, copied, onCopy,
 }: { post: ContentPost; index: number; copied: string | null; onCopy: (id: string, text: string) => void }) {
   const isCopied = copied === post.id
-  const over = post.text.length > 280
+  // Split on double newlines to visually separate Hook / What Happened / Fix sections
+  const sections = post.text.split(/\n\n+/)
+
   return (
     <div style={{
       borderRadius: 14, overflow: 'hidden',
-      border: `1px solid ${over ? 'rgba(248,113,113,0.3)' : 'rgba(29,161,242,0.2)'}`,
+      border: '1px solid rgba(29,161,242,0.2)',
       background: 'rgba(10,12,22,0.8)',
       boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
     }}>
@@ -68,11 +65,14 @@ function TweetCard({
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <AtSign size={11} color="#1da1f2" />
           <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', color: '#1da1f2', textTransform: 'uppercase' }}>
-            Tweet V{index + 1}
+            Post V{index + 1}
+          </span>
+          <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 4, background: 'rgba(29,161,242,0.1)', border: '1px solid rgba(29,161,242,0.2)', color: 'rgba(29,161,242,0.7)', fontWeight: 700 }}>
+            Premium
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <CharBadge text={post.text} limit={280} />
+          <CharBadge text={post.text} />
           <button
             onClick={() => onCopy(post.id, post.text)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: isCopied ? '#1da1f2' : 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600 }}
@@ -82,9 +82,26 @@ function TweetCard({
           </button>
         </div>
       </div>
-      {/* body */}
-      <div style={{ padding: '14px 16px', fontSize: 13.5, lineHeight: 1.68, color: 'rgb(220,224,242)', fontFamily: 'Inter, sans-serif', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-        {post.text}
+      {/* body — render sections with dividers */}
+      <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {sections.map((section, i) => (
+          <div key={i}>
+            {i > 0 && (
+              <div style={{ height: 1, background: 'rgba(29,161,242,0.08)', marginBottom: 14 }} />
+            )}
+            <div style={{
+              fontSize: i === 0 ? 15 : 13.5,
+              fontWeight: i === 0 ? 600 : 400,
+              lineHeight: 1.7,
+              color: i === 0 ? 'rgb(235,238,255)' : 'rgb(200,205,230)',
+              fontFamily: 'Inter, sans-serif',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+            }}>
+              {section}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
