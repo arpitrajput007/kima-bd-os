@@ -49,12 +49,42 @@ vs status-quo cross-border (SWIFT / correspondent banking):
 Slow (T+2/T+3), expensive FX and wire fees, opaque. Kima's UPR settles instantly and atomically across fiat/stablecoin/CBDC via one API, with compliance built in. Best wedge for cross-border fintechs, neobanks, exporters, and corridor businesses (UAE-India, EU-India, US-India).`
 
 // ── Agentic payments (priority wedge) ────────────────────────────────────────
-export const AGENTIC_PAYMENTS = `AGENTIC PAYMENTS (high-priority wedge):
-AI agents cannot be trusted with money today. Tool/permission gates (e.g. MCP gates) can be bypassed, prompt injection can drain funds, and there is no execution accountability — no way to prove an agent's transaction was authorized and untampered. This blocks autonomous AI commerce.
+export const AGENTIC_PAYMENTS = `AGENTIC PAYMENTS (highest-priority wedge):
 
-Our answer: Aeredium provides the security/trust layer for agent money movement — TEE-attested execution where no human OR agent can forge or tamper with a block, threshold-governed access to funds/APIs, and verifiable execution accountability. Kima provides the safe settlement rails so agents can move real value across chains and fiat via a single API without touching bridges or custodians. Together we make AI agents reliable enough to hold and move real money.
+THE PROBLEM — THREE GAPS every agentic payment company hits:
+1. Narrow settlement rails — most agent wallets settle on card networks or USDC on EVM only. The moment a flow goes cross-chain, non-EVM, agent-to-agent, or fiat off-ramp it breaks. No single API exists that spans all rails.
+2. Software-level mandate enforcement — identity layers (e.g. KYA tokens, MCP gates, permission systems) can verify who the agent is but a compromised agent runtime or prompt injection can still pass those checks and execute unauthorized transactions. Policy enforcement is logical, not cryptographic — it can be bypassed.
+3. No verifiable audit trail — there is no cryptographic proof that a transaction was authorized, within policy, and untampered. Enterprises and regulators demand this. No current agent payment stack provides it.
 
-Target signals: AI agent frameworks, agentic commerce / autonomous-checkout startups, MCP-based tooling, AI wallets, agent marketplaces, anyone building "let an AI agent pay / transact" features.`
+OUR ANSWER:
+- Kima solves Gap 1: single API settlement across 9+ chains, stablecoins, fiat, CBDCs — no bridges, no custodian handoff. Agents can move real value across any rail via one integration.
+- Aeredium solves Gaps 2 & 3: TEE-attested validators and AERKey threshold ECDSA enforce spend policy at the hardware/key level inside a hardware enclave — policy bypass becomes cryptographically impossible even if the agent runtime is compromised. Every block is TEE-attested across AWS Nitro, Azure SEV-SNP, and GCP Confidential Space, providing an immutable verifiable audit trail.
+Together: "X proves who the agent is. Kima ensures the payment settles safely across any rail. Aeredium ensures execution is provably authorized and untamperable."
+ALWAYS position as additive/complementary, not rip-and-replace.
+
+ICP — WHO TO TARGET:
+- AI-native product companies (seed to Series A) that sell agent products to enterprises where agents take real consequential actions: payments, data access, procurement, expense approvals.
+- PRIMARY URGENCY SIGNAL: enterprise deals stalling in security review because they cannot demonstrate agent identity, policy enforcement, and audit trail. This is the live buying signal.
+- Also target: agentic commerce / autonomous-checkout startups, MCP-based tooling, AI wallet builders, agent marketplaces, anyone building "let an AI agent pay / transact" features.
+
+SOURCING POOLS (confirmed high-fit):
+- YC W24/S24 AI agents category
+- a16z portfolio: autonomous workflow, procurement, expense, customer-ops agents
+- ProductHunt AI agent launches (last 6 months)
+- LinkedIn Sales Navigator: CTO + "agentic" / "autonomous" at seed–Series A AI/fintech companies
+
+CONTACTS: Founders/CEOs at small companies; Head of Product, VP Engineering, or Head of Trust at larger ones.
+TRIGGER EVENTS to watch: enterprise customer announcement, funding round closed, compliance/security hire.
+
+DISCOVERY QUESTION (most diagnostic): "When you sell to enterprise customers, what do they ask about your agents' permissions and audit trail?" — if enterprise customers are already asking this, there is a confirmed live buying signal.
+
+RESONANCE SCENARIOS (reference these in outreach — buyers respond strongly):
+1. Payment drain: agent pays for data hiding a malicious instruction; TEE execution gate holds and logs it before the transaction executes.
+2. HFT gate: human approval fatigue on fast agents; policy gate catches the bad call that slipped through.
+
+KEY COMPETITORS IN THIS SPACE:
+- Aergap: governance-only sidecar (identity + policy + audit console). They explicitly defer "settlement and signing" — no settlement rails, no cryptographic execution guarantees, software-level policy only. Our wedge: Aeredium provides hardware-attested execution (TEE, not software policy) + AERKey cryptographic signing accountability. Kima provides settlement rails Aergap customers will eventually need and can't get from Aergap. Frame as "complete agent trust + settlement infrastructure" vs. "governance sidecar without rails."
+- Skyfire: KYA Token (agent identity) + Agentic Wallet (USDC on EVM + tokenized cards) + Buy for Me (autonomous checkout). Settlement is EVM-only USDC + card networks — no cross-chain, no fiat off-ramp. Policy is software-level, not key-level. No verifiable audit trail. Position Kima + Aeredium as additive to Skyfire, not competitive.`
 
 // ── Target customer categories ───────────────────────────────────────────────
 export const TARGET_CATEGORIES_BLOCK = `TARGET CUSTOMER CATEGORIES:
@@ -67,7 +97,7 @@ export const TARGET_CATEGORIES_BLOCK = `TARGET CUSTOMER CATEGORIES:
 
 // ── Ideal customer profile ───────────────────────────────────────────────────
 export const ICP_BLOCK = `IDEAL CUSTOMER PROFILES (ICP):
-- AI agent / agentic-commerce builders needing safe autonomous payments
+- AI agent / agentic-commerce builders needing safe autonomous payments — specifically seed–Series A AI-native product companies selling agent products to enterprises where agents take consequential actions (payments, procurement, data access); primary urgency = enterprise deals stalling in security review
 - PSPs and payment gateways needing stablecoin settlement
 - Cross-border fintechs (remittance, payroll, B2B payments), corridor businesses (UAE-India, EU-India, US-India)
 - DEXs / wallets needing cross-chain settlement or on/off-ramp
