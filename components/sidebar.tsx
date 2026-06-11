@@ -24,19 +24,21 @@ import {
   CreditCard,
   LineChart,
   PenLine,
+  ShieldCheck,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
 const navGroups: {
   label: string
-  items: { href: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; glow?: boolean; voice?: boolean }[]
+  items: { href: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; glow?: boolean; voice?: boolean; cyan?: boolean }[]
 }[] = [
 
   {
     label: 'Intelligence',
     items: [
-      { href: '/copilot',      label: 'AI Co-Pilot',        icon: Bot, glow: true },
+      { href: '/copilot',         label: 'AI Co-Pilot',        icon: Bot, glow: true },
+      { href: '/aergap-copilot',  label: 'Aergap Co-Pilot',    icon: ShieldCheck, cyan: true },
       { href: '/today',        label: "Today's Plan",       icon: Sun },
       { href: '/dashboard',    label: 'BD Command Center', icon: LayoutDashboard },
       { href: '/leads',        label: 'Lead Inbox',         icon: Inbox },
@@ -120,7 +122,7 @@ export function Sidebar() {
             {collapsed && gi > 0 && (
               <div className="my-2 mx-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }} />
             )}
-            {group.items.map(({ href, label, icon: Icon, glow, voice }) => {
+            {group.items.map(({ href, label, icon: Icon, glow, voice, cyan }) => {
               const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
               return (
                 <Link
@@ -128,7 +130,11 @@ export function Sidebar() {
                   href={href}
                   className={cn('nav-item', isActive && 'active', collapsed && 'justify-center px-0')}
                   title={collapsed ? label : undefined}
-                  style={glow && !isActive ? {
+                  style={cyan && !isActive ? {
+                    background: 'rgba(6,182,212,0.07)',
+                    borderColor: 'rgba(6,182,212,0.22)',
+                    color: 'rgba(103,232,249,0.9)',
+                  } : glow && !isActive ? {
                     background: 'rgba(124,58,237,0.08)',
                     borderColor: 'rgba(124,58,237,0.25)',
                     color: 'rgba(167,139,250,0.9)',
@@ -140,6 +146,12 @@ export function Sidebar() {
                 >
                   <Icon size={15} className="flex-shrink-0" />
                   {!collapsed && <span>{label}</span>}
+                  {!collapsed && cyan && !isActive && (
+                    <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded"
+                      style={{ background: 'rgba(6,182,212,0.15)', color: '#67e8f9' }}>
+                      NEW
+                    </span>
+                  )}
                   {!collapsed && glow && !isActive && (
                     <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded"
                       style={{ background: 'rgba(124,58,237,0.2)', color: '#a78bfa' }}>
