@@ -210,7 +210,16 @@ export default function AergapCopilotPage() {
       }
       setMessages(prev => [...prev, agentMsg])
       histRef.current.push({ role: 'assistant', content: data.reply })
-      if (!sessionId && data.session_id) { setSessionId(data.session_id); setTimeout(loadSessions, 1500) }
+      if (!sessionId && data.session_id) {
+        setSessionId(data.session_id)
+        // Load immediately (title already has [Aergap] prefix from creation)
+        // then again after autoTitle finishes rewriting it (~3s OpenAI call)
+        setTimeout(loadSessions, 500)
+        setTimeout(loadSessions, 4000)
+      } else {
+        // Refresh list on every turn so titles stay current
+        setTimeout(loadSessions, 500)
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Co-Pilot failed to respond')
     } finally { setThinking(false) }

@@ -290,7 +290,7 @@ async function getOrCreateSession(sessionId?: string): Promise<string> {
     const { data } = await supabase.from('voice_sessions').select('id').eq('id', sessionId).single()
     if (data) return sessionId
   }
-  const { data } = await supabase.from('voice_sessions').insert({ title: 'Aergap BD chat', message_count: 0 }).select('id').single()
+  const { data } = await supabase.from('voice_sessions').insert({ title: '[Aergap] BD chat', message_count: 0 }).select('id').single()
   return data?.id || crypto.randomUUID()
 }
 
