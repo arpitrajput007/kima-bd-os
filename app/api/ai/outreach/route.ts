@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { PRODUCT_BRAIN, SINGLE_API_LINE } from '@/lib/kima-knowledge'
 import { MAX_FOLLOWUPS, getOutreachLearnings } from '@/lib/outreach'
 import { routeJSONWithBanGuard, type AIProvider } from '@/lib/ai-router'
+import { outreachMemory } from '@/lib/agent-memory'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -218,14 +219,18 @@ async function generateAutoDrafts(leadId: string, draftingProvider: AIProvider =
     return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
   }
 
-  const learnings = await getOutreachLearnings(supabase)
+  const [learnings, memory] = await Promise.all([
+    getOutreachLearnings(supabase),
+    outreachMemory({ tags: (lead.tags as string[] | null) || [] }),
+  ])
 
   const systemPrompt = `You are Arpit, leading BD/partnerships for Kima and Aeredium. You write your own outreach DMs by hand after researching each prospect.
 
 ${PRODUCT_BRAIN}
 
 ${HUMAN_RULES}
-${learnings.hasData ? `\n${learnings.block}\n` : ''}
+${learnings.hasData ? `\n${learnings.block}\n` : ''}${memory}
+
 You will produce SIX drafts for the SAME lead — 2 variations per channel. Each variation within a channel MUST use a completely different hook, evidence point, and angle. They cannot feel like the same message reworded.
 
 Channel 1 — Telegram / X DM (short_1, short_2): 2–3 sentences each. Punchy, one sharp hook. Each version starts from a different specific fact about this lead.
@@ -295,7 +300,10 @@ async function generateFollowup(leadId: string, stage: number, draftingProvider:
 
   const channel = (lead as LeadRow).last_channel || ((priorMsgs || [])[0]?.channel) || 'telegram'
 
-  const learnings = await getOutreachLearnings(supabase)
+  const [learnings, memory] = await Promise.all([
+    getOutreachLearnings(supabase),
+    outreachMemory({ tags: (lead.tags as string[] | null) || [] }),
+  ])
 
   const isFinal = stage >= MAX_FOLLOWUPS - 1
   const systemPrompt = `You are Arpit, leading BD/partnerships for Kima and Aeredium. You're writing a SHORT follow-up to someone who hasn't replied yet. You are not annoyed and not pushy — just persistent and useful.
@@ -303,7 +311,8 @@ async function generateFollowup(leadId: string, stage: number, draftingProvider:
 ${PRODUCT_BRAIN}
 
 ${HUMAN_RULES}
-${learnings.hasData ? `\n${learnings.block}\n` : ''}
+${learnings.hasData ? `\n${learnings.block}\n` : ''}${memory}
+
 FOLLOW-UP RULES:
 - Keep it SHORT — 1 to 3 sentences. Shorter than the first message.
 - Do NOT repeat the same hook or pitch from the prior message(s). Lead with a DIFFERENT angle: a fresh proof point, a new trigger, a relevant comparison, or a genuinely useful nudge.
@@ -406,14 +415,18 @@ export async function POST(req: NextRequest) {
   }
   const channelGuide = channelGuides[channel] || 'LinkedIn message'
 
-  const learnings = await getOutreachLearnings(supabase)
+  const [learnings, memory] = await Promise.all([
+    getOutreachLearnings(supabase),
+    outreachMemory(),
+  ])
 
   const systemPrompt = `You are writing BD outreach messages for Arpit, who leads BD/partnerships for Kima and Aeredium.
 
 ${PRODUCT_BRAIN}
 
 ${HUMAN_RULES}
-${learnings.hasData ? `\n${learnings.block}\n` : ''}
+${learnings.hasData ? `\n${learnings.block}\n` : ''}${memory}
+
 MESSAGE STRUCTURE (keep it natural, don't make it look like a checklist):
 1. Personal opener based on their specific company/product/trigger
 2. The specific pain point they have

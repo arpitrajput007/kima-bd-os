@@ -125,23 +125,32 @@ async function buildDossier(lead: LeadRow): Promise<string> {
 
 // Pull the Kima/Aeredium brain + what the agent has already learned, so answers
 // are grounded in our products AND prior intelligence about this exact lead.
+// Uses the centralized memory system (lib/agent-memory.ts) for up to 56 entries
+// with type diversity, vs the old limit(20) by recency.
 async function loadAgentContext(leadId: string): Promise<string> {
-  const [rulesRes, knowledgeRes] = await Promise.all([
-    supabase.from('agent_rules').select('rule_type, rule').eq('status', 'active').order('weight', { ascending: false }).limit(20),
-    supabase.from('agent_knowledge').select('title, content, knowledge_type, tags').eq('status', 'active').order('created_at', { ascending: false }).limit(20),
-  ])
+  const { fullMemory, loadKnowledge } = await import('@/lib/agent-memory')
+
+  // Load lead-specific knowledge (tagged to this lead) separately first
+  const { data: leadTaggedRaw } = await supabase
+    .from('agent_knowledge')
+    .select('title, content, knowledge_type, tags')
+    .eq('status', 'active')
+    .contains('tags', [`lead:${leadId}`])
+    .limit(10)
+
+  const leadTagged = leadTaggedRaw || []
+
+  // Full memory excluding lead-specific (those are surfaced first above)
+  const generalMemory = await fullMemory({ tags: [] })
+
   let ctx = ''
-  if (rulesRes.data?.length) {
-    ctx += `\n\nYOUR ACTIVE BD RULES:\n${rulesRes.data.map(r => `[${r.rule_type}] ${r.rule}`).join('\n')}`
+  if (leadTagged.length) {
+    const fmt = (k: { knowledge_type: string; title: string; content: string }) =>
+      `[${k.knowledge_type}] ${k.title}: ${k.content.slice(0, 350)}`
+    ctx += `\n\nWHAT YOU'VE ALREADY LEARNED ABOUT THIS LEAD:\n${leadTagged.map(fmt).join('\n\n')}`
   }
-  if (knowledgeRes.data?.length) {
-    // Surface knowledge tagged to this lead first.
-    const tagged = knowledgeRes.data.filter(k => (k.tags as string[] | null)?.includes(`lead:${leadId}`))
-    const general = knowledgeRes.data.filter(k => !(k.tags as string[] | null)?.includes(`lead:${leadId}`)).slice(0, 10)
-    const fmt = (k: { knowledge_type: string; title: string; content: string }) => `[${k.knowledge_type}] ${k.title}: ${k.content.slice(0, 350)}`
-    if (tagged.length) ctx += `\n\nWHAT YOU'VE ALREADY LEARNED ABOUT THIS LEAD:\n${tagged.map(fmt).join('\n\n')}`
-    if (general.length) ctx += `\n\nYOUR LEARNED INTELLIGENCE:\n${general.map(fmt).join('\n\n')}`
-  }
+  ctx += generalMemory
+
   return ctx
 }
 

@@ -8,6 +8,7 @@ import { exaConfigured, exaSearchCompanies, exaCompanyNews } from '@/lib/exa'
 import { perplexityConfigured, researchCompanyTrigger } from '@/lib/perplexity'
 import { routeJSON, type AIProvider } from '@/lib/ai-router'
 import { CLAUDE_FAST } from '@/lib/claude'
+import { discoveryMemory } from '@/lib/agent-memory'
 
 // Deep research (OpenAI + Exa + crawling) per company is slow. Without this the
 // function hits Vercel's default timeout and gets killed before saving leads.
@@ -243,25 +244,9 @@ Return up to 8 SPECIFIC, REAL, NAMED companies (quality over quantity — 8 grea
   }
 }
 
-// Fetch all active agent_knowledge for injection into prompts
-async function getLearnedIntelligence(): Promise<string> {
-  try {
-    const { data } = await supabase
-      .from('agent_knowledge')
-      .select('title, content, knowledge_type, created_at')
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(30)
-    if (!data || data.length === 0) return ''
-    const lines = data.map(
-      (k: { title: string; content: string; knowledge_type: string; created_at: string }) =>
-        `[${new Date(k.created_at).toISOString().split('T')[0]}][${k.knowledge_type}] ${k.title}:\n${k.content}`
-    )
-    return `\n\nLEARNED INTELLIGENCE (from your training sessions — use this to score and analyze leads more precisely):\n${lines.join('\n\n---\n')}`
-  } catch {
-    return ''
-  }
-}
+// Removed: getLearnedIntelligence() — replaced by discoveryMemory() from lib/agent-memory.ts
+// discoveryMemory() loads up to 56 knowledge entries (8 per type × 7 types) + active rules
+// + feedback patterns, vs the old limit(30) by recency which dropped older knowledge.
 
 // Full deep-dive research on a single company
 async function deepResearch(
@@ -523,8 +508,8 @@ export async function POST(req: NextRequest) {
       companies = await extractCompanies(content, `${source.source_name} (${source.source_type})`, researchProvider)
     }
 
-    // 5b. Load learned intelligence to inject into all deepResearch calls
-    const learnedIntelligence = await getLearnedIntelligence()
+    // 5b. Load full memory: up to 56 knowledge entries (8 per type) + active rules + feedback patterns
+    const learnedIntelligence = await discoveryMemory()
 
     // Drop generic categories that slipped through as "companies".
     const realCompanies = companies.filter(c => !isGenericName(c.name))

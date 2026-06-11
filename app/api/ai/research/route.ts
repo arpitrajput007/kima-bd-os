@@ -1,6 +1,7 @@
 import { claudeJSON, claudeText, CLAUDE_RESEARCH } from "@/lib/claude"
 import { NextRequest, NextResponse } from 'next/server'
 import { PRODUCT_BRAIN } from '@/lib/kima-knowledge'
+import { scoringMemory } from '@/lib/agent-memory'
 
 
 async function getHunterContacts(website: string): Promise<string> {
@@ -29,9 +30,12 @@ export async function POST(req: NextRequest) {
 
   const { company_name, website, description, action } = await req.json()
 
+  const memory = await scoringMemory()
+
   const systemPrompt = `You are a senior BD researcher for Kima and Aeredium — financial infrastructure companies.
 
 ${PRODUCT_BRAIN}
+${memory}
 
 Always respond with valid JSON only. No markdown, no prose outside JSON.
 Always separate FACTS (verified) from ASSUMPTIONS (inferred).

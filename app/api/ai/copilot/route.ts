@@ -47,9 +47,9 @@ async function buildBDContext(): Promise<string> {
   const now = Date.now()
 
   try {
-    const [{ data: rules }, { data: knowledge }, { data: leads }, { data: outreach }, { data: activities }] = await Promise.all([
-      supabase.from('agent_rules').select('rule_type, rule').eq('status', 'active').order('weight', { ascending: false }).limit(25),
-      supabase.from('agent_knowledge').select('title, content, knowledge_type, created_at').eq('status', 'active').order('created_at', { ascending: false }).limit(25),
+    const { fullMemory: loadFullMemory } = await import('@/lib/agent-memory')
+    const [memoryBlock, { data: leads }, { data: outreach }, { data: activities }] = await Promise.all([
+      loadFullMemory(),
       supabase.from('leads').select('company_name, status, customer_category, lead_score, pain_point, next_follow_up_at, updated_at').limit(500),
       supabase.from('outreach_messages').select('channel, status').limit(800),
       supabase.from('lead_activities').select('type, scheduled_at, completed_at').limit(500),
@@ -112,16 +112,8 @@ async function buildBDContext(): Promise<string> {
       a.type === 'follow_up' && !a.completed_at && a.scheduled_at && new Date(a.scheduled_at).getTime() < now)
     if (overdue.length) parts.push(`OVERDUE FOLLOW-UPS (CRM): ${overdue.length}`)
 
-    // Active rules
-    if (rules && rules.length) {
-      parts.push('YOUR ACTIVE BD RULES:\n' + rules.map(r => `  [${r.rule_type}] ${r.rule}`).join('\n'))
-    }
-
-    // Learned knowledge
-    if (knowledge && knowledge.length) {
-      parts.push('YOUR LEARNED INTELLIGENCE:\n' +
-        knowledge.map(k => `  [${k.knowledge_type}] ${k.title}: ${(k.content || '').slice(0, 220)}`).join('\n'))
-    }
+    // Memory: rules + knowledge + feedback via centralized system (up to 56 entries, type-diverse)
+    if (memoryBlock) parts.push(memoryBlock)
   } catch (e) {
     console.error('[buildBDContext]', e)
   }

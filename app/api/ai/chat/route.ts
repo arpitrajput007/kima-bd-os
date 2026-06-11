@@ -34,38 +34,23 @@ Never start with "Certainly!" or "Great question!" — just answer directly.`
 
 async function getContextualSystemPrompt(): Promise<string> {
   try {
-    // Load active agent rules
-    const { data: rules } = await supabase
-      .from('agent_rules')
-      .select('rule_type, rule')
-      .eq('status', 'active')
-      .order('weight', { ascending: false })
-      .limit(20)
+    const { fullMemory: loadFullMemory } = await import('@/lib/agent-memory')
 
-    // Load recent agent knowledge (last 15 entries)
-    const { data: knowledge } = await supabase
-      .from('agent_knowledge')
-      .select('title, content, knowledge_type')
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(15)
-
-    // Load recent high-score leads for context
-    const { data: leads } = await supabase
-      .from('leads')
-      .select('company_name, lead_score, status, pain_point')
-      .gte('lead_score', 60)
-      .order('lead_score', { ascending: false })
-      .limit(10)
+    // Load memory + top leads in parallel
+    const [memoryBlock, { data: leads }] = await Promise.all([
+      loadFullMemory(),
+      supabase
+        .from('leads')
+        .select('company_name, lead_score, status, pain_point')
+        .gte('lead_score', 60)
+        .order('lead_score', { ascending: false })
+        .limit(10),
+    ])
 
     let context = SYSTEM_BASE
 
-    if (rules && rules.length > 0) {
-      context += `\n\nYOUR ACTIVE BD RULES:\n${rules.map(r => `[${r.rule_type}] ${r.rule}`).join('\n')}`
-    }
-
-    if (knowledge && knowledge.length > 0) {
-      context += `\n\nYOUR LEARNED INTELLIGENCE:\n${knowledge.map(k => `[${k.knowledge_type}] ${k.title}: ${k.content.slice(0, 300)}`).join('\n\n')}`
+    if (memoryBlock) {
+      context += memoryBlock
     }
 
     if (leads && leads.length > 0) {

@@ -19,6 +19,7 @@
 import { claudeJSON, CLAUDE_RESEARCH } from '@/lib/claude'
 import { NextRequest, NextResponse } from 'next/server'
 import { PRODUCT_BRAIN } from '@/lib/kima-knowledge'
+import { scoringMemory } from '@/lib/agent-memory'
 
 // ── Infer company name from a URL ─────────────────────────────
 function guessCompanyName(url: string): string {
@@ -91,14 +92,20 @@ export async function POST(req: NextRequest) {
 
   const companyName = guessCompanyName(url)
 
-  // Live web research first
-  const webResearch = await webResearchCompany(url, companyName)
+  // Live web research + memory in parallel
+  const [webResearch, memory] = await Promise.all([
+    webResearchCompany(url, companyName),
+    scoringMemory(),
+  ])
 
   const systemPrompt = `You are a senior BD researcher for Kima and Aeredium — financial infrastructure companies.
 
 ${PRODUCT_BRAIN}
 
 Your job is to qualify a company as a potential Kima/Aeredium lead and fill EVERY field in the BD database — including the deeper analytical fields (risk_angle, settlement_angle, security_angle, revenue_potential, integration_feasibility, competitive positioning, social links, verified facts vs assumptions).
+
+Apply the agent rules below when scoring and classifying leads. prioritize/reject rules override the base score. score_boost/score_penalty rules adjust the final score.
+${memory}
 
 Return ONLY valid JSON. No markdown, no prose outside JSON.`
 
