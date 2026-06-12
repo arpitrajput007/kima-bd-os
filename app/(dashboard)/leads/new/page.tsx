@@ -246,8 +246,9 @@ function DiscussPanel({ leadData }: { leadData: QualifyResult }) {
       .from('voice_sessions')
       .insert({ title, message_count: 0 })
       .select('id').single()
-    sessionRef.current = created?.id ?? crypto.randomUUID()
-    return sessionRef.current
+    const newId = created?.id ?? crypto.randomUUID()
+    sessionRef.current = newId
+    return newId
   }
 
   // Load session when panel opens
