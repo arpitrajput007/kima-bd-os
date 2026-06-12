@@ -204,13 +204,56 @@ const DISCUSS_STARTERS = [
 ]
 
 function DiscussPanel({ leadData }: { leadData: QualifyResult }) {
-  const [open,     setOpen]    = useState(false)
-  const [input,    setInput]   = useState('')
-  const [thinking, setThinking] = useState(false)
+  const supabase = createClient()
+  const [open,      setOpen]     = useState(false)
+  const [input,     setInput]    = useState('')
+  const [thinking,  setThinking] = useState(false)
   const [msgs, setMsgs] = useState<{ role: 'user' | 'assistant'; content: string; id: string }[]>([])
-  const histRef  = useRef<{ role: 'user' | 'assistant'; content: string }[]>([])
-  const endRef   = useRef<HTMLDivElement>(null)
-  const taRef    = useRef<HTMLTextAreaElement>(null)
+  const histRef    = useRef<{ role: 'user' | 'assistant'; content: string }[]>([])
+  const sessionRef = useRef<string | null>(null)
+  const endRef     = useRef<HTMLDivElement>(null)
+  const taRef      = useRef<HTMLTextAreaElement>(null)
+
+  // Load or create a session for this lead on first open
+  const ensureSession = async (): Promise<string> => {
+    if (sessionRef.current) return sessionRef.current
+    const title = `[Lead] ${leadData.company_name}`
+    // Try to find an existing session for this lead
+    const { data: existing } = await supabase
+      .from('voice_sessions')
+      .select('id, message_count')
+      .ilike('title', title)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    if (existing) {
+      // Load previous messages
+      const { data: prevMsgs } = await supabase
+        .from('voice_messages')
+        .select('id, role, content')
+        .eq('session_id', existing.id)
+        .order('created_at', { ascending: true })
+      if (prevMsgs?.length) {
+        const loaded = prevMsgs.map(m => ({ id: m.id, role: m.role as 'user' | 'assistant', content: m.content }))
+        setMsgs(loaded)
+        histRef.current = loaded.map(m => ({ role: m.role, content: m.content }))
+      }
+      sessionRef.current = existing.id
+      return existing.id
+    }
+    // Create new
+    const { data: created } = await supabase
+      .from('voice_sessions')
+      .insert({ title, message_count: 0 })
+      .select('id').single()
+    sessionRef.current = created?.id ?? crypto.randomUUID()
+    return sessionRef.current
+  }
+
+  // Load session when panel opens
+  useEffect(() => {
+    if (open && !sessionRef.current) { ensureSession() }
+  }, [open]) // eslint-disable-line
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs, thinking])
 
@@ -233,6 +276,15 @@ function DiscussPanel({ leadData }: { leadData: QualifyResult }) {
       const agentMsg = { role: 'assistant' as const, content: data.reply, id: crypto.randomUUID() }
       setMsgs(prev => [...prev, agentMsg])
       histRef.current.push({ role: 'assistant', content: data.reply })
+
+      // Persist both messages to Supabase
+      const sid = await ensureSession()
+      await supabase.from('voice_messages').insert([
+        { session_id: sid, role: 'user',      content: q          },
+        { session_id: sid, role: 'assistant', content: data.reply },
+      ])
+      const { data: s } = await supabase.from('voice_sessions').select('message_count').eq('id', sid).single()
+      await supabase.from('voice_sessions').update({ message_count: (s?.message_count || 0) + 2, updated_at: new Date().toISOString() }).eq('id', sid)
     } catch (e) {
       const err = e instanceof Error ? e.message : 'Failed'
       setMsgs(prev => [...prev, { role: 'assistant', content: `Error: ${err}`, id: crypto.randomUUID() }])
