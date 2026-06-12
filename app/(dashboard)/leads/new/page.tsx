@@ -10,6 +10,7 @@ import {
   Sparkles, Search, TrendingUp, Target, Star, BarChart2,
   ArrowRight, Shield, DollarSign, MessageCircle,
   BookOpen, Layers, ExternalLink, Clock, RefreshCw, History,
+  MessageSquare, Send, Brain,
 } from 'lucide-react'
 import Link from 'next/link'
 import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL, REGIONS } from '@/lib/types'
@@ -156,6 +157,187 @@ function SectionCard({ icon: Icon, title, open, onToggle, children, accent }: {
         {open ? <ChevronUp size={14} color="rgb(70,75,100)" /> : <ChevronDown size={14} color="rgb(70,75,100)" />}
       </button>
       {open && <div style={{ padding: '22px 24px' }}>{children}</div>}
+    </div>
+  )
+}
+
+// ── Markdown renderer (lightweight) ──────────────────────────
+function RichText({ text }: { text: string }) {
+  const lines = text.split('\n')
+  const out: React.ReactNode[] = []
+  let list: React.ReactNode[] = []
+  let listType: 'ul' | 'ol' | null = null
+  const flush = () => {
+    if (list.length) {
+      out.push(listType === 'ol'
+        ? <ol key={out.length} style={{ margin: '3px 0 6px', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 3 }}>{list}</ol>
+        : <ul key={out.length} style={{ margin: '3px 0 6px', paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 3 }}>{list}</ul>)
+      list = []; listType = null
+    }
+  }
+  const fmt = (s: string) => s.split(/(\*\*[^*]+\*\*)/g).map((p, i) =>
+    p.startsWith('**') && p.endsWith('**')
+      ? <strong key={i} style={{ color: 'white', fontWeight: 600 }}>{p.slice(2, -2)}</strong>
+      : <span key={i}>{p}</span>
+  )
+  lines.forEach((raw, idx) => {
+    const line = raw.trimEnd()
+    const bullet = line.match(/^\s*[-*]\s+(.*)/)
+    const numbered = line.match(/^\s*(\d+)\.\s+(.*)/)
+    if (bullet) { if (listType === 'ol') flush(); listType = 'ul'; list.push(<li key={idx} style={{ lineHeight: 1.55 }}>{fmt(bullet[1])}</li>) }
+    else if (numbered) { if (listType === 'ul') flush(); listType = 'ol'; list.push(<li key={idx} style={{ lineHeight: 1.55 }}>{fmt(numbered[2])}</li>) }
+    else if (line === '') { flush() }
+    else { flush(); out.push(<p key={idx} style={{ margin: '0 0 5px', lineHeight: 1.6 }}>{fmt(line)}</p>) }
+  })
+  flush()
+  return <div>{out}</div>
+}
+
+// ── Discuss panel ─────────────────────────────────────────────
+const DISCUSS_STARTERS = [
+  'Why is the score only 42?',
+  'What would make this a good lead?',
+  'Who should I reach out to first?',
+  'Write a cold email for this company',
+  'What are the biggest red flags here?',
+  'Is there a Kima angle I might be missing?',
+]
+
+function DiscussPanel({ leadData }: { leadData: QualifyResult }) {
+  const [open,     setOpen]    = useState(false)
+  const [input,    setInput]   = useState('')
+  const [thinking, setThinking] = useState(false)
+  const [msgs, setMsgs] = useState<{ role: 'user' | 'assistant'; content: string; id: string }[]>([])
+  const histRef  = useRef<{ role: 'user' | 'assistant'; content: string }[]>([])
+  const endRef   = useRef<HTMLDivElement>(null)
+  const taRef    = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs, thinking])
+
+  const send = async (text: string) => {
+    const q = text.trim()
+    if (!q || thinking) return
+    const userMsg = { role: 'user' as const, content: q, id: crypto.randomUUID() }
+    setMsgs(prev => [...prev, userMsg])
+    histRef.current.push({ role: 'user', content: q })
+    setInput('')
+    if (taRef.current) taRef.current.style.height = 'auto'
+    setThinking(true)
+    try {
+      const res = await fetch('/api/ai/qualify-lead/discuss', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: q, lead_data: leadData, history: histRef.current.slice(-10) }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      const agentMsg = { role: 'assistant' as const, content: data.reply, id: crypto.randomUUID() }
+      setMsgs(prev => [...prev, agentMsg])
+      histRef.current.push({ role: 'assistant', content: data.reply })
+    } catch (e) {
+      const err = e instanceof Error ? e.message : 'Failed'
+      setMsgs(prev => [...prev, { role: 'assistant', content: `Error: ${err}`, id: crypto.randomUUID() }])
+    } finally { setThinking(false) }
+  }
+
+  return (
+    <div style={{ borderRadius: 14, border: '1px solid rgba(167,139,250,0.25)', background: C.cardBg, overflow: 'hidden' }}>
+      {/* Toggle header */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: 'rgba(124,58,237,0.07)', border: 'none', cursor: 'pointer', borderBottom: open ? '1px solid rgba(167,139,250,0.15)' : 'none' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(124,58,237,0.18)', border: '1px solid rgba(167,139,250,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <MessageSquare size={13} color="#a78bfa" />
+          </div>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'white' }}>Discuss this lead</span>
+          {msgs.length > 0 && (
+            <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 10, background: 'rgba(167,139,250,0.2)', color: '#a78bfa' }}>
+              {msgs.filter(m => m.role === 'assistant').length}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {!open && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>Ask before deciding</span>}
+          {open ? <ChevronUp size={13} color="rgba(255,255,255,0.3)" /> : <ChevronDown size={13} color="rgba(255,255,255,0.3)" />}
+        </div>
+      </button>
+
+      {open && (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {/* Messages */}
+          <div style={{ maxHeight: 380, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {msgs.length === 0 ? (
+              <div>
+                <p style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.3)', marginBottom: 10, lineHeight: 1.5 }}>
+                  Ask anything about <strong style={{ color: 'rgba(255,255,255,0.5)' }}>{leadData.company_name}</strong> before deciding. The agent knows the full research.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {DISCUSS_STARTERS.map(s => (
+                    <button key={s} onClick={() => send(s)}
+                      style={{ textAlign: 'left', padding: '7px 10px', borderRadius: 8, fontSize: 11.5, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgb(160,165,200)', cursor: 'pointer', transition: 'all 0.12s' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(124,58,237,0.1)'; e.currentTarget.style.borderColor = 'rgba(167,139,250,0.25)'; e.currentTarget.style.color = '#c4a7fc' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.025)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = 'rgb(160,165,200)' }}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              msgs.map(m => (
+                m.role === 'user' ? (
+                  <div key={m.id} style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <div style={{ maxWidth: '85%', borderRadius: '12px 12px 3px 12px', padding: '8px 12px', fontSize: 12.5, lineHeight: 1.55, whiteSpace: 'pre-wrap', background: 'rgba(124,58,237,0.18)', border: '1px solid rgba(124,58,237,0.3)', color: 'rgb(225,218,252)' }}>
+                      {m.content}
+                    </div>
+                  </div>
+                ) : (
+                  <div key={m.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                    <div style={{ width: 24, height: 24, borderRadius: 7, background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+                      <Brain size={12} color="#a78bfa" />
+                    </div>
+                    <div style={{ flex: 1, borderRadius: '3px 12px 12px 12px', padding: '9px 13px', fontSize: 12.5, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgb(205,210,232)' }}>
+                      <RichText text={m.content} />
+                    </div>
+                  </div>
+                )
+              ))
+            )}
+            {thinking && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div style={{ width: 24, height: 24, borderRadius: 7, background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Loader2 size={11} className="animate-spin" color="#a78bfa" />
+                </div>
+                <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.3)' }}>Thinking…</span>
+              </div>
+            )}
+            <div ref={endRef} />
+          </div>
+
+          {/* Input */}
+          <div style={{ padding: '8px 10px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', padding: '5px 6px' }}>
+              <textarea
+                ref={taRef}
+                value={input}
+                onChange={e => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input) } }}
+                placeholder="Ask anything about this lead…"
+                rows={1}
+                style={{ flex: 1, resize: 'none', maxHeight: 120, border: 'none', background: 'transparent', padding: '5px 7px', fontSize: 12.5, color: 'white', fontFamily: 'inherit', lineHeight: 1.5, outline: 'none' }}
+              />
+              <button
+                onClick={() => send(input)}
+                disabled={thinking || !input.trim()}
+                style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 8, border: 'none', cursor: thinking || !input.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: thinking || !input.trim() ? 'rgba(167,139,250,0.12)' : 'rgb(124,58,237)', color: thinking || !input.trim() ? '#a78bfa' : 'white' }}
+              >
+                {thinking ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+              </button>
+            </div>
+            <p style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.18)', marginTop: 5, textAlign: 'center' }}>Enter to send · Shift+Enter for new line</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -864,6 +1046,9 @@ export default function NewLeadPage() {
                 )}
               </div>
             </div>
+
+            {/* Discuss this lead */}
+            <DiscussPanel leadData={result} />
 
             {/* Commercial potential */}
             <SectionCard icon={DollarSign} title="Commercial Potential" open={open.commercial} onToggle={() => toggle('commercial')} accent="rgb(52,211,153)">
