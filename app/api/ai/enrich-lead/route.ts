@@ -4,8 +4,11 @@
 // Full AI enrichment pipeline for a freshly-added lead.
 // Runs: research + classify + kima_fit + aeredium_fit (parallel)
 //       → score (sequential, needs research data)
-//       → contacts + use_cases (parallel)
+//       → contacts (findAndSaveContacts)
 //       → sets status = 'approved'
+//
+// NOTE: Use cases are NOT generated here — only on explicit
+//       user request via the "Regenerate" button.
 //
 // POST { lead_id: string }
 // ============================================================
@@ -115,37 +118,6 @@ Return JSON:
 }`
 }
 
-function pUseCases(lead: Record<string, unknown>) {
-  return `Generate 2-3 REAL, CONCRETE use cases showing exactly how Kima and/or Aeredium can work with this company.
-
-Company: ${lead.company_name}
-Website: ${lead.website || 'N/A'}
-Description: ${lead.description || lead.product_summary || 'N/A'}
-Business Model: ${lead.business_model || 'N/A'}
-Industry: ${lead.industry_category || 'N/A'}
-Product to Sell: ${lead.product_to_sell || 'N/A'}
-Pain Point: ${lead.pain_point || 'N/A'}
-Kima Fit: ${lead.kima_fit || 'N/A'}
-Aeredium Fit: ${lead.aeredium_fit || 'N/A'}
-Settlement Angle: ${lead.settlement_angle || 'N/A'}
-Security Angle: ${lead.security_angle || 'N/A'}
-
-Return a JSON array of 2-3 use case objects:
-[{
-  "id": "short-kebab-slug",
-  "title": "Precise, specific title naming the actual workflow",
-  "category": "Settlement | Payments | Treasury | Security | On/Off-ramp | Agentic | DvP | Other",
-  "scenario": "Story of what the company does TODAY and how it changes with Kima. 3-4 sentences.",
-  "kima_role": "Exactly what Kima does — which API, which settlement path, which chains. 2-3 sentences.",
-  "aeredium_role": "What Aeredium adds, or empty string if not relevant.",
-  "outcome_for_company": "Concrete measurable outcome: settlement time, cost, market access. 1-2 sentences.",
-  "outcome_for_kima": "Transaction volume, fee revenue, partnership type. 1 sentence.",
-  "feasibility": "high | medium | low",
-  "impact": "transformative | significant | incremental",
-  "why_now": "Why relevant RIGHT NOW, or empty string."
-}]`
-}
-
 // ── Contact finder helper ───────────────────────────────────────
 
 async function findAndSaveContacts(leadId: string, company: string, website: string) {
@@ -228,7 +200,7 @@ export async function POST(req: NextRequest) {
     patch.updated_at = new Date().toISOString()
     await supabase.from('leads').update(patch).eq('id', lead_id)
 
-    // ── Phase 2: score + contacts + use cases ─────────────────
+    // ── Phase 2: score ─────────────────────────────────────────
     const freshDesc = (resR.status === 'fulfilled' && resR.value.company_summary) ? resR.value.company_summary : desc
 
     const [scoreR] = await Promise.allSettled([
@@ -246,24 +218,8 @@ export async function POST(req: NextRequest) {
       }).eq('id', lead_id)
     }
 
-    // Contacts + use cases in parallel
-    const { data: enrichedLead } = await supabase.from('leads').select('*').eq('id', lead_id).single()
-
-    await Promise.allSettled([
-      findAndSaveContacts(lead_id, name, website),
-      (async () => {
-        if (!enrichedLead) return
-        const useCases = await claudeJSON({
-          model: CLAUDE_RESEARCH,
-          system: `You are a senior BD strategist for Kima and Aeredium.\n\n${PRODUCT_BRAIN}\n\nReturn ONLY valid JSON — no markdown.`,
-          user: pUseCases(enrichedLead),
-          maxTokens: 3000,
-        })
-        if (Array.isArray(useCases)) {
-          await supabase.from('leads').update({ use_cases: useCases, updated_at: new Date().toISOString() }).eq('id', lead_id)
-        }
-      })(),
-    ])
+    // Contacts only — use cases are generated on explicit user request
+    await findAndSaveContacts(lead_id, name, website)
 
     // ── Done: mark as approved ─────────────────────────────────
     await supabase.from('leads').update({ status: 'approved', updated_at: new Date().toISOString() }).eq('id', lead_id)
