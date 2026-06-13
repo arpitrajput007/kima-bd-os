@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
@@ -138,6 +138,20 @@ export default function AerediumPage() {
   const [adding, setAdding] = useState<string | null>(null)
   const [added, setAdded] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState<string | null>(null)
+
+  // On mount: check which companies are already in the CRM
+  useEffect(() => {
+    const names = TARGETS.map(t => t.company)
+    supabase
+      .from('leads')
+      .select('company_name')
+      .in('company_name', names)
+      .then(({ data }) => {
+        if (data?.length) {
+          setAdded(new Set(data.map((r: { company_name: string }) => r.company_name)))
+        }
+      })
+  }, []) // eslint-disable-line
 
   // Filter
   const filtered = TARGETS.filter(t => {
