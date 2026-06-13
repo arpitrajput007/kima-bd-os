@@ -65,6 +65,31 @@ function InfoBlock({ title, value }: { title: string; value?: string | null }) {
   )
 }
 
+// Renders a prose string as clean bullet points
+function ProseBullets({ text, color = 'rgb(210,215,235)', dotColor = 'rgba(167,139,250,0.7)', fontSize = 13 }: {
+  text: string; color?: string; dotColor?: string; fontSize?: number
+}) {
+  const sentences = text
+    .split(/(?<=[.!?])\s+(?=[A-Z—])|(?<=\n)\s*/)
+    .map(s => s.trim().replace(/^[•·\-–—]\s*/, ''))
+    .filter(s => s.length > 8)
+
+  if (sentences.length <= 1) {
+    return <p style={{ fontSize, lineHeight: 1.7, color, margin: 0 }}>{text}</p>
+  }
+
+  return (
+    <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {sentences.map((s, i) => (
+        <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <span style={{ flexShrink: 0, marginTop: 7, width: 5, height: 5, borderRadius: '50%', background: dotColor }} />
+          <span style={{ fontSize, lineHeight: 1.65, color }}>{s}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 function SocialChip({ icon: Icon, label, href, color }: {
   icon: React.ComponentType<{ size?: number }>; label: string; href: string; color: string
 }) {
@@ -634,6 +659,26 @@ function ContactedModal({ lead, onClose, onSaved }: {
 }
 
 /* ── Real Use Cases section ─────────────────────────────── */
+// ── Bullet renderer: handles both new (array) and legacy (string) formats ──
+function UCPoints({ value, color }: { value: string | string[] | unknown; color: string }) {
+  const pts: string[] = Array.isArray(value)
+    ? (value as string[]).filter(Boolean)
+    : typeof value === 'string' && value.trim()
+      ? value.split(/(?<=[.!?])\s+(?=[A-Z—])|\n/).map(s => s.trim()).filter(s => s.length > 8)
+      : []
+  if (!pts.length) return null
+  return (
+    <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 7 }}>
+      {pts.map((pt, i) => (
+        <li key={i} style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+          <span style={{ flexShrink: 0, marginTop: 5, width: 5, height: 5, borderRadius: '50%', background: color, opacity: 0.8 }} />
+          <span style={{ fontSize: 13, lineHeight: 1.6, color: 'rgb(210,215,235)' }}>{pt.replace(/^[•·\-–—]\s*/, '')}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 function UseCasesSection({ lead, onGenerated }: { lead: Lead; onGenerated: (cases: UseCase[]) => void }) {
   const [generating, setGenerating] = useState(false)
   const cases: UseCase[] = (lead.use_cases as UseCase[]) || []
@@ -675,10 +720,17 @@ function UseCasesSection({ lead, onGenerated }: { lead: Lead; onGenerated: (case
     DvP: 'rgb(110,231,183)', Other: 'rgb(160,165,195)',
   }[c] ?? 'rgb(160,165,195)')
 
+  const hasAerediumRole = (uc: UseCase) => {
+    const r = uc.aeredium_role
+    if (!r) return false
+    if (Array.isArray(r)) return (r as string[]).some(s => s.trim().length > 0)
+    return typeof r === 'string' && r.trim().length > 0
+  }
+
   return (
     <div style={{ padding: '0 24px 24px' }}>
       {/* Section header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, paddingTop: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, paddingTop: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(99,102,241,0.2))', border: '1px solid rgba(124,58,237,0.35)' }}>
             <Puzzle size={16} color="rgb(167,139,250)" />
@@ -709,15 +761,11 @@ function UseCasesSection({ lead, onGenerated }: { lead: Lead; onGenerated: (case
 
       {/* Empty state */}
       {cases.length === 0 && !generating && (
-        <div style={{
-          borderRadius: 16, border: '1px dashed rgba(124,58,237,0.2)', background: 'rgba(124,58,237,0.03)',
-          padding: '48px 24px', textAlign: 'center',
-        }}>
+        <div style={{ borderRadius: 16, border: '1px dashed rgba(124,58,237,0.2)', background: 'rgba(124,58,237,0.03)', padding: '48px 24px', textAlign: 'center' }}>
           <Puzzle size={36} color="rgba(167,139,250,0.3)" style={{ margin: '0 auto 14px' }} />
           <p style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 8 }}>No use cases yet</p>
           <p style={{ fontSize: 13, color: 'rgb(100,107,140)', lineHeight: 1.65, maxWidth: 420, margin: '0 auto 20px' }}>
-            The agent will research {lead.company_name}&apos;s product, workflows, and pain points,
-            then build 2-3 concrete scenarios showing exactly how Kima/Aeredium fits.
+            The agent researches {lead.company_name}&apos;s workflows and pain points, then builds concrete scenarios showing exactly how Kima/Aeredium fits.
           </p>
           <button onClick={generate} disabled={generating}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 22px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: 'white', border: 'none', boxShadow: '0 2px 14px rgba(124,58,237,0.3)' }}>
@@ -728,107 +776,118 @@ function UseCasesSection({ lead, onGenerated }: { lead: Lead; onGenerated: (case
 
       {/* Generating skeleton */}
       {generating && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
-          {[0, 1, 2].map(i => (
-            <div key={i} style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', background: C.cardBg, padding: 22, opacity: 0.5 + i * 0.15 }}>
-              <div style={{ height: 16, borderRadius: 8, background: 'rgba(255,255,255,0.07)', marginBottom: 12, width: '60%' }} />
-              <div style={{ height: 12, borderRadius: 6, background: 'rgba(255,255,255,0.05)', marginBottom: 8, width: '100%' }} />
-              <div style={{ height: 12, borderRadius: 6, background: 'rgba(255,255,255,0.05)', marginBottom: 8, width: '85%' }} />
-              <div style={{ height: 12, borderRadius: 6, background: 'rgba(255,255,255,0.05)', width: '70%' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {[0, 1].map(i => (
+            <div key={i} style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', background: C.cardBg, padding: '20px 24px', opacity: 0.5 + i * 0.2 }}>
+              <div style={{ height: 10, borderRadius: 5, background: 'rgba(255,255,255,0.06)', marginBottom: 10, width: '30%' }} />
+              <div style={{ height: 17, borderRadius: 8, background: 'rgba(255,255,255,0.08)', marginBottom: 16, width: '65%' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {[100,85,92].map((w, j) => <div key={j} style={{ height: 11, borderRadius: 5, background: 'rgba(255,255,255,0.05)', width: `${w}%` }} />)}
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Use case cards */}
+      {/* Use case list — vertical, readable */}
       {cases.length > 0 && !generating && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 18 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {cases.map((uc, idx) => {
             const feas   = feasColor(uc.feasibility)
             const impact = impactColor(uc.impact)
             const cc     = catColor(uc.category)
             return (
               <div key={uc.id || idx} style={{
-                borderRadius: 18, border: '1px solid rgba(255,255,255,0.09)',
+                borderRadius: 18, border: '1px solid rgba(255,255,255,0.08)',
                 background: C.cardBg, overflow: 'hidden',
-                boxShadow: '0 8px 28px rgba(0,0,0,0.32)',
-                display: 'flex', flexDirection: 'column',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.28)',
               }}>
-                {/* Card header */}
-                <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: `${cc}18`, color: cc, border: `1px solid ${cc}30`, letterSpacing: '0.04em' }}>
+                {/* ── Header ── */}
+                <div style={{ padding: '18px 24px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+                  {/* Index bubble */}
+                  <div style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 9, background: `${cc}18`, border: `1px solid ${cc}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: cc, marginTop: 2 }}>
+                    {idx + 1}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {/* Pills row */}
+                    <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 9 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: `${cc}18`, color: cc, border: `1px solid ${cc}30`, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                         {uc.category}
                       </span>
-                      <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20, background: feas.bg, color: feas.text, border: `1px solid ${feas.border}` }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 9px', borderRadius: 20, background: feas.bg, color: feas.text, border: `1px solid ${feas.border}` }}>
                         {uc.feasibility} feasibility
                       </span>
-                      <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20, background: impact.bg, color: impact.text, border: `1px solid ${impact.border}` }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 9px', borderRadius: 20, background: impact.bg, color: impact.text, border: `1px solid ${impact.border}` }}>
                         {uc.impact}
                       </span>
                     </div>
+                    <h3 style={{ fontSize: 16, fontWeight: 700, color: 'white', margin: 0, lineHeight: 1.35, letterSpacing: '-0.015em' }}>
+                      {uc.title}
+                    </h3>
                   </div>
-                  <h3 style={{ fontSize: 15, fontWeight: 700, color: 'white', margin: 0, lineHeight: 1.4, letterSpacing: '-0.01em' }}>
-                    {uc.title}
-                  </h3>
                 </div>
 
-                {/* Body */}
-                <div style={{ padding: '18px 20px', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* ── Body: 2-col on wide, stacked on narrow ── */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
 
-                  {/* Scenario */}
-                  <div>
-                    <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.18em', color: 'rgb(100,107,140)', marginBottom: 8 }}>
-                      📖 Scenario
-                    </p>
-                    <p style={{ fontSize: 13, lineHeight: 1.7, color: 'rgb(190,195,225)', margin: 0 }}>{uc.scenario}</p>
+                  {/* Left col: Scenario + Why Now */}
+                  <div style={{ padding: '20px 24px', borderRight: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 11 }}>
+                        <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.16em', color: 'rgb(100,107,140)' }}>📖 The Situation</span>
+                      </div>
+                      <UCPoints value={uc.scenario} color="rgb(147,155,200)" />
+                    </div>
+
+                    {uc.why_now && (typeof uc.why_now === 'string' ? uc.why_now.trim() : true) && (
+                      <div style={{ display: 'flex', gap: 9, padding: '10px 14px', borderRadius: 10, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
+                        <Lightbulb size={13} color="#fbbf24" style={{ flexShrink: 0, marginTop: 2 }} />
+                        <div>
+                          <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#fbbf24', display: 'block', marginBottom: 4 }}>Why Now</span>
+                          <span style={{ fontSize: 12, color: 'rgb(210,185,130)', lineHeight: 1.55 }}>{uc.why_now as string}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Kima Role */}
-                  <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(124,58,237,0.07)', border: '1px solid rgba(124,58,237,0.18)' }}>
-                    <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgb(167,139,250)', marginBottom: 7 }}>
-                      ⚡ Kima&apos;s Role
-                    </p>
-                    <p style={{ fontSize: 12, lineHeight: 1.65, color: 'rgb(196,183,240)', margin: 0 }}>{uc.kima_role}</p>
+                  {/* Right col: Roles + Outcomes */}
+                  <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                    {/* Kima role */}
+                    <div style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(124,58,237,0.07)', border: '1px solid rgba(124,58,237,0.18)' }}>
+                      <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgb(167,139,250)', marginBottom: 10 }}>
+                        ⚡ Kima&apos;s Role
+                      </div>
+                      <UCPoints value={uc.kima_role} color="rgb(167,139,250)" />
+                    </div>
+
+                    {/* Aeredium role — only if relevant */}
+                    {hasAerediumRole(uc) && (
+                      <div style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(34,211,238,0.06)', border: '1px solid rgba(34,211,238,0.18)' }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgb(103,232,249)', marginBottom: 10 }}>
+                          🛡 Aeredium&apos;s Role
+                        </div>
+                        <UCPoints value={uc.aeredium_role} color="rgb(103,232,249)" />
+                      </div>
+                    )}
+
+                    {/* Outcomes */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      <div style={{ padding: '12px 14px', borderRadius: 11, background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)' }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgb(52,211,153)', marginBottom: 8 }}>
+                          For {lead.company_name.split(' ')[0]}
+                        </div>
+                        <UCPoints value={uc.outcome_for_company} color="rgb(52,211,153)" />
+                      </div>
+                      <div style={{ padding: '12px 14px', borderRadius: 11, background: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.18)' }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgb(167,139,250)', marginBottom: 8 }}>
+                          For Kima
+                        </div>
+                        <UCPoints value={uc.outcome_for_kima} color="rgb(167,139,250)" />
+                      </div>
+                    </div>
+
                   </div>
-
-                  {/* Aeredium Role — only if relevant */}
-                  {uc.aeredium_role && uc.aeredium_role.trim() && (
-                    <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(34,211,238,0.06)', border: '1px solid rgba(34,211,238,0.18)' }}>
-                      <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgb(103,232,249)', marginBottom: 7 }}>
-                        🛡 Aeredium&apos;s Role
-                      </p>
-                      <p style={{ fontSize: 12, lineHeight: 1.65, color: 'rgb(167,228,240)', margin: 0 }}>{uc.aeredium_role}</p>
-                    </div>
-                  )}
-
-                  {/* Outcomes */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <div style={{ padding: '10px 12px', borderRadius: 11, background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)' }}>
-                      <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgb(52,211,153)', marginBottom: 6 }}>
-                        For {lead.company_name.split(' ')[0]}
-                      </p>
-                      <p style={{ fontSize: 12, lineHeight: 1.6, color: 'rgb(150,210,180)', margin: 0 }}>{uc.outcome_for_company}</p>
-                    </div>
-                    <div style={{ padding: '10px 12px', borderRadius: 11, background: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.18)' }}>
-                      <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgb(167,139,250)', marginBottom: 6 }}>
-                        For Kima
-                      </p>
-                      <p style={{ fontSize: 12, lineHeight: 1.6, color: 'rgb(185,170,235)', margin: 0 }}>{uc.outcome_for_kima}</p>
-                    </div>
-                  </div>
-
-                  {/* Why now — only if present */}
-                  {uc.why_now && uc.why_now.trim() && (
-                    <div style={{ display: 'flex', gap: 8, padding: '8px 12px', borderRadius: 9, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
-                      <Lightbulb size={13} color="rgb(251,191,36)" style={{ flexShrink: 0, marginTop: 1 }} />
-                      <p style={{ fontSize: 12, color: 'rgb(200,175,130)', margin: 0, lineHeight: 1.55 }}>
-                        <span style={{ fontWeight: 700, color: 'rgb(251,191,36)' }}>Why now: </span>
-                        {uc.why_now}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
             )
@@ -1363,9 +1422,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                           <span style={{ fontSize: 11, fontWeight: 700, color: config.color, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Evidence · {config.label}</span>
                           <span style={{ fontSize: 11, color: 'rgb(120,127,160)', marginLeft: 'auto' }}>{config.sub}</span>
                         </div>
-                        <div style={{ fontSize: 13, color: 'rgb(220,225,240)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>
-                          {lead.pain_point_evidence}
-                        </div>
+                        <ProseBullets text={lead.pain_point_evidence!} color="rgb(220,225,240)" dotColor={config.color} />
                         {lead.pain_point_source_url && (
                           <a href={lead.pain_point_source_url} target="_blank" rel="noopener noreferrer"
                             style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: config.color, textDecoration: 'none', padding: '6px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${config.border}` }}>
@@ -1414,13 +1471,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   {/* Main pitch */}
                   <div style={{ borderRadius: 12, border: '1px solid rgba(52,211,153,0.2)', background: 'rgba(52,211,153,0.06)', padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                       <Puzzle size={14} color="#34d399" />
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.08em' }}>How Kima helps</span>
                     </div>
-                    <div style={{ fontSize: 13, color: 'rgb(220,225,240)', lineHeight: 1.65 }}>
-                      {lead.kima_fit}
-                    </div>
+                    <ProseBullets text={lead.kima_fit!} color="rgb(220,225,240)" dotColor="rgba(52,211,153,0.7)" />
                   </div>
                   {/* Use case + feasibility */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -1442,13 +1497,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   {/* Settlement Angle */}
                   {lead.settlement_angle && (
                     <div style={{ borderRadius: 12, border: '1px solid rgba(168,85,247,0.2)', background: 'rgba(168,85,247,0.06)', padding: '14px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                         <ArrowRight size={14} color="#c084fc" />
                         <span style={{ fontSize: 11, fontWeight: 700, color: '#c084fc', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Settlement Angle</span>
                       </div>
-                      <div style={{ fontSize: 13, color: 'rgb(220,225,240)', lineHeight: 1.65 }}>
-                        {lead.settlement_angle}
-                      </div>
+                      <ProseBullets text={lead.settlement_angle} color="rgb(220,225,240)" dotColor="rgba(192,132,252,0.7)" />
                     </div>
                   )}
                 </div>
@@ -1470,24 +1523,20 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   {/* Main pitch */}
                   <div style={{ borderRadius: 12, border: '1px solid rgba(168,85,247,0.2)', background: 'rgba(168,85,247,0.06)', padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                       <Shield size={14} color="#c084fc" />
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#c084fc', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Trust & Security</span>
                     </div>
-                    <div style={{ fontSize: 13, color: 'rgb(220,225,240)', lineHeight: 1.65 }}>
-                      {lead.aeredium_fit}
-                    </div>
+                    <ProseBullets text={lead.aeredium_fit!} color="rgb(220,225,240)" dotColor="rgba(192,132,252,0.7)" />
                   </div>
                   {/* Risk Angle */}
                   {lead.risk_angle && (
                     <div style={{ borderRadius: 12, border: '1px solid rgba(244,114,182,0.2)', background: 'rgba(244,114,182,0.06)', padding: '14px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                         <AlertTriangle size={14} color='#f472b6' />
                         <span style={{ fontSize: 11, fontWeight: 700, color: '#f472b6', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Risk Angle</span>
                       </div>
-                      <div style={{ fontSize: 13, color: 'rgb(220,225,240)', lineHeight: 1.65 }}>
-                        {lead.risk_angle}
-                      </div>
+                      <ProseBullets text={lead.risk_angle} color="rgb(220,225,240)" dotColor="rgba(244,114,182,0.7)" />
                     </div>
                   )}
                 </div>
