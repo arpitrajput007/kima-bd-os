@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import {
   Sun, Target, Flame, ArrowRight, MessageSquare, Mail, Link2,
   AtSign, CheckCircle, Eye, Loader2, RefreshCw, Clock, CalendarCheck,
-  Sparkles, Zap, TrendingUp, Wand2, Copy, ExternalLink, Download, ShieldAlert,
+  Sparkles, Zap, TrendingUp, Wand2, Copy, ExternalLink, Download, ShieldAlert, Trash2,
 } from 'lucide-react'
 import { cn, getScoreBg, truncate } from '@/lib/utils'
 import type { Lead, Contact } from '@/lib/types'
@@ -164,10 +164,22 @@ function FollowUpRow({ lead, onSent }: { lead: LeadWithContacts; onSent: () => v
 }
 
 // One lead card in the plan — used for both today's picks and the date-grouped backlog.
-function PlanLeadCard({ lead, rank, actionLoading, onContacted, onReserved }: {
+function PlanLeadCard({ lead, rank, actionLoading, onContacted, onReserved, onDelete }: {
   lead: LeadWithContacts; rank: number | null; actionLoading: string | null
-  onContacted: (id: string) => void; onReserved?: (id: string) => void
+  onContacted: (id: string) => void; onReserved?: (id: string) => void; onDelete?: (id: string) => void
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleDelete = () => {
+    if (confirmDelete) {
+      if (confirmTimer.current) clearTimeout(confirmTimer.current)
+      onDelete?.(lead.id)
+    } else {
+      setConfirmDelete(true)
+      confirmTimer.current = setTimeout(() => setConfirmDelete(false), 3000)
+    }
+  }
   const contact = bestContact(lead.contacts)
   const waiting = daysSince(lead.created_at)
   return (
@@ -279,6 +291,21 @@ function PlanLeadCard({ lead, rank, actionLoading, onContacted, onReserved }: {
             className="btn btn-ghost justify-center" style={{ fontSize: '11px', padding: '5px 12px', color: 'rgb(130,135,165)' }}>
             <Eye size={12} /> View details
           </Link>
+          {onDelete && (
+            <button
+              onClick={handleDelete}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                padding: '5px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                fontSize: '11px', fontWeight: 600, transition: 'all 0.15s',
+                background: confirmDelete ? 'rgba(244,63,94,0.14)' : 'rgba(255,255,255,0.04)',
+                color: confirmDelete ? '#f43f5e' : 'rgba(255,255,255,0.22)',
+                borderTop: `1px solid ${confirmDelete ? 'rgba(244,63,94,0.25)' : 'rgba(255,255,255,0.06)'}`,
+              }}>
+              <Trash2 size={11} />
+              {confirmDelete ? 'Confirm delete?' : 'Remove lead'}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -441,6 +468,14 @@ export default function TodayPage() {
     if (error) toast.error('Update failed')
     else { toast.success('Saved for later — will appear in your Reserved pipeline'); loadData() }
     setActionLoading(null)
+  }
+
+  const deleteLead = async (id: string) => {
+    const lead = [...leads, ...planLeads].find(l => l.id === id)
+    await supabase.from('leads').delete().eq('id', id)
+    setPlanLeads(prev => prev.filter(l => l.id !== id))
+    setLeads(prev => prev.filter(l => l.id !== id))
+    toast(`${lead?.company_name ?? 'Lead'} removed from pipeline`)
   }
 
   const unReserve = async (id: string) => {
@@ -640,7 +675,7 @@ export default function TodayPage() {
                     </div>
                     <div className="flex flex-col gap-3">
                       {group.leads.map((lead, i) => (
-                        <PlanLeadCard key={lead.id} lead={lead} rank={gi === 0 ? i + 1 : null} actionLoading={actionLoading} onContacted={(id) => setContactingLead(leads.find(l => l.id === id) || null)} onReserved={markReserved} />
+                        <PlanLeadCard key={lead.id} lead={lead} rank={gi === 0 ? i + 1 : null} actionLoading={actionLoading} onContacted={(id) => setContactingLead(leads.find(l => l.id === id) || null)} onReserved={markReserved} onDelete={deleteLead} />
                       ))}
                     </div>
                   </div>
