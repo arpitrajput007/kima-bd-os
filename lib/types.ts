@@ -203,6 +203,8 @@ export interface Lead {
   updated_at: string
   contacts?: Contact[]
   outreach_messages?: OutreachMessage[]
+  contacts_total?: number     // total contacts found at this company
+  contacts_reached?: number   // how many have been actually contacted
 }
 
 export interface ContactTouch {

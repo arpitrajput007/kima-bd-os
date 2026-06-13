@@ -11,7 +11,7 @@ import {
   StickyNote, Bell, Check, Send, AtSign, Globe,
   RefreshCw, ExternalLink, Trophy, XCircle,
   Flame, Target, Link2, FileText, Upload, Sparkles,
-  BookOpen, Zap, ShieldCheck,
+  BookOpen, Zap, ShieldCheck, Users,
 } from 'lucide-react'
 import { cn, getScoreBg, truncate } from '@/lib/utils'
 import type { Lead } from '@/lib/types'
@@ -94,8 +94,8 @@ function formatDate(iso: string): string {
 }
 
 // ── Log Activity Modal ──────────────────────────────────────────
-function AddActivityModal({ lead, onClose, onSaved }: {
-  lead: Lead; onClose: () => void; onSaved: () => void
+function AddActivityModal({ lead, onClose, onSaved, onOutreachLogged }: {
+  lead: Lead; onClose: () => void; onSaved: () => void; onOutreachLogged?: () => void
 }) {
   const supabase = createClient()
   const [type, setType] = useState<ActivityType>('note')
@@ -117,6 +117,10 @@ function AddActivityModal({ lead, onClose, onSaved }: {
       content: content.trim() || 'Follow-up scheduled',
       scheduled_at: type === 'follow_up' && scheduledAt ? new Date(scheduledAt).toISOString() : null,
     })
+    // Auto-increment contacts_reached when logging outreach
+    if (isOutreach && onOutreachLogged) {
+      onOutreachLogged()
+    }
     setSaving(false)
     toast.success('Activity logged')
     onSaved(); onClose()
@@ -655,6 +659,8 @@ function LeadFlyout({ lead, onClose, onActivityAdded, onStatusChange }: {
   const [activities, setActivities] = useState<Activity[]>(lead.activities || [])
   const [showAddModal, setShowAddModal] = useState(false)
   const [completing, setCompleting] = useState<string | null>(null)
+  const [contactsTotal,   setContactsTotal]   = useState(lead.contacts_total   ?? 0)
+  const [contactsReached, setContactsReached] = useState(lead.contacts_reached ?? 0)
 
   const loadActivities = useCallback(async () => {
     const { data } = await supabase.from('lead_activities').select('*').eq('lead_id', lead.id).order('created_at', { ascending: false })
@@ -667,6 +673,20 @@ function LeadFlyout({ lead, onClose, onActivityAdded, onStatusChange }: {
     setCompleting(id)
     await supabase.from('lead_activities').update({ completed_at: new Date().toISOString() }).eq('id', id)
     setCompleting(null); loadActivities(); onActivityAdded()
+  }
+
+  const adjustContactsTotal = async (delta: number) => {
+    const next = Math.max(0, contactsTotal + delta)
+    setContactsTotal(next)
+    await supabase.from('leads').update({ contacts_total: next, updated_at: new Date().toISOString() }).eq('id', lead.id)
+    onActivityAdded()
+  }
+
+  const bumpContactsReached = async () => {
+    const next = Math.min(contactsTotal || 999, (contactsReached) + 1)
+    setContactsReached(next)
+    await supabase.from('leads').update({ contacts_reached: next, updated_at: new Date().toISOString() }).eq('id', lead.id)
+    onActivityAdded()
   }
 
   const pendingFollowUps = activities.filter(a => a.type === 'follow_up' && !a.completed_at)
@@ -730,6 +750,41 @@ function LeadFlyout({ lead, onClose, onActivityAdded, onStatusChange }: {
           </div>
           <div className="text-[10px] font-bold uppercase tracking-widest text-muted mb-2">Move stage</div>
           <StageRail currentStatus={lead.status} onMove={(s) => onStatusChange(lead.id, s)} />
+
+          {/* Contact coverage row */}
+          <div className="flex items-center gap-3 mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <Users size={12} style={{ color: '#38bdf8' }} />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-muted">Contacts</span>
+            </div>
+            {/* Progress bar */}
+            <div style={{ flex: 1, height: 4, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+              <div style={{
+                height: '100%',
+                width: `${contactsTotal > 0 ? Math.min(100, Math.round((contactsReached / contactsTotal) * 100)) : 0}%`,
+                background: contactsReached >= contactsTotal && contactsTotal > 0 ? '#34d399' : '#38bdf8',
+                borderRadius: 999, transition: 'width 0.35s ease',
+              }} />
+            </div>
+            {/* Reached */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <span className="text-[12px] font-bold tabular-nums" style={{ color: '#38bdf8' }}>{contactsReached}</span>
+              <span className="text-[10px] text-muted">reached of</span>
+            </div>
+            {/* Total with +/- */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <button onClick={() => adjustContactsTotal(-1)}
+                style={{ width: 18, height: 18, borderRadius: 5, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-3)', fontSize: 13, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: contactsTotal <= 0 ? 0.3 : 1 }}>
+                −
+              </button>
+              <span className="text-[12px] font-bold tabular-nums text-white" style={{ minWidth: 16, textAlign: 'center' }}>{contactsTotal}</span>
+              <button onClick={() => adjustContactsTotal(+1)}
+                style={{ width: 18, height: 18, borderRadius: 5, background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.25)', color: '#38bdf8', fontSize: 13, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                +
+              </button>
+            </div>
+            <span className="text-[10px] text-muted flex-shrink-0">available</span>
+          </div>
         </div>
 
         {/* Pending follow-ups */}
@@ -820,7 +875,12 @@ function LeadFlyout({ lead, onClose, onActivityAdded, onStatusChange }: {
       </div>
 
       {showAddModal && (
-        <AddActivityModal lead={lead} onClose={() => setShowAddModal(false)} onSaved={() => { loadActivities(); onActivityAdded() }} />
+        <AddActivityModal
+          lead={lead}
+          onClose={() => setShowAddModal(false)}
+          onSaved={() => { loadActivities(); onActivityAdded() }}
+          onOutreachLogged={bumpContactsReached}
+        />
       )}
     </>
   )
@@ -902,6 +962,26 @@ function PipelineCard({ lead, stage, onClick }: {
             {lead.pain_point}
           </div>
         )}
+
+        {/* Contact coverage bar */}
+        {(lead.contacts_total ?? 0) > 0 && (() => {
+          const reached = lead.contacts_reached ?? 0
+          const total   = lead.contacts_total ?? 1
+          const pct     = Math.min(100, Math.round((reached / total) * 100))
+          const done    = reached >= total
+          const barColor = done ? '#34d399' : '#38bdf8'
+          return (
+            <div className="flex items-center gap-1.5 mb-2.5">
+              <Users size={9} style={{ color: barColor, flexShrink: 0 }} />
+              <div style={{ flex: 1, height: 3, borderRadius: 999, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${pct}%`, background: barColor, borderRadius: 999, transition: 'width 0.3s ease' }} />
+              </div>
+              <span className="tabular-nums" style={{ fontSize: 9, fontWeight: 700, color: barColor, minWidth: 22, textAlign: 'right' }}>
+                {reached}/{total}
+              </span>
+            </div>
+          )
+        })()}
 
         {/* Footer */}
         <div className="flex items-center justify-between gap-1">
