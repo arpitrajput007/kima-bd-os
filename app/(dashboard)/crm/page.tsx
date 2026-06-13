@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -11,7 +11,7 @@ import {
   StickyNote, Bell, Check, Send, AtSign, Globe,
   RefreshCw, ExternalLink, Trophy, XCircle,
   Flame, Target, Link2, FileText, Upload, Sparkles,
-  BookOpen, Zap, ShieldCheck, Users,
+  BookOpen, Zap, ShieldCheck, Users, Trash2,
 } from 'lucide-react'
 import { cn, getScoreBg, truncate } from '@/lib/utils'
 import type { Lead, Contact } from '@/lib/types'
@@ -959,11 +959,28 @@ function LeadFlyout({ lead, onClose, onActivityAdded, onStatusChange }: {
 }
 
 // ── Pipeline Card (improved) ────────────────────────────────────
-function PipelineCard({ lead, stage, onClick }: {
+function PipelineCard({ lead, stage, onClick, onDelete }: {
   lead: LeadWithActivity
   stage: typeof PIPELINE_STAGES[number]
   onClick: () => void
+  onDelete: (id: string) => void
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (confirmDelete) {
+      // Second click — confirmed
+      if (confirmTimer.current) clearTimeout(confirmTimer.current)
+      onDelete(lead.id)
+    } else {
+      // First click — arm
+      setConfirmDelete(true)
+      confirmTimer.current = setTimeout(() => setConfirmDelete(false), 3000)
+    }
+  }
+
   const lastActivity = (lead.activities || []).find(a => a.type !== 'status_change')
   const pendingFollowUp = (lead.activities || []).find(a => a.type === 'follow_up' && !a.completed_at)
   const isOverdue = pendingFollowUp?.scheduled_at && new Date(pendingFollowUp.scheduled_at) < new Date()
@@ -982,6 +999,8 @@ function PipelineCard({ lead, stage, onClick }: {
           ? '1px solid rgba(74,222,128,0.2)'
           : isLost
           ? '1px solid rgba(244,63,94,0.12)'
+          : confirmDelete
+          ? '1px solid rgba(244,63,94,0.5)'
           : '1px solid var(--border)',
         borderRadius: 12,
         cursor: 'pointer',
@@ -997,6 +1016,24 @@ function PipelineCard({ lead, stage, onClick }: {
           ? 'linear-gradient(90deg, #4ade80, #22d3ee)'
           : `linear-gradient(90deg, ${stage.color}cc, ${stage.color}33)`,
       }} />
+
+      {/* Delete button — floated top-right */}
+      <button
+        onClick={handleDeleteClick}
+        title={confirmDelete ? 'Click again to confirm delete' : 'Remove from pipeline'}
+        style={{
+          position: 'absolute', top: 7, right: 7, zIndex: 2,
+          display: 'flex', alignItems: 'center', gap: 3,
+          padding: confirmDelete ? '3px 7px' : '3px 5px',
+          borderRadius: 6, border: 'none', cursor: 'pointer',
+          fontSize: 10, fontWeight: 700,
+          background: confirmDelete ? 'rgba(244,63,94,0.18)' : 'rgba(255,255,255,0.05)',
+          color: confirmDelete ? '#f43f5e' : 'rgba(255,255,255,0.2)',
+          transition: 'all 0.15s',
+        }}>
+        <Trash2 size={10} />
+        {confirmDelete && 'Confirm?'}
+      </button>
 
       <div style={{ padding: '12px 14px' }}>
         {/* Company + score */}
@@ -1138,6 +1175,14 @@ export default function CRMPage() {
   }, []) // eslint-disable-line
 
   useEffect(() => { loadData() }, [loadData])
+
+  const deleteLead = async (id: string) => {
+    const lead = leads.find(l => l.id === id)
+    await supabase.from('leads').delete().eq('id', id)
+    setLeads(prev => prev.filter(l => l.id !== id))
+    if (selectedLead?.id === id) setSelectedLead(null)
+    toast(`${lead?.company_name ?? 'Lead'} removed from pipeline`)
+  }
 
   const moveStage = async (id: string, status: LeadStatus) => {
     await supabase.from('leads').update({ status, updated_at: new Date().toISOString() }).eq('id', id)
@@ -1385,7 +1430,7 @@ export default function CRMPage() {
                           Empty
                         </div>
                       ) : stageLeads.map(lead => (
-                        <PipelineCard key={lead.id} lead={lead} stage={stage} onClick={() => setSelectedLead(lead)} />
+                        <PipelineCard key={lead.id} lead={lead} stage={stage} onClick={() => setSelectedLead(lead)} onDelete={deleteLead} />
                       ))}
                     </div>
                   </div>
@@ -1430,7 +1475,7 @@ export default function CRMPage() {
                       {stageLeads.length === 0 ? (
                         <div className="text-center text-[11px] text-muted" style={{ padding: '20px 8px', opacity: 0.4 }}>Empty</div>
                       ) : stageLeads.map(lead => (
-                        <PipelineCard key={lead.id} lead={lead} stage={stage} onClick={() => setSelectedLead(lead)} />
+                        <PipelineCard key={lead.id} lead={lead} stage={stage} onClick={() => setSelectedLead(lead)} onDelete={deleteLead} />
                       ))}
                     </div>
                   </div>
