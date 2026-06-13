@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
-import { Bell, X, CheckCircle2, ArrowRight, Calendar, ChevronLeft } from 'lucide-react'
+import { Bell, X, CheckCircle2, ArrowRight, ChevronLeft } from 'lucide-react'
 import { toast } from 'sonner'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -37,17 +37,6 @@ function timeOverdueLabel(iso: string): string {
   if (d >= 1) return `${d}d overdue`
   if (h >= 1) return `${h}h overdue`
   return 'due now'
-}
-
-function gcalUrl(company: string, followUpDateMs: number): string {
-  const dt  = new Date(followUpDateMs)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const fmt = (d: Date) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`
-  const start = fmt(dt)
-  const end   = fmt(new Date(followUpDateMs + 86400000))
-  const title = encodeURIComponent(`Follow up: ${company}`)
-  const desc  = encodeURIComponent(`Time to follow up with ${company}. Log the outcome in Kima BD OS.`)
-  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${desc}&dates=${start}/${end}`
 }
 
 const CHANNEL_LABEL: Record<string, string> = {
@@ -297,9 +286,7 @@ export default function FollowUpNotifications() {
         follow_up_at: nextAtTs,
       })
 
-      // Open Google Calendar with the follow-up event prefilled
-      window.open(gcalUrl(lead.company_name, nextAt.getTime()), '_blank')
-      toast.success(`Logged ✓  Next follow-up in ${days}d — calendar opened`)
+      toast.success(`✓ Next follow-up for ${lead.company_name} in ${days}d`)
     }
 
     // Remove from visible list immediately
