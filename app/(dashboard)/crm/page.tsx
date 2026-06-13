@@ -988,116 +988,127 @@ function PipelineCard({ lead, stage, onClick, onDelete }: {
   const isLost = stage.status === 'lost'
 
   return (
-    <div onClick={onClick} className="card-hover"
+    <div onClick={onClick}
       style={{
         background: isWon
-          ? 'linear-gradient(135deg, rgba(74,222,128,0.05), rgba(34,211,238,0.02))'
-          : isLost
-          ? 'rgba(244,63,94,0.03)'
-          : 'rgb(var(--bg-surface-2))',
+          ? 'linear-gradient(145deg, rgba(74,222,128,0.07), rgba(34,211,238,0.03))'
+          : isLost ? 'rgba(244,63,94,0.04)' : 'rgb(var(--bg-surface-2))',
         border: isWon
-          ? '1px solid rgba(74,222,128,0.2)'
-          : isLost
-          ? '1px solid rgba(244,63,94,0.12)'
-          : confirmDelete
-          ? '1px solid rgba(244,63,94,0.5)'
+          ? '1px solid rgba(74,222,128,0.22)'
+          : isLost ? '1px solid rgba(244,63,94,0.14)'
+          : confirmDelete ? '1px solid rgba(244,63,94,0.55)'
           : '1px solid var(--border)',
-        borderRadius: 12,
+        borderRadius: 14,
         cursor: 'pointer',
-        opacity: isLost ? 0.55 : 1,
+        opacity: isLost ? 0.6 : 1,
         overflow: 'hidden',
         position: 'relative',
-      }}>
-
-      {/* Stage accent bar */}
+        boxShadow: '0 2px 10px rgba(0,0,0,0.28)',
+        transition: 'box-shadow 0.15s, border-color 0.15s, transform 0.1s',
+      }}
+      onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-1px)')}
+      onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
+    >
+      {/* Stage accent stripe */}
       <div style={{
-        height: 2,
+        height: 3,
         background: isWon
           ? 'linear-gradient(90deg, #4ade80, #22d3ee)'
-          : `linear-gradient(90deg, ${stage.color}cc, ${stage.color}33)`,
+          : `linear-gradient(90deg, ${stage.color}, ${stage.color}44)`,
       }} />
 
-      {/* Delete button — floated top-right */}
+      {/* Delete button — top-right corner */}
       <button
         onClick={handleDeleteClick}
-        title={confirmDelete ? 'Click again to confirm delete' : 'Remove from pipeline'}
+        title={confirmDelete ? 'Click again to confirm' : 'Remove from pipeline'}
         style={{
-          position: 'absolute', top: 7, right: 7, zIndex: 2,
-          display: 'flex', alignItems: 'center', gap: 3,
-          padding: confirmDelete ? '3px 7px' : '3px 5px',
-          borderRadius: 6, border: 'none', cursor: 'pointer',
+          position: 'absolute', top: 10, right: 10, zIndex: 2,
+          display: 'flex', alignItems: 'center', gap: 4,
+          padding: confirmDelete ? '4px 8px' : '4px 6px',
+          borderRadius: 7, border: 'none', cursor: 'pointer',
           fontSize: 10, fontWeight: 700,
-          background: confirmDelete ? 'rgba(244,63,94,0.18)' : 'rgba(255,255,255,0.05)',
-          color: confirmDelete ? '#f43f5e' : 'rgba(255,255,255,0.2)',
+          background: confirmDelete ? 'rgba(244,63,94,0.2)' : 'rgba(255,255,255,0.06)',
+          color: confirmDelete ? '#f43f5e' : 'rgba(255,255,255,0.22)',
           transition: 'all 0.15s',
         }}>
         <Trash2 size={10} />
         {confirmDelete && 'Confirm?'}
       </button>
 
-      <div style={{ padding: '12px 14px' }}>
-        {/* Company + score */}
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="text-[13px] font-bold"
-            style={{
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
-              textDecoration: isLost ? 'line-through' : 'none',
-              color: isLost ? 'var(--text-3)' : 'white',
-            }}>
+      <div style={{ padding: '14px 16px' }}>
+
+        {/* Company name + optional website */}
+        <div style={{ marginBottom: 10, paddingRight: confirmDelete ? 80 : 32 }}>
+          <div style={{
+            fontSize: 14.5, fontWeight: 700, lineHeight: 1.25,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            textDecoration: isLost ? 'line-through' : 'none',
+            color: isLost ? 'rgba(255,255,255,0.35)' : 'white',
+          }}>
             {lead.company_name}
           </div>
-          {isWon  && <Trophy size={12} style={{ color: '#4ade80', flexShrink: 0 }} />}
-          {isLost && <XCircle size={12} style={{ color: '#f43f5e', flexShrink: 0, opacity: 0.5 }} />}
+          {lead.website && (
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {lead.website.replace(/^https?:\/\//, '')}
+            </div>
+          )}
+        </div>
+
+        {/* Score + category row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
           {!isWon && !isLost && lead.lead_score != null && (
-            <span className={cn('badge', getScoreBg(lead.lead_score))} style={{ fontSize: 9, flexShrink: 0, padding: '1px 6px' }}>
+            <span className={cn(getScoreBg(lead.lead_score))} style={{ fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 20, flexShrink: 0 }}>
               {lead.lead_score}
+            </span>
+          )}
+          {isWon  && <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: '#4ade80' }}><Trophy size={11} /> Won</span>}
+          {isLost && <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: '#f43f5e', opacity: 0.6 }}><XCircle size={11} /> Lost</span>}
+          {(lead.customer_category || []).length > 0 && (
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 999,
+              color: stage.color, background: stage.bg, border: `1px solid ${stage.color}38`,
+              flexShrink: 0,
+            }}>
+              {(lead.customer_category as string[])[0].replace(' Customer', '')}
             </span>
           )}
         </div>
 
-        {/* Category badge */}
-        {(lead.customer_category || []).length > 0 && (
-          <div className="mb-2">
-            <span className="badge" style={{ fontSize: 9, padding: '1px 7px', color: stage.color, background: stage.bg, borderColor: stage.color + '30' }}>
-              {(lead.customer_category as string[])[0].replace(' Customer', '')}
-            </span>
-          </div>
-        )}
-
         {/* Pain point */}
         {lead.pain_point && (
-          <div className="text-[11px] text-muted mb-2.5"
-            style={{ lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          <div style={{
+            fontSize: 12, color: 'rgba(200,205,225,0.58)', lineHeight: 1.6,
+            marginBottom: 12,
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+          }}>
             {lead.pain_point}
           </div>
         )}
 
-        {/* Contact coverage bar — auto-derived from contacts table */}
+        {/* Contact coverage bar */}
         {(lead.contacts || []).length > 0 && (() => {
-          const total   = (lead.contacts || []).length
-          const reached = (lead.contacts || []).filter(c => (c.contacted_channels?.length ?? 0) > 0).length
-          const pct     = Math.min(100, Math.round((reached / total) * 100))
-          const done    = reached >= total
-          const barColor = done ? '#34d399' : '#38bdf8'
-          // channel breakdown e.g. "LinkedIn ×2"
+          const total    = (lead.contacts || []).length
+          const reached  = (lead.contacts || []).filter(c => (c.contacted_channels?.length ?? 0) > 0).length
+          const pct      = Math.min(100, Math.round((reached / total) * 100))
+          const barColor = reached >= total ? '#34d399' : '#38bdf8'
           const channelCounts: Record<string, number> = {}
           ;(lead.contacts || []).forEach(c =>
             (c.contacted_channels || []).forEach(t => { channelCounts[t.channel] = (channelCounts[t.channel] || 0) + 1 })
           )
           const channelLabel = Object.entries(channelCounts).map(([ch, n]) => `${ch} ×${n}`).join(' · ')
           return (
-            <div className="mb-2.5">
-              <div className="flex items-center gap-1.5 mb-1">
-                <Users size={9} style={{ color: barColor, flexShrink: 0 }} />
-                <div style={{ flex: 1, height: 3, borderRadius: 999, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${pct}%`, background: barColor, borderRadius: 999, transition: 'width 0.3s ease' }} />
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <Users size={10} style={{ color: barColor, flexShrink: 0 }} />
+                <div style={{ flex: 1, height: 4, borderRadius: 999, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${pct}%`, background: barColor, borderRadius: 999, transition: 'width 0.35s ease' }} />
                 </div>
-                <span className="tabular-nums" style={{ fontSize: 9, fontWeight: 700, color: barColor, minWidth: 22, textAlign: 'right' }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: barColor, minWidth: 24, textAlign: 'right', flexShrink: 0 }}>
                   {reached}/{total}
                 </span>
               </div>
               {channelLabel && (
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', paddingLeft: 13, lineHeight: 1.4 }}>
+                <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.22)', paddingLeft: 17, marginTop: 3 }}>
                   {channelLabel}
                 </div>
               )}
@@ -1105,34 +1116,38 @@ function PipelineCard({ lead, stage, onClick, onDelete }: {
           )
         })()}
 
-        {/* Footer */}
-        <div className="flex items-center justify-between gap-1">
+        {/* Footer divider + row */}
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', marginBottom: 10 }} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
           {lastActivity ? (() => {
             const meta = getActivityMeta(lastActivity)
             const Icon = meta.icon
             return (
-              <div className="flex items-center gap-1.5">
-                <div style={{ width: 18, height: 18, borderRadius: 5, background: meta.color + '18', border: `1px solid ${meta.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon size={10} style={{ color: meta.color }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 22, height: 22, borderRadius: 7, background: meta.color + '1a', border: `1px solid ${meta.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Icon size={11} style={{ color: meta.color }} />
                 </div>
-                <span className="text-[10px] text-muted">{relTime(lastActivity.created_at)}</span>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.32)' }}>{relTime(lastActivity.created_at)}</span>
               </div>
             )
           })() : (
-            <span className="text-[10px] text-muted italic">No activity</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.18)', fontStyle: 'italic' }}>No activity yet</span>
           )}
 
           {pendingFollowUp && (
-            <div className="flex items-center gap-1 text-[10px] font-semibold" style={{
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              fontSize: 10, fontWeight: 700,
               color: isOverdue ? '#fb7185' : '#fbbf24',
-              background: isOverdue ? 'rgba(251,65,133,0.08)' : 'rgba(251,191,36,0.08)',
-              border: `1px solid ${isOverdue ? 'rgba(251,65,133,0.25)' : 'rgba(251,191,36,0.25)'}`,
-              padding: '2px 7px', borderRadius: 6,
+              background: isOverdue ? 'rgba(251,65,133,0.1)' : 'rgba(251,191,36,0.1)',
+              border: `1px solid ${isOverdue ? 'rgba(251,65,133,0.3)' : 'rgba(251,191,36,0.3)'}`,
+              padding: '3px 8px', borderRadius: 7,
             }}>
               <Bell size={9} />{isOverdue ? 'Overdue' : 'Follow-up'}
             </div>
           )}
         </div>
+
       </div>
     </div>
   )
@@ -1383,31 +1398,33 @@ export default function CRMPage() {
 
         ) : view === 'pipeline' ? (
           /* ── Kanban board ─────────────────────────────────── */
-          <div style={{ overflowX: 'auto', paddingBottom: 20 }}>
-            <div className="flex gap-3" style={{ minWidth: 'max-content', alignItems: 'start' }}>
+          <div style={{ overflowX: 'auto', paddingBottom: 24 }}>
+            <div className="flex gap-4" style={{ minWidth: 'max-content', alignItems: 'start' }}>
 
               {/* Active stages */}
               {activeStages.map(stage => {
                 const stageLeads = leads.filter(l => l.status === stage.status)
                 return (
-                  <div key={stage.status} style={{ width: 256, flexShrink: 0 }}>
+                  <div key={stage.status} style={{ width: 296, flexShrink: 0 }}>
                     {/* Column header */}
                     <div style={{
-                      background: 'rgb(var(--bg-surface-2))',
+                      background: `linear-gradient(135deg, ${stage.color}10, rgba(255,255,255,0.01))`,
                       border: '1px solid var(--border)',
-                      borderTop: `2px solid ${stage.color}`,
-                      borderRadius: '10px 10px 0 0',
-                      padding: '10px 14px 9px',
-                      marginBottom: 0,
+                      borderTop: `3px solid ${stage.color}`,
+                      borderRadius: '12px 12px 0 0',
+                      padding: '12px 16px 11px',
                     }}>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[12px] font-bold" style={{ color: stage.color }}>
-                          {stage.label}
-                        </span>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ width: 7, height: 7, borderRadius: 999, background: stage.color, boxShadow: `0 0 6px ${stage.color}` }} />
+                          <span style={{ fontSize: 12.5, fontWeight: 700, color: stage.color, letterSpacing: '0.01em' }}>
+                            {stage.label}
+                          </span>
+                        </div>
                         <span style={{
-                          minWidth: 20, height: 20, padding: '0 6px', borderRadius: 6,
-                          background: stage.bg, border: `1px solid ${stage.color}30`,
-                          color: stage.color, fontSize: 11, fontWeight: 700,
+                          minWidth: 22, height: 22, padding: '0 7px', borderRadius: 8,
+                          background: stage.bg, border: `1px solid ${stage.color}35`,
+                          color: stage.color, fontSize: 12, fontWeight: 800,
                           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                         }}>
                           {stageLeads.length}
@@ -1417,17 +1434,18 @@ export default function CRMPage() {
 
                     {/* Cards */}
                     <div style={{
-                      background: 'rgba(255,255,255,0.012)',
+                      background: 'rgba(255,255,255,0.01)',
                       border: '1px solid var(--border)',
                       borderTop: 'none',
-                      borderRadius: '0 0 10px 10px',
-                      padding: 8,
-                      minHeight: 120,
-                      display: 'flex', flexDirection: 'column', gap: 6,
+                      borderRadius: '0 0 12px 12px',
+                      padding: 10,
+                      minHeight: 140,
+                      display: 'flex', flexDirection: 'column', gap: 8,
                     }}>
                       {stageLeads.length === 0 ? (
-                        <div className="text-center text-[11px] text-muted" style={{ padding: '28px 8px', opacity: 0.5 }}>
-                          Empty
+                        <div style={{ textAlign: 'center', padding: '36px 8px', opacity: 0.35 }}>
+                          <div style={{ fontSize: 24, marginBottom: 6 }}>—</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Empty</div>
                         </div>
                       ) : stageLeads.map(lead => (
                         <PipelineCard key={lead.id} lead={lead} stage={stage} onClick={() => setSelectedLead(lead)} onDelete={deleteLead} />
@@ -1442,7 +1460,7 @@ export default function CRMPage() {
               {terminalStages.map(stage => {
                 const stageLeads = leads.filter(l => l.status === stage.status)
                 return (
-                  <div key={stage.status} style={{ width: 220, flexShrink: 0 }}>
+                  <div key={stage.status} style={{ width: 248, flexShrink: 0 }}>
                     <div style={{
                       background: stage.status === 'won' ? 'rgba(74,222,128,0.05)' : 'rgba(244,63,94,0.03)',
                       border: `1px solid ${stage.status === 'won' ? 'rgba(74,222,128,0.2)' : 'rgba(244,63,94,0.12)'}`,
