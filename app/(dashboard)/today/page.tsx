@@ -8,6 +8,7 @@ import {
   Sun, Target, Flame, ArrowRight, MessageSquare, Mail, Link2,
   AtSign, CheckCircle, Eye, Loader2, RefreshCw, Clock, CalendarCheck,
   Sparkles, Zap, TrendingUp, Wand2, Copy, ExternalLink, Download, ShieldAlert, Trash2,
+  Search, X,
 } from 'lucide-react'
 import { cn, getScoreBg, truncate } from '@/lib/utils'
 import type { Lead, Contact } from '@/lib/types'
@@ -322,6 +323,8 @@ export default function TodayPage() {
   const [hackFetching, setHackFetching] = useState(false)
   const [bgJob, setBgJob] = useState<{ status: string; sources_done: number; sources_total: number; leads_saved: number; current_source?: string } | null>(null)
   const [contactingLead, setContactingLead] = useState<LeadWithContacts | null>(null)
+  const [searchQuery, setSearchQuery]   = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
 
   // Poll for background job status (runs even if user navigates away and comes back).
   const pollJob = useCallback(async () => {
@@ -531,6 +534,21 @@ export default function TodayPage() {
     })
   }
 
+  // Search — filter plan groups by company name
+  const q = searchQuery.trim().toLowerCase()
+  const filteredPlanGroups = q
+    ? planGroups
+        .map(g => ({ ...g, leads: g.leads.filter(l => l.company_name.toLowerCase().includes(q)) }))
+        .filter(g => g.leads.length > 0)
+    : planGroups
+
+  // Suggestions — all leads whose name includes the typed chars (min 1 char)
+  const suggestions = searchQuery.length >= 1
+    ? readyLeads
+        .filter(l => l.company_name.toLowerCase().includes(q))
+        .slice(0, 8)
+    : []
+
   const followUps = leads.filter(followUpDue)
 
   const toBook = leads.filter(l => l.status === 'replied')
@@ -634,12 +652,99 @@ export default function TodayPage() {
           </div>
         </div>
 
+        {/* ── Search bar ───────────────────────────────────── */}
+        <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <Search size={15} style={{ position: 'absolute', left: 14, color: searchQuery ? '#a78bfa' : 'rgba(255,255,255,0.25)', pointerEvents: 'none', flexShrink: 0 }} />
+            <input
+              value={searchQuery}
+              onChange={e => { setSearchQuery(e.target.value); setShowSuggestions(true) }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              placeholder="Search any company in your plan…"
+              style={{
+                width: '100%', padding: '11px 44px',
+                background: searchQuery ? 'rgba(124,58,237,0.07)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${searchQuery ? 'rgba(124,58,237,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                borderRadius: 12, fontSize: 13, color: 'white', outline: 'none',
+                transition: 'all 0.2s',
+              }}
+            />
+            {searchQuery && (
+              <button onClick={() => { setSearchQuery(''); setShowSuggestions(false) }}
+                style={{ position: 'absolute', right: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', display: 'flex', padding: 4 }}>
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Suggestions dropdown */}
+          {showSuggestions && suggestions.length > 0 && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 100,
+              background: 'rgb(14,16,28)', border: '1px solid rgba(124,58,237,0.25)',
+              borderRadius: 14, overflow: 'hidden',
+              boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
+            }}>
+              {suggestions.map((lead, idx) => {
+                const name = lead.company_name
+                const qi = name.toLowerCase().indexOf(q)
+                return (
+                  <button key={lead.id}
+                    onMouseDown={() => { setSearchQuery(name); setShowSuggestions(false) }}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '11px 16px', background: 'none', border: 'none', cursor: 'pointer',
+                      borderBottom: idx < suggestions.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                      textAlign: 'left', transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(124,58,237,0.1)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                  >
+                    {/* Avatar */}
+                    <div style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, background: 'rgba(124,58,237,0.18)', border: '1px solid rgba(167,139,250,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#a78bfa' }}>
+                      {name.charAt(0).toUpperCase()}
+                    </div>
+                    {/* Name with highlighted match */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'white' }}>
+                        {qi === -1 ? name : (
+                          <>
+                            {name.slice(0, qi)}
+                            <mark style={{ background: 'rgba(167,139,250,0.3)', color: '#c4b5fd', borderRadius: 3, padding: '0 2px' }}>
+                              {name.slice(qi, qi + searchQuery.length)}
+                            </mark>
+                            {name.slice(qi + searchQuery.length)}
+                          </>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>
+                        {(lead.customer_category || [])[0]?.replace(' Customer', '') || ''}
+                        {lead.lead_score != null ? ` · Score ${lead.lead_score}` : ''}
+                      </div>
+                    </div>
+                    {/* Score chip */}
+                    {lead.lead_score != null && (
+                      <span className={cn('badge', getScoreBg(lead.lead_score))} style={{ fontSize: 10, flexShrink: 0 }}>
+                        {lead.lead_score}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
         {/* ── Date-wise plan: who to reach out to, by day ─── */}
         <div>
           <div className="flex items-center gap-2 mb-4">
             <Flame size={14} style={{ color: '#fb7185' }} />
             <span className="text-[11px] font-bold tracking-widest uppercase" style={{ color: 'rgb(100,106,135)' }}>
               Reach-out plan · by day · {readyLeads.length} waiting
+              {searchQuery && filteredPlanGroups.length > 0 && (
+                <span style={{ color: '#a78bfa', marginLeft: 6 }}>· showing {filteredPlanGroups.reduce((n, g) => n + g.leads.length, 0)} match{filteredPlanGroups.reduce((n, g) => n + g.leads.length, 0) !== 1 ? 'es' : ''}</span>
+              )}
             </span>
           </div>
 
@@ -648,7 +753,13 @@ export default function TodayPage() {
               <Loader2 size={20} className="animate-spin mx-auto mb-3" style={{ color: '#a78bfa' }} />
               Building your plan…
             </div>
-          ) : planGroups.length === 0 ? (
+          ) : filteredPlanGroups.length === 0 && searchQuery ? (
+            <div className="section-card" style={{ padding: '36px 20px', textAlign: 'center' }}>
+              <Search size={28} className="mx-auto mb-3" style={{ color: 'rgba(255,255,255,0.1)', display: 'block' }} />
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 6 }}>No match for &ldquo;{searchQuery}&rdquo;</div>
+              <div style={{ fontSize: 12, color: 'rgb(100,106,135)' }}>Try a different name or <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', color: '#a78bfa', cursor: 'pointer', fontWeight: 600 }}>clear search</button></div>
+            </div>
+          ) : planGroups.length === 0 && !searchQuery ? (
             <div className="section-card p-14 text-center">
               <Sparkles size={40} className="mx-auto mb-4 opacity-15" style={{ color: 'rgb(160,165,195)' }} />
               <div className="text-[14px] font-semibold text-white mb-2">Inbox zero — every researched lead is handled</div>
@@ -661,7 +772,7 @@ export default function TodayPage() {
             </div>
           ) : (
             <div className="flex flex-col gap-8">
-              {planGroups.map((group, gi) => {
+              {filteredPlanGroups.map((group, gi) => {
                 const isToday = group.label === 'Today'
                 return (
                   <div key={group.key}>
