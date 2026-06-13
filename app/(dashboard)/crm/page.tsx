@@ -14,7 +14,7 @@ import {
   BookOpen, Zap, ShieldCheck, Users,
 } from 'lucide-react'
 import { cn, getScoreBg, truncate } from '@/lib/utils'
-import type { Lead } from '@/lib/types'
+import type { Lead, Contact } from '@/lib/types'
 import type { LeadStatus } from '@/lib/types'
 
 type ActivityType = 'note' | 'call' | 'email' | 'meeting' | 'follow_up' | 'status_change'
@@ -648,6 +648,124 @@ function StageRail({ currentStatus, onMove }: { currentStatus: LeadStatus; onMov
   )
 }
 
+// ── Contacts Section ────────────────────────────────────────────
+const CONTACT_CHANNELS = [
+  { key: 'linkedin',  label: 'LinkedIn',  color: '#60a5fa' },
+  { key: 'email',     label: 'Email',     color: '#a78bfa' },
+  { key: 'telegram',  label: 'Telegram',  color: '#22d3ee' },
+  { key: 'twitter',   label: 'X/Twitter', color: '#38bdf8' },
+  { key: 'discord',   label: 'Discord',   color: '#818cf8' },
+  { key: 'call',      label: 'Call',      color: '#34d399' },
+]
+
+function ContactsSection({ contacts, onUpdated }: { contacts: Contact[]; onUpdated: () => void }) {
+  const supabase = createClient()
+  const [local, setLocal] = useState<Contact[]>(contacts)
+
+  const toggle = async (contactId: string, channel: string) => {
+    const contact = local.find(c => c.id === contactId)
+    if (!contact) return
+    const existing = contact.contacted_channels || []
+    const already  = existing.some(t => t.channel === channel)
+    const updated  = already
+      ? existing.filter(t => t.channel !== channel)
+      : [...existing, { channel, contacted_at: new Date().toISOString() }]
+    await supabase.from('contacts').update({ contacted_channels: updated }).eq('id', contactId)
+    setLocal(prev => prev.map(c => c.id === contactId ? { ...c, contacted_channels: updated } : c))
+    onUpdated()
+  }
+
+  const reached = local.filter(c => (c.contacted_channels?.length ?? 0) > 0).length
+
+  if (local.length === 0) {
+    return (
+      <div style={{ padding: '10px 22px 12px', borderBottom: '1px solid var(--border)' }}>
+        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted">
+          <Users size={11} /> Contacts · None found — run AI research to discover contacts
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ padding: '12px 22px', borderBottom: '1px solid var(--border)' }}>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Users size={12} style={{ color: '#38bdf8' }} />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted">Contacts</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div style={{ width: 80, height: 3, borderRadius: 999, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${local.length > 0 ? Math.round((reached / local.length) * 100) : 0}%`, background: reached === local.length ? '#34d399' : '#38bdf8', borderRadius: 999 }} />
+          </div>
+          <span className="text-[11px] font-bold tabular-nums" style={{ color: reached === local.length && reached > 0 ? '#34d399' : '#38bdf8' }}>
+            {reached}/{local.length}
+          </span>
+        </div>
+      </div>
+
+      {/* Contact rows */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+        {local.map(contact => {
+          const touches       = contact.contacted_channels || []
+          const touchedSet    = new Set(touches.map(t => t.channel))
+          const wasContacted  = touches.length > 0
+          return (
+            <div key={contact.id} style={{
+              padding: '9px 11px', borderRadius: 10,
+              border: `1px solid ${wasContacted ? 'rgba(52,211,153,0.2)' : 'rgba(255,255,255,0.07)'}`,
+              background: wasContacted ? 'rgba(52,211,153,0.04)' : 'rgba(255,255,255,0.02)',
+            }}>
+              {/* Name + role */}
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div style={{ width: 22, height: 22, borderRadius: 7, flexShrink: 0, background: wasContacted ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.05)', border: `1px solid ${wasContacted ? 'rgba(52,211,153,0.25)' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {wasContacted
+                      ? <CheckCircle2 size={11} style={{ color: '#34d399' }} />
+                      : <Users size={11} style={{ color: 'rgba(255,255,255,0.25)' }} />}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[12px] font-semibold text-white truncate block">{contact.name || 'Unknown'}</span>
+                    {contact.role && <span className="text-[10px] text-muted">{contact.role}</span>}
+                  </div>
+                </div>
+                {/* External links */}
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {contact.linkedin_url && <a href={contact.linkedin_url} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', opacity: 0.7 }}><ExternalLink size={10} /></a>}
+                  {contact.twitter_url  && <a href={contact.twitter_url}  target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8', opacity: 0.7 }}><ExternalLink size={10} /></a>}
+                </div>
+              </div>
+
+              {/* Channel chips — toggle on/off */}
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {CONTACT_CHANNELS.map(ch => {
+                  const active = touchedSet.has(ch.key)
+                  return (
+                    <button key={ch.key} onClick={() => toggle(contact.id, ch.key)}
+                      title={active ? `Remove ${ch.label}` : `Mark as reached via ${ch.label}`}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 3,
+                        padding: '3px 7px', borderRadius: 5, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                        border:      `1px solid ${active ? ch.color + '55' : 'rgba(255,255,255,0.08)'}`,
+                        background:  active ? ch.color + '1a' : 'rgba(255,255,255,0.03)',
+                        color:       active ? ch.color : 'rgba(255,255,255,0.22)',
+                        transition:  'all 0.12s',
+                      }}>
+                      {active && <Check size={8} />}
+                      {ch.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ── Lead Flyout ─────────────────────────────────────────────────
 function LeadFlyout({ lead, onClose, onActivityAdded, onStatusChange }: {
   lead: LeadWithActivity
@@ -659,8 +777,6 @@ function LeadFlyout({ lead, onClose, onActivityAdded, onStatusChange }: {
   const [activities, setActivities] = useState<Activity[]>(lead.activities || [])
   const [showAddModal, setShowAddModal] = useState(false)
   const [completing, setCompleting] = useState<string | null>(null)
-  const [contactsTotal,   setContactsTotal]   = useState(lead.contacts_total   ?? 0)
-  const [contactsReached, setContactsReached] = useState(lead.contacts_reached ?? 0)
 
   const loadActivities = useCallback(async () => {
     const { data } = await supabase.from('lead_activities').select('*').eq('lead_id', lead.id).order('created_at', { ascending: false })
@@ -673,20 +789,6 @@ function LeadFlyout({ lead, onClose, onActivityAdded, onStatusChange }: {
     setCompleting(id)
     await supabase.from('lead_activities').update({ completed_at: new Date().toISOString() }).eq('id', id)
     setCompleting(null); loadActivities(); onActivityAdded()
-  }
-
-  const adjustContactsTotal = async (delta: number) => {
-    const next = Math.max(0, contactsTotal + delta)
-    setContactsTotal(next)
-    await supabase.from('leads').update({ contacts_total: next, updated_at: new Date().toISOString() }).eq('id', lead.id)
-    onActivityAdded()
-  }
-
-  const bumpContactsReached = async () => {
-    const next = Math.min(contactsTotal || 999, (contactsReached) + 1)
-    setContactsReached(next)
-    await supabase.from('leads').update({ contacts_reached: next, updated_at: new Date().toISOString() }).eq('id', lead.id)
-    onActivityAdded()
   }
 
   const pendingFollowUps = activities.filter(a => a.type === 'follow_up' && !a.completed_at)
@@ -750,41 +852,6 @@ function LeadFlyout({ lead, onClose, onActivityAdded, onStatusChange }: {
           </div>
           <div className="text-[10px] font-bold uppercase tracking-widest text-muted mb-2">Move stage</div>
           <StageRail currentStatus={lead.status} onMove={(s) => onStatusChange(lead.id, s)} />
-
-          {/* Contact coverage row */}
-          <div className="flex items-center gap-3 mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <Users size={12} style={{ color: '#38bdf8' }} />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-muted">Contacts</span>
-            </div>
-            {/* Progress bar */}
-            <div style={{ flex: 1, height: 4, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-              <div style={{
-                height: '100%',
-                width: `${contactsTotal > 0 ? Math.min(100, Math.round((contactsReached / contactsTotal) * 100)) : 0}%`,
-                background: contactsReached >= contactsTotal && contactsTotal > 0 ? '#34d399' : '#38bdf8',
-                borderRadius: 999, transition: 'width 0.35s ease',
-              }} />
-            </div>
-            {/* Reached */}
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <span className="text-[12px] font-bold tabular-nums" style={{ color: '#38bdf8' }}>{contactsReached}</span>
-              <span className="text-[10px] text-muted">reached of</span>
-            </div>
-            {/* Total with +/- */}
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <button onClick={() => adjustContactsTotal(-1)}
-                style={{ width: 18, height: 18, borderRadius: 5, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-3)', fontSize: 13, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: contactsTotal <= 0 ? 0.3 : 1 }}>
-                −
-              </button>
-              <span className="text-[12px] font-bold tabular-nums text-white" style={{ minWidth: 16, textAlign: 'center' }}>{contactsTotal}</span>
-              <button onClick={() => adjustContactsTotal(+1)}
-                style={{ width: 18, height: 18, borderRadius: 5, background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.25)', color: '#38bdf8', fontSize: 13, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                +
-              </button>
-            </div>
-            <span className="text-[10px] text-muted flex-shrink-0">available</span>
-          </div>
         </div>
 
         {/* Pending follow-ups */}
@@ -833,6 +900,12 @@ function LeadFlyout({ lead, onClose, onActivityAdded, onStatusChange }: {
           </Link>
         </div>
 
+        {/* Contact coverage — live from contacts table */}
+        <ContactsSection
+          contacts={lead.contacts || []}
+          onUpdated={onActivityAdded}
+        />
+
         {/* Activity timeline */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 22px' }}>
           <div className="text-[10px] font-bold uppercase tracking-widest text-muted mb-4">Activity timeline</div>
@@ -879,7 +952,6 @@ function LeadFlyout({ lead, onClose, onActivityAdded, onStatusChange }: {
           lead={lead}
           onClose={() => setShowAddModal(false)}
           onSaved={() => { loadActivities(); onActivityAdded() }}
-          onOutreachLogged={bumpContactsReached}
         />
       )}
     </>
@@ -963,22 +1035,35 @@ function PipelineCard({ lead, stage, onClick }: {
           </div>
         )}
 
-        {/* Contact coverage bar */}
-        {(lead.contacts_total ?? 0) > 0 && (() => {
-          const reached = lead.contacts_reached ?? 0
-          const total   = lead.contacts_total ?? 1
+        {/* Contact coverage bar — auto-derived from contacts table */}
+        {(lead.contacts || []).length > 0 && (() => {
+          const total   = (lead.contacts || []).length
+          const reached = (lead.contacts || []).filter(c => (c.contacted_channels?.length ?? 0) > 0).length
           const pct     = Math.min(100, Math.round((reached / total) * 100))
           const done    = reached >= total
           const barColor = done ? '#34d399' : '#38bdf8'
+          // channel breakdown e.g. "LinkedIn ×2"
+          const channelCounts: Record<string, number> = {}
+          ;(lead.contacts || []).forEach(c =>
+            (c.contacted_channels || []).forEach(t => { channelCounts[t.channel] = (channelCounts[t.channel] || 0) + 1 })
+          )
+          const channelLabel = Object.entries(channelCounts).map(([ch, n]) => `${ch} ×${n}`).join(' · ')
           return (
-            <div className="flex items-center gap-1.5 mb-2.5">
-              <Users size={9} style={{ color: barColor, flexShrink: 0 }} />
-              <div style={{ flex: 1, height: 3, borderRadius: 999, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${pct}%`, background: barColor, borderRadius: 999, transition: 'width 0.3s ease' }} />
+            <div className="mb-2.5">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Users size={9} style={{ color: barColor, flexShrink: 0 }} />
+                <div style={{ flex: 1, height: 3, borderRadius: 999, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${pct}%`, background: barColor, borderRadius: 999, transition: 'width 0.3s ease' }} />
+                </div>
+                <span className="tabular-nums" style={{ fontSize: 9, fontWeight: 700, color: barColor, minWidth: 22, textAlign: 'right' }}>
+                  {reached}/{total}
+                </span>
               </div>
-              <span className="tabular-nums" style={{ fontSize: 9, fontWeight: 700, color: barColor, minWidth: 22, textAlign: 'right' }}>
-                {reached}/{total}
-              </span>
+              {channelLabel && (
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', paddingLeft: 13, lineHeight: 1.4 }}>
+                  {channelLabel}
+                </div>
+              )}
             </div>
           )
         })()}
@@ -1027,18 +1112,28 @@ export default function CRMPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true)
-    const { data: leadsData } = await supabase
-      .from('leads').select('*')
-      .not('status', 'in', '("rejected","archived","reserved")')
-      .order('lead_score', { ascending: false, nullsFirst: false })
-    const { data: activitiesData } = await supabase
-      .from('lead_activities').select('*').order('created_at', { ascending: false })
+    const [{ data: leadsData }, { data: activitiesData }, { data: contactsData }] = await Promise.all([
+      supabase.from('leads').select('*')
+        .not('status', 'in', '("rejected","archived","reserved")')
+        .order('lead_score', { ascending: false, nullsFirst: false }),
+      supabase.from('lead_activities').select('*').order('created_at', { ascending: false }),
+      supabase.from('contacts').select('id, lead_id, name, role, contact_confidence, email, linkedin_url, twitter_url, telegram, contacted_channels, created_at').order('created_at'),
+    ])
     const actsByLead: Record<string, Activity[]> = {}
     ;(activitiesData || []).forEach((a: Activity) => {
       if (!actsByLead[a.lead_id]) actsByLead[a.lead_id] = []
       actsByLead[a.lead_id].push(a)
     })
-    setLeads((leadsData || []).map((l: Lead) => ({ ...l, activities: actsByLead[l.id] || [] })))
+    const contactsByLead: Record<string, Contact[]> = {}
+    ;(contactsData || []).forEach((c: Contact) => {
+      if (!contactsByLead[c.lead_id]) contactsByLead[c.lead_id] = []
+      contactsByLead[c.lead_id].push(c)
+    })
+    setLeads((leadsData || []).map((l: Lead) => ({
+      ...l,
+      activities: actsByLead[l.id] || [],
+      contacts: contactsByLead[l.id] || [],
+    })))
     setLoading(false)
   }, []) // eslint-disable-line
 
