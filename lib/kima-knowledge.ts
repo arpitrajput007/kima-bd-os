@@ -56,11 +56,12 @@ THE PROBLEM — THREE GAPS every agentic payment company hits:
 2. Software-level mandate enforcement — identity layers (e.g. KYA tokens, MCP gates, permission systems) can verify who the agent is but a compromised agent runtime or prompt injection can still pass those checks and execute unauthorized transactions. Policy enforcement is logical, not cryptographic — it can be bypassed.
 3. No verifiable audit trail — there is no cryptographic proof that a transaction was authorized, within policy, and untampered. Enterprises and regulators demand this. No current agent payment stack provides it.
 
-OUR ANSWER:
+OUR ANSWER — THREE PRODUCTS, THREE GAPS:
+- Aergap solves Gaps 2 & 3: Agent Identity proves who the agent is. Agent Policy + Execution Gate blocks unauthorized actions before they execute — not after. Audit Trail gives enterprises the cryptographic proof they demand. All hardware-enforced, not software-level.
 - Kima solves Gap 1: single API settlement across 9+ chains, stablecoins, fiat, CBDCs — no bridges, no custodian handoff. Agents can move real value across any rail via one integration.
-- Aeredium solves Gaps 2 & 3: TEE-attested validators and AERKey threshold ECDSA enforce spend policy at the hardware/key level inside a hardware enclave — policy bypass becomes cryptographically impossible even if the agent runtime is compromised. Every block is TEE-attested across AWS Nitro, Azure SEV-SNP, and GCP Confidential Space, providing an immutable verifiable audit trail.
-Together: "X proves who the agent is. Kima ensures the payment settles safely across any rail. Aeredium ensures execution is provably authorized and untamperable."
-ALWAYS position as additive/complementary, not rip-and-replace.
+- Aeredium adds institutional-grade infrastructure: TEE-attested validators + AERKey threshold ECDSA enforce spend policy at the hardware/key level. Banks and enterprises can build on top with Bitcoin-anchored finality and ~250k TPS.
+Together: "Aergap proves who the agent is and gates what it can do. Kima ensures the payment settles safely across any rail. Aeredium provides the institutional-grade execution layer underneath it all."
+ALWAYS position as additive/complementary — sell the full suite where applicable.
 
 ICP — WHO TO TARGET:
 - AI-native product companies (seed to Series A) that sell agent products to enterprises where agents take real consequential actions: payments, data access, procurement, expense approvals.
@@ -83,8 +84,9 @@ RESONANCE SCENARIOS (reference these in outreach — buyers respond strongly):
 2. HFT gate: human approval fatigue on fast agents; policy gate catches the bad call that slipped through.
 
 KEY COMPETITORS IN THIS SPACE:
-- Aergap: governance-only sidecar (identity + policy + audit console). They explicitly defer "settlement and signing" — no settlement rails, no cryptographic execution guarantees, software-level policy only. Our wedge: Aeredium provides hardware-attested execution (TEE, not software policy) + AERKey cryptographic signing accountability. Kima provides settlement rails Aergap customers will eventually need and can't get from Aergap. Frame as "complete agent trust + settlement infrastructure" vs. "governance sidecar without rails."
-- Skyfire: KYA Token (agent identity) + Agentic Wallet (USDC on EVM + tokenized cards) + Buy for Me (autonomous checkout). Settlement is EVM-only USDC + card networks — no cross-chain, no fiat off-ramp. Policy is software-level, not key-level. No verifiable audit trail. Position Kima + Aeredium as additive to Skyfire, not competitive.`
+- Skyfire: KYA Token (agent identity) + Agentic Wallet (USDC on EVM + tokenized cards) + Buy for Me (autonomous checkout). Settlement is EVM-only USDC + card networks — no cross-chain, no fiat off-ramp. Policy is software-level, not key-level. No verifiable audit trail. Position our full suite (Aergap + Kima + Aeredium) as additive to or replacing Skyfire.
+- Software-only governance tools (MCP gates, RBAC, KYA tokens): verify who the agent is but a compromised runtime or prompt injection can still pass those checks and execute unauthorized transactions — policy enforcement is logical, not cryptographic. Aergap's Execution Gate is hardware-enforced, not software-level.
+- Bridge/messaging layers (LayerZero, Wormhole): smart contracts, oracles, relayers, wrapped assets — every one is an attack surface. Kima has no bridges, no smart contracts, no wrapped assets.`
 
 // ── Target customer categories ───────────────────────────────────────────────
 export const TARGET_CATEGORIES_BLOCK = `TARGET CUSTOMER CATEGORIES:
