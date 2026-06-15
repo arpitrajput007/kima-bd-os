@@ -765,7 +765,7 @@ function UseCasesSection({ lead, onGenerated }: { lead: Lead; onGenerated: (case
           <Puzzle size={36} color="rgba(167,139,250,0.3)" style={{ margin: '0 auto 14px' }} />
           <p style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 8 }}>No use cases yet</p>
           <p style={{ fontSize: 13, color: 'rgb(100,107,140)', lineHeight: 1.65, maxWidth: 420, margin: '0 auto 20px' }}>
-            The agent researches {lead.company_name}&apos;s workflows and pain points, then builds concrete scenarios showing exactly how Kima/Aeredium fits.
+            The agent researches {lead.company_name}&apos;s workflows and pain points, then builds concrete scenarios showing exactly how Kima, Aeredium, and Aergap each fit.
           </p>
           <button onClick={generate} disabled={generating}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 22px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: 'white', border: 'none', boxShadow: '0 2px 14px rgba(124,58,237,0.3)' }}>
@@ -1840,10 +1840,10 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
   }
 
   const starters = [
-    'What do they actually do, in depth?',
-    'What’s the strongest angle to pitch Kima here?',
-    'What objections will they raise, and how do I counter them?',
-    'How does their tech work and where does Kima/Aeredium fit?',
+    ‘How does their tech work and where do Kima, Aeredium & Aergap each fit?’,
+    ‘Do they have AI agents taking real consequential actions — are they an Aergap customer?’,
+    ‘What\’s the strongest angle to pitch the full suite here?’,
+    ‘What objections will they raise, and how do I counter them?’,
   ]
 
   if (!mounted) return null
@@ -1897,7 +1897,7 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
           {messages.length === 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <p style={{ fontSize: 13, color: 'rgb(150,157,180)', lineHeight: 1.65, margin: 0 }}>
-                Ask anything about <span style={{ color: 'rgb(103,232,249)' }}>{lead.company_name}</span> — their tech, business, risks, or how to position Kima/Aeredium. I research them live before answering, and I remember what we figure out.
+                Ask anything about <span style={{ color: 'rgb(103,232,249)' }}>{lead.company_name}</span> — how their tech works, whether they have AI agents taking real actions, and where <strong style={{ color: 'white' }}>Kima / Aeredium / Aergap</strong> each plug in. I research them live and remember what we figure out.
               </p>
               <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgb(100,107,140)', marginTop: 2 }}>Try asking</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

@@ -68,6 +68,7 @@ AEREDIUM FIT: ${lead_data.aeredium_fit}
 SUGGESTED USE CASE: ${lead_data.suggested_use_case}
 SETTLEMENT ANGLE: ${lead_data.settlement_angle}
 SECURITY ANGLE: ${lead_data.security_angle}
+${lead_data.product_matches?.length ? `\nPRODUCT MATCH MATRIX:\n${lead_data.product_matches.map((p: { product: string; match: string; why: string; use_case?: string }) => `  ${p.product} (${p.match}): ${p.why}${p.use_case ? ' | USE CASE: ' + p.use_case : ''}`).join('\n')}` : ''}
 
 CUSTOMER CATEGORIES: ${(lead_data.customer_category || []).join(', ')}
 INDUSTRY: ${lead_data.industry_category}
@@ -77,13 +78,20 @@ PRODUCT TO SELL: ${lead_data.product_to_sell}
 REVENUE POTENTIAL: ${lead_data.revenue_potential}
 INTEGRATION FEASIBILITY: ${lead_data.integration_feasibility}`.trim()
 
-  const systemPrompt = `You are a sharp senior BD advisor for Kima Finance and Aeredium. You are helping the user evaluate a specific lead BEFORE deciding to add it to the pipeline or discard it.
+  const systemPrompt = `You are a sharp senior BD advisor for Kima, Aeredium, and Aergap — three complementary products. You are helping the user evaluate a specific lead BEFORE deciding to add it to the pipeline or discard it.
 
 ${FULL_BRAIN}
 
 ${memoryBlock ? `AGENT MEMORY:\n${memoryBlock}` : ''}
 
-The user has just finished reviewing the AI research report for a lead and wants to ask questions before making a decision. Answer concisely, directly, and with conviction. Reference specific details from the lead data. Give your actual opinion — don't hedge.
+ALWAYS EVALUATE ALL THREE PRODUCTS:
+- Aergap: Do they have AI agents taking real consequential actions? Enterprise deals stalling in security review? → agent identity, policy gate, audit trail
+- Kima: Do they need cross-chain, cross-rail, or stablecoin settlement? → UPR / LaaS / DvP
+- Aeredium: Do they need institutional-grade infrastructure, bank API access, or hardware signing? → L1 / AERLink / AERKey
+
+When asked "how does their tech work and where do we fit" — explain their tech first in plain terms, then map each of our products to a specific integration point for this company.
+
+Answer concisely, directly, and with conviction. Reference specific details from the lead data. Give your actual opinion — don't hedge.
 
 Format: short paragraphs, **bold** for key points. No "Certainly!" or filler.`
 

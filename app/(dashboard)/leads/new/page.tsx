@@ -204,12 +204,12 @@ function RichText({ text }: { text: string }) {
 
 // ── Discuss panel ─────────────────────────────────────────────
 const DISCUSS_STARTERS = [
-  'Why is the score only 42?',
-  'What would make this a good lead?',
-  'Who should I reach out to first?',
-  'Write a cold email for this company',
-  'What are the biggest red flags here?',
-  'Is there a Kima angle I might be missing?',
+  'How does their tech work and where do Kima, Aeredium & Aergap each fit?',
+  'Do they have AI agents taking real consequential actions — are they an Aergap customer?',
+  'What would make this a strong lead for our full suite?',
+  'Who should I reach out to first and what should I say?',
+  'What objections will they raise and how do I counter them?',
+  'Write a cold outreach message focused on Aergap',
 ]
 
 function DiscussPanel({ leadData }: { leadData: QualifyResult }) {
@@ -332,7 +332,7 @@ function DiscussPanel({ leadData }: { leadData: QualifyResult }) {
             {msgs.length === 0 ? (
               <div>
                 <p style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.3)', marginBottom: 10, lineHeight: 1.5 }}>
-                  Ask anything about <strong style={{ color: 'rgba(255,255,255,0.5)' }}>{leadData.company_name}</strong> before deciding. The agent knows the full research.
+                  Ask anything about <strong style={{ color: 'rgba(255,255,255,0.5)' }}>{leadData.company_name}</strong> — how their tech works, whether AI agents are in their product, and where <strong style={{ color: 'rgba(255,255,255,0.5)' }}>Kima / Aeredium / Aergap</strong> each fit.
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {DISCUSS_STARTERS.map(s => (
