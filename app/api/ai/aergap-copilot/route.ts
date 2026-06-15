@@ -320,13 +320,21 @@ export async function POST(req: NextRequest) {
     if (body.action === 'save_memory') {
       const { title, content } = body
       if (!title || !content) return NextResponse.json({ error: 'title and content required' }, { status: 400 })
-      const { error } = await supabase.from('agent_knowledge').insert({
-        title, content,
-        knowledge_type: 'general',
-        tags: ['aergap', 'copilot'],
-        status: 'active',
-      })
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      // Skip insert if a memory with the same title already exists (prevents duplicates from repeated saves)
+      const { data: existing } = await supabase
+        .from('agent_knowledge')
+        .select('id')
+        .ilike('title', title.trim())
+        .limit(1)
+      if (!existing || existing.length === 0) {
+        const { error } = await supabase.from('agent_knowledge').insert({
+          title, content,
+          knowledge_type: 'general',
+          tags: ['aergap', 'copilot'],
+          status: 'active',
+        })
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      }
       return NextResponse.json({ saved: true })
     }
 
@@ -383,6 +391,16 @@ export async function POST(req: NextRequest) {
         memory = { title: String(parsed.memory_suggestion.title), content: String(parsed.memory_suggestion.content) }
       }
     } catch { /* use default reply */ }
+
+    // Suppress the prompt if this memory title is already saved — stops the dialog from reappearing
+    if (memory) {
+      const { data: alreadySaved } = await supabase
+        .from('agent_knowledge')
+        .select('id')
+        .ilike('title', memory.title.trim())
+        .limit(1)
+      if (alreadySaved && alreadySaved.length > 0) memory = null
+    }
 
     // Persist to session store
     await supabase.from('voice_messages').insert([
