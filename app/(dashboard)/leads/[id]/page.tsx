@@ -1777,7 +1777,7 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'distill', lead_id: lead.id, transcript }),
       }).then(r => r.json()).then(j => {
-        if (j?.saved) toast.success('Saved what I learned to the agent’s memory')
+        if (j?.saved) toast.success('Saved what I learned to the agent's memory')
       }).catch(() => {})
     }
   }
@@ -1840,10 +1840,10 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
   }
 
   const starters = [
-    ‘How does their tech work and where do Kima, Aeredium & Aergap each fit?’,
-    ‘Do they have AI agents taking real consequential actions — are they an Aergap customer?’,
-    ‘What\’s the strongest angle to pitch the full suite here?’,
-    ‘What objections will they raise, and how do I counter them?’,
+    'How does their tech work and where do Kima, Aeredium & Aergap each fit?',
+    'Do they have AI agents taking real consequential actions — are they an Aergap customer?',
+    'What\'s the strongest angle to pitch the full suite here?',
+    'What objections will they raise, and how do I counter them?',
   ]
 
   if (!mounted) return null
@@ -1986,7 +1986,7 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
             <div style={{ flex: 1, overflowY: 'auto', padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
               {sessions.length === 0 && (
                 <div style={{ fontSize: 12, color: 'rgb(110,117,145)', padding: '16px 10px', lineHeight: 1.6 }}>
-                  No conversations yet. Ask a question and it’ll be saved here so you can review it later.
+                  No conversations yet. Ask a question and it'll be saved here so you can review it later.
                 </div>
               )}
               {sessions.map(s => (
