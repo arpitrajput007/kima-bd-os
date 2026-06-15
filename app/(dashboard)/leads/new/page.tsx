@@ -24,6 +24,14 @@ const C = {
 // ── Types ─────────────────────────────────────────────────────
 interface FactItem { label: string; value: string }
 
+interface ProductMatch {
+  product: string
+  company: 'Kima' | 'Aeredium' | 'Aergap'
+  match: 'strong' | 'partial' | 'none'
+  why: string
+  use_case?: string
+}
+
 interface QualifyResult {
   company_name: string; description: string; business_model: string
   product_summary: string; supported_chains_or_rails: string; current_providers: string
@@ -42,6 +50,7 @@ interface QualifyResult {
   verdict: 'good_lead' | 'not_a_lead'
   verdict_reasoning: string; verdict_flags: string[]; verdict_strengths: string[]
   source_url: string; source_summary: string
+  product_matches?: ProductMatch[]
 }
 
 interface CacheEntry {
@@ -412,7 +421,7 @@ export default function NewLeadPage() {
   const [histLoading,  setHistLoading]  = useState(true)
   const [open, setOpen] = useState({
     company: true, competitive: true, classification: true,
-    painPoint: true, fit: true, commercial: true,
+    painPoint: true, products: true, fit: true, commercial: true,
     social: true, intel: false, scoring: false,
   })
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -1019,6 +1028,122 @@ export default function NewLeadPage() {
                 )}
               </div>
             </SectionCard>
+
+            {/* Products & Use Cases */}
+            {(result.product_matches?.length ?? 0) > 0 && (
+              <SectionCard icon={Layers} title="Products & Use Cases" open={open.products} onToggle={() => toggle('products')} accent="rgb(56,189,248)">
+                {(() => {
+                  const groups: Record<string, ProductMatch[]> = {}
+                  ;(result.product_matches ?? []).forEach(pm => {
+                    if (!groups[pm.company]) groups[pm.company] = []
+                    groups[pm.company].push(pm)
+                  })
+                  const companyMeta: Record<string, { color: string; bg: string; border: string; dot: string }> = {
+                    Kima:     { color: 'rgb(96,165,250)',   bg: 'rgba(96,165,250,0.08)',   border: 'rgba(96,165,250,0.22)',   dot: 'rgba(96,165,250,0.9)' },
+                    Aeredium: { color: 'rgb(167,139,250)',  bg: 'rgba(167,139,250,0.08)',  border: 'rgba(167,139,250,0.22)',  dot: 'rgba(167,139,250,0.9)' },
+                    Aergap:   { color: 'rgb(251,191,36)',   bg: 'rgba(251,191,36,0.07)',   border: 'rgba(251,191,36,0.22)',   dot: 'rgba(251,191,36,0.9)' },
+                  }
+                  const matchStyle = (m: string) => ({
+                    strong:  { icon: '✓', color: 'rgb(52,211,153)',  bg: 'rgba(52,211,153,0.1)',  border: 'rgba(52,211,153,0.22)',  label: 'Strong Match' },
+                    partial: { icon: '~', color: 'rgb(251,191,36)',  bg: 'rgba(251,191,36,0.08)', border: 'rgba(251,191,36,0.22)',  label: 'Partial'      },
+                    none:    { icon: '✕', color: 'rgb(156,163,175)', bg: 'rgba(255,255,255,0.03)',border: 'rgba(255,255,255,0.07)', label: 'No Match'     },
+                  }[m] ?? { icon: '?', color: 'rgb(156,163,175)', bg: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.07)', label: m })
+
+                  const strongCount  = (result.product_matches ?? []).filter(p => p.match === 'strong').length
+                  const partialCount = (result.product_matches ?? []).filter(p => p.match === 'partial').length
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                      {/* summary chips */}
+                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        {strongCount > 0 && (
+                          <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 20, background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.3)', color: 'rgb(52,211,153)' }}>
+                            {strongCount} strong {strongCount === 1 ? 'match' : 'matches'}
+                          </span>
+                        )}
+                        {partialCount > 0 && (
+                          <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 20, background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.28)', color: 'rgb(251,191,36)' }}>
+                            {partialCount} partial {partialCount === 1 ? 'match' : 'matches'}
+                          </span>
+                        )}
+                        {strongCount === 0 && partialCount === 0 && (
+                          <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 20, background: 'rgba(252,165,165,0.1)', border: '1px solid rgba(252,165,165,0.25)', color: 'rgb(252,165,165)' }}>
+                            No product match
+                          </span>
+                        )}
+                      </div>
+
+                      {/* per-company groups */}
+                      {(['Kima', 'Aeredium', 'Aergap'] as const).map(co => {
+                        const items = groups[co]
+                        if (!items?.length) return null
+                        const cm = companyMeta[co]
+                        const hasHit = items.some(p => p.match !== 'none')
+                        return (
+                          <div key={co}>
+                            {/* Company header */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                              <div style={{ width: 6, height: 6, borderRadius: '50%', background: cm.dot, flexShrink: 0 }} />
+                              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: cm.color }}>{co}</span>
+                              <div style={{ flex: 1, height: 1, background: cm.border }} />
+                              {hasHit && (
+                                <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: cm.bg, border: `1px solid ${cm.border}`, color: cm.color }}>
+                                  {items.filter(p => p.match !== 'none').length}/{items.length} match
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Product rows */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              {items.map((pm, idx) => {
+                                const ms = matchStyle(pm.match)
+                                return (
+                                  <div key={idx} style={{
+                                    borderRadius: 12, border: `1px solid ${ms.border}`,
+                                    background: ms.bg, padding: '12px 16px',
+                                    opacity: pm.match === 'none' ? 0.6 : 1,
+                                  }}>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                                      <div style={{ flex: 1 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                                          <span style={{
+                                            width: 20, height: 20, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            fontSize: 11, fontWeight: 700, flexShrink: 0,
+                                            background: `${ms.color}18`, color: ms.color,
+                                          }}>{ms.icon}</span>
+                                          <span style={{ fontSize: 13, fontWeight: 600, color: pm.match === 'none' ? 'rgb(120,125,155)' : 'rgb(220,225,245)' }}>
+                                            {pm.product}
+                                          </span>
+                                        </div>
+                                        <p style={{ fontSize: 12.5, lineHeight: 1.6, color: pm.match === 'none' ? 'rgb(90,95,125)' : 'rgb(170,175,205)', margin: '0 0 0 28px' }}>
+                                          {pm.why}
+                                        </p>
+                                        {pm.use_case && pm.match !== 'none' && (
+                                          <div style={{ margin: '8px 0 0 28px', padding: '7px 12px', borderRadius: 8, background: `${cm.color}10`, border: `1px solid ${cm.border}` }}>
+                                            <p style={{ fontSize: 11, color: cm.color, margin: 0, lineHeight: 1.55 }}>
+                                              <span style={{ fontWeight: 700, letterSpacing: '0.05em' }}>USE CASE — </span>{pm.use_case}
+                                            </p>
+                                          </div>
+                                        )}
+                                      </div>
+                                      <span style={{
+                                        flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 20,
+                                        background: ms.bg, border: `1px solid ${ms.border}`, color: ms.color,
+                                        letterSpacing: '0.04em',
+                                      }}>{ms.label}</span>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
+              </SectionCard>
+            )}
 
             {/* Fit */}
             <SectionCard icon={Zap} title="Kima & Aeredium Fit" open={open.fit} onToggle={() => toggle('fit')} accent="rgb(167,139,250)">

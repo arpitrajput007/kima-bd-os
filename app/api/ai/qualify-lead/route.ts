@@ -18,7 +18,7 @@
 
 import { claudeJSON, CLAUDE_RESEARCH } from '@/lib/claude'
 import { NextRequest, NextResponse } from 'next/server'
-import { PRODUCT_BRAIN } from '@/lib/kima-knowledge'
+import { PRODUCT_BRAIN, AERGAP_KNOWLEDGE, PRODUCTS_CATALOG } from '@/lib/kima-knowledge'
 import { scoringMemory } from '@/lib/agent-memory'
 
 // ── Infer company name from a URL ─────────────────────────────
@@ -98,11 +98,20 @@ export async function POST(req: NextRequest) {
     scoringMemory(),
   ])
 
-  const systemPrompt = `You are a senior BD researcher for Kima and Aeredium — financial infrastructure companies.
+  const systemPrompt = `You are a senior BD researcher for Kima, Aeredium, and Aergap — three complementary financial and AI infrastructure products.
 
 ${PRODUCT_BRAIN}
 
-Your job is to qualify a company as a potential Kima/Aeredium lead and fill EVERY field in the BD database — including the deeper analytical fields (risk_angle, settlement_angle, security_angle, revenue_potential, integration_feasibility, competitive positioning, social links, verified facts vs assumptions).
+--- AERGAP ---
+${AERGAP_KNOWLEDGE}
+
+--- FULL PRODUCT CATALOG ---
+${PRODUCTS_CATALOG}
+
+Your job is to:
+1. Qualify a company as a potential lead for ANY or ALL of our three products (Kima, Aeredium, Aergap)
+2. Fill EVERY field in the BD database — including risk_angle, settlement_angle, security_angle, revenue_potential, integration_feasibility, competitive positioning, social links, verified facts vs assumptions
+3. Evaluate every product in the catalog against this company and produce a product_matches array
 
 Apply the agent rules below when scoring and classifying leads. prioritize/reject rules override the base score. score_boost/score_penalty rules adjust the final score.
 ${memory}
@@ -189,7 +198,78 @@ Return a single JSON object with ALL of these fields:
 
   // ── Source ─────────────────────────────────────────────────
   "source_url": "The single most useful URL found (news article, funding post, etc.)",
-  "source_summary": "One sentence describing what that source reveals"
+  "source_summary": "One sentence describing what that source reveals",
+
+  // ── Product & use-case match matrix ────────────────────────
+  // Evaluate EVERY product in the catalog. Return exactly 9 entries — one per product.
+  // match values: "strong" | "partial" | "none"
+  // why: 1-2 specific sentences explaining the match or mismatch for THIS company
+  // use_case: concrete use case sentence if match is strong or partial, else ""
+  "product_matches": [
+    {
+      "product": "Kima UPR",
+      "company": "Kima",
+      "match": "strong | partial | none",
+      "why": "specific reason for this company",
+      "use_case": "e.g. Enable cross-chain USDC deposits across 5 chains via one API integration"
+    },
+    {
+      "product": "Kima LaaS",
+      "company": "Kima",
+      "match": "strong | partial | none",
+      "why": "...",
+      "use_case": ""
+    },
+    {
+      "product": "Kima DvP",
+      "company": "Kima",
+      "match": "strong | partial | none",
+      "why": "...",
+      "use_case": ""
+    },
+    {
+      "product": "Aeredium Institutional L1",
+      "company": "Aeredium",
+      "match": "strong | partial | none",
+      "why": "...",
+      "use_case": ""
+    },
+    {
+      "product": "Aeredium AERLink",
+      "company": "Aeredium",
+      "match": "strong | partial | none",
+      "why": "...",
+      "use_case": ""
+    },
+    {
+      "product": "Aeredium AERKey",
+      "company": "Aeredium",
+      "match": "strong | partial | none",
+      "why": "...",
+      "use_case": ""
+    },
+    {
+      "product": "Aergap Agent Identity",
+      "company": "Aergap",
+      "match": "strong | partial | none",
+      "why": "...",
+      "use_case": ""
+    },
+    {
+      "product": "Aergap Execution Gate",
+      "company": "Aergap",
+      "match": "strong | partial | none",
+      "why": "...",
+      "use_case": ""
+    },
+    {
+      "product": "Aergap Audit Trail",
+      "company": "Aergap",
+      "match": "strong | partial | none",
+      "why": "...",
+      "use_case": ""
+    }
+  ]
 }
 
 SCORING:
@@ -207,7 +287,7 @@ VERDICT:
       model: CLAUDE_RESEARCH,
       system: systemPrompt,
       user: userPrompt,
-      maxTokens: 4000,
+      maxTokens: 5500,
     })
 
     return NextResponse.json({

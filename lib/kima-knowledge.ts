@@ -133,3 +133,63 @@ ${BATTLECARDS}`
 export const FULL_BRAIN = `${PRODUCT_BRAIN}
 
 ${ICP_BLOCK}`
+
+// ── Aergap (third product we qualify leads for) ──────────────────────────────
+export const AERGAP_KNOWLEDGE = `AERGAP — Trust & governance layer for AI agents that take high-stakes actions.
+Aergap sits underneath AI agents and determines what they are allowed to do before they act.
+
+Core products / capabilities:
+- Agent Identity: verifiable, cross-ecosystem readable identity for every agent — enterprises and regulators can prove who (or what) acted
+- Agent Policy: declarative rules governing exactly what each agent is permitted to do, enforced before execution
+- Execution Gate: pre-action blocking (NOT post-hoc detection) — unauthorized calls are stopped before they happen, not logged after
+- Audit Trail: immutable, unified cryptographic log of every agent action and gate decision — satisfies enterprise & regulatory audit requirements
+
+Primary wedge: AI agents that can move money or perform irreversible actions.
+Core message: "When an AI agent can move money, one wrong call cannot be undone. Aergap is the gate that determines what the agent is allowed to do before it acts."
+
+ICP: AI-native product companies (seed–Series A) that sell agent products to enterprises where agents take real consequential actions — payments, data access, procurement, expense approvals.
+Primary urgency signal: enterprise deals stalling in security review because the company cannot demonstrate agent identity, policy enforcement, and audit trail.
+Key contacts: Founder/CEO (small companies); Head of Product, VP Engineering, Head of AI, Head of Trust, Security leads (larger).
+Trigger events: enterprise customer announcement, funding round, compliance/security hire, AI product launch.`
+
+// ── Full product catalog (used in qualify-lead to evaluate all products) ──────
+export const PRODUCTS_CATALOG = `COMPLETE PRODUCT CATALOG — evaluate every lead against ALL of these:
+
+━━ KIMA ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Kima UPR (Universal Payment Rail)
+   One API for instant atomic settlement across blockchains, fiat, stablecoins, CBDCs — no bridges, no wrapped assets, no smart contract risk. 9+ chains + major fiat corridors.
+   Best fit: companies needing cross-chain or cross-rail value movement; cross-border fintechs; PSPs adding stablecoin settlement; wallets needing on/off-ramp; DEXs needing cross-chain deposits.
+
+2. Kima LaaS (Liquidity as a Service)
+   On-demand pooled cross-chain liquidity — companies tap Kima's pools instead of holding large fragmented reserves on multiple chains.
+   Best fit: protocols with liquidity fragmented across chains; market makers; lending protocols with collateral on different chains.
+
+3. Kima DvP (Delivery vs Payment)
+   Atomic asset-for-payment settlement via decentralized escrow — no smart contracts holding funds.
+   Best fit: RWA platforms, tokenized securities, institutional OTC desks needing simultaneous asset + payment settlement.
+
+━━ AEREDIUM ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. Aeredium Institutional L1
+   EVM-compatible L1 with TEE-attested validators across AWS Nitro / Azure SEV-SNP / GCP Confidential Space. ~250k TPS, 20ms block time, Bitcoin-anchored finality, privacy mode.
+   Best fit: banks; institutional asset managers; fintechs needing regulated high-throughput settlement; custodians wanting to offer their own settlement network.
+
+5. Aeredium AERLink (Bank API Bridge)
+   Threshold-governed access to bank APIs, ERPs, and SWIFT — institutions expose core-banking systems WITHOUT modifying legacy infrastructure or handing over custody.
+   Best fit: fintechs that need to connect to bank ledgers; cross-border payment companies needing bank connectivity; neobanks building on top of correspondent banks.
+
+6. Aeredium AERKey (TEE Threshold Signing)
+   TEE-attested threshold ECDSA across three cloud providers — signing keys are never assembled in any single place. Cryptographic policy enforcement at key level.
+   Best fit: custodians; MPC wallet providers; companies needing hardware-grade signing accountability and key governance.
+
+━━ AERGAP ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. Aergap Agent Identity
+   Verifiable, cross-ecosystem readable identity for every AI agent — proves who acted for enterprise and regulatory compliance.
+   Best fit: AI-native companies selling agents to enterprises; companies where regulators ask "which agent did what?"; MCP-based tooling where agent identity matters.
+
+8. Aergap Agent Policy + Execution Gate
+   Declarative spend/action policies enforced at the gate before execution — stops unauthorized agent calls before they happen, not after.
+   Best fit: companies whose AI agents take consequential actions (payments, procurement, data access); companies with enterprise customers demanding policy enforcement proof; AI wallet builders; agentic commerce startups.
+
+9. Aergap Audit Trail
+   Immutable cryptographic log of every agent action and gate decision — satisfies enterprise security review and regulatory audit requirements.
+   Best fit: any AI-native company facing enterprise security review; companies where agents make financial or compliance-sensitive decisions; highly regulated verticals (finance, healthcare, legal).`
