@@ -1777,7 +1777,7 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'distill', lead_id: lead.id, transcript }),
       }).then(r => r.json()).then(j => {
-        if (j?.saved) toast.success('Saved what I learned to the agent's memory')
+        if (j?.saved) toast.success("Saved what I learned to the agent's memory")
       }).catch(() => {})
     }
   }
