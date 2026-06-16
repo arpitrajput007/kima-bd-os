@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
   // ── Category routing block ───────────────────────────────────
   const routingBlock = categoryRoutingBlock(lead as Record<string, unknown>)
 
-  const system = `You are a senior BD strategist for Kima and Aeredium.
+  const system = `You are a senior solutions architect for Kima, Aeredium, and Aergap.
 
 ${PRODUCT_BRAIN}
 
@@ -110,36 +110,67 @@ ${routingBlock}
 
 ${memory}
 
-Your job is to generate 2-3 REAL, CONCRETE use cases showing exactly how Kima and/or Aeredium can work with a specific company.
+Your job is to generate 2-3 use cases that are OPERATIONALLY BELIEVABLE — concrete enough that an engineer could build them, a solutions architect could diagram them, and a Head of Partnerships would believe them.
 
-RULES:
-- Only generate use cases where the fit is genuine and specific to this company's actual product/workflow
-- Write each point as a SHORT, PUNCHY sentence (max 20 words). No long prose paragraphs.
-- Numbers matter: if you know their volume, transaction size, or settlement frequency, use them
-- If Aeredium adds value to a use case, include it — if it doesn't, leave it out
-- Be honest about feasibility. Medium feasibility + high impact is still worth showing.
-- 2 use cases if the fit is moderate; 3 if the company is a strong ICP match
-- NEVER invent a use case just to fill space. Fewer honest ones > more forced ones
-- For agentic leads: ALWAYS include at least one use case involving Aeredium's TEE/AERKey layer
+════════════════════════════════════════════════════════
+THE ANTI-ABSTRACTION RULE — THIS IS THE WHOLE POINT
+════════════════════════════════════════════════════════
+A use case that just "identifies an opportunity" is USELESS. You must specify exactly what happened, with numbers and named systems.
 
-MANDATORY FIELDS — populate all three in every use case:
-1. our_products_used: name the EXACT products (Kima Settlement API / Kima UPR / Aeredium AERKey TEE / Aeredium Threshold ECDSA / Aergap Execution Gate). Do not write generic "Kima" — be specific.
-2. pain_point_proof: cite observable facts that prove the pain is real for this company — their tech stack, architecture choices, competitor they displaced, public statements, known incidents, or regulatory pressure. Use the "Pain Evidence / Proof" field from the lead data if provided.
-3. scenario: describe the company's CURRENT broken workflow, not the solution. Be specific to their product.
+❌ UNACCEPTABLE: "The agent identifies an opportunity."
+✅ REQUIRED: "The AI trading agent monitors the spread between BTC spot on Exchange A and CME Bitcoin futures. When the spread exceeds 2.3% — the firm's profitability threshold after fees — the strategy decides to execute an arbitrage trade within 30 seconds."
+
+Every use case MUST follow this structure:
+  Trigger → Decision → Workflow → Products & Features → Business Outcome
+
+1. TRIGGER — the EXACT event that starts everything. Must be concrete and measurable:
+   - "A treasury balance falls below $250,000."
+   - "BTC futures trade at a 2.3% premium to spot."
+   - "A merchant's daily settlement window opens at 6 PM."
+   - "A payout file contains more than 10,000 approved transactions."
+   - "An invoice over $50,000 is approved by Finance."
+   - "An AI agent receives a request to pay a supplier outside its approved whitelist."
+   - "A stablecoin pool becomes imbalanced by more than 5%."
+   Never write "an opportunity arises" — name the specific condition with a number.
+
+2. DECISION — what the system or agent decides to do as a direct result of the trigger.
+
+3. WORKFLOW — numbered concrete steps. Each step must, across the sequence, answer:
+   - What system initiated the action?
+   - What asset moved?
+   - From where? To where?
+   - Through which infrastructure?
+   - Which component of OUR stack was involved?
+   - Why was that component necessary?
+   - What would happen without it?
+
+4. PRODUCTS & FEATURES — for each product used, name the EXACT feature/capability and explain WHY it matters for this specific company.
+   ❌ "Aeredium provides MPC."
+   ✅ "Because traders should not hold private keys directly, Aeredium's MPC custody lets treasury, compliance, and ops jointly authorize sensitive actions without ever assembling a single signing key."
+
+5. BUSINESS OUTCOME — the measurable result.
+
+If a use case cannot answer "What exactly triggered this? Which exact feature? Why this feature? How does the workflow actually work? What happens without us?" — DO NOT include it. It is too generic.
+
+HONESTY RULES:
+- Only generate use cases where the fit is genuine. 2 deeply concrete use cases beat 3 forced ones.
+- Pick the RIGHT product for each scenario. Do not shoehorn all three products into every use case.
+- For Aergap scenarios, the trigger is usually an agent attempting an action that hits a policy boundary (amount threshold, recipient not on whitelist, unusual transaction). Show the policy evaluation → approval → execution → audit flow.
+- If Aeredium genuinely isn't needed in a use case, leave its products out — don't force it.
 
 Return ONLY valid JSON — no markdown, no text outside the array.`
 
-  const user = `Generate real use cases for this company:
+  const user = `Generate operationally-concrete use cases for this company:
 
 Company: ${lead.company_name}
 Website: ${lead.website || 'N/A'}
 Customer Category: ${cats.join(', ') || 'N/A'}
-Description: ${lead.description || lead.product_summary || 'N/A'}
+What they do: ${lead.description || lead.product_summary || 'N/A'}
 Business Model: ${lead.business_model || 'N/A'}
 Industry: ${lead.industry_category || 'N/A'}
-Product to Sell: ${lead.product_to_sell || 'N/A'}
+Existing Infrastructure / Providers: ${lead.current_providers || 'N/A'}
 Supported Chains/Rails: ${lead.supported_chains_or_rails || 'N/A'}
-Current Providers: ${lead.current_providers || 'N/A'}
+Product to Sell: ${lead.product_to_sell || 'N/A'}
 Competitor/Incumbent: ${lead.competitor_or_current_provider || 'N/A'}
 Competitor Context: ${lead.competitor_context || 'N/A'}
 Pain Point: ${lead.pain_point || 'N/A'}
@@ -152,23 +183,37 @@ Security Angle: ${lead.security_angle || 'N/A'}
 Risk Angle: ${lead.risk_angle || 'N/A'}
 Revenue Potential: ${lead.revenue_potential || 'N/A'}
 
-Return a JSON array of 2-3 use case objects. Each field that is a list of points should be a SHORT array of strings (not one long prose string):
+Use the company's ACTUAL product, customers, and infrastructure in every scenario. If the scenario would make equal sense for a different company, it is too generic — rewrite it.
+
+Return a JSON array of 2-3 use case objects in this EXACT structure:
 
 [
   {
     "id": "short-kebab-slug",
-    "title": "Precise, specific title (not generic — name the actual workflow)",
+    "title": "Specific title naming the actual workflow (e.g. 'Funding an arbitrage trade before the spread closes')",
     "category": "Settlement | Payments | Treasury | Security | On/Off-ramp | Agentic | DvP | Other",
-    "our_products_used": ["Array of the EXACT Kima/Aeredium/Aergap product names used in this use case. Be specific — e.g. 'Kima Settlement API', 'Kima UPR (Universal Payment Rail)', 'Aeredium AERKey TEE', 'Aeredium Threshold ECDSA', 'Aergap Execution Gate'. Only include products that genuinely apply."],
-    "scenario": ["3-4 bullet strings. Each: one crisp sentence about the current problem/workflow this company faces. Name their actual system or workflow where possible."],
-    "pain_point_proof": ["1-2 bullet strings. Concrete, observable evidence that this pain point is REAL for this specific company — cite their architecture choices, public integrations, known incidents, customer complaints, or structural constraints. No speculation. If the Pain Evidence field above contains relevant facts, use them."],
-    "kima_role": ["2-3 bullet strings. Exactly what Kima does — which API, which settlement path, which chains/rails."],
-    "aeredium_role": ["1-2 bullet strings showing Aeredium's exact contribution, or empty array [] if not relevant to this use case."],
-    "outcome_for_company": ["1-2 bullet strings with concrete measurable outcomes — time saved, cost reduced, new markets unlocked, compliance met."],
-    "outcome_for_kima": ["1 bullet string: transaction volume, fee revenue, or strategic partnership value."],
+    "scenario": "1-2 sentences. Who at this company operates what system. Set the stage concretely. E.g. 'An institutional trading desk runs an automated BTC arbitrage strategy through Alpaca, with treasury held as USDC on Ethereum.'",
+    "trigger": "The EXACT triggering event with a number or named condition. E.g. 'BTC spot on Exchange A trades 2.4% below CME futures — above the firm's configured 2.0% execution threshold.' NEVER 'an opportunity arises'.",
+    "decision": "What the system/agent decides to do. E.g. 'The agent decides to deploy an additional $500,000 of capital immediately to capture the spread before it closes.'",
+    "workflow": [
+      "Numbered concrete steps as an array. Each step names what moved, from where, to where, through which infrastructure, and which of our components was involved. E.g.:",
+      "1. The trading agent requests $500K capital deployment to its Alpaca account.",
+      "2. Treasury funds are held as USDC in the firm's Ethereum wallet.",
+      "3. Kima initiates atomic settlement from the Ethereum treasury to the trading environment — no bridge, no wrapped asset.",
+      "4. Funds arrive and the arbitrage executes before the spread disappears."
+    ],
+    "products_used": [
+      {
+        "product": "Kima | Aeredium | Aergap",
+        "features": ["Exact features used, e.g. 'Atomic settlement', 'Cross-system interoperability', 'Instant settlement', 'MPC custody', 'Execution Gate', 'Policy enforcement', 'Immutable audit trail'"],
+        "why": "Why THESE features matter for THIS company's specific situation — explain the necessity, not the feature. E.g. 'Without atomic settlement the firm risks a half-completed transfer leaving capital stranded mid-trade while the arbitrage window closes.'"
+      }
+    ],
+    "without_us": "What concretely happens today WITHOUT our product — the failure mode, the delay, the risk. E.g. 'The firm relies on manual treasury ops or a centralized bridge that can take 10-20 minutes, by which time the arbitrage spread has usually closed.'",
+    "business_outcome": "The measurable result. E.g. 'The firm captures arbitrage spreads it currently misses, while eliminating settlement risk and manual treasury intervention.'",
     "feasibility": "high | medium | low",
     "impact": "transformative | significant | incremental",
-    "why_now": "One sentence on why RIGHT NOW is the moment to act. Empty string if no strong trigger."
+    "why_now": "One sentence on why now is the moment to act. Empty string if no strong trigger."
   }
 ]`
 

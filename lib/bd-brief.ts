@@ -21,9 +21,12 @@ WRITING RULES — non-negotiable:
 3. Plain English. Write as if explaining to a smart business person who is not technical.
 4. Every sentence must pass the "So what?" test. If it doesn't help decide whether to pursue — cut it.
 5. No marketing language. No feature lists. No repeating product features unless they directly solve a named problem.
-6. For the real-life use case, use "Sender A → Receiver B" or "Agent A tries to do X" story format with specifics.
+6. The real-life use case must be OPERATIONALLY BELIEVABLE — concrete enough that an engineer could build it and a Head of Partnerships would believe it. Follow Trigger → Decision → Workflow → Products/Features → Outcome.
+   - The TRIGGER must be an exact event with a number or named condition ("a treasury balance falls below $250K", "an agent tries to pay a supplier not on the whitelist") — NEVER "an opportunity arises".
+   - For each product, name the EXACT feature and explain WHY it matters for this company. Not "Aeredium provides MPC" but "Because traders shouldn't hold keys directly, Aeredium's MPC custody lets treasury and compliance jointly authorize without assembling a single signing key."
+   - Always answer "what happens without us" concretely — the failure mode, the delay, the risk.
    BAD: "Kima enables cross-chain interoperability."
-   GOOD: "A corporate treasury agent running on their platform decides to move $2M from a USDC account on Ethereum to pay a supplier in BNB Chain. Without Kima, this requires a bridge, manual approval, 20 minutes, and counterparty risk. With Kima, the agent calls one API — the payment settles atomically in under 60 seconds, with full audit trail."
+   GOOD: "Trigger: BTC spot trades 2.4% below CME futures, above the firm's 2.0% threshold. Decision: the agent deploys $500K immediately. Workflow: treasury USDC on Ethereum → Kima atomic settlement → Alpaca trading account → arbitrage executes before the spread closes. Without Kima: a centralized bridge takes 10-20 min and the window closes."
 7. Pain points must be OPERATIONAL problems specific to this company's actual workflow and infrastructure — not generic category challenges.
 8. The opportunity section must answer: why THIS product for THIS company, and why the other products are less relevant.
 9. Discovery questions must be ones you would actually ask on a first call — diagnostic, not generic.
@@ -101,13 +104,22 @@ Return this exact JSON structure:
     "why_not_the_others": "One sentence: briefly explain why the other products are less relevant for this specific company right now."
   },
   "real_use_case": {
-    "title": "Short, specific title — must name the actual workflow at ${lead.company_name}, not a generic payment scenario",
-    "story": [
-      "3–4 bullets. Walk through the exact scenario using their actual product and customers. Use 'User A / Agent A / Sender A → Receiver B' framing. Each bullet = one step. Make it specific enough that someone unfamiliar with payments would understand what breaks and why."
+    "title": "Specific title naming the actual workflow at ${lead.company_name} — not a generic payment scenario",
+    "scenario": "1-2 sentences. Who at ${lead.company_name} operates what system. Set the stage concretely using their actual product and infrastructure.",
+    "trigger": "The EXACT triggering event with a number or named condition. E.g. 'A treasury balance falls below $250K' or 'An agent attempts to pay a supplier not on the approved whitelist'. NEVER 'an opportunity arises'.",
+    "decision": "What the system or agent decides to do as a direct result of the trigger.",
+    "workflow": [
+      "3-5 numbered concrete steps. Each names what moved, from where, to where, through which infrastructure, and which of our components was involved. Specific enough that an engineer could build it."
     ],
-    "without_us": "One sentence: what concretely happens today without our product? Name the friction — time, cost, risk, failure mode.",
-    "with_us": "One sentence: what specifically changes with our product? Same specificity as 'without_us'.",
-    "outcome": "One sentence: the measurable result — time saved, cost reduced, risk eliminated, market accessed."
+    "products_used": [
+      {
+        "product": "Kima | Aeredium | Aergap",
+        "features": ["Exact features used — e.g. 'Atomic settlement', 'MPC custody', 'Execution Gate', 'Immutable audit trail'"],
+        "why": "Why THESE features matter for THIS company specifically — explain the necessity. E.g. 'Without atomic settlement, a half-completed transfer would strand capital mid-trade.' Not just 'provides MPC'."
+      }
+    ],
+    "without_us": "What concretely happens today WITHOUT our product — the failure mode, delay, or risk. Name specifics.",
+    "business_outcome": "One sentence: the measurable result — time saved, cost reduced, risk eliminated, market accessed."
   },
   "discovery_questions": [
     "3–5 questions for the first call. Each must be diagnostic — designed to surface whether the pain is real and whether there is budget and authority to act. Not 'Tell us about your payment flows' — more specific than that."

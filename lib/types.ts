@@ -153,10 +153,13 @@ export interface BDBrief {
   }
   real_use_case: {
     title:              string
-    story:              string[]    // Sender A → Receiver B bullets
-    without_us:         string      // one sentence: what happens today
-    with_us:            string      // one sentence: what happens with us
-    outcome:            string      // measurable result
+    scenario:           string      // the setup: who operates what system
+    trigger:            string      // the EXACT triggering event (with numbers/thresholds)
+    decision:           string      // what the system/agent decides to do
+    workflow:           string[]    // concrete numbered steps: what moved, from where, to where, through which infra
+    products_used:      UseCaseProduct[]  // which products, which exact features, why each matters
+    without_us:         string      // what concretely happens today without us (the failure mode)
+    business_outcome:   string      // measurable result
   }
   discovery_questions:  string[]    // 3-5 real call questions
   bd_verdict: {
@@ -165,15 +168,36 @@ export interface BDBrief {
   }
 }
 
+// Which product + which exact features + WHY each feature matters.
+// This is what makes a use case operationally believable rather than abstract.
+export interface UseCaseProduct {
+  product: 'Kima' | 'Aeredium' | 'Aergap'
+  features: string[]   // exact capabilities used (e.g. "Atomic settlement", "MPC custody")
+  why: string          // why each feature is necessary for THIS company's situation
+}
+
 export interface UseCase {
   id: string
   title: string
   category: string
-  scenario: string
-  kima_role: string
-  aeredium_role?: string
-  outcome_for_company: string
-  outcome_for_kima: string
+
+  // ── Operationally-concrete structure (Trigger → Decision → Workflow → Products → Outcome) ──
+  scenario?: string | string[]      // the setup: who operates what system
+  trigger?: string                  // the EXACT triggering event (threshold/time/condition, with numbers)
+  decision?: string                 // what the system/agent decides to do as a result
+  workflow?: string[]               // concrete numbered steps — what moved, from where, to where, through which infra
+  products_used?: UseCaseProduct[]  // which products, which exact features, why each matters
+  without_us?: string               // what concretely happens today without our product (the failure mode)
+  business_outcome?: string         // the measurable result
+
+  // ── Legacy fields (kept so older saved use cases still render) ──
+  kima_role?: string | string[]
+  aeredium_role?: string | string[]
+  pain_point_proof?: string | string[]
+  our_products_used?: string[]
+  outcome_for_company?: string | string[]
+  outcome_for_kima?: string | string[]
+
   feasibility: 'high' | 'medium' | 'low'
   impact: 'transformative' | 'significant' | 'incremental'
   why_now?: string

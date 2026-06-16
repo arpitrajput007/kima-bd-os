@@ -23,7 +23,7 @@ import {
   buildTarget, channelDeepLink, logTouch, recordOutcome,
   type OutreachMeta, type OutreachOutcome,
 } from '@/lib/outreach'
-import type { Lead, Contact, ContactTouch, OutreachMessage, UseCase, BDBrief } from '@/lib/types'
+import type { Lead, Contact, ContactTouch, OutreachMessage, UseCase, BDBrief, UseCaseProduct } from '@/lib/types'
 import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL, REGIONS } from '@/lib/types'
 import { actStart, actFinish, ACTION_TOOL, ACTION_LABEL } from '@/lib/agent-activity'
 
@@ -679,6 +679,148 @@ function UCPoints({ value, color }: { value: string | string[] | unknown; color:
   )
 }
 
+/* ── Operational Use Case flow ──────────────────────────── */
+// Renders the Trigger → Decision → Workflow → Products/Features → Outcome
+// structure. Used by both the Real Use Cases section and the BD Brief.
+
+const PRODUCT_COLORS: Record<string, { text: string; bg: string; border: string }> = {
+  Kima:     { text: 'rgb(167,139,250)', bg: 'rgba(124,58,237,0.08)', border: 'rgba(124,58,237,0.25)' },
+  Aeredium: { text: 'rgb(103,232,249)', bg: 'rgba(34,211,238,0.07)', border: 'rgba(34,211,238,0.25)' },
+  Aergap:   { text: 'rgb(110,231,183)', bg: 'rgba(52,211,153,0.07)', border: 'rgba(52,211,153,0.25)' },
+}
+
+function FlowStep({ label, color, children }: { label: string; color: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.16em', color, marginBottom: 7 }}>
+        {label}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+// Renders a products_used array: [{ product, features[], why }]
+function ProductsUsed({ items }: { items: UseCaseProduct[] }) {
+  if (!items?.length) return null
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {items.map((p, i) => {
+        const c = PRODUCT_COLORS[p.product] || PRODUCT_COLORS.Kima
+        return (
+          <div key={i} style={{ borderRadius: 11, border: `1px solid ${c.border}`, background: c.bg, padding: '12px 14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: c.text }}>{p.product}</span>
+              {(p.features || []).map((f, j) => (
+                <span key={j} style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6, background: `${c.text}1a`, color: c.text, border: `1px solid ${c.border}` }}>
+                  {f}
+                </span>
+              ))}
+            </div>
+            {p.why && (
+              <p style={{ fontSize: 12, lineHeight: 1.55, color: 'rgb(200,205,225)', margin: 0 }}>
+                <span style={{ color: c.text, fontWeight: 700 }}>Why: </span>{p.why}
+              </p>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// The full Trigger → Decision → Workflow → Products → Outcome flow.
+// `uc` may be a UseCase or a BDBrief.real_use_case — both share these fields.
+function FlowUseCase({ uc }: { uc: {
+  scenario?: string | string[]; trigger?: string; decision?: string
+  workflow?: string[]; products_used?: UseCaseProduct[]
+  without_us?: string; business_outcome?: string
+} }) {
+  const scenarioText = Array.isArray(uc.scenario) ? uc.scenario.join(' ') : uc.scenario
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+      {scenarioText && (
+        <FlowStep label="📖 Scenario" color="rgb(100,107,140)">
+          <p style={{ fontSize: 13, lineHeight: 1.6, color: 'rgb(190,195,220)', margin: 0 }}>{scenarioText}</p>
+        </FlowStep>
+      )}
+
+      {/* Trigger → Decision (the "what exactly happened") */}
+      {(uc.trigger || uc.decision) && (
+        <div style={{ display: 'grid', gridTemplateColumns: uc.trigger && uc.decision ? '1fr 1fr' : '1fr', gap: 12 }}>
+          {uc.trigger && (
+            <div style={{ borderRadius: 11, border: '1px solid rgba(251,191,36,0.22)', background: 'rgba(251,191,36,0.06)', padding: '12px 14px' }}>
+              <FlowStep label="⚡ Trigger" color="rgb(251,191,36)">
+                <p style={{ fontSize: 13, lineHeight: 1.55, color: 'rgb(220,210,180)', margin: 0 }}>{uc.trigger}</p>
+              </FlowStep>
+            </div>
+          )}
+          {uc.decision && (
+            <div style={{ borderRadius: 11, border: '1px solid rgba(96,165,250,0.22)', background: 'rgba(96,165,250,0.06)', padding: '12px 14px' }}>
+              <FlowStep label="🧭 Decision" color="rgb(147,197,253)">
+                <p style={{ fontSize: 13, lineHeight: 1.55, color: 'rgb(200,215,235)', margin: 0 }}>{uc.decision}</p>
+              </FlowStep>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Workflow — numbered concrete steps */}
+      {uc.workflow && uc.workflow.length > 0 && (
+        <div style={{ borderRadius: 11, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', padding: '14px 16px' }}>
+          <FlowStep label="⚙️ Workflow" color="rgb(130,137,170)">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {uc.workflow.map((step, i) => (
+                <div key={i} style={{ display: 'flex', gap: 11, alignItems: 'flex-start' }}>
+                  <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 6, background: 'rgba(167,139,250,0.13)', border: '1px solid rgba(167,139,250,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: 'rgb(167,139,250)' }}>
+                    {i + 1}
+                  </span>
+                  <span style={{ fontSize: 13, lineHeight: 1.55, color: 'rgb(205,210,230)', paddingTop: 1 }}>
+                    {step.replace(/^\s*\d+[.)]\s*/, '')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </FlowStep>
+        </div>
+      )}
+
+      {/* Products & Features used */}
+      {uc.products_used && uc.products_used.length > 0 && (
+        <FlowStep label="🧩 Products & Features Used" color="rgb(100,107,140)">
+          <ProductsUsed items={uc.products_used} />
+        </FlowStep>
+      )}
+
+      {/* Without us / Business outcome */}
+      {(uc.without_us || uc.business_outcome) && (
+        <div style={{ display: 'grid', gridTemplateColumns: uc.without_us && uc.business_outcome ? '1fr 1fr' : '1fr', gap: 12 }}>
+          {uc.without_us && (
+            <div style={{ borderRadius: 11, border: '1px solid rgba(248,113,133,0.2)', background: 'rgba(248,113,133,0.06)', padding: '12px 14px' }}>
+              <FlowStep label="🚫 Without Us" color="rgb(248,113,133)">
+                <p style={{ fontSize: 13, lineHeight: 1.55, color: 'rgb(220,200,210)', margin: 0 }}>{uc.without_us}</p>
+              </FlowStep>
+            </div>
+          )}
+          {uc.business_outcome && (
+            <div style={{ borderRadius: 11, border: '1px solid rgba(52,211,153,0.22)', background: 'rgba(52,211,153,0.06)', padding: '12px 14px' }}>
+              <FlowStep label="✅ Business Outcome" color="rgb(52,211,153)">
+                <p style={{ fontSize: 13, lineHeight: 1.55, color: 'rgb(190,225,205)', margin: 0 }}>{uc.business_outcome}</p>
+              </FlowStep>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// True if a use case has the new operational structure (vs legacy fields)
+function hasFlowStructure(uc: { trigger?: string; workflow?: string[]; products_used?: unknown[] }): boolean {
+  return Boolean(uc.trigger || (uc.workflow && uc.workflow.length) || (uc.products_used && uc.products_used.length))
+}
+
 /* ── BD Brief Section ───────────────────────────────────── */
 // 7-section quick-scan brief: answer "is this worth pursuing?"
 // in under 60 seconds.
@@ -866,31 +1008,11 @@ function BDBriefSection({ lead, onGenerated }: { lead: Lead; onGenerated: (brief
             </BriefBlock>
           </div>
 
-          {/* ── Row 4: Real-Life Use Case ─────────────── */}
+          {/* ── Row 4: Real-Life Use Case (operational flow) ─── */}
           {brief.real_use_case && (
             <BriefBlock style={{ borderColor: 'rgba(167,139,250,0.2)', background: 'rgba(124,58,237,0.05)' }}>
               <BriefLabel>🎯 Real-life use case — {brief.real_use_case.title}</BriefLabel>
-              <BriefBullets items={brief.real_use_case.story} dot="rgba(167,139,250,0.8)" color="rgb(210,215,235)" />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginTop: 14 }}>
-                {brief.real_use_case.without_us && (
-                  <div style={{ padding: '10px 13px', borderRadius: 10, background: 'rgba(248,113,133,0.07)', border: '1px solid rgba(248,113,133,0.2)' }}>
-                    <div style={{ fontSize: 9, fontWeight: 800, color: 'rgb(248,113,133)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 6 }}>Without us</div>
-                    <p style={{ fontSize: 12, color: 'rgb(210,215,235)', lineHeight: 1.55, margin: 0 }}>{brief.real_use_case.without_us}</p>
-                  </div>
-                )}
-                {brief.real_use_case.with_us && (
-                  <div style={{ padding: '10px 13px', borderRadius: 10, background: 'rgba(52,211,153,0.07)', border: '1px solid rgba(52,211,153,0.2)' }}>
-                    <div style={{ fontSize: 9, fontWeight: 800, color: 'rgb(52,211,153)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 6 }}>With us</div>
-                    <p style={{ fontSize: 12, color: 'rgb(210,215,235)', lineHeight: 1.55, margin: 0 }}>{brief.real_use_case.with_us}</p>
-                  </div>
-                )}
-                {brief.real_use_case.outcome && (
-                  <div style={{ padding: '10px 13px', borderRadius: 10, background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)' }}>
-                    <div style={{ fontSize: 9, fontWeight: 800, color: 'rgb(251,191,36)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 6 }}>Outcome</div>
-                    <p style={{ fontSize: 12, color: 'rgb(210,215,235)', lineHeight: 1.55, margin: 0 }}>{brief.real_use_case.outcome}</p>
-                  </div>
-                )}
-              </div>
+              <FlowUseCase uc={brief.real_use_case} />
             </BriefBlock>
           )}
 
@@ -1065,20 +1187,13 @@ function UseCasesSection({ lead, onGenerated }: { lead: Lead; onGenerated: (case
                   </div>
                 </div>
 
-                {/* ── Body: 2-col on wide, stacked on narrow ── */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
-
-                  {/* Left col: Scenario + Why Now */}
-                  <div style={{ padding: '20px 24px', borderRight: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 11 }}>
-                        <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.16em', color: 'rgb(100,107,140)' }}>📖 The Situation</span>
-                      </div>
-                      <UCPoints value={uc.scenario} color="rgb(147,155,200)" />
-                    </div>
-
+                {/* ── Body ── */}
+                {hasFlowStructure(uc) ? (
+                  /* NEW: operational Trigger → Decision → Workflow → Products → Outcome */
+                  <div style={{ padding: '20px 24px' }}>
+                    <FlowUseCase uc={uc} />
                     {uc.why_now && (typeof uc.why_now === 'string' ? uc.why_now.trim() : true) && (
-                      <div style={{ display: 'flex', gap: 9, padding: '10px 14px', borderRadius: 10, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
+                      <div style={{ display: 'flex', gap: 9, padding: '10px 14px', borderRadius: 10, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)', marginTop: 14 }}>
                         <Lightbulb size={13} color="#fbbf24" style={{ flexShrink: 0, marginTop: 2 }} />
                         <div>
                           <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#fbbf24', display: 'block', marginBottom: 4 }}>Why Now</span>
@@ -1087,46 +1202,58 @@ function UseCasesSection({ lead, onGenerated }: { lead: Lead; onGenerated: (case
                       </div>
                     )}
                   </div>
-
-                  {/* Right col: Roles + Outcomes */}
-                  <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-                    {/* Kima role */}
-                    <div style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(124,58,237,0.07)', border: '1px solid rgba(124,58,237,0.18)' }}>
-                      <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgb(167,139,250)', marginBottom: 10 }}>
-                        ⚡ Kima&apos;s Role
+                ) : (
+                  /* LEGACY: 2-col layout for use cases generated before the flow upgrade */
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
+                    <div style={{ padding: '20px 24px', borderRight: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 11 }}>
+                          <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.16em', color: 'rgb(100,107,140)' }}>📖 The Situation</span>
+                        </div>
+                        <UCPoints value={uc.scenario} color="rgb(147,155,200)" />
                       </div>
-                      <UCPoints value={uc.kima_role} color="rgb(167,139,250)" />
+                      {uc.why_now && (typeof uc.why_now === 'string' ? uc.why_now.trim() : true) && (
+                        <div style={{ display: 'flex', gap: 9, padding: '10px 14px', borderRadius: 10, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
+                          <Lightbulb size={13} color="#fbbf24" style={{ flexShrink: 0, marginTop: 2 }} />
+                          <div>
+                            <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#fbbf24', display: 'block', marginBottom: 4 }}>Why Now</span>
+                            <span style={{ fontSize: 12, color: 'rgb(210,185,130)', lineHeight: 1.55 }}>{uc.why_now as string}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-
-                    {/* Aeredium role — only if relevant */}
-                    {hasAerediumRole(uc) && (
-                      <div style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(34,211,238,0.06)', border: '1px solid rgba(34,211,238,0.18)' }}>
-                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgb(103,232,249)', marginBottom: 10 }}>
-                          🛡 Aeredium&apos;s Role
+                    <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      <div style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(124,58,237,0.07)', border: '1px solid rgba(124,58,237,0.18)' }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgb(167,139,250)', marginBottom: 10 }}>
+                          ⚡ Kima&apos;s Role
                         </div>
-                        <UCPoints value={uc.aeredium_role} color="rgb(103,232,249)" />
+                        <UCPoints value={uc.kima_role} color="rgb(167,139,250)" />
                       </div>
-                    )}
-
-                    {/* Outcomes */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      <div style={{ padding: '12px 14px', borderRadius: 11, background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)' }}>
-                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgb(52,211,153)', marginBottom: 8 }}>
-                          For {lead.company_name.split(' ')[0]}
+                      {hasAerediumRole(uc) && (
+                        <div style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(34,211,238,0.06)', border: '1px solid rgba(34,211,238,0.18)' }}>
+                          <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgb(103,232,249)', marginBottom: 10 }}>
+                            🛡 Aeredium&apos;s Role
+                          </div>
+                          <UCPoints value={uc.aeredium_role} color="rgb(103,232,249)" />
                         </div>
-                        <UCPoints value={uc.outcome_for_company} color="rgb(52,211,153)" />
-                      </div>
-                      <div style={{ padding: '12px 14px', borderRadius: 11, background: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.18)' }}>
-                        <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgb(167,139,250)', marginBottom: 8 }}>
-                          For Kima
+                      )}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <div style={{ padding: '12px 14px', borderRadius: 11, background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)' }}>
+                          <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgb(52,211,153)', marginBottom: 8 }}>
+                            For {lead.company_name.split(' ')[0]}
+                          </div>
+                          <UCPoints value={uc.outcome_for_company} color="rgb(52,211,153)" />
                         </div>
-                        <UCPoints value={uc.outcome_for_kima} color="rgb(167,139,250)" />
+                        <div style={{ padding: '12px 14px', borderRadius: 11, background: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.18)' }}>
+                          <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgb(167,139,250)', marginBottom: 8 }}>
+                            For Kima
+                          </div>
+                          <UCPoints value={uc.outcome_for_kima} color="rgb(167,139,250)" />
+                        </div>
                       </div>
                     </div>
-
                   </div>
-                </div>
+                )}
               </div>
             )
           })}
