@@ -343,38 +343,47 @@ export async function POST(req: NextRequest) {
 
     // ── Phase 3: Honest product fit (all 3 products, one call) ──
     // Runs AFTER company understanding + pain — this is the key change.
-    const fitData = await claudeJSON({
+    type FitSection = Record<string, unknown>
+    type FitResult = {
+      kima?: FitSection; aeredium?: FitSection; aergap?: FitSection
+      combined_opportunity?: string; strategic_hypotheses?: string[]
+      honest_assessment?: string; competitor_context?: string
+    }
+    const fitData = await claudeJSON<FitResult>({
       model: CLAUDE_RESEARCH, system: SYS,
       user: pFit(name, resSum, painSum), maxTokens: 2000,
     }).catch(() => null)
 
     const fitSum = fitData ? JSON.stringify({
-      kima_verdict: fitData.kima?.verdict,
+      kima_verdict:     fitData.kima?.verdict,
       aeredium_verdict: fitData.aeredium?.verdict,
-      aergap_verdict: fitData.aergap?.verdict,
+      aergap_verdict:   fitData.aergap?.verdict,
       honest_assessment: fitData.honest_assessment,
     }) : 'Fit evaluation: not available'
 
     const patch3: Record<string, unknown> = {}
     if (fitData) {
-      if (fitData.kima) {
-        if (fitData.kima.kima_fit)               patch3.kima_fit               = fitData.kima.kima_fit
-        if (fitData.kima.suggested_use_case)      patch3.suggested_use_case     = fitData.kima.suggested_use_case
-        if (fitData.kima.settlement_angle)        patch3.settlement_angle       = fitData.kima.settlement_angle
-        if (fitData.kima.integration_feasibility) patch3.integration_feasibility = fitData.kima.integration_feasibility
-        if (fitData.kima.revenue_potential)       patch3.revenue_potential      = fitData.kima.revenue_potential
-      }
-      if (fitData.aeredium) {
-        if (fitData.aeredium.aeredium_fit)   patch3.aeredium_fit  = fitData.aeredium.aeredium_fit
-        if (fitData.aeredium.security_angle) patch3.security_angle = fitData.aeredium.security_angle
-        if (fitData.aeredium.risk_angle)     patch3.risk_angle    = fitData.aeredium.risk_angle
-      }
-      if (fitData.competitor_context)     patch3.competitor_context     = fitData.competitor_context
-      if (fitData.honest_assessment)      patch3.competitor_context     = fitData.honest_assessment // repurpose field
+      const k = fitData.kima ?? {}
+      if (k.kima_fit)               patch3.kima_fit               = k.kima_fit
+      if (k.suggested_use_case)     patch3.suggested_use_case     = k.suggested_use_case
+      if (k.settlement_angle)       patch3.settlement_angle       = k.settlement_angle
+      if (k.integration_feasibility) patch3.integration_feasibility = k.integration_feasibility
+      if (k.revenue_potential)      patch3.revenue_potential      = k.revenue_potential
+
+      const ae = fitData.aeredium ?? {}
+      if (ae.aeredium_fit)   patch3.aeredium_fit  = ae.aeredium_fit
+      if (ae.security_angle) patch3.security_angle = ae.security_angle
+      if (ae.risk_angle)     patch3.risk_angle    = ae.risk_angle
+
+      // Store honest_assessment in competitor_context field (re-purposed for
+      // a richer summary that includes the full honest evaluation)
+      if (fitData.honest_assessment) patch3.competitor_context = fitData.honest_assessment
+      else if (fitData.competitor_context) patch3.competitor_context = fitData.competitor_context
+
       if (fitData.strategic_hypotheses?.length)
         patch3.assumptions = [
           ...(patch1.assumptions as {text:string}[] || []),
-          ...(fitData.strategic_hypotheses as string[]).map((h: string) => ({ text: `[Strategic hypothesis] ${h}` })),
+          ...fitData.strategic_hypotheses.map(h => ({ text: `[Strategic hypothesis] ${h}` })),
         ]
       patch3.updated_at = new Date().toISOString()
       await supabase.from('leads').update(patch3).eq('id', lead_id)
@@ -383,7 +392,7 @@ export async function POST(req: NextRequest) {
     // ── Phase 4: Score ─────────────────────────────────────────
     const scoreData = await claudeJSON({
       model: CLAUDE_RESEARCH, system: SYS,
-      user: pScore(name, fitSum, resData?.company_stage || ''), maxTokens: 600,
+      user: pScore(name, fitSum, String(resData?.company_stage || '')), maxTokens: 600,
     }).catch(() => null)
 
     if (scoreData) {

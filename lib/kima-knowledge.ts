@@ -179,39 +179,6 @@ export const ICP_BLOCK = `IDEAL CUSTOMER PROFILES (ICP):
 - Banks & institutions needing native settlement infra (Aeredium) without custody handoff
 - Web2 companies with SWIFT/wire friction (exporters, neobanks)`
 
-// ── The mandatory outreach line ──────────────────────────────────────────────
-export const SINGLE_API_LINE =
-  'All of this is possible with a single API integration, which is completely free, instant, and hassle-free.'
-
-// ── Composed blocks for prompts ──────────────────────────────────────────────
-
-// Compact product context (use in token-tight calls like company extraction)
-export const PRODUCT_BRAIN_COMPACT = `${KIMA_KNOWLEDGE}
-
-${AEREDIUM_KNOWLEDGE}`
-
-// Full product brain (research, scoring, outreach, chat, learn)
-export const PRODUCT_BRAIN = `${CONSULTANT_FRAMEWORK}
-
-${KIMA_KNOWLEDGE}
-
-${AEREDIUM_KNOWLEDGE}
-
-${AERGAP_KNOWLEDGE}
-
-${AGENTIC_PAYMENTS}
-
-${TARGET_CATEGORIES_BLOCK}
-
-${BATTLECARDS}`
-
-// Everything, including ICP (for strategy/advisory contexts like the voice agent)
-export const FULL_BRAIN = `${PRODUCT_BRAIN}
-
-${ICP_BLOCK}
-
-${AERGAP_KNOWLEDGE}`
-
 // ── AERGAP ───────────────────────────────────────────────────────────────────
 export const AERGAP_KNOWLEDGE = `AERGAP — Governance and control layer for AI agents that move money.
 
@@ -243,6 +210,37 @@ WHEN AERGAP IS NOT THE RIGHT ANSWER:
 
 Key contacts: Founder/CEO (small companies); Head of Product, VP Engineering, Head of AI, Head of Trust, Security leads (larger).
 Trigger events: enterprise customer announcement, funding round, compliance/security hire, AI agent product launch.`
+
+// ── The mandatory outreach line ──────────────────────────────────────────────
+export const SINGLE_API_LINE =
+  'All of this is possible with a single API integration, which is completely free, instant, and hassle-free.'
+
+// ── Composed blocks for prompts ──────────────────────────────────────────────
+
+// Compact product context (use in token-tight calls like company extraction)
+export const PRODUCT_BRAIN_COMPACT = `${KIMA_KNOWLEDGE}
+
+${AEREDIUM_KNOWLEDGE}`
+
+// Full product brain (research, scoring, outreach, chat, learn)
+export const PRODUCT_BRAIN = `${CONSULTANT_FRAMEWORK}
+
+${KIMA_KNOWLEDGE}
+
+${AEREDIUM_KNOWLEDGE}
+
+${AERGAP_KNOWLEDGE}
+
+${AGENTIC_PAYMENTS}
+
+${TARGET_CATEGORIES_BLOCK}
+
+${BATTLECARDS}`
+
+// Everything, including ICP (for strategy/advisory contexts like the voice agent)
+export const FULL_BRAIN = `${PRODUCT_BRAIN}
+
+${ICP_BLOCK}`
 
 // ── Full product catalog (used in qualify-lead to evaluate all products) ──────
 export const PRODUCTS_CATALOG = `COMPLETE PRODUCT CATALOG — evaluate every lead against ALL of these:
