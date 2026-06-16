@@ -23,7 +23,7 @@ import {
   buildTarget, channelDeepLink, logTouch, recordOutcome,
   type OutreachMeta, type OutreachOutcome,
 } from '@/lib/outreach'
-import type { Lead, Contact, ContactTouch, OutreachMessage, UseCase } from '@/lib/types'
+import type { Lead, Contact, ContactTouch, OutreachMessage, UseCase, BDBrief } from '@/lib/types'
 import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL, REGIONS } from '@/lib/types'
 import { actStart, actFinish, ACTION_TOOL, ACTION_LABEL } from '@/lib/agent-activity'
 
@@ -679,6 +679,244 @@ function UCPoints({ value, color }: { value: string | string[] | unknown; color:
   )
 }
 
+/* ── BD Brief Section ───────────────────────────────────── */
+// 7-section quick-scan brief: answer "is this worth pursuing?"
+// in under 60 seconds.
+
+function BriefBullets({ items, color = 'rgb(210,215,235)', dot = 'rgba(167,139,250,0.7)' }: {
+  items: string[]; color?: string; dot?: string
+}) {
+  if (!items?.length) return null
+  return (
+    <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 7 }}>
+      {items.map((item, i) => (
+        <li key={i} style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+          <span style={{ flexShrink: 0, marginTop: 6, width: 5, height: 5, borderRadius: '50%', background: dot }} />
+          <span style={{ fontSize: 13, lineHeight: 1.6, color }}>{item}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function BriefLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.2em', color: 'rgb(100,107,140)', marginBottom: 10 }}>
+      {children}
+    </div>
+  )
+}
+
+function BriefBlock({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return (
+    <div style={{ borderRadius: 12, padding: '14px 16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', ...style }}>
+      {children}
+    </div>
+  )
+}
+
+function BDBriefSection({ lead, onGenerated }: { lead: Lead; onGenerated: (brief: BDBrief) => void }) {
+  const [generating, setGenerating] = useState(false)
+  const brief = lead.bd_brief as BDBrief | undefined
+
+  const generate = async () => {
+    setGenerating(true)
+    const actId = actStart({ tool: 'Claude', action: 'Generate BD Brief', page: `Lead — ${lead.company_name}`, timestamp: Date.now() })
+    const t0 = Date.now()
+    try {
+      const res = await fetch('/api/ai/bd-brief', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead_id: lead.id }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      onGenerated(json.bd_brief)
+      actFinish(actId, 'success', 'BD brief ready', Date.now() - t0)
+      toast.success('BD brief generated')
+    } catch (err: unknown) {
+      actFinish(actId, 'error', err instanceof Error ? err.message : 'Failed', Date.now() - t0)
+      toast.error(err instanceof Error ? err.message : 'Brief generation failed')
+    } finally { setGenerating(false) }
+  }
+
+  const verdictStyle = (fit: string) => {
+    if (fit === 'Strong Fit')   return { bg: 'rgba(52,211,153,0.12)', border: 'rgba(52,211,153,0.3)', text: 'rgb(52,211,153)',  icon: '🟢' }
+    if (fit === 'Moderate Fit') return { bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.3)', text: 'rgb(251,191,36)', icon: '🟡' }
+    return                             { bg: 'rgba(248,113,133,0.1)', border: 'rgba(248,113,133,0.3)', text: 'rgb(248,113,133)', icon: '🔴' }
+  }
+
+  return (
+    <div style={{ padding: '24px 24px 28px' }}>
+
+      {/* ── Section header ─────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(251,191,36,0.2), rgba(124,58,237,0.15))', border: '1px solid rgba(251,191,36,0.25)' }}>
+            <Target size={16} color="rgb(251,191,36)" />
+          </div>
+          <div>
+            <h2 style={{ fontSize: 17, fontWeight: 700, color: 'white', margin: 0, letterSpacing: '-0.02em' }}>BD Brief</h2>
+            <p style={{ fontSize: 11, color: 'rgb(100,107,140)', margin: '2px 0 0' }}>
+              Is this worth pursuing? · 60-second scan
+            </p>
+          </div>
+        </div>
+        <button onClick={generate} disabled={generating}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px',
+            borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: generating ? 'not-allowed' : 'pointer',
+            opacity: generating ? 0.7 : 1, fontFamily: 'inherit',
+            background: brief ? 'rgba(124,58,237,0.08)' : 'linear-gradient(135deg, rgba(251,191,36,0.2), rgba(124,58,237,0.12))',
+            border: '1px solid rgba(251,191,36,0.3)', color: 'rgb(251,191,36)',
+          }}>
+          {generating
+            ? <><Loader2 size={13} className="animate-spin" />Writing Brief…</>
+            : brief
+              ? <><RefreshCw size={12} />Regenerate</>
+              : <><Sparkles size={12} />Generate BD Brief</>}
+        </button>
+      </div>
+
+      {/* ── Empty state ─────────────────────────────── */}
+      {!brief && !generating && (
+        <div style={{ borderRadius: 16, border: '1px dashed rgba(251,191,36,0.2)', background: 'rgba(251,191,36,0.03)', padding: '44px 24px', textAlign: 'center' }}>
+          <Target size={34} color="rgba(251,191,36,0.3)" style={{ margin: '0 auto 14px' }} />
+          <p style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 8 }}>No BD brief yet</p>
+          <p style={{ fontSize: 13, color: 'rgb(100,107,140)', lineHeight: 1.65, maxWidth: 440, margin: '0 auto 20px' }}>
+            Generate a 60-second brief answering: is this lead worth pursuing, what problem do we solve, and what to say on the call.
+          </p>
+          <button onClick={generate} disabled={generating}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 22px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: 'linear-gradient(135deg, rgba(251,191,36,0.3), rgba(124,58,237,0.2))', color: 'rgb(251,191,36)', border: '1px solid rgba(251,191,36,0.3)' }}>
+            <Sparkles size={14} /> Generate BD Brief
+          </button>
+        </div>
+      )}
+
+      {/* ── Skeleton ────────────────────────────────── */}
+      {generating && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, opacity: 0.5 }}>
+          {[0,1,2].map(i => (
+            <div key={i} style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)', padding: 16 }}>
+              <div style={{ height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.07)', marginBottom: 12, width: '25%' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {[95, 80, 88].slice(0, i + 2).map((w, j) => <div key={j} style={{ height: 10, borderRadius: 4, background: 'rgba(255,255,255,0.05)', width: `${w}%` }} />)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Brief content ───────────────────────────── */}
+      {brief && !generating && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+          {/* ── Row 1: BD Verdict (prominent) ─────────── */}
+          {brief.bd_verdict && (() => {
+            const vs = verdictStyle(brief.bd_verdict.fit)
+            return (
+              <div style={{ borderRadius: 14, padding: '16px 20px', background: vs.bg, border: `1px solid ${vs.border}`, display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div style={{ fontSize: 28 }}>{vs.icon}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 17, fontWeight: 800, color: vs.text, letterSpacing: '-0.01em', marginBottom: 4 }}>{brief.bd_verdict.fit}</div>
+                  <div style={{ fontSize: 13, lineHeight: 1.55, color: 'rgb(210,215,235)' }}>{brief.bd_verdict.reason}</div>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* ── Row 2: Summary + Money flow ─────────── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <BriefBlock>
+              <BriefLabel>📌 What they do</BriefLabel>
+              <BriefBullets items={brief.lead_summary} dot="rgba(96,165,250,0.8)" color="rgb(210,215,235)" />
+            </BriefBlock>
+            <BriefBlock>
+              <BriefLabel>💸 How money moves</BriefLabel>
+              <p style={{ fontSize: 13, lineHeight: 1.65, color: 'rgb(210,215,235)', margin: 0 }}>{brief.how_money_moves}</p>
+            </BriefBlock>
+          </div>
+
+          {/* ── Row 3: Pain points + Opportunity ─────── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <BriefBlock style={{ borderColor: 'rgba(248,113,133,0.2)', background: 'rgba(248,113,133,0.04)' }}>
+              <BriefLabel>🔥 Pain points</BriefLabel>
+              <BriefBullets items={brief.pain_points} dot="rgba(248,113,133,0.8)" color="rgb(220,215,235)" />
+            </BriefBlock>
+            <BriefBlock style={{ borderColor: 'rgba(52,211,153,0.2)', background: 'rgba(52,211,153,0.04)' }}>
+              <BriefLabel>⚡ Opportunity for us</BriefLabel>
+              {brief.opportunity?.products?.length > 0 && (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                  {brief.opportunity.products.map(p => (
+                    <span key={p} style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'rgba(124,58,237,0.2)', color: 'rgb(196,167,252)', border: '1px solid rgba(124,58,237,0.35)' }}>
+                      {p}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {brief.opportunity?.gap_solved && (
+                <p style={{ fontSize: 13, color: 'rgb(52,211,153)', lineHeight: 1.55, margin: '0 0 8px', fontWeight: 500 }}>
+                  {brief.opportunity.gap_solved}
+                </p>
+              )}
+              {brief.opportunity?.why_they_care && (
+                <p style={{ fontSize: 12, color: 'rgb(160,215,180)', lineHeight: 1.55, margin: 0 }}>
+                  → {brief.opportunity.why_they_care}
+                </p>
+              )}
+            </BriefBlock>
+          </div>
+
+          {/* ── Row 4: Real-Life Use Case ─────────────── */}
+          {brief.real_use_case && (
+            <BriefBlock style={{ borderColor: 'rgba(167,139,250,0.2)', background: 'rgba(124,58,237,0.05)' }}>
+              <BriefLabel>🎯 Real-life use case — {brief.real_use_case.title}</BriefLabel>
+              <BriefBullets items={brief.real_use_case.story} dot="rgba(167,139,250,0.8)" color="rgb(210,215,235)" />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginTop: 14 }}>
+                {brief.real_use_case.without_us && (
+                  <div style={{ padding: '10px 13px', borderRadius: 10, background: 'rgba(248,113,133,0.07)', border: '1px solid rgba(248,113,133,0.2)' }}>
+                    <div style={{ fontSize: 9, fontWeight: 800, color: 'rgb(248,113,133)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 6 }}>Without us</div>
+                    <p style={{ fontSize: 12, color: 'rgb(210,215,235)', lineHeight: 1.55, margin: 0 }}>{brief.real_use_case.without_us}</p>
+                  </div>
+                )}
+                {brief.real_use_case.with_us && (
+                  <div style={{ padding: '10px 13px', borderRadius: 10, background: 'rgba(52,211,153,0.07)', border: '1px solid rgba(52,211,153,0.2)' }}>
+                    <div style={{ fontSize: 9, fontWeight: 800, color: 'rgb(52,211,153)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 6 }}>With us</div>
+                    <p style={{ fontSize: 12, color: 'rgb(210,215,235)', lineHeight: 1.55, margin: 0 }}>{brief.real_use_case.with_us}</p>
+                  </div>
+                )}
+                {brief.real_use_case.outcome && (
+                  <div style={{ padding: '10px 13px', borderRadius: 10, background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)' }}>
+                    <div style={{ fontSize: 9, fontWeight: 800, color: 'rgb(251,191,36)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 6 }}>Outcome</div>
+                    <p style={{ fontSize: 12, color: 'rgb(210,215,235)', lineHeight: 1.55, margin: 0 }}>{brief.real_use_case.outcome}</p>
+                  </div>
+                )}
+              </div>
+            </BriefBlock>
+          )}
+
+          {/* ── Row 5: Discovery Questions ─────────────── */}
+          {brief.discovery_questions?.length > 0 && (
+            <BriefBlock style={{ borderColor: 'rgba(96,165,250,0.2)', background: 'rgba(96,165,250,0.04)' }}>
+              <BriefLabel>❓ Discovery questions — ask on the first call</BriefLabel>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {brief.discovery_questions.map((q, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 6, background: 'rgba(96,165,250,0.15)', border: '1px solid rgba(96,165,250,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'rgb(147,197,253)' }}>
+                      {i + 1}
+                    </span>
+                    <span style={{ fontSize: 13, lineHeight: 1.6, color: 'rgb(210,215,235)', paddingTop: 2 }}>{q}</span>
+                  </div>
+                ))}
+              </div>
+            </BriefBlock>
+          )}
+
+        </div>
+      )}
+    </div>
+  )
+}
+
 function UseCasesSection({ lead, onGenerated }: { lead: Lead; onGenerated: (cases: UseCase[]) => void }) {
   const [generating, setGenerating] = useState(false)
   const cases: UseCase[] = (lead.use_cases as UseCase[]) || []
@@ -998,6 +1236,24 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
   useEffect(() => { loadLead() }, [id]) // eslint-disable-line
 
+  // Auto-generate BD brief the first time a lead page opens if:
+  // - lead is fully enriched (approved/qualified/contacted etc.)
+  // - no brief exists yet
+  useEffect(() => {
+    if (!lead || lead.bd_brief) return
+    const enrichedStatuses = ['approved','qualified','contacted','replied','meeting_booked','won','integration']
+    if (!enrichedStatuses.includes(lead.status)) return
+    // Fire quietly in the background — no toast, just populates the section
+    fetch('/api/ai/bd-brief', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lead_id: lead.id }),
+    })
+      .then(r => r.json())
+      .then(json => { if (json.success) setLead(l => l ? { ...l, bd_brief: json.bd_brief } : l) })
+      .catch(() => { /* silent — user can click Generate manually */ })
+  }, [lead?.id, lead?.status]) // eslint-disable-line
+
   const saveEdits = async () => {
     if (!lead) return; setSaving(true)
     const score = editForm.lead_score
@@ -1278,6 +1534,14 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               Apollo: Verify Emails
             </button>
           </div>
+        </div>
+
+        {/* ══ BD BRIEF — full-width quick scan ════════════════ */}
+        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          <BDBriefSection
+            lead={lead}
+            onGenerated={brief => setLead(l => l ? { ...l, bd_brief: brief } : l)}
+          />
         </div>
 
         {/* ══ BODY ════════════════════════════════════════════ */}

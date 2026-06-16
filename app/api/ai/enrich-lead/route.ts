@@ -224,6 +224,17 @@ export async function POST(req: NextRequest) {
     // ── Done: mark as approved ─────────────────────────────────
     await supabase.from('leads').update({ status: 'approved', updated_at: new Date().toISOString() }).eq('id', lead_id)
 
+    // ── BD Brief: generate last so it has all enriched data ────
+    // Fire-and-forget — brief failure must not block the enrichment result
+    try {
+      const { generateBDBrief } = await import('@/lib/bd-brief')
+      const freshLead = await supabase.from('leads').select('*').eq('id', lead_id).single()
+      if (freshLead.data) {
+        const brief = await generateBDBrief(freshLead.data as Record<string, unknown>)
+        await supabase.from('leads').update({ bd_brief: brief, updated_at: new Date().toISOString() }).eq('id', lead_id)
+      }
+    } catch { /* non-fatal — user can regenerate from the lead page */ }
+
     return NextResponse.json({ success: true, lead_id })
 
   } catch (err: unknown) {
