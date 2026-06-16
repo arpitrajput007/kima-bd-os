@@ -122,6 +122,11 @@ RULES:
 - NEVER invent a use case just to fill space. Fewer honest ones > more forced ones
 - For agentic leads: ALWAYS include at least one use case involving Aeredium's TEE/AERKey layer
 
+MANDATORY FIELDS — populate all three in every use case:
+1. our_products_used: name the EXACT products (Kima Settlement API / Kima UPR / Aeredium AERKey TEE / Aeredium Threshold ECDSA / Aergap Execution Gate). Do not write generic "Kima" — be specific.
+2. pain_point_proof: cite observable facts that prove the pain is real for this company — their tech stack, architecture choices, competitor they displaced, public statements, known incidents, or regulatory pressure. Use the "Pain Evidence / Proof" field from the lead data if provided.
+3. scenario: describe the company's CURRENT broken workflow, not the solution. Be specific to their product.
+
 Return ONLY valid JSON — no markdown, no text outside the array.`
 
   const user = `Generate real use cases for this company:
@@ -139,6 +144,7 @@ Competitor/Incumbent: ${lead.competitor_or_current_provider || 'N/A'}
 Competitor Context: ${lead.competitor_context || 'N/A'}
 Pain Point: ${lead.pain_point || 'N/A'}
 Pain Severity: ${lead.pain_point_severity || 'N/A'}
+Pain Evidence / Proof: ${lead.pain_point_evidence || 'N/A'}
 Kima Fit: ${lead.kima_fit || 'N/A'}
 Aeredium Fit: ${lead.aeredium_fit || 'N/A'}
 Settlement Angle: ${lead.settlement_angle || 'N/A'}
@@ -153,14 +159,16 @@ Return a JSON array of 2-3 use case objects. Each field that is a list of points
     "id": "short-kebab-slug",
     "title": "Precise, specific title (not generic — name the actual workflow)",
     "category": "Settlement | Payments | Treasury | Security | On/Off-ramp | Agentic | DvP | Other",
-    "scenario": "3-4 bullet points as a JSON array. Each point: one crisp sentence about the current problem or workflow. E.g. ['Agent wallets are EVM-only — Solana payments fail silently.', 'Suppliers demand fiat payment, not stablecoins.']",
-    "kima_role": "2-3 bullet points as a JSON array. Exactly what Kima does — which API, which settlement path, which chains.",
-    "aeredium_role": "1-2 bullet points as a JSON array, or empty array [] if Aeredium is not relevant to this use case.",
-    "outcome_for_company": "1-2 bullet points as a JSON array with concrete measurable outcomes (time, cost, market access).",
-    "outcome_for_kima": "1 bullet point as a JSON array: transaction volume, fee revenue, or partnership type.",
+    "our_products_used": ["Array of the EXACT Kima/Aeredium/Aergap product names used in this use case. Be specific — e.g. 'Kima Settlement API', 'Kima UPR (Universal Payment Rail)', 'Aeredium AERKey TEE', 'Aeredium Threshold ECDSA', 'Aergap Execution Gate'. Only include products that genuinely apply."],
+    "scenario": ["3-4 bullet strings. Each: one crisp sentence about the current problem/workflow this company faces. Name their actual system or workflow where possible."],
+    "pain_point_proof": ["1-2 bullet strings. Concrete, observable evidence that this pain point is REAL for this specific company — cite their architecture choices, public integrations, known incidents, customer complaints, or structural constraints. No speculation. If the Pain Evidence field above contains relevant facts, use them."],
+    "kima_role": ["2-3 bullet strings. Exactly what Kima does — which API, which settlement path, which chains/rails."],
+    "aeredium_role": ["1-2 bullet strings showing Aeredium's exact contribution, or empty array [] if not relevant to this use case."],
+    "outcome_for_company": ["1-2 bullet strings with concrete measurable outcomes — time saved, cost reduced, new markets unlocked, compliance met."],
+    "outcome_for_kima": ["1 bullet string: transaction volume, fee revenue, or strategic partnership value."],
     "feasibility": "high | medium | low",
     "impact": "transformative | significant | incremental",
-    "why_now": "One sentence on why RIGHT NOW. Empty string if no strong trigger."
+    "why_now": "One sentence on why RIGHT NOW is the moment to act. Empty string if no strong trigger."
   }
 ]`
 

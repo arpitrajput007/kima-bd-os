@@ -75,12 +75,16 @@ export default function MoneyTouchingAgentsPage() {
   }), [added])
 
   // ── Enrichment ────────────────────────────────────────────────
+  // Step 1: Full research/classify/fit/contacts via enrich-lead
+  // Step 2: Auto-generate Aergap playbook use cases (chained after enrichment)
+  //         so use-cases AI has all enriched context in the DB to work with
   const kickOffEnrichment = (leadId: string, coName: string) => {
     setEnriching(s => new Set([...s, coName]))
     const a1 = actStart({ tool: 'Claude',        action: 'Research + Classify + Fit Analysis', page: `Money Agents — ${coName}`, timestamp: Date.now() })
     const a2 = actStart({ tool: 'ContactFinder', action: 'Find Contacts',                      page: `Money Agents — ${coName}`, timestamp: Date.now() })
-    const a3 = actStart({ tool: 'Claude',        action: 'Generate Use Cases',                 page: `Money Agents — ${coName}`, timestamp: Date.now() })
+    const a3 = actStart({ tool: 'Claude',        action: 'Aergap Playbook + Use Cases',        page: `Money Agents — ${coName}`, timestamp: Date.now() })
     const t0 = Date.now()
+
     fetch('/api/ai/enrich-lead', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -88,23 +92,48 @@ export default function MoneyTouchingAgentsPage() {
     })
       .then(r => r.json())
       .then(res => {
-        const dur = Date.now() - t0
+        const enrichDur = Date.now() - t0
         if (res.success) {
-          actFinish(a1, 'success', 'Research complete', Math.round(dur * 0.4))
-          actFinish(a2, 'success', 'Contacts saved',    Math.round(dur * 0.3))
-          actFinish(a3, 'success', 'Use cases ready',   Math.round(dur * 0.3))
-          toast.success(`✓ ${coName} fully enriched`)
+          actFinish(a1, 'success', 'Research complete', Math.round(enrichDur * 0.55))
+          actFinish(a2, 'success', 'Contacts saved',    Math.round(enrichDur * 0.45))
+          toast(`${coName} enriched — running Aergap playbook…`, { icon: '⚡' })
+
+          // Chain use-cases generation: runs AFTER enrichment so the AI has all
+          // enriched fields (kima_fit, aeredium_fit, business_model, etc.) in the DB.
+          // Since these leads are tagged 'Agentic Payments Customer', the use-cases
+          // route automatically applies the full Aergap sales playbook.
+          const t1 = Date.now()
+          return fetch('/api/ai/use-cases', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lead_id: leadId }),
+          })
+            .then(r => r.json())
+            .then(ucRes => {
+              const ucDur = Date.now() - t1
+              if (ucRes.success) {
+                actFinish(a3, 'success', `${ucRes.use_cases?.length ?? 0} Aergap use cases saved`, ucDur)
+                toast.success(`✓ ${coName} — deep research + Aergap use cases ready`)
+              } else {
+                actFinish(a3, 'error', 'Use case gen failed', ucDur)
+                toast.success(`✓ ${coName} enriched (use cases failed — retry from lead page)`)
+              }
+            })
+            .catch(() => {
+              actFinish(a3, 'error', 'Use cases error', 0)
+              toast.success(`✓ ${coName} enriched (use cases timed out — retry from lead page)`)
+            })
         } else {
-          actFinish(a1, 'error', 'Partial', dur)
+          actFinish(a1, 'error', 'Partial', enrichDur)
           actFinish(a2, 'error', 'Partial', 0)
-          actFinish(a3, 'error', 'Partial', 0)
+          actFinish(a3, 'error', 'Skipped — enrichment partial', 0)
           toast.error(`Enrichment partial for ${coName}`)
         }
       })
       .catch(() => {
         actFinish(a1, 'error', 'Failed', 0)
         actFinish(a2, 'error', 'Failed', 0)
-        actFinish(a3, 'error', 'Failed', 0)
+        actFinish(a3, 'error', 'Skipped — enrichment failed', 0)
         toast.error(`Enrichment failed for ${coName}`)
       })
       .finally(() => setEnriching(s => { const n = new Set(s); n.delete(coName); return n }))
