@@ -9,22 +9,25 @@ import { claudeJSON, CLAUDE_RESEARCH } from '@/lib/claude'
 import { PRODUCT_BRAIN } from '@/lib/kima-knowledge'
 import type { BDBrief } from '@/lib/types'
 
-const SYSTEM = `You are a senior BD analyst for Kima, Aeredium, and Aergap — financial infrastructure companies.
+const SYSTEM = `You are a senior solutions architect and BD strategist for Kima, Aeredium, and Aergap — financial infrastructure companies.
 
 ${PRODUCT_BRAIN}
 
-YOUR JOB: Write a BD brief that helps a sales person decide in 30–60 seconds whether this lead is worth pursuing, what problem we solve for them, and what to say on the first call.
+YOUR JOB: Write a BD brief that feels like it was prepared by someone who spent hours researching this specific company. The benchmark: if you replace the company name with a different company and the brief still makes sense, you have failed.
 
-WRITING RULES — follow these exactly:
-1. Plain English only. Write as if explaining to a smart businessperson who is not technical.
-2. Every sentence must pass the "So what?" test. If it doesn't help decide whether to pursue, cut it.
-3. No marketing language. No feature lists. No long paragraphs. No repeating product features.
-4. For the real-life use case, use the "Sender A → Receiver B" storytelling format.
-   BAD: "Kima enables cross-chain interoperability and atomic settlement."
-   GOOD: "An AI trading agent earns USDC on Solana and needs to pay a supplier who only accepts USDT on BNB Chain. Without Kima, this requires 3 separate bridges, manual steps, and counterparty risk. With Kima, the agent calls one API — the payment settles end-to-end in under 60 seconds."
-5. Pain points must be OPERATIONAL problems this specific company faces — not generic industry challenges.
-6. Discovery questions must be ones you would ACTUALLY ask on a first call — not generic filler.
-7. BE SPECIFIC. Name their actual workflows, their stack, their customers. Generic = useless.
+WRITING RULES — non-negotiable:
+1. Understand the company before evaluating products. The brief must reflect deep company knowledge, not a product pitch.
+2. "No fit" or "Weak Fit" is an acceptable BD verdict. If the fit is weak, say so clearly and explain why. This protects the BD team's time and credibility.
+3. Plain English. Write as if explaining to a smart business person who is not technical.
+4. Every sentence must pass the "So what?" test. If it doesn't help decide whether to pursue — cut it.
+5. No marketing language. No feature lists. No repeating product features unless they directly solve a named problem.
+6. For the real-life use case, use "Sender A → Receiver B" or "Agent A tries to do X" story format with specifics.
+   BAD: "Kima enables cross-chain interoperability."
+   GOOD: "A corporate treasury agent running on their platform decides to move $2M from a USDC account on Ethereum to pay a supplier in BNB Chain. Without Kima, this requires a bridge, manual approval, 20 minutes, and counterparty risk. With Kima, the agent calls one API — the payment settles atomically in under 60 seconds, with full audit trail."
+7. Pain points must be OPERATIONAL problems specific to this company's actual workflow and infrastructure — not generic category challenges.
+8. The opportunity section must answer: why THIS product for THIS company, and why the other products are less relevant.
+9. Discovery questions must be ones you would actually ask on a first call — diagnostic, not generic.
+10. Strategic hypotheses must be clearly labeled as future-state possibilities, not current facts.
 
 Return ONLY valid JSON. No markdown, no text outside the JSON.`
 
@@ -33,69 +36,88 @@ export async function generateBDBrief(lead: Record<string, unknown>): Promise<BD
     ? (lead.customer_category as string[]).join(', ')
     : String(lead.customer_category || 'N/A')
 
-  const user = `Generate a BD brief for this lead. Use all the enriched data below — it contains research findings, pain analysis, and product fit analysis already done by the agent.
+  const assumptions = Array.isArray(lead.assumptions)
+    ? (lead.assumptions as {text:string}[]).map(a => a.text || String(a)).join('\n')
+    : ''
+
+  const user = `Generate a BD brief for this company. The agent has already done deep research — use all the enriched data below.
 
 COMPANY: ${lead.company_name}
 WEBSITE: ${lead.website || 'N/A'}
 INDUSTRY: ${lead.industry_category || 'N/A'}
 CUSTOMER CATEGORY: ${cats}
 REGION: ${lead.region || 'N/A'}
+STAGE: ${lead.business_model ? 'see business model' : 'unknown'}
 
-WHAT THEY DO:
+WHAT THEY ACTUALLY DO:
 ${lead.description || lead.product_summary || 'N/A'}
 
 BUSINESS MODEL: ${lead.business_model || 'N/A'}
+EXISTING INFRASTRUCTURE / STACK: ${lead.current_providers || 'N/A'}
 CHAINS / RAILS THEY SUPPORT: ${lead.supported_chains_or_rails || 'N/A'}
-CURRENT PROVIDERS / STACK: ${lead.current_providers || 'N/A'}
 
-PAIN POINT: ${lead.pain_point || 'N/A'}
+IDENTIFIED PAIN POINTS: ${lead.pain_point || 'N/A'}
 PAIN SEVERITY: ${lead.pain_point_severity || 'N/A'}
-PAIN EVIDENCE: ${lead.pain_point_evidence || 'N/A'}
+PAIN EVIDENCE (what makes this pain credible): ${lead.pain_point_evidence || 'N/A'}
 
-KIMA FIT: ${lead.kima_fit || 'N/A'}
-AEREDIUM FIT: ${lead.aeredium_fit || 'N/A'}
-SETTLEMENT ANGLE: ${lead.settlement_angle || 'N/A'}
-SECURITY ANGLE: ${lead.security_angle || 'N/A'}
-RISK ANGLE: ${lead.risk_angle || 'N/A'}
-PRODUCT TO SELL THEM: ${lead.product_to_sell || 'N/A'}
+PRODUCT FIT ANALYSIS:
+- Kima fit: ${lead.kima_fit || 'N/A'}
+- Aeredium fit: ${lead.aeredium_fit || 'N/A'}
+- Settlement angle: ${lead.settlement_angle || 'N/A'}
+- Security angle: ${lead.security_angle || 'N/A'}
+- Risk angle: ${lead.risk_angle || 'N/A'}
+- Competitor context: ${lead.competitor_context || 'N/A'}
+
+PRODUCT TO SELL: ${lead.product_to_sell || 'N/A'}
 SUGGESTED USE CASE: ${lead.suggested_use_case || 'N/A'}
 INTEGRATION FEASIBILITY: ${lead.integration_feasibility || 'N/A'}
 
-TRIGGER / REASON TO REACH OUT NOW: ${lead.trigger_reason || 'N/A'}
+TRIGGER / WHY NOW: ${lead.trigger_reason || 'N/A'}
 REVENUE POTENTIAL: ${lead.revenue_potential || 'N/A'}
 LEAD SCORE: ${lead.lead_score ?? 'N/A'} / 100
 
-Return this exact JSON structure. Every field is required. Keep bullets SHORT — max 20 words each:
+STRATEGIC HYPOTHESES (future-state possibilities flagged by the agent):
+${assumptions || 'None identified'}
+
+━━ OUTPUT REQUIREMENTS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+The brief must be specific to ${lead.company_name}. If you can replace the name with any other company and the brief still makes sense — rewrite it.
+
+The BD Verdict must be honest. If the fit is weak, say so and explain why. The BD team needs signal, not manufactured confidence.
+
+Return this exact JSON structure:
 
 {
   "lead_summary": [
-    "2–3 short bullet strings. What does this company do, in plain English? What problem are they solving for their customers?"
+    "2–3 bullets. What does ${lead.company_name} specifically do — not the category, the actual product and workflow? What problem do they solve for their customers?"
   ],
-  "how_money_moves": "2–3 sentences. Walk through how money, assets, or value actually flows through their product. Be specific about who pays who, in what currency, across which rails.",
+  "how_money_moves": "2–3 sentences. How does value actually flow through their product? Who sends what, to whom, across which systems? Be specific to their actual infrastructure.",
   "pain_points": [
-    "Top 3 operational problems they face RIGHT NOW. Each as one short punchy sentence. Name the actual pain — not abstract industry challenges."
+    "Top 3 operational problems specific to ${lead.company_name}'s situation. Each as one punchy sentence. Traceable to their actual workflow or stack — NOT generic industry problems."
   ],
   "opportunity": {
-    "products": ["List only the products that genuinely apply: 'Kima', 'Aeredium', 'Aergap'. Do not list all three if only one fits."],
-    "gap_solved": "One sentence: what specific gap in their current setup does our product fill?",
-    "why_they_care": "One sentence: what business outcome do they get — faster settlement, lower cost, compliance, new markets, reduced risk?"
+    "products": ["Only list products with genuine fit: 'Kima', 'Aeredium', 'Aergap'. If none fit strongly, list the best one with caveats. If truly no fit, say ['No clear fit at this time']."],
+    "gap_solved": "One sentence: what specific gap in ${lead.company_name}'s current setup does our product fill? Name their actual limitation.",
+    "why_they_care": "One sentence: what concrete business outcome do they get? (not features — outcomes: faster settlement, new corridor opened, compliance unlocked, cost reduced by X%)",
+    "why_not_the_others": "One sentence: briefly explain why the other products are less relevant for this specific company right now."
   },
   "real_use_case": {
-    "title": "Short action title for this specific scenario (not generic)",
+    "title": "Short, specific title — must name the actual workflow at ${lead.company_name}, not a generic payment scenario",
     "story": [
-      "3–4 bullet strings. Walk through the exact scenario step by step using Sender A / User A → Receiver B framing.",
-      "Each bullet = one step in the story. Who initiates? What happens? Where does it break without us?"
+      "3–4 bullets. Walk through the exact scenario using their actual product and customers. Use 'User A / Agent A / Sender A → Receiver B' framing. Each bullet = one step. Make it specific enough that someone unfamiliar with payments would understand what breaks and why."
     ],
-    "without_us": "One sentence: what actually happens today without our product. Be specific and concrete.",
-    "with_us": "One sentence: what happens when they use our product instead. Same specificity.",
-    "outcome": "One sentence: the measurable result — time saved, cost reduced, risk eliminated, new capability unlocked."
+    "without_us": "One sentence: what concretely happens today without our product? Name the friction — time, cost, risk, failure mode.",
+    "with_us": "One sentence: what specifically changes with our product? Same specificity as 'without_us'.",
+    "outcome": "One sentence: the measurable result — time saved, cost reduced, risk eliminated, market accessed."
   },
   "discovery_questions": [
-    "3–5 questions you would actually ask on a first call to validate the opportunity. Not generic filler — questions that surface their real pain and budget authority."
+    "3–5 questions for the first call. Each must be diagnostic — designed to surface whether the pain is real and whether there is budget and authority to act. Not 'Tell us about your payment flows' — more specific than that."
+  ],
+  "strategic_hypotheses": [
+    "1–3 future-state possibilities. Clearly labeled as hypotheses, not current facts. E.g. 'If they expand into Southeast Asia, Kima becomes relevant because their current EVM-only stack doesn't cover those corridors.'"
   ],
   "bd_verdict": {
     "fit": "Strong Fit | Moderate Fit | Weak Fit",
-    "reason": "One sentence explaining why. Reference something specific about this company."
+    "reason": "One sentence. Reference something specific about ${lead.company_name} — their stage, their infrastructure, their customer type, or their identified pain. Not generic."
   }
 }`
 

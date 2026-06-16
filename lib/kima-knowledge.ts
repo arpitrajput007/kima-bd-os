@@ -6,35 +6,105 @@
 // facts in ONE place and the whole agent gets sharper.
 // ============================================================
 
-// ── KIMA (Kima Network / Kima Finance) ───────────────────────────────────────
-export const KIMA_KNOWLEDGE = `KIMA — Universal settlement & cross-ecosystem money-transfer protocol.
-Kima moves value across public blockchains, private/permissioned chains, and traditional bank accounts WITHOUT bridges, wrapped/synthetic assets, smart contracts, oracles, or relayers. Kima manages native liquidity pools on each chain and settles peer-to-peer — there are no smart contracts holding user funds, which removes the exact attack surfaces hackers exploit (smart-contract bugs, cross-chain messaging exploits, oracle/relayer compromise, wrapped-asset de-pegs).
+// ── KIMA ─────────────────────────────────────────────────────────────────────
+export const KIMA_KNOWLEDGE = `KIMA — Trustless settlement and interoperability infrastructure.
+
+What Kima actually is:
+Kima acts as a settlement layer that sits ON TOP of existing blockchains and bank accounts — it does not replace them. It is asset-agnostic, chain-agnostic, and system-agnostic. It can connect stablecoins, cryptocurrencies, bank accounts, treasury systems, and any system exposed through APIs. When a payment needs to move across rails that don't natively speak to each other — different chains, fiat and crypto, bank accounts and wallets — Kima is the settlement layer that makes it happen atomically.
+
+How it works:
+Kima manages native liquidity pools on each connected rail and settles peer-to-peer without bridges, wrapped/synthetic assets, smart contracts, oracles, or relayers. There are no smart contracts holding user funds — this removes the attack surfaces that cause bridge hacks.
 
 Core products:
-- Universal Payment Rail (UPR): ONE API for instant, atomic settlement across fiat, stablecoins, CBDCs, and tokenized assets, spanning 9+ chains and major fiat currencies. Connects Web2 banking and Web3 in a single integration.
-- Liquidity as a Service (LaaS): tap pooled cross-chain liquidity without holding large reserves; built-in KYT/AML compliance.
-- Delivery vs Payment (DvP): atomic asset-for-payment swaps via decentralized escrow (no smart contracts) — built for RWAs, securities, tokenized assets.
+- Universal Payment Rail (UPR): one API for instant atomic settlement across blockchains, fiat, stablecoins, CBDCs, and tokenized assets. Connects Web2 banking and Web3 in a single integration.
+- Liquidity as a Service (LaaS): pooled cross-chain liquidity — companies tap Kima's pools instead of holding fragmented reserves on multiple chains.
+- Delivery vs Payment (DvP): atomic asset-for-payment settlement via decentralized escrow (no smart contracts) — for RWAs, securities, tokenized assets.
 
-Security: MPC via TEE + TSS (threshold signatures), MPC vaults, quantum-resistant cryptography. Non-custodial and compliance-native (KYT/AML).
+Use cases Kima is built for: remittances, on/off ramps, payouts, pay-ins, commerce, trading, cross-border B2B settlement, treasury rebalancing, and any scenario where value needs to move between systems that don't natively interconnect.
 
-Primary use cases: cross-chain deposits/withdrawals, fiat-to-crypto on-ramp, crypto-to-fiat off-ramp, stablecoin payments, cross-border settlement (remittance/payroll/B2B), treasury rebalancing across chains, RWA delivery-versus-payment, in-app cross-chain wallets, DeFi lending collateral across chains.
+Who Kima is for: infrastructure for remittance providers, card companies, fintechs, PSPs, wallets, and enterprises — NOT a direct-to-consumer product.
 
-Integration pitch: a single API integration — fast, instant, and hassle-free.
+Credibility: sandbox work with the European Central Bank and Mastercard. Team from IBM, UBS, JP Morgan, HP.
 
-Credibility: partnerships/sandbox work with the European Central Bank and Mastercard (stablecoin card sandbox). Team from IBM, UBS, JP Morgan, HP.`
+WHEN KIMA IS NOT THE RIGHT ANSWER:
+- A company that already operates mature, proven settlement infrastructure for their specific use case. If they built it themselves and it works, Kima is a competitor scenario, not a customer scenario.
+- A company whose only "cross-chain" need is trivial (e.g., one chain with one stablecoin and no expansion plans).
+- Direct-to-consumer apps without a settlement infrastructure layer.
+Example anti-pattern: suggesting Kima's on/off-ramp to Binance. Binance already has the most mature fiat-crypto corridors in the industry. That's not a gap — that's their core business. The right question to ask about Binance would be: where does their existing infrastructure break, and is that a Kima problem?`
 
 // ── AEREDIUM ─────────────────────────────────────────────────────────────────
-export const AEREDIUM_KNOWLEDGE = `AEREDIUM — The trust layer for institutional settlement. An EVM-compatible Layer 1 built for banks and institutions.
+export const AEREDIUM_KNOWLEDGE = `AEREDIUM — The institutional-grade full-stack infrastructure layer.
 
-What makes it structurally different:
-- TEE-attested validators: every block is signed inside a hardware-attested enclave, spread across three cloud providers (AWS Nitro, Azure SEV-SNP, GCP Confidential Space). No human can produce a block — this removes validator/human compromise as an attack vector.
-- AERKey: TEE-attested threshold ECDSA across the three clouds — signing keys are never assembled in any single place.
-- AERLink: threshold-governed access to bank APIs, ERPs, and SWIFT, so institutions expose core-banking systems WITHOUT modifying legacy infrastructure or handing over custody.
-- Bridgeless cross-chain settlement to EVM and non-EVM networks (Ethereum, Bitcoin, Solana, Polygon). Bitcoin-anchored finality. Encrypted-by-default transactions (Privacy Mode).
+What Aeredium actually is:
+Aeredium is the broader infrastructure complement to Kima following the merger. It extends the offering into a complete full-stack institutional solution. It is not a consumer product or a startup tool — it is built for organizations that need enterprise-grade security, throughput, and regulatory defensibility.
 
-Performance: ~250,000 TPS end-to-end on testnet (mainnet target ~1M TPS), 50 blocks/sec, 20ms block time — roughly 10x Visa's peak throughput.
+What makes it different:
+- TEE-attested validators: every block is signed inside a hardware-attested enclave across three cloud providers (AWS Nitro, Azure SEV-SNP, GCP Confidential Space). No human can produce a block.
+- AERKey: TEE-attested threshold ECDSA across three clouds — signing keys are never assembled in a single place. Cryptographic policy enforcement at the key level.
+- AERLink: threshold-governed access to bank APIs, ERPs, and SWIFT — institutions expose core-banking systems WITHOUT modifying legacy infrastructure or handing over custody.
+- Privacy Mode: encrypted-by-default transactions.
+- Performance: ~250,000 TPS on testnet, 20ms block time — roughly 10x Visa's peak throughput.
+- Bitcoin-anchored finality.
+- Future-ready wallet infrastructure: designed for autonomous agents to transact securely without traditional key-management risks.
 
-Bank engagement models: (1) Participant — bank holds an institutional wallet; (2) Service offering — bank resells Aeredium access (an alternative to the Fireblocks / Coinbase Custody model); (3) KYC sponsor — institutional compliance gateway; (4) AERLink operator — expose core-banking APIs without system changes.`
+Bank engagement models: (1) Participant — holds an institutional wallet; (2) Service offering — resells Aeredium access (alternative to Fireblocks/Coinbase Custody model); (3) KYC sponsor — institutional compliance gateway; (4) AERLink operator — exposes core-banking APIs without system changes.
+
+WHEN AEREDIUM IS NOT THE RIGHT ANSWER:
+- Early-stage startups without institutional partners or high-throughput requirements. The TEE infrastructure is overkill for companies moving small volumes.
+- Companies that need a payment API, not a settlement network.
+- Companies with no need for institutional-grade compliance, throughput, or privacy.`
+
+// ── Consultant reasoning framework ───────────────────────────────────────────
+// Injected into enrichment and bd-brief prompts to force the right order of
+// reasoning. This is the single most important quality lever in the system.
+export const CONSULTANT_FRAMEWORK = `
+════════════════════════════════════════════════════════
+HOW TO REASON ABOUT A LEAD — READ THIS BEFORE ANYTHING ELSE
+════════════════════════════════════════════════════════
+
+You are a senior solutions consultant and BD strategist. Your job is not to find reasons to recommend our products. Your job is to arrive at a credible, specific, honest assessment of whether we can genuinely help this company — and if so, how.
+
+Follow this order strictly:
+
+STEP 1 — UNDERSTAND THE COMPANY FIRST
+Before thinking about our products at all, understand this specific company:
+- What do they actually do? (Not the category — the specific product and workflow)
+- Who are their actual customers? (Types, names if known, deal sizes, relationship dynamic)
+- How do they make money? (Revenue model specifics, not just "SaaS" or "payments")
+- What infrastructure do they already have? (Which payment rails, custody solutions, blockchains, banking partners)
+- What stage are they at? (Early startup / growth / mature enterprise — matters enormously)
+- What regions and regulatory environments do they operate in?
+- What strategic direction are they moving in? (New markets, new products, recent hires, announcements)
+- What visible constraints or limitations does their current setup have?
+
+STEP 2 — IDENTIFY THEIR REAL PAIN POINTS
+Based only on what you learned in Step 1:
+- What operational bottlenecks are likely costing them money, speed, or customers?
+- What capabilities are clearly missing from their stack?
+- What friction exists in their core workflow that their customers experience?
+- What are they likely trying to solve in the next 12–24 months based on their strategic direction?
+Do NOT list generic industry problems. The pain points must be traceable to this specific company's situation.
+
+STEP 3 — EVALUATE OUR PRODUCTS HONESTLY
+Only after understanding the company and their pains, evaluate each product:
+- Does Kima solve a REAL settlement or interoperability problem they have?
+- Does Aeredium solve a REAL institutional infrastructure problem they have?
+- Does Aergap solve a REAL AI agent governance problem they have?
+
+CRITICAL: "No fit" is a perfectly valid — and valuable — conclusion for any or all products.
+- If you force a recommendation where none exists, you waste the BD team's time and destroy trust in the agent's judgment.
+- If you recommend Kima to a company that already has mature settlement infrastructure, you look like you didn't do your homework.
+- 3 highly credible, deeply reasoned opportunities > 30 generic suggestions.
+
+TEST: If you replaced the company name with a different company and the analysis still made sense — you have failed. The output must be specific to THIS company.
+
+STEP 4 — HYPOTHESIZE STRATEGICALLY
+For products that aren't an immediate fit, ask: "Under what future conditions would this become relevant?"
+- "If they expand into X corridor, Kima becomes relevant because..."
+- "When they start giving agents financial authority, Aergap becomes critical because..."
+- "If they partner with institutional players, Aeredium's TEE infrastructure would matter because..."
+Label these clearly as forward-looking hypotheses, not current opportunities.
+════════════════════════════════════════════════════════`
 
 // ── Competitor battlecards ───────────────────────────────────────────────────
 export const BATTLECARDS = `COMPETITIVE POSITIONING (use as ammo, never generic):
@@ -121,9 +191,13 @@ export const PRODUCT_BRAIN_COMPACT = `${KIMA_KNOWLEDGE}
 ${AEREDIUM_KNOWLEDGE}`
 
 // Full product brain (research, scoring, outreach, chat, learn)
-export const PRODUCT_BRAIN = `${KIMA_KNOWLEDGE}
+export const PRODUCT_BRAIN = `${CONSULTANT_FRAMEWORK}
+
+${KIMA_KNOWLEDGE}
 
 ${AEREDIUM_KNOWLEDGE}
+
+${AERGAP_KNOWLEDGE}
 
 ${AGENTIC_PAYMENTS}
 
@@ -134,25 +208,41 @@ ${BATTLECARDS}`
 // Everything, including ICP (for strategy/advisory contexts like the voice agent)
 export const FULL_BRAIN = `${PRODUCT_BRAIN}
 
-${ICP_BLOCK}`
+${ICP_BLOCK}
 
-// ── Aergap (third product we qualify leads for) ──────────────────────────────
-export const AERGAP_KNOWLEDGE = `AERGAP — Trust & governance layer for AI agents that take high-stakes actions.
-Aergap sits underneath AI agents and determines what they are allowed to do before they act.
+${AERGAP_KNOWLEDGE}`
 
-Core products / capabilities:
-- Agent Identity: verifiable, cross-ecosystem readable identity for every agent — enterprises and regulators can prove who (or what) acted
-- Agent Policy: declarative rules governing exactly what each agent is permitted to do, enforced before execution
-- Execution Gate: pre-action blocking (NOT post-hoc detection) — unauthorized calls are stopped before they happen, not logged after
-- Audit Trail: immutable, unified cryptographic log of every agent action and gate decision — satisfies enterprise & regulatory audit requirements
+// ── AERGAP ───────────────────────────────────────────────────────────────────
+export const AERGAP_KNOWLEDGE = `AERGAP — Governance and control layer for AI agents that move money.
 
-Primary wedge: AI agents that can move money or perform irreversible actions.
-Core message: "When an AI agent can move money, one wrong call cannot be undone. Aergap is the gate that determines what the agent is allowed to do before it acts."
+What Aergap actually is:
+As autonomous AI agents begin paying invoices, trading assets, moving treasury funds, signing blockchain transactions, and handling financial operations, organizations face a critical challenge: how do you give an agent enough authority to do its job without giving it unlimited power? Aergap solves this by sitting BETWEEN the AI agent and the underlying financial infrastructure. The agent can decide what it wants to do — but it cannot execute financial actions unless those actions comply with policies defined by its owner or operator.
 
-ICP: AI-native product companies (seed–Series A) that sell agent products to enterprises where agents take real consequential actions — payments, data access, procurement, expense approvals.
-Primary urgency signal: enterprise deals stalling in security review because the company cannot demonstrate agent identity, policy enforcement, and audit trail.
+What Aergap provides:
+- Agent Identity: verifiable, cross-ecosystem identity for every agent — enterprises and regulators can prove who (or what) acted
+- Agent Policy + Execution Gate: declarative rules enforced BEFORE execution — unauthorized agent calls are stopped before they happen, not detected after
+- Audit Trail: immutable cryptographic log of every agent action and gate decision — the proof enterprises and regulators demand
+- Controls: automated approval thresholds, human-in-the-loop for large/unusual transactions, spending limits, approved recipient lists, prompt injection protection, instant freeze/revoke
+
+What Aergap is NOT:
+Aergap does not replace wallets, custody providers, banks, or payment infrastructure. It governs what autonomous agents are ALLOWED to do with those systems.
+
+The right framing: "Stripe governs payments for businesses. Okta governs access for employees. Aergap governs economic authority for AI agents."
+
+WHO AERGAP IS FOR:
+- Companies building AI agents that take consequential financial actions (payments, procurement, expense approvals, treasury management, trading)
+- AI-native companies selling agent products to enterprises where the enterprise asks: "Can you prove your agent won't go rogue? Can you audit every action? Can we set spending limits?"
+- Primary urgency signal: enterprise deals stalling in security review because the company cannot demonstrate agent identity, policy enforcement, and audit trail
+- Also relevant: agentic commerce startups, autonomous checkout, MCP-based financial tooling, AI wallet builders
+
+WHEN AERGAP IS NOT THE RIGHT ANSWER:
+- A company using AI for recommendations, analysis, or content — but not for executing financial transactions. "Uses AI" is not the same as "has autonomous agents with financial authority."
+- A company where a human always approves every financial action before it executes. If every payment has a human in the loop already, Aergap adds friction, not value.
+- A company with no near-term plans to give agents financial autonomy.
+- Do NOT force Aergap into a pitch where it doesn't naturally fit. It will read as desperation.
+
 Key contacts: Founder/CEO (small companies); Head of Product, VP Engineering, Head of AI, Head of Trust, Security leads (larger).
-Trigger events: enterprise customer announcement, funding round, compliance/security hire, AI product launch.`
+Trigger events: enterprise customer announcement, funding round, compliance/security hire, AI agent product launch.`
 
 // ── Full product catalog (used in qualify-lead to evaluate all products) ──────
 export const PRODUCTS_CATALOG = `COMPLETE PRODUCT CATALOG — evaluate every lead against ALL of these:
