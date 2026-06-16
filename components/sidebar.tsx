@@ -25,6 +25,7 @@ import {
   LineChart,
   PenLine,
   ShieldCheck,
+  DollarSign,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -44,7 +45,8 @@ const navGroups: {
       { href: '/leads',        label: 'Lead Inbox',         icon: Inbox },
       { href: '/crm',          label: 'CRM',                icon: Kanban },
       { href: '/aeredium',        label: 'Aeredium Targets',   icon: Shield, glow: true },
-      { href: '/agentic-payments', label: 'Agentic Payments',   icon: CreditCard, glow: true },
+      { href: '/agentic-payments',      label: 'Agentic Payments',      icon: CreditCard,  glow: true },
+      { href: '/money-touching-agents', label: 'Money Touching Agents', icon: DollarSign,  glow: true },
       { href: '/reports',      label: 'Weekly Reports',     icon: BarChart3 },
       { href: '/learn',        label: 'Make Agent Learn',   icon: BookOpen, glow: true },
       { href: '/voice',        label: 'Voice Chat',         icon: Mic, voice: true },
