@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Bot, Brain, Send, Loader2, Sparkles, Plus, History, X,
   Mic, MicOff, Volume2, VolumeX, MessageSquare, Type,
-  Lightbulb, Check, BookOpen, ChevronDown, Zap, Target, TrendingUp,
+  Lightbulb, Check, BookOpen, ChevronDown, Zap, Target, TrendingUp, Square,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -111,6 +111,7 @@ export default function CopilotPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const historyRef = useRef<{ role: 'user' | 'assistant'; content: string }[]>([])
+  const abortRef = useRef<AbortController | null>(null)
 
   // Context counts for sidebar
   const [ctx, setCtx] = useState<{ knowledge: number; rules: number; leads: number }>({ knowledge: 0, rules: 0, leads: 0 })
@@ -137,6 +138,12 @@ export default function CopilotPage() {
 
   useEffect(() => { loadSessions(); loadCtx() }, [loadSessions, loadCtx])
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, thinking, transcript])
+
+  const stopGeneration = useCallback(() => {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setThinking(false)
+  }, [])
 
   const newSession = () => {
     setSessionId(null); setMessages([]); historyRef.current = []; setShowSessions(false)
@@ -177,10 +184,14 @@ export default function CopilotPage() {
     historyRef.current.push({ role: 'user', content: q })
     setInput(''); setTranscript(''); setThinking(true)
 
+    const controller = new AbortController()
+    abortRef.current = controller
+
     try {
       const res = await fetch('/api/ai/copilot', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: q, session_id: sessionId, messages: historyRef.current.slice(-16) }),
+        signal: controller.signal,
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -190,9 +201,11 @@ export default function CopilotPage() {
       if (!sessionId && data.session_id) { setSessionId(data.session_id); setTimeout(loadSessions, 1500) }
       speak(data.reply)
     } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') return
       toast.error(e instanceof Error ? e.message : 'Co-Pilot failed to respond')
     } finally {
       setThinking(false)
+      abortRef.current = null
     }
   }, [sessionId, thinking, voiceEnabled]) // eslint-disable-line
 
@@ -369,6 +382,9 @@ export default function CopilotPage() {
                       <Loader2 size={15} className="animate-spin" color="#a78bfa" />
                     </div>
                     <span style={{ fontSize: 13, color: 'rgb(150,155,185)' }}>Reading your pipeline & thinking…</span>
+                    <button onClick={stopGeneration} title="Stop generation" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(248,113,133,0.35)', background: 'rgba(248,113,133,0.1)', color: '#fb7185', fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>
+                      <Square size={10} fill="#fb7185" /> Stop
+                    </button>
                   </div>
                 )}
                 <div ref={endRef} />
@@ -404,9 +420,12 @@ export default function CopilotPage() {
                     <VolumeX size={16} />
                   </button>
                 )}
-                <button onClick={() => send(input)} disabled={thinking || !input.trim()}
-                  style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 11, border: 'none', cursor: thinking || !input.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: thinking || !input.trim() ? 'rgba(167,139,250,0.15)' : 'rgb(167,139,250)', color: thinking || !input.trim() ? '#a78bfa' : '#0b0814' }}>
-                  {thinking ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                <button
+                  onClick={thinking ? stopGeneration : () => send(input)}
+                  disabled={!thinking && !input.trim()}
+                  style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 11, border: 'none', cursor: (!thinking && !input.trim()) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: thinking ? 'rgba(248,113,133,0.2)' : (input.trim() ? 'rgb(167,139,250)' : 'rgba(167,139,250,0.15)'), color: thinking ? '#fb7185' : (!input.trim() ? '#a78bfa' : '#0b0814') }}
+                  title={thinking ? 'Stop generation' : 'Send'}>
+                  {thinking ? <Square size={14} fill="#fb7185" /> : <Send size={16} />}
                 </button>
               </div>
               <div style={{ fontSize: 10.5, color: 'rgb(90,97,125)', marginTop: 7, textAlign: 'center' }}>

@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
   Plus, Edit, Trash2, Loader2, Save, X,
   Database, Play, Pause, Zap, CheckCircle, AlertCircle, Clock,
-  Sparkles, Lightbulb, Check,
+  Sparkles, Lightbulb, Check, Square,
 } from 'lucide-react'
 import type { Source } from '@/lib/types'
 import { cn, formatDate } from '@/lib/utils'
@@ -68,6 +68,7 @@ export default function SourcesPage() {
   const [suggesting, setSuggesting] = useState(false)
   const [suggestions, setSuggestions] = useState<SourceSuggestion[]>([])
   const [addingIdx, setAddingIdx] = useState<number | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   // Ask the agent which new sources are worth adding.
   const suggestSources = async () => {
@@ -165,6 +166,13 @@ export default function SourcesPage() {
     setShowForm(true)
   }
 
+  const stopDiscovery = () => {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setRunningId(null)
+    toast('Discovery stopped')
+  }
+
   // Run the discovery pipeline for a single source
   const runDiscovery = async (source: Source) => {
     if (!source.source_url_or_query) {
@@ -178,11 +186,15 @@ export default function SourcesPage() {
       return next
     })
 
+    const controller = new AbortController()
+    abortRef.current = controller
+
     try {
       const res = await fetch('/api/ai/discover', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ source_id: source.id }),
+        signal: controller.signal,
       })
       const data: RunResult = await res.json()
       setRunResults(prev => ({ ...prev, [source.id]: data }))
@@ -193,6 +205,7 @@ export default function SourcesPage() {
         loadSources()
       }
     } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') return
       toast.error('Network error during discovery')
       setRunResults(prev => ({
         ...prev,
@@ -200,6 +213,7 @@ export default function SourcesPage() {
       }))
     } finally {
       setRunningId(null)
+      abortRef.current = null
     }
   }
 
@@ -455,16 +469,21 @@ export default function SourcesPage() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      {/* Run Now */}
+                      {/* Run Now / Stop */}
                       <button
-                        onClick={() => runDiscovery(source)}
-                        disabled={!!runningId}
+                        onClick={isRunning ? stopDiscovery : () => runDiscovery(source)}
+                        disabled={!!runningId && !isRunning}
                         className="btn btn-ai flex items-center gap-1.5"
-                        style={{ padding: '6px 12px', fontSize: '12px', opacity: runningId && runningId !== source.id ? 0.4 : 1 }}
-                        title="Run discovery now — bot will read this source and find leads"
+                        style={{
+                          padding: '6px 12px', fontSize: '12px',
+                          ...(isRunning
+                            ? { color: '#fb7185', border: '1px solid rgba(248,113,133,0.35)', background: 'rgba(248,113,133,0.1)' }
+                            : { opacity: runningId && runningId !== source.id ? 0.4 : 1 }),
+                        }}
+                        title={isRunning ? 'Stop discovery' : 'Run discovery now — bot will read this source and find leads'}
                       >
                         {isRunning ? (
-                          <><Loader2 size={12} className="animate-spin" /> Running…</>
+                          <><Loader2 size={12} className="animate-spin" /><Square size={10} fill="#fb7185" style={{ marginLeft: 2 }} /> Stop</>
                         ) : (
                           <><Zap size={12} /> Run Now</>
                         )}

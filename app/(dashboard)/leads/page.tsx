@@ -185,7 +185,9 @@ export default function LeadsPage() {
       <div className="page-header">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-xl font-bold text-white">Lead Inbox</h1>
+            <h1 className="text-xl font-bold text-white" style={filters.status === 'rejected' ? { color: '#fb7185' } : {}}>
+              {filters.status === 'rejected' ? 'Rejected Leads' : 'Lead Inbox'}
+            </h1>
             <p className="text-xs mt-0.5" style={{ color: 'rgb(100,100,120)' }}>
               {loading ? 'Loading...' : `${filteredLeads.length} leads`}
               {hasFilters && ' (filtered)'}
@@ -207,6 +209,19 @@ export default function LeadsPage() {
             </div>
             <button onClick={loadLeads} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '12px' }}>
               <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+            </button>
+            <button
+              onClick={() => {
+                const next = filters.status === 'rejected' ? '' : 'rejected'
+                setFilters(f => ({ ...f, status: next }))
+                setActiveCatFilter(null)
+              }}
+              className="btn btn-secondary"
+              style={{ padding: '7px 12px', fontSize: '12px', ...(filters.status === 'rejected' ? { color: '#fb7185', borderColor: 'rgba(248,113,133,0.4)', background: 'rgba(248,113,133,0.1)' } : {}) }}
+              title="Show rejected leads"
+            >
+              <XCircle size={12} style={{ color: filters.status === 'rejected' ? '#fb7185' : undefined }} />
+              Rejected
             </button>
             <button onClick={cleanupGeneric} disabled={cleaning} className="btn btn-secondary" style={{ padding: '7px 12px', fontSize: '12px' }}
               title="Archive leads whose name is a generic category instead of a real company">
