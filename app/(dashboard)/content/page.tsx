@@ -7,7 +7,7 @@ import {
   Link2, CheckCheck, Image, Download,
   Zap, Hash, AlignLeft, AtSign, MessageCircle, X,
   Bookmark, BookmarkCheck, Trash2, ChevronDown, ChevronUp,
-  Clock, CheckCircle2, Filter,
+  Clock, CheckCircle2, Filter, History, RotateCcw,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -21,7 +21,7 @@ interface ContentResult {
   linkedin: ContentPost[]
 }
 type TabKey     = 'tweets' | 'thread' | 'linkedin'
-type PageView   = 'create' | 'saved'
+type PageView   = 'create' | 'saved' | 'sessions'
 type PostType   = 'tweet' | 'linkedin' | 'thread_tweet'
 type DraftStatus = 'saved' | 'posted'
 type FilterType  = 'all' | 'tweet' | 'linkedin' | 'thread_tweet'
@@ -37,6 +37,19 @@ interface ContentDraft {
   status: DraftStatus
   notes: string | null
   posted_at: string | null
+  created_at: string
+}
+
+interface ContentSession {
+  id: string
+  source_url: string | null
+  news_context: string | null
+  incident_summary: string | null
+  root_cause: string | null
+  kima_angle: string | null
+  tweets: ContentPost[]
+  thread: ContentPost[]
+  linkedin: ContentPost[]
   created_at: string
 }
 
@@ -459,6 +472,39 @@ export default function ContentStudioPage() {
   const [filterType, setFilterType]   = useState<FilterType>('all')
   const [showPosted, setShowPosted]   = useState(false)
 
+  // Sessions
+  const [sessions, setSessions]           = useState<ContentSession[]>([])
+  const [sessionsLoading, setSessionsLoading] = useState(false)
+
+  const loadSessions = useCallback(async () => {
+    setSessionsLoading(true)
+    try {
+      const res  = await fetch('/api/content-sessions')
+      const json = await res.json()
+      setSessions(json.sessions || [])
+    } catch { /* silent */ }
+    finally  { setSessionsLoading(false) }
+  }, [])
+
+  useEffect(() => { loadSessions() }, [loadSessions])
+
+  const restoreSession = (session: ContentSession) => {
+    setUrl(session.source_url || '')
+    setNews(session.news_context || '')
+    setResult({
+      incident_summary: session.incident_summary || '',
+      root_cause: session.root_cause || '',
+      kima_angle: session.kima_angle || '',
+      tweets: session.tweets,
+      thread: session.thread,
+      linkedin: session.linkedin,
+    })
+    setSavedMap({})
+    setGraphicStates({})
+    setView('create')
+    toast.success('Session restored')
+  }
+
   // Load drafts on mount and when switching to saved view
   const loadDrafts = useCallback(async () => {
     setDraftsLoading(true)
@@ -485,6 +531,23 @@ export default function ContentStudioPage() {
       if (!res.ok) throw new Error(json.error)
       setResult(json.data)
       toast.success('Content generated')
+      // Auto-save the full session silently
+      fetch('/api/content-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_url: url.trim() || null,
+          news_context: news.trim() || null,
+          incident_summary: json.data.incident_summary,
+          root_cause: json.data.root_cause,
+          kima_angle: json.data.kima_angle,
+          tweets: json.data.tweets,
+          thread: json.data.thread,
+          linkedin: json.data.linkedin,
+        }),
+      }).then(r => r.json()).then(s => {
+        if (s.session) setSessions(prev => [s.session, ...prev])
+      }).catch(() => { /* non-critical */ })
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Generation failed') }
     finally { setLoading(false) }
   }
@@ -576,8 +639,9 @@ export default function ContentStudioPage() {
         {/* Top-level view switcher */}
         <div style={{ display: 'flex', gap: 4, padding: '3px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
           {([
-            { key: 'create', label: 'Create' },
-            { key: 'saved',  label: `Saved Drafts${savedCount > 0 ? ` (${savedCount})` : ''}` },
+            { key: 'create',   label: 'Create' },
+            { key: 'saved',    label: `Saved Drafts${savedCount > 0 ? ` (${savedCount})` : ''}` },
+            { key: 'sessions', label: `Sessions${sessions.length > 0 ? ` (${sessions.length})` : ''}` },
           ] as { key: PageView; label: string }[]).map(({ key, label }) => (
             <button key={key} onClick={() => setView(key)} style={{ padding: '5px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: view === key ? 'rgba(255,255,255,0.08)' : 'none', color: view === key ? 'white' : 'rgba(255,255,255,0.35)', transition: 'all 0.15s' }}>
               {label}
@@ -802,6 +866,102 @@ export default function ContentStudioPage() {
                   onDelete={deleteDraft}
                 />
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════
+          SESSIONS VIEW
+      ════════════════════════════════════════════════════════ */}
+      {view === 'sessions' && (
+        <div className="p-8">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'white', marginBottom: 3 }}>Generation History</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Every generation is auto-saved. Click Restore to reload any session.</div>
+            </div>
+            <button onClick={loadSessions} disabled={sessionsLoading} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, fontSize: 11, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.3)' }}>
+              <RefreshCw size={11} className={sessionsLoading ? 'animate-spin' : ''} /> Refresh
+            </button>
+          </div>
+
+          {sessionsLoading && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+              <Loader2 size={24} className="animate-spin" style={{ color: '#a78bfa' }} />
+            </div>
+          )}
+
+          {!sessionsLoading && sessions.length === 0 && (
+            <div style={{ minHeight: 300, borderRadius: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(18,19,32,0.5)', border: '2px dashed rgba(255,255,255,0.06)' }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, marginBottom: 14, background: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <History size={20} color="rgba(167,139,250,0.4)" />
+              </div>
+              <p style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 6 }}>No sessions yet</p>
+              <p style={{ fontSize: 12, color: 'rgb(90,95,130)', textAlign: 'center', lineHeight: 1.6, maxWidth: 280 }}>Generate content — each run is saved here automatically.</p>
+              <button onClick={() => setView('create')} className="btn btn-primary mt-4" style={{ fontSize: 12, padding: '7px 16px' }}>
+                <Sparkles size={13} /> Go to Create
+              </button>
+            </div>
+          )}
+
+          {!sessionsLoading && sessions.length > 0 && (
+            <div className="space-y-3">
+              {sessions.map(session => {
+                const totalPosts = session.tweets.length + session.thread.length + session.linkedin.length
+                const preview    = session.incident_summary || session.news_context || 'No summary'
+                return (
+                  <div key={session.id} style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(167,139,250,0.15)', background: 'rgba(10,12,22,0.85)', boxShadow: '0 3px 16px rgba(0,0,0,0.2)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 16px', background: 'rgba(167,139,250,0.05)', borderBottom: '1px solid rgba(167,139,250,0.1)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <History size={12} color="#a78bfa" />
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <Clock size={9} /> {timeAgo(session.created_at)}
+                            </span>
+                            <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 4, background: 'rgba(29,161,242,0.08)', border: '1px solid rgba(29,161,242,0.15)', color: 'rgba(29,161,242,0.7)', fontWeight: 700 }}>{session.tweets.length} tweets</span>
+                            <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 4, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', color: 'rgba(129,140,248,0.7)', fontWeight: 700 }}>{session.thread.length} thread</span>
+                            <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 4, background: 'rgba(10,102,194,0.08)', border: '1px solid rgba(10,102,194,0.2)', color: 'rgba(96,165,250,0.7)', fontWeight: 700 }}>{session.linkedin.length} LinkedIn</span>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => restoreSession(session)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', color: '#a78bfa' }}
+                      >
+                        <RotateCcw size={11} /> Restore
+                      </button>
+                    </div>
+
+                    <div style={{ padding: '12px 16px' }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'rgb(225,228,255)', lineHeight: 1.55, marginBottom: session.kima_angle ? 8 : 0 }}>
+                        {preview.slice(0, 200)}{preview.length > 200 ? '…' : ''}
+                      </div>
+                      {session.kima_angle && (
+                        <div style={{ fontSize: 11, color: 'rgba(167,139,250,0.65)', lineHeight: 1.5 }}>
+                          Angle: {session.kima_angle.slice(0, 140)}{session.kima_angle.length > 140 ? '…' : ''}
+                        </div>
+                      )}
+                      {session.source_url && (
+                        <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <Link2 size={9} /> {session.source_url.slice(0, 80)}{session.source_url.length > 80 ? '…' : ''}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ padding: '0 16px 12px', display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
+                      {totalPosts === 0 ? (
+                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>No posts in this session</span>
+                      ) : (
+                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>{totalPosts} posts total — restore to view and save individual ones</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
