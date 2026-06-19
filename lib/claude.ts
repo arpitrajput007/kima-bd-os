@@ -15,9 +15,12 @@ import Anthropic from '@anthropic-ai/sdk'
 // Models — tiered by cost/quality trade-off.
 // Use CLAUDE_THINK only when extended reasoning genuinely helps (e.g. deepResearch).
 // For everything else, Sonnet is faster and ~5× cheaper.
-export const CLAUDE_THINK    = 'claude-opus-4-8'   // Opus + thinking — deepResearch ONLY
-export const CLAUDE_RESEARCH = 'claude-sonnet-4-6' // solid research, reports, analysis
-export const CLAUDE_FAST     = 'claude-sonnet-4-6' // fast extraction, lighter tasks
+// CLAUDE_MINI (Haiku) is ~20× cheaper than Sonnet — use for classification, scoring,
+// and any task where the input is already structured and the output is small.
+export const CLAUDE_THINK    = 'claude-opus-4-8'              // Opus + thinking — deepResearch ONLY
+export const CLAUDE_RESEARCH = 'claude-sonnet-4-6'            // solid research, reports, analysis
+export const CLAUDE_FAST     = 'claude-sonnet-4-6'            // fast extraction, lighter tasks
+export const CLAUDE_MINI     = 'claude-haiku-4-5-20251001'    // classification, scoring, cheap structured tasks
 
 export function claudeConfigured(): boolean {
   return !!process.env.ANTHROPIC_API_KEY
@@ -60,9 +63,18 @@ export async function claudeJSON<T = Record<string, unknown>>(params: {
 }): Promise<T> {
   const client = _client()
   const model = params.model ?? CLAUDE_RESEARCH
-  const systemPrompt =
+  const systemText =
     params.system.trimEnd() +
     '\n\nCRITICAL: Return ONLY valid JSON — no markdown, no code fences, no explanatory text before or after the JSON.'
+
+  // cache_control marks the system prompt for Anthropic prompt caching.
+  // Cache hits cost 90% less on input tokens — critical when the same large
+  // system prompt (PRODUCT_BRAIN ~4-5k tokens) is sent on multiple calls.
+  const systemBlock: Anthropic.TextBlockParam = {
+    type: 'text',
+    text: systemText,
+    cache_control: { type: 'ephemeral' },
+  }
 
   const response = await client.messages.create({
     model,
@@ -71,7 +83,7 @@ export async function claudeJSON<T = Record<string, unknown>>(params: {
     // (Opus 4.8 with thinking: adaptive rejects the temperature param).
     ...(params.thinking ? { thinking: { type: 'adaptive' } } : {}),
     ...(params.temperature != null && !params.thinking ? { temperature: params.temperature } : {}),
-    system: systemPrompt,
+    system: [systemBlock],
     messages: [{ role: 'user', content: params.user }],
   })
 
@@ -94,12 +106,18 @@ export async function claudeText(params: {
 }): Promise<string> {
   const client = _client()
 
+  const systemBlock: Anthropic.TextBlockParam = {
+    type: 'text',
+    text: params.system,
+    cache_control: { type: 'ephemeral' },
+  }
+
   const response = await client.messages.create({
     model: params.model ?? CLAUDE_RESEARCH,
     max_tokens: params.maxTokens ?? 4000,
     ...(params.thinking ? { thinking: { type: 'adaptive' } } : {}),
     ...(params.temperature != null && !params.thinking ? { temperature: params.temperature } : {}),
-    system: params.system,
+    system: [systemBlock],
     messages: [{ role: 'user', content: params.user }],
   })
 
@@ -117,11 +135,17 @@ export async function claudeStream(params: {
 }): Promise<ReadableStream<Uint8Array>> {
   const client = _client()
 
+  const systemBlock: Anthropic.TextBlockParam = {
+    type: 'text',
+    text: params.system,
+    cache_control: { type: 'ephemeral' },
+  }
+
   const stream = client.messages.stream({
     model: params.model ?? CLAUDE_RESEARCH,
     max_tokens: params.maxTokens ?? 4000,
     // Note: temperature/top_p/top_k are removed on Opus 4.7+ — do not add them back.
-    system: params.system,
+    system: [systemBlock],
     messages: params.messages,
   })
 

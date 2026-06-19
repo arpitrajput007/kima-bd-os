@@ -13,7 +13,7 @@
 // POST { lead_id: string }
 // ============================================================
 
-import { claudeJSON, CLAUDE_RESEARCH } from '@/lib/claude'
+import { claudeJSON, CLAUDE_RESEARCH, CLAUDE_MINI } from '@/lib/claude'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { PRODUCT_BRAIN } from '@/lib/kima-knowledge'
@@ -234,6 +234,45 @@ Return JSON:
 }`
 }
 
+// ── Research cache helpers ──────────────────────────────────────
+
+function extractDomain(url: string): string {
+  try {
+    return new URL(url.startsWith('http') ? url : `https://${url}`).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
+}
+
+const CACHE_TTL_DAYS = 7
+
+async function getCachedResearch(domain: string): Promise<Record<string, unknown> | null> {
+  if (!domain) return null
+  try {
+    const cutoff = new Date(Date.now() - CACHE_TTL_DAYS * 86_400_000).toISOString()
+    const { data } = await supabase
+      .from('lead_research_cache')
+      .select('research_data')
+      .eq('domain', domain)
+      .gte('created_at', cutoff)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    return (data?.research_data as Record<string, unknown>) ?? null
+  } catch {
+    return null
+  }
+}
+
+async function saveResearchCache(domain: string, companyName: string, url: string, data: Record<string, unknown>) {
+  if (!domain) return
+  try {
+    await supabase.from('lead_research_cache').insert({
+      url, domain, company_name: companyName, research_data: data, web_research_used: false,
+    })
+  } catch { /* non-fatal */ }
+}
+
 // ── Contact finder helper ───────────────────────────────────────
 
 async function findAndSaveContacts(leadId: string, company: string, website: string) {
@@ -284,10 +323,21 @@ export async function POST(req: NextRequest) {
     // ════════════════════════════════════════════════════════════
 
     // ── Phase 1: Deep company research ────────────────────────
-    const resData = await claudeJSON({
-      model: CLAUDE_RESEARCH, system: SYS,
-      user: pResearch(name, website, desc), maxTokens: 2500,
-    }).catch(() => null)
+    // Check research cache first — avoids burning API credits on companies
+    // we've already researched within the last 7 days.
+    const domain = website ? extractDomain(website) : ''
+    let fromCache = false
+    let resData = await getCachedResearch(domain)
+    if (resData) {
+      fromCache = true
+    } else {
+      resData = await claudeJSON({
+        model: CLAUDE_RESEARCH, system: SYS,
+        user: pResearch(name, website, desc), maxTokens: 2500,
+      }).catch(() => null)
+      if (resData) await saveResearchCache(domain, name, website || '', resData as Record<string, unknown>)
+    }
+    void fromCache // suppress unused-var lint
 
     const resSum = resData
       ? `Company: ${name}\nWhat they do: ${resData.company_summary || desc}\nBusiness model: ${resData.business_model || 'unknown'}\nExisting infrastructure: ${resData.existing_infrastructure || 'unknown'}\nCustomer profile: ${resData.customer_profile || 'unknown'}\nStage: ${resData.company_stage || 'unknown'}\nStrategic direction: ${resData.strategic_direction || 'unknown'}\nVisible constraints: ${resData.visible_constraints || 'unknown'}`
@@ -314,7 +364,8 @@ export async function POST(req: NextRequest) {
     // ── Phase 2: Pain identification + Classification (parallel) ──
     const [painR, classR] = await Promise.allSettled([
       claudeJSON({ model: CLAUDE_RESEARCH, system: SYS, user: pPain(name, resSum), maxTokens: 1500 }),
-      claudeJSON({ model: CLAUDE_RESEARCH, system: SYS, user: pClassify(name, website, resSum), maxTokens: 800 }),
+      // Classification is picking from fixed enum lists — Haiku handles this well at ~20× lower cost.
+      claudeJSON({ model: CLAUDE_MINI, system: SYS, user: pClassify(name, website, resSum), maxTokens: 800 }),
     ])
 
     const painSum = painR.status === 'fulfilled'
@@ -390,8 +441,9 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Phase 4: Score ─────────────────────────────────────────
+    // Scoring from a structured summary is a straightforward numerical task — Haiku is sufficient.
     const scoreData = await claudeJSON({
-      model: CLAUDE_RESEARCH, system: SYS,
+      model: CLAUDE_MINI, system: SYS,
       user: pScore(name, fitSum, String(resData?.company_stage || '')), maxTokens: 600,
     }).catch(() => null)
 

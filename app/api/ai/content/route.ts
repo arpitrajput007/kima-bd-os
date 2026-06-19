@@ -277,7 +277,7 @@ Return JSON exactly:
   try {
     let result = await claudeJSON<ContentResult>({
       model: 'claude-sonnet-4-6',
-      maxTokens: 6000,
+      maxTokens: 3000,
       temperature: 0.88,
       system: systemPrompt,
       user: userPrompt,
@@ -293,7 +293,7 @@ Return JSON exactly:
     if (found.length > 0) {
       result = await claudeJSON<ContentResult>({
         model: 'claude-sonnet-4-6',
-        maxTokens: 6000,
+        maxTokens: 3000,
         temperature: 0.92,
         system: systemPrompt,
         user: `${userPrompt}\n\nYOUR PREVIOUS ATTEMPT USED THESE BANNED PHRASES: ${found.map(b => `"${b}"`).join(', ')}. Rewrite ALL content so none of these phrases — or anything stylistically similar — appear anywhere. Keep it sharp, specific, and human.`,
