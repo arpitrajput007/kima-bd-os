@@ -171,7 +171,49 @@ function parseGoogleDocsUrl(url: string): { type: 'doc' | 'sheet' | 'slide'; id:
   } catch { return null }
 }
 
+// ── Twitter/X reading (API → oEmbed fallback) ────────────────────────────────
+async function fetchTweetViaAPI(tweetUrl: string): Promise<string> {
+  const bearerToken = process.env.TWITTER_BEARER_TOKEN
+  if (!bearerToken) return ''
+  const match = tweetUrl.match(/\/status\/(\d+)/)
+  if (!match) return ''
+  try {
+    const res = await fetch(
+      `https://api.twitter.com/2/tweets/${match[1]}?tweet.fields=text,created_at&expansions=author_id&user.fields=name,username`,
+      { headers: { Authorization: `Bearer ${bearerToken}` }, signal: AbortSignal.timeout(12_000) }
+    )
+    if (!res.ok) return ''
+    const json = await res.json() as { data?: { text?: string }; includes?: { users?: Array<{ username: string; name: string }> } }
+    const text   = json.data?.text || ''
+    const author = json.includes?.users?.[0]
+    return author ? `Tweet by @${author.username} (${author.name}):\n${text}` : text
+  } catch { return '' }
+}
+
+async function fetchTweetOEmbed(tweetUrl: string): Promise<string> {
+  try {
+    const res = await fetch(
+      `https://publish.twitter.com/oembed?url=${encodeURIComponent(tweetUrl)}&omit_script=true`,
+      { signal: AbortSignal.timeout(12_000) }
+    )
+    if (!res.ok) return ''
+    const json = await res.json() as { html?: string; author_name?: string }
+    const text   = (json.html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+    const author = json.author_name ? `Tweet by @${json.author_name}:\n` : ''
+    return author + text
+  } catch { return '' }
+}
+
 async function fetchUrl(url: string): Promise<{ content: string; source: string }> {
+  // Twitter/X — use API then oEmbed; Jina gets blocked by X
+  if (/twitter\.com|x\.com/.test(url)) {
+    const apiText = await fetchTweetViaAPI(url)
+    if (apiText.length > 20) return { content: apiText, source: `Tweet (${url})` }
+    const oembedText = await fetchTweetOEmbed(url)
+    if (oembedText.length > 20) return { content: oembedText, source: `Tweet (${url})` }
+    throw new Error('Could not read this tweet automatically. Paste the tweet text directly into the chat.')
+  }
+
   const google = parseGoogleDocsUrl(url)
   if (google) {
     const exportUrls = {
@@ -193,6 +235,7 @@ async function fetchUrl(url: string): Promise<{ content: string; source: string 
     }
     return { content: text, source: `Google ${google.type} (${google.id})` }
   }
+
   const res = await fetch(`https://r.jina.ai/${url}`, {
     headers: { Accept: 'text/plain' },
     signal: AbortSignal.timeout(25000),
