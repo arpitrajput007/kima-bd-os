@@ -17,6 +17,7 @@ import { claudeJSON, CLAUDE_RESEARCH, CLAUDE_MINI } from '@/lib/claude'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { PRODUCT_BRAIN } from '@/lib/kima-knowledge'
+import { scoringMemory } from '@/lib/agent-memory'
 
 export const maxDuration = 300 // Vercel Pro / Enterprise
 
@@ -29,7 +30,7 @@ const supabase = createClient(
 // The PRODUCT_BRAIN now includes the CONSULTANT_FRAMEWORK which
 // instructs the model to understand the company BEFORE evaluating
 // product fit. This is the most important quality lever.
-const SYS = `You are a senior solutions consultant and BD strategist for Kima, Aeredium, and Aergap — financial infrastructure companies.
+const SYS_BASE = `You are a senior solutions consultant and BD strategist for Kima, Aeredium, and Aergap — financial infrastructure companies.
 
 ${PRODUCT_BRAIN}
 
@@ -308,6 +309,12 @@ export async function POST(req: NextRequest) {
   // Mark in-progress
   await supabase.from('leads').update({ status: 'researching', updated_at: new Date().toISOString() }).eq('id', lead_id)
 
+  // Inject learned memory (rules/knowledge/feedback from Make Agent Learn) so
+  // enrichment reflects everything taught — ICP signals, product preferences,
+  // rejected patterns. Used as the system prompt for every phase below.
+  const memory = await scoringMemory({ tags: (lead.tags as string[] | null) || [] })
+  const SYS = `${SYS_BASE}${memory}`
+
   try {
     // ════════════════════════════════════════════════════════════
     // NEW: Sequential deep reasoning pipeline
@@ -425,6 +432,11 @@ export async function POST(req: NextRequest) {
       if (ae.aeredium_fit)   patch3.aeredium_fit  = ae.aeredium_fit
       if (ae.security_angle) patch3.security_angle = ae.security_angle
       if (ae.risk_angle)     patch3.risk_angle    = ae.risk_angle
+
+      // Aergap fit was evaluated but previously thrown away — persist it now.
+      const ag = fitData.aergap ?? {}
+      if (ag.aergap_fit)          patch3.aergap_fit          = ag.aergap_fit
+      if (ag.agent_control_angle) patch3.agent_control_angle = ag.agent_control_angle
 
       // Store honest_assessment in competitor_context field (re-purposed for
       // a richer summary that includes the full honest evaluation)

@@ -67,6 +67,8 @@ PAIN EVIDENCE (what makes this pain credible): ${lead.pain_point_evidence || 'N/
 PRODUCT FIT ANALYSIS:
 - Kima fit: ${lead.kima_fit || 'N/A'}
 - Aeredium fit: ${lead.aeredium_fit || 'N/A'}
+- Aergap fit (AI-agent governance): ${lead.aergap_fit || 'N/A'}
+- Agent control angle: ${lead.agent_control_angle || 'N/A'}
 - Settlement angle: ${lead.settlement_angle || 'N/A'}
 - Security angle: ${lead.security_angle || 'N/A'}
 - Risk angle: ${lead.risk_angle || 'N/A'}

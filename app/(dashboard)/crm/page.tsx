@@ -11,7 +11,7 @@ import {
   StickyNote, Bell, Check, Send, AtSign, Globe,
   RefreshCw, ExternalLink, Trophy, XCircle,
   Flame, Target, Link2, FileText, Upload, Sparkles,
-  BookOpen, Zap, ShieldCheck, Users, Trash2,
+  BookOpen, Zap, ShieldCheck, Users, Trash2, Search,
 } from 'lucide-react'
 import { cn, getScoreBg, truncate } from '@/lib/utils'
 import type { Lead, Contact } from '@/lib/types'
@@ -1161,6 +1161,7 @@ export default function CRMPage() {
   const [selectedLead, setSelectedLead] = useState<LeadWithActivity | null>(null)
   const [view, setView] = useState<'pipeline' | 'followups' | 'wins'>('pipeline')
   const [showAddLead, setShowAddLead] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -1211,7 +1212,11 @@ export default function CRMPage() {
     loadData()
   }
 
-  const allFollowUps = leads.flatMap(l =>
+  const filteredLeads = searchQuery.trim()
+    ? leads.filter(l => l.company_name.toLowerCase().includes(searchQuery.toLowerCase().trim()))
+    : leads
+
+  const allFollowUps = filteredLeads.flatMap(l =>
     (l.activities || [])
       .filter(a => a.type === 'follow_up' && !a.completed_at)
       .map(a => ({ ...a, lead: l }))
@@ -1225,10 +1230,10 @@ export default function CRMPage() {
     toast.success('Follow-up marked done'); loadData()
   }
 
-  const stageCounts = PIPELINE_STAGES.map(s => ({ ...s, count: leads.filter(l => l.status === s.status).length }))
-  const totalActive  = leads.filter(l => !['won', 'lost'].includes(l.status)).length
-  const wonCount     = leads.filter(l => l.status === 'won').length
-  const lostCount    = leads.filter(l => l.status === 'lost').length
+  const stageCounts = PIPELINE_STAGES.map(s => ({ ...s, count: filteredLeads.filter(l => l.status === s.status).length }))
+  const totalActive  = filteredLeads.filter(l => !['won', 'lost'].includes(l.status)).length
+  const wonCount     = filteredLeads.filter(l => l.status === 'won').length
+  const lostCount    = filteredLeads.filter(l => l.status === 'lost').length
   const totalClosed  = wonCount + lostCount
   const winRate      = totalClosed > 0 ? Math.round((wonCount / totalClosed) * 100) : 0
 
@@ -1255,6 +1260,22 @@ export default function CRMPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Search bar */}
+            <div style={{ position: 'relative' }}>
+              <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)', pointerEvents: 'none' }} />
+              <input
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search leads…"
+                className="input-dark"
+                style={{ paddingLeft: 30, paddingRight: searchQuery ? 28 : 10, fontSize: 12, height: 34, width: 200 }}
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', alignItems: 'center', padding: 0 }}>
+                  <X size={12} />
+                </button>
+              )}
+            </div>
             <button onClick={loadData} className="btn btn-secondary" style={{ padding: '7px 10px' }}>
               <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
             </button>
@@ -1403,7 +1424,7 @@ export default function CRMPage() {
 
               {/* Active stages */}
               {activeStages.map(stage => {
-                const stageLeads = leads.filter(l => l.status === stage.status)
+                const stageLeads = filteredLeads.filter(l => l.status === stage.status)
                 return (
                   <div key={stage.status} style={{ width: 296, flexShrink: 0 }}>
                     {/* Column header */}
@@ -1458,7 +1479,7 @@ export default function CRMPage() {
               {/* Terminal stages (Won / Lost) — side by side, visually separated */}
               <div style={{ width: 2, flexShrink: 0, background: 'rgba(255,255,255,0.06)', borderRadius: 2, alignSelf: 'stretch', margin: '0 4px' }} />
               {terminalStages.map(stage => {
-                const stageLeads = leads.filter(l => l.status === stage.status)
+                const stageLeads = filteredLeads.filter(l => l.status === stage.status)
                 return (
                   <div key={stage.status} style={{ width: 248, flexShrink: 0 }}>
                     <div style={{
@@ -1614,7 +1635,7 @@ export default function CRMPage() {
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 16 }}>
-                {leads.filter(l => l.status === 'won').map((lead, idx) => (
+                {filteredLeads.filter(l => l.status === 'won').map((lead, idx) => (
                   <div key={lead.id} onClick={() => setSelectedLead(lead)} className="section-card card-hover"
                     style={{ padding: '20px 22px', cursor: 'pointer', borderColor: 'rgba(74,222,128,0.18)', background: 'linear-gradient(135deg, rgba(74,222,128,0.04), rgba(34,211,238,0.02))', position: 'relative', overflow: 'hidden' }}>
                     {/* Top accent */}

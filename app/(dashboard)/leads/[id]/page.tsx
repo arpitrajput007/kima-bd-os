@@ -27,7 +27,7 @@ import type { Lead, Contact, ContactTouch, OutreachMessage, UseCase, BDBrief, Us
 import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL, REGIONS } from '@/lib/types'
 import { actStart, actFinish, ACTION_TOOL, ACTION_LABEL } from '@/lib/agent-activity'
 
-type AIAction = 'research' | 'pain_points' | 'kima_fit' | 'aeredium_fit' | 'classify' | 'score' | 'contacts' | null
+type AIAction = 'research' | 'pain_points' | 'kima_fit' | 'aeredium_fit' | 'aergap_fit' | 'classify' | 'score' | 'contacts' | null
 
 /* ── Design tokens (matching reference exactly) ──────────────── */
 const C = {
@@ -146,18 +146,20 @@ function ActionBtn({ icon: Icon, label, variant = 'default', onClick, disabled, 
 function FindingCard({ icon: Icon, title, subtitle, body, rightLabel, rightValue, pill, pillVariant = 'purple', expanded, onToggle, children }: {
   icon: React.ComponentType<{ size?: number; color?: string; style?: React.CSSProperties }>; title: string; subtitle?: string
   body?: string | null; rightLabel?: string; rightValue?: string | null
-  pill?: string | null; pillVariant?: 'purple' | 'red' | 'green'
+  pill?: string | null; pillVariant?: 'purple' | 'red' | 'green' | 'cyan'
   expanded: boolean; onToggle: () => void; children?: React.ReactNode
 }) {
   const iconBg: Record<string, React.CSSProperties> = {
     purple: { background: 'rgba(168,85,247,0.13)', color: 'rgb(196,167,252)' },
     red:    { background: 'rgba(248,113,133,0.12)', color: 'rgb(252,165,165)' },
     green:  { background: 'rgba(52,211,153,0.12)',  color: 'rgb(110,231,183)' },
+    cyan:   { background: 'rgba(34,211,238,0.12)',  color: 'rgb(103,232,249)' },
   }
   const pillSty: Record<string, React.CSSProperties> = {
     red:    { border: '1px solid rgba(248,113,133,0.4)', background: 'rgba(248,113,133,0.1)', color: 'rgb(252,165,165)' },
     green:  { border: '1px solid rgba(52,211,153,0.4)',  background: 'rgba(52,211,153,0.1)',  color: 'rgb(110,231,183)' },
     purple: { border: '1px solid rgba(168,85,247,0.4)',  background: 'rgba(168,85,247,0.1)',  color: 'rgb(196,167,252)' },
+    cyan:   { border: '1px solid rgba(34,211,238,0.4)',  background: 'rgba(34,211,238,0.1)',  color: 'rgb(103,232,249)' },
   }
   return (
     <div style={{ borderRadius: 16, border: C.border, background: C.cardBg, boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
@@ -1287,11 +1289,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     if (!window.__bda) window.__bda = { events: [], v: 0 }
     const toolMap: Record<string, string> = {
       research: 'Claude', classify: 'Claude', kima_fit: 'Claude',
-      aeredium_fit: 'Claude', score: 'Claude', contacts: 'ContactFinder', pain_points: 'Claude',
+      aeredium_fit: 'Claude', aergap_fit: 'Claude', score: 'Claude', contacts: 'ContactFinder', pain_points: 'Claude',
     }
     const labelMap: Record<string, string> = {
       research: 'Research Company', classify: 'Classify Lead', kima_fit: 'Kima Fit Analysis',
-      aeredium_fit: 'Aeredium Fit Analysis', score: 'Score Lead',
+      aeredium_fit: 'Aeredium Fit Analysis', aergap_fit: 'Aergap Fit Analysis', score: 'Score Lead',
       contacts: 'Find Contacts', pain_points: 'Identify Pain Points',
     }
     if (aiAction) {
@@ -1343,7 +1345,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [contactedModalOpen, setContactedModalOpen] = useState(false)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     overview: true, research: true, pain: true, kima: true,
-    aeredium: true, contacts: true, outreach: true, feedback: false
+    aeredium: true, aergap: true, contacts: true, outreach: true, feedback: false
   })
 
   const toggle = (k: string) => setExpanded(s => ({ ...s, [k]: !s[k] }))
@@ -1460,6 +1462,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         await supabase.from('leads').update({
           aeredium_fit: json.data.aeredium_fit, security_angle: json.data.security_angle,
           risk_angle: json.data.risk_angle, updated_at: new Date().toISOString()
+        }).eq('id', id); loadLead()
+      } else if (action === 'aergap_fit') {
+        await supabase.from('leads').update({
+          aergap_fit: json.data.aergap_fit, agent_control_angle: json.data.agent_control_angle,
+          updated_at: new Date().toISOString()
         }).eq('id', id); loadLead()
       } else if (action === 'score') {
         const s = json.data.lead_score
@@ -1652,6 +1659,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               { action: 'pain_points' as AIAction, label: 'Identify Pain Points' },
               { action: 'kima_fit' as AIAction,    label: 'Kima Fit'             },
               { action: 'aeredium_fit' as AIAction,label: 'Aeredium Fit'         },
+              { action: 'aergap_fit' as AIAction,  label: 'Aergap Fit'           },
               { action: 'classify' as AIAction,    label: 'Classify'             },
               { action: 'score' as AIAction,       label: 'Score Lead'           },
               { action: 'contacts' as AIAction,    label: 'Find Contacts'        },
@@ -1944,6 +1952,41 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 <button onClick={() => runAI('aeredium_fit')} disabled={aiAction !== null}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 9, border: '1px solid rgba(168,85,247,0.28)', background: 'rgba(168,85,247,0.09)', padding: '8px 14px', fontSize: 13, color: 'rgb(196,167,252)', cursor: 'pointer', fontFamily: 'inherit' }}>
                   <Sparkles size={12} />Analyze Aeredium Fit
+                </button>
+              )}
+            </FindingCard>
+
+            {/* Aergap Fit — AI-agent governance */}
+            <FindingCard
+              icon={BadgeCheck} title="Aergap Fit" pillVariant="cyan"
+              body={lead.aergap_fit ? lead.aergap_fit.split('\n')[0] : 'Aergap fit not analyzed yet.'}
+              expanded={expanded.aergap} onToggle={() => toggle('aergap')}
+            >
+              {lead.aergap_fit ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {/* Main pitch */}
+                  <div style={{ borderRadius: 12, border: '1px solid rgba(34,211,238,0.2)', background: 'rgba(34,211,238,0.06)', padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                      <BadgeCheck size={14} color="#22d3ee" />
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#67e8f9', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Agent Governance</span>
+                    </div>
+                    <ProseBullets text={lead.aergap_fit!} color="rgb(220,225,240)" dotColor="rgba(34,211,238,0.7)" />
+                  </div>
+                  {/* Control / governance angle */}
+                  {lead.agent_control_angle && (
+                    <div style={{ borderRadius: 12, border: '1px solid rgba(96,165,250,0.2)', background: 'rgba(96,165,250,0.06)', padding: '14px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                        <Shield size={14} color="#60a5fa" />
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'rgb(147,197,253)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Control Angle</span>
+                      </div>
+                      <ProseBullets text={lead.agent_control_angle} color="rgb(220,225,240)" dotColor="rgba(96,165,250,0.7)" />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button onClick={() => runAI('aergap_fit')} disabled={aiAction !== null}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 9, border: '1px solid rgba(34,211,238,0.28)', background: 'rgba(34,211,238,0.09)', padding: '8px 14px', fontSize: 13, color: 'rgb(103,232,249)', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  <Sparkles size={12} />Analyze Aergap Fit
                 </button>
               )}
             </FindingCard>

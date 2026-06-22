@@ -77,11 +77,11 @@ export const TOOL_META: Record<ToolName, { color: string; bg: string; label: str
 
 export const ACTION_TOOL: Record<string, ToolName> = {
   research: 'Claude', classify: 'Claude', kima_fit: 'Claude',
-  aeredium_fit: 'Claude', score: 'Claude', contacts: 'ContactFinder', pain_points: 'Claude',
+  aeredium_fit: 'Claude', aergap_fit: 'Claude', score: 'Claude', contacts: 'ContactFinder', pain_points: 'Claude',
 }
 
 export const ACTION_LABEL: Record<string, string> = {
   research: 'Research Company', classify: 'Classify Lead',
-  kima_fit: 'Kima Fit Analysis', aeredium_fit: 'Aeredium Fit Analysis',
+  kima_fit: 'Kima Fit Analysis', aeredium_fit: 'Aeredium Fit Analysis', aergap_fit: 'Aergap Fit Analysis',
   score: 'Score Lead', contacts: 'Find Contacts', pain_points: 'Identify Pain Points',
 }

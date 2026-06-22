@@ -225,6 +225,8 @@ export interface Lead {
   pain_point_evidence_type?: 'verified_source' | 'agent_analysis' | 'inferred'
   kima_fit?: string
   aeredium_fit?: string
+  aergap_fit?: string
+  agent_control_angle?: string
   suggested_use_case?: string
   trigger_reason?: string
   risk_angle?: string
