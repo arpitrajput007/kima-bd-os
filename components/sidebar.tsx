@@ -81,6 +81,20 @@ const navGroups: {
 export function Sidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const [apiIssues, setApiIssues] = useState<string[]>([])
+
+  useState(() => {
+    const load = () => {
+      try {
+        const raw = localStorage.getItem('bd_api_issues')
+        setApiIssues(raw ? (JSON.parse(raw) as string[]) : [])
+      } catch { setApiIssues([]) }
+    }
+    load()
+    const handler = () => load()
+    window.addEventListener('bd_api_health_update', handler)
+    return () => window.removeEventListener('bd_api_health_update', handler)
+  })
 
   return (
     <aside
@@ -133,6 +147,7 @@ export function Sidebar() {
             )}
             {group.items.map(({ href, label, icon: Icon, glow, voice, cyan }) => {
               const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+              const hasApiAlert = href === '/settings' && apiIssues.length > 0
               return (
                 <Link
                   key={href}
@@ -172,6 +187,16 @@ export function Sidebar() {
                   )}
                   {!collapsed && isActive && (
                     <div className="ml-auto w-1 h-1 rounded-full" style={{ background: 'rgb(167,139,250)' }} />
+                  )}
+                  {!collapsed && hasApiAlert && !isActive && (
+                    <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded"
+                      style={{ background: 'rgba(248,113,133,0.2)', color: '#f87171' }}
+                      title={`API issues: ${apiIssues.join(', ')}`}>
+                      !
+                    </span>
+                  )}
+                  {collapsed && hasApiAlert && (
+                    <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: '#f87171' }} />
                   )}
                 </Link>
               )
