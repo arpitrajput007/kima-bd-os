@@ -215,6 +215,84 @@ Trigger events: enterprise customer announcement, funding round, compliance/secu
 export const SINGLE_API_LINE =
   'All of this is possible with a single API integration, which is completely free, instant, and hassle-free.'
 
+// ── Per-lead product focus (deterministic routing) ───────────────────────────
+// Decides which product LEADS the pitch for a given lead. An AI-agent company
+// must get an Aergap governance pitch — NOT the default Kima cross-chain /
+// settlement framing. This is deterministic and does NOT depend on the
+// learn/approval rule loop (which only applies after manual approval).
+
+export type ProductFocus = 'aergap' | 'settlement'
+
+export interface LeadFocusInput {
+  company_name?: string | null
+  description?: string | null
+  product_summary?: string | null
+  business_model?: string | null
+  industry_category?: string | null
+  customer_category?: string[] | string | null
+  product_to_sell?: string | null
+}
+
+// Strong signals only — we do NOT want to mistakenly pitch Aergap to a pure
+// payments/settlement company just because it mentions "agent" once.
+const AI_AGENT_KEYWORDS = [
+  'ai agent', 'ai agents', 'agentic', 'autonomous agent', 'autonomous agents',
+  'autonomous checkout', 'agent payment', 'agent payments', 'agent wallet',
+  'agents that pay', 'agent that pays', 'agent-to-agent', 'model context protocol',
+  'agent identity', 'agent governance', 'agentic commerce', 'ai-native',
+]
+
+export function isAiAgentLead(lead: LeadFocusInput): boolean {
+  const cats = Array.isArray(lead.customer_category)
+    ? lead.customer_category
+    : lead.customer_category ? [lead.customer_category] : []
+  if (cats.some(c => (c || '').toLowerCase().includes('agentic'))) return true
+
+  const industry = (lead.industry_category || '').toLowerCase()
+  if (industry.includes('ai commerce') || industry.includes('payment agent') || industry.includes('ai agent')) return true
+
+  const hay = [lead.company_name, lead.description, lead.product_summary, lead.business_model]
+    .filter(Boolean).join(' ').toLowerCase()
+  return AI_AGENT_KEYWORDS.some(k => hay.includes(k))
+}
+
+// The Aergap-first directive. Injected LATE in the prompt (after the generic
+// rules) so it overrides any earlier Kima/settlement framing.
+export const AERGAP_FOCUS_DIRECTIVE = `══ PRODUCT FOCUS FOR THIS LEAD — AERGAP (AI-agent governance), NOT settlement ══
+
+This is an AI-agent company. The scope of work you pitch MUST center on Aergap. Any earlier mention of Kima, cross-chain, settlement, the "single API" line, or bridges does NOT apply to this lead — override it.
+
+LEAD WITH AERGAP:
+- Agent Identity — verifiable proof of who (or what) acted
+- Agent Policy + Execution Gate — unauthorized agent actions are blocked BEFORE they execute, not detected after, and it's hardware-enforced, not software-level
+- Audit Trail — immutable cryptographic log of every agent action and gate decision
+- Controls — spend limits, approved-recipient lists, human-in-the-loop for large/unusual transactions, prompt-injection protection, instant freeze/revoke
+
+THE HOOK (use when it fits their situation): enterprise deals stalling in security review because they can't prove agent identity, policy enforcement, and audit trail. That is the live buying signal.
+
+FRAMING LINE you may use: "Stripe governs payments for businesses. Okta governs access for employees. Aergap governs economic authority for AI agents."
+
+HARD BANS for this lead — do NOT lead with, pitch, or headline any of these:
+- Cross-chain settlement, interoperability, bridges, "no bridges", wrapped/synthetic assets
+- Kima UPR, single-API settlement, liquidity, on/off-ramp as the primary offer
+- The "single API integration, completely free, instant, and hassle-free" Kima line
+Only mention Kima/Aeredium if it is genuinely additive AND only after Aergap is established — one sentence maximum, framed as "and later, once agents are moving real value across rails…". Never make settlement the headline for this lead.`
+
+// The default settlement directive — keeps the Kima single-API line for
+// non-AI-agent leads.
+export const SETTLEMENT_FOCUS_DIRECTIVE = `══ PRODUCT FOCUS FOR THIS LEAD — Kima / Aeredium settlement ══
+
+Lead with the Kima/Aeredium angle that fits their situation (cross-chain settlement, on/off-ramp, liquidity, institutional infra). Weave in the single-API idea naturally where it fits: "${SINGLE_API_LINE}"
+Only bring in Aergap if they genuinely build AI agents that take consequential financial actions — otherwise leave it out.`
+
+// Resolve the right focus + directive for a lead. Use this in every outreach /
+// drafting path so the product choice is consistent and deterministic.
+export function productFocusDirective(lead: LeadFocusInput): { focus: ProductFocus; directive: string } {
+  return isAiAgentLead(lead)
+    ? { focus: 'aergap', directive: AERGAP_FOCUS_DIRECTIVE }
+    : { focus: 'settlement', directive: SETTLEMENT_FOCUS_DIRECTIVE }
+}
+
 // ── Composed blocks for prompts ──────────────────────────────────────────────
 
 // Compact product context (use in token-tight calls like company extraction)

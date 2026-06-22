@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { PRODUCT_BRAIN, SINGLE_API_LINE } from '@/lib/kima-knowledge'
+import { PRODUCT_BRAIN, productFocusDirective, type LeadFocusInput } from '@/lib/kima-knowledge'
 import { MAX_FOLLOWUPS, getOutreachLearnings } from '@/lib/outreach'
 import { routeJSONWithBanGuard, type AIProvider } from '@/lib/ai-router'
 import { outreachMemory } from '@/lib/agent-memory'
@@ -59,8 +59,8 @@ Opener: Start with the ONE thing that makes THIS company different — a specifi
 
 Structure (natural, not checklist):
 - Hook = their specific situation (1-2 sentences)
-- Problem Kima fixes for them — stated simply, not as a feature list (1-2 sentences)
-- The single-API idea woven in naturally where it fits: "${SINGLE_API_LINE}"
+- The problem WE fix for them — stated simply, not as a feature list (1-2 sentences). Which product leads is set by the PRODUCT FOCUS block below — follow it exactly.
+- The product value woven in naturally where it fits (the PRODUCT FOCUS block tells you which product and the exact framing)
 - One clean CTA — a yes/no question, a specific ask, or a soft close. Vary it.
 
 Length and formatting:
@@ -224,12 +224,16 @@ async function generateAutoDrafts(leadId: string, draftingProvider: AIProvider =
     outreachMemory({ tags: (lead.tags as string[] | null) || [] }),
   ])
 
-  const systemPrompt = `You are Arpit, leading BD/partnerships for Kima and Aeredium. You write your own outreach DMs by hand after researching each prospect.
+  const { directive: focusDirective } = productFocusDirective(lead as LeadFocusInput)
+
+  const systemPrompt = `You are Arpit, leading BD/partnerships for Kima, Aeredium, and Aergap. You write your own outreach DMs by hand after researching each prospect.
 
 ${PRODUCT_BRAIN}
 
 ${HUMAN_RULES}
 ${learnings.hasData ? `\n${learnings.block}\n` : ''}${memory}
+
+${focusDirective}
 
 You will produce SIX drafts for the SAME lead — 2 variations per channel. Each variation within a channel MUST use a completely different hook, evidence point, and angle. They cannot feel like the same message reworded.
 
@@ -305,13 +309,17 @@ async function generateFollowup(leadId: string, stage: number, draftingProvider:
     outreachMemory({ tags: (lead.tags as string[] | null) || [] }),
   ])
 
+  const { directive: focusDirective } = productFocusDirective(lead as LeadFocusInput)
+
   const isFinal = stage >= MAX_FOLLOWUPS - 1
-  const systemPrompt = `You are Arpit, leading BD/partnerships for Kima and Aeredium. You're writing a SHORT follow-up to someone who hasn't replied yet. You are not annoyed and not pushy — just persistent and useful.
+  const systemPrompt = `You are Arpit, leading BD/partnerships for Kima, Aeredium, and Aergap. You're writing a SHORT follow-up to someone who hasn't replied yet. You are not annoyed and not pushy — just persistent and useful.
 
 ${PRODUCT_BRAIN}
 
 ${HUMAN_RULES}
 ${learnings.hasData ? `\n${learnings.block}\n` : ''}${memory}
+
+${focusDirective}
 
 FOLLOW-UP RULES:
 - Keep it SHORT — 1 to 3 sentences. Shorter than the first message.
@@ -420,19 +428,29 @@ export async function POST(req: NextRequest) {
     outreachMemory(),
   ])
 
-  const systemPrompt = `You are writing BD outreach messages for Arpit, who leads BD/partnerships for Kima and Aeredium.
+  const { directive: focusDirective } = productFocusDirective({
+    company_name,
+    customer_category,
+    product_to_sell,
+    description: use_case,
+    business_model: pain_point,
+  } as LeadFocusInput)
+
+  const systemPrompt = `You are writing BD outreach messages for Arpit, who leads BD/partnerships for Kima, Aeredium, and Aergap.
 
 ${PRODUCT_BRAIN}
 
 ${HUMAN_RULES}
 ${learnings.hasData ? `\n${learnings.block}\n` : ''}${memory}
 
+${focusDirective}
+
 MESSAGE STRUCTURE (keep it natural, don't make it look like a checklist):
 1. Personal opener based on their specific company/product/trigger
 2. The specific pain point they have
-3. Kima/Aeredium fit for their situation
+3. Our product fit for their situation — which product leads is set by the PRODUCT FOCUS block above
 4. Product/use case to sell
-5. The single-API idea woven in
+5. The product value woven in (follow the PRODUCT FOCUS block for the exact framing)
 6. Soft, specific CTA
 
 Return JSON only. No markdown prose.`
