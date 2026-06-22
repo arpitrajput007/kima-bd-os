@@ -337,14 +337,17 @@ async function getOrCreateSession(sessionId?: string): Promise<string> {
   return data?.id || crypto.randomUUID()
 }
 
-async function autoTitle(sessionId: string, firstMsg: string) {
+async function autoTitle(sessionId: string, firstMsg: string, firstReply = '') {
   try {
+    const snippet = `User: ${firstMsg.slice(0, 200)}${firstReply ? `\nAssistant: ${firstReply.slice(0, 200)}` : ''}`
     const c = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: `Create a short 4-6 word title for an Aergap BD conversation that starts with: "${firstMsg.slice(0, 200)}". Return ONLY the title, no quotes.` }],
-      max_tokens: 20, temperature: 0.3,
+      messages: [{ role: 'user', content: `Generate a specific 4-7 word title for this BD conversation. Focus on the company name, person, product, or concrete goal — NOT generic phrases like "BD chat" or "Strategy Session". Examples of good titles: "Outreach to Skyfire's CEO", "Kima Fit for Stripe Agents", "Pitch Angle for Ramp Treasury".\n\nConversation:\n${snippet}\n\nReturn ONLY the title, no quotes, no punctuation at the end.` }],
+      max_tokens: 25, temperature: 0.4,
     })
-    const title = `[Aergap] ${c.choices[0].message.content?.trim() || 'BD chat'}`
+    const raw = c.choices[0].message.content?.trim() || ''
+    if (!raw || raw.toLowerCase().includes('bd chat')) return // skip generic fallback
+    const title = `[Aergap] ${raw}`
     await supabase.from('voice_sessions').update({ title }).eq('id', sessionId)
   } catch { /* non-critical */ }
 }
@@ -453,7 +456,7 @@ export async function POST(req: NextRequest) {
     const { data: s } = await supabase.from('voice_sessions').select('message_count').eq('id', sessionId).single()
     const newCount = (s?.message_count || 0) + 2
     await supabase.from('voice_sessions').update({ message_count: newCount, updated_at: new Date().toISOString() }).eq('id', sessionId)
-    if (newCount === 2) autoTitle(sessionId, message)
+    if (newCount <= 2) autoTitle(sessionId, message, reply)
 
     return NextResponse.json({ reply, memory, session_id: sessionId })
   } catch (err: unknown) {
