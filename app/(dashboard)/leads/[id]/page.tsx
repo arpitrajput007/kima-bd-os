@@ -263,14 +263,46 @@ const ALL_OUTREACH_CHANNELS = [
   { id: 'telegram', label: 'Telegram',    color: '#22d3ee' },
 ]
 
-function ContactCard({ contact, leadId, onRefresh, onUpdate, refreshing }: {
-  contact: Contact; leadId: string; onRefresh: () => void; onUpdate: () => void; refreshing: boolean
+/* ── Timezone utilities — zero API calls, pure browser ───── */
+const REGION_TZ: Record<string, { tz: string; label: string }> = {
+  'North America':        { tz: 'America/New_York',    label: 'ET' },
+  'Europe':               { tz: 'Europe/London',       label: 'GMT/BST' },
+  'Asia':                 { tz: 'Asia/Singapore',      label: 'SGT' },
+  'Middle East':          { tz: 'Asia/Dubai',          label: 'GST' },
+  'MENA':                 { tz: 'Asia/Dubai',          label: 'GST' },
+  'Africa':               { tz: 'Africa/Lagos',        label: 'WAT' },
+  'Southeast Asia':       { tz: 'Asia/Bangkok',        label: 'ICT' },
+  'South Asia':           { tz: 'Asia/Kolkata',        label: 'IST' },
+  'Latin America':        { tz: 'America/Sao_Paulo',   label: 'BRT' },
+  'UAE-India corridor':   { tz: 'Asia/Dubai',          label: 'GST' },
+  'US-India corridor':    { tz: 'America/New_York',    label: 'ET' },
+  'EU-India corridor':    { tz: 'Europe/London',       label: 'GMT' },
+}
+
+function useRegionTime(region?: string | null) {
+  const [time, setTime] = useState<string | null>(null)
+  useEffect(() => {
+    const entry = region ? REGION_TZ[region] : null
+    if (!entry) { setTime(null); return }
+    const fmt = new Intl.DateTimeFormat('en-US', { timeZone: entry.tz, hour: 'numeric', minute: '2-digit', hour12: true, weekday: 'short' })
+    const tick = () => setTime(fmt.format(new Date()))
+    tick()
+    const id = setInterval(tick, 30_000)
+    return () => clearInterval(id)
+  }, [region])
+  const tzLabel = region ? REGION_TZ[region]?.label : null
+  return { time, tzLabel }
+}
+
+function ContactCard({ contact, leadId, region, onRefresh, onUpdate, refreshing }: {
+  contact: Contact; leadId: string; region?: string | null; onRefresh: () => void; onUpdate: () => void; refreshing: boolean
 }) {
   const supabase = createClient()
   const [enriching, setEnriching] = useState(false)
   const [pendingChannel, setPendingChannel] = useState<string | null>(null)
   const [pendingMessage, setPendingMessage] = useState('')
   const [saving, setSaving] = useState(false)
+  const { time: regionTime, tzLabel } = useRegionTime(region)
 
   // ── Draft state ──────────────────────────────────────
   const [drafts, setDrafts] = useState<OutreachMessage[]>([])
@@ -466,6 +498,13 @@ function ContactCard({ contact, leadId, onRefresh, onUpdate, refreshing }: {
           <div>
             <div style={{ fontSize: 15, fontWeight: 700, color: 'white' }}>{contact.name || '—'}</div>
             <div style={{ fontSize: 12, color: 'rgb(148,163,184)', marginTop: 2 }}>{contact.role}</div>
+            {regionTime && (
+              <div style={{ fontSize: 11, color: 'rgb(100,107,140)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: 10 }}>🕐</span>
+                <span style={{ fontVariantNumeric: 'tabular-nums' }}>{regionTime}</span>
+                {tzLabel && <span style={{ color: 'rgb(75,82,110)', fontWeight: 500 }}>· {tzLabel}</span>}
+              </div>
+            )}
           </div>
         </div>
         {contact.contact_confidence && (
@@ -2278,7 +2317,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   </div>
                 ) : (
                   contacts.map(contact => (
-                    <ContactCard key={contact.id} contact={contact} leadId={lead.id}
+                    <ContactCard key={contact.id} contact={contact} leadId={lead.id} region={lead.region}
                       onRefresh={loadLead}
                       onUpdate={loadLead}
                       refreshing={aiAction === 'contacts'} />
