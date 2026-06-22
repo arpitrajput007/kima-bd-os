@@ -17,7 +17,7 @@ interface ReachoutRecord {
   contact_id: string | null
   channel: string
   message: string | null
-  status: 'sent' | 'delivered' | 'replied' | 'archived'
+  status: 'draft' | 'sent' | 'delivered' | 'replied' | 'archived'
   created_at: string
   updated_at: string
   leads: { id: string; company_name: string; website: string | null; industry_category: string | null } | null
@@ -40,6 +40,7 @@ const CHANNEL_CFG: Record<string, { label: string; color: string; bg: string; bo
 }
 
 const OUTCOME_CFG: Record<string, { label: string; color: string; bg: string; border: string; icon: typeof CheckCircle2 }> = {
+  draft:    { label: 'Draft',      color: 'rgb(251,191,36)',   bg: 'rgba(251,191,36,0.08)',  border: 'rgba(251,191,36,0.25)',  icon: MessageSquare },
   sent:     { label: 'Pending',    color: 'rgb(148,163,184)',  bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.2)',  icon: Clock },
   replied:  { label: 'Replied ✓',  color: 'rgb(52,211,153)',   bg: 'rgba(52,211,153,0.1)',   border: 'rgba(52,211,153,0.3)',   icon: CheckCircle2 },
   archived: { label: 'No Response', color: 'rgb(248,113,133)', bg: 'rgba(248,113,133,0.08)', border: 'rgba(248,113,133,0.2)', icon: XCircle },
@@ -173,6 +174,16 @@ function RecordCard({ record, onOutcomeChange }: { record: ReachoutRecord; onOut
           <OutcomeIcon size={11} />{outcome.label}
         </span>
 
+        {record.status === 'draft' && (
+          <>
+            <div style={{ flex: 1 }} />
+            <Link href={`/leads/${record.lead_id}`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: 'none', border: '1px solid rgba(251,191,36,0.3)', background: 'rgba(251,191,36,0.08)', color: 'rgb(251,191,36)' }}>
+              <Send size={12} />Go send it →
+            </Link>
+          </>
+        )}
+
         {/* Action buttons — only show if pending */}
         {record.status === 'sent' && (
           <>
@@ -205,7 +216,6 @@ export default function ReachoutStoragePage() {
     const { data, error } = await supabase
       .from('outreach_messages')
       .select('*, leads(id, company_name, website, industry_category), contacts(id, name, role)')
-      .neq('status', 'draft')
       .not('message', 'is', null)
       .order('created_at', { ascending: false })
     if (!error && data) setRecords(data as unknown as ReachoutRecord[])
@@ -242,7 +252,9 @@ export default function ReachoutStoragePage() {
   })
 
   /* ── Stats ── */
-  const totalSent = records.length
+  const totalDrafts = records.filter(r => r.status === 'draft').length
+  const sent = records.filter(r => r.status !== 'draft')
+  const totalSent = sent.length
   const totalReplied = records.filter(r => r.status === 'replied').length
   const totalNoResponse = records.filter(r => r.status === 'archived').length
   const replyRate = totalSent > 0 ? Math.round((totalReplied / totalSent) * 100) : 0
@@ -276,15 +288,15 @@ export default function ReachoutStoragePage() {
 
       {/* Stats row */}
       <div style={{ display: 'flex', gap: 14, marginBottom: 28, flexWrap: 'wrap' }}>
+        <StatCard label="Drafts waiting" value={totalDrafts}
+          sub={totalDrafts > 0 ? 'Ready to send' : undefined}
+          color="rgb(251,191,36)" bg="rgba(251,191,36,0.08)" />
         <StatCard label="Total sent" value={totalSent} color="rgb(96,165,250)" bg="rgba(96,165,250,0.1)" />
         <StatCard label="Got a reply" value={totalReplied}
           sub={totalSent > 0 ? `${replyRate}% reply rate` : undefined}
           color="rgb(52,211,153)" bg="rgba(52,211,153,0.1)" />
-        <StatCard label="No response" value={totalNoResponse}
-          sub={totalNoResponse > 0 ? `${totalSent - totalReplied - totalNoResponse} pending` : undefined}
-          color="rgb(248,113,133)" bg="rgba(248,113,133,0.1)" />
-        <StatCard label="With saved message" value={withMessage}
-          sub={bestChannel ? `Best: ${CHANNEL_CFG[bestChannel[0]]?.label ?? bestChannel[0]} (${Math.round(bestChannel[1].replied / bestChannel[1].sent * 100)}%)` : undefined}
+        <StatCard label="Best channel" value={bestChannel ? (CHANNEL_CFG[bestChannel[0]]?.label ?? bestChannel[0]) : '—'}
+          sub={bestChannel ? `${Math.round(bestChannel[1].replied / bestChannel[1].sent * 100)}% reply rate` : undefined}
           color="rgb(167,139,250)" bg="rgba(167,139,250,0.1)" />
       </div>
 
@@ -310,7 +322,8 @@ export default function ReachoutStoragePage() {
 
         {/* Outcome filter */}
         {[
-          { key: 'all', label: 'All outcomes' },
+          { key: 'all', label: 'All' },
+          { key: 'draft', label: '📝 Drafts' },
           { key: 'sent', label: '⏳ Pending' },
           { key: 'replied', label: '✓ Replied' },
           { key: 'archived', label: '✗ No response' },

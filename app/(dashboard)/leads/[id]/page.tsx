@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, use, useRef } from 'react'
+import { useEffect, useState, use, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -271,6 +271,79 @@ function ContactCard({ contact, leadId, onRefresh, onUpdate, refreshing }: {
   const [pendingChannel, setPendingChannel] = useState<string | null>(null)
   const [pendingMessage, setPendingMessage] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // ── Draft state ──────────────────────────────────────
+  const [drafts, setDrafts] = useState<OutreachMessage[]>([])
+  const [showDraftForm, setShowDraftForm] = useState(false)
+  const [draftChannel, setDraftChannel] = useState('linkedin')
+  const [draftText, setDraftText] = useState('')
+  const [savingDraft, setSavingDraft] = useState(false)
+  const [sendingDraft, setSendingDraft] = useState<string | null>(null)
+  const [copiedDraft, setCopiedDraft] = useState<string | null>(null)
+
+  const loadDrafts = useCallback(async () => {
+    const { data } = await supabase
+      .from('outreach_messages')
+      .select('*')
+      .eq('contact_id', contact.id)
+      .eq('status', 'draft')
+      .order('updated_at', { ascending: false })
+    setDrafts((data as OutreachMessage[]) || [])
+  }, [supabase, contact.id])
+
+  useEffect(() => { loadDrafts() }, [loadDrafts])
+
+  const saveDraft = async () => {
+    if (!draftText.trim()) return
+    setSavingDraft(true)
+    const { error } = await supabase.from('outreach_messages').insert({
+      lead_id: leadId,
+      contact_id: contact.id,
+      channel: draftChannel,
+      message: draftText.trim(),
+      status: 'draft',
+    })
+    setSavingDraft(false)
+    if (error) { toast.error('Could not save draft'); return }
+    toast.success('Draft saved — come back when ready to send')
+    setShowDraftForm(false)
+    setDraftText('')
+    loadDrafts()
+  }
+
+  const deleteDraft = async (draftId: string) => {
+    await supabase.from('outreach_messages').delete().eq('id', draftId)
+    setDrafts(prev => prev.filter(d => d.id !== draftId))
+    toast.success('Draft deleted')
+  }
+
+  const sendDraft = async (draft: OutreachMessage) => {
+    if (!draft.message || !draft.channel) return
+    setSendingDraft(draft.id)
+
+    // Copy to clipboard for easy pasting
+    await navigator.clipboard.writeText(draft.message)
+    setCopiedDraft(draft.id)
+    setTimeout(() => setCopiedDraft(null), 2000)
+
+    // Mark draft as sent in outreach_messages
+    const now = new Date().toISOString()
+    await supabase.from('outreach_messages').update({ status: 'sent', updated_at: now }).eq('id', draft.id)
+
+    // Mark contacted_channels for this contact
+    const chId = draft.channel
+    if (!touchedSet.has(chId)) {
+      const updated: ContactTouch[] = [...localTouched, { channel: chId, contacted_at: now }]
+      setLocalTouched(updated)
+      await supabase.from('contacts').update({ contacted_channels: updated }).eq('id', contact.id)
+    }
+
+    setSendingDraft(null)
+    setDrafts(prev => prev.filter(d => d.id !== draft.id))
+    const chLabel = ALL_OUTREACH_CHANNELS.find(c => c.id === chId)?.label || chId
+    toast.success(`Message copied! Mark ${chLabel} as contacted once sent.`)
+    onUpdate()
+  }
   const initials = contact.name
     ? contact.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : '?'
@@ -532,6 +605,123 @@ function ContactCard({ contact, leadId, onRefresh, onUpdate, refreshing }: {
             </div>
           )
         })()}
+      </div>
+
+      {/* ── Draft messages for later ─────────────────────────── */}
+      <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: drafts.length > 0 || showDraftForm ? 10 : 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgb(100,107,140)', textTransform: 'uppercase', letterSpacing: '0.14em', display: 'flex', alignItems: 'center', gap: 6 }}>
+            {drafts.length > 0 && (
+              <span style={{ width: 16, height: 16, borderRadius: '50%', background: 'rgba(251,191,36,0.2)', border: '1px solid rgba(251,191,36,0.4)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#fbbf24' }}>
+                {drafts.length}
+              </span>
+            )}
+            Drafts
+          </div>
+          {!showDraftForm && (
+            <button onClick={() => { setShowDraftForm(true); setDraftText(''); setDraftChannel('linkedin') }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: 'rgb(167,139,250)', background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 7, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
+              <Edit size={11} />Prepare message
+            </button>
+          )}
+        </div>
+
+        {/* Existing drafts */}
+        {drafts.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: showDraftForm ? 10 : 0 }}>
+            {drafts.map(draft => {
+              const ch = ALL_OUTREACH_CHANNELS.find(c => c.id === draft.channel)
+              const preview = (draft.message || '').slice(0, 120)
+              const isLong = (draft.message?.length || 0) > 120
+              const isSending = sendingDraft === draft.id
+              const isCopied = copiedDraft === draft.id
+              return (
+                <div key={draft.id} style={{ borderRadius: 10, border: '1px solid rgba(251,191,36,0.2)', background: 'rgba(251,191,36,0.04)', padding: '11px 13px' }}>
+                  {/* Draft header */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
+                    <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: (ch ? ch.color : '#a78bfa') + '20', border: `1px solid ${(ch ? ch.color : '#a78bfa')}44`, color: ch?.color ?? '#a78bfa' }}>
+                      {ch?.label ?? draft.channel}
+                    </span>
+                    <span style={{ fontSize: 10, color: 'rgba(251,191,36,0.6)', fontWeight: 600 }}>
+                      DRAFT
+                    </span>
+                    <span style={{ fontSize: 10, color: 'rgb(80,87,120)', marginLeft: 'auto' }}>
+                      {new Date(draft.updated_at || draft.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                  {/* Message preview */}
+                  <p style={{ fontSize: 12, color: 'rgb(180,187,210)', lineHeight: 1.6, margin: '0 0 10px', whiteSpace: 'pre-wrap' }}>
+                    {preview}{isLong ? '…' : ''}
+                  </p>
+                  {/* Actions */}
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => sendDraft(draft)} disabled={isSending}
+                      style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(52,211,153,0.35)', background: 'rgba(52,211,153,0.1)', color: 'rgb(52,211,153)', fontSize: 11, fontWeight: 700, cursor: isSending ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+                      {isSending ? <Loader2 size={11} className="animate-spin" /> : isCopied ? <CheckCircle2 size={11} /> : <Copy size={11} />}
+                      {isCopied ? 'Copied!' : 'Copy & send'}
+                    </button>
+                    <button onClick={() => {
+                        setDraftText(draft.message || '')
+                        setDraftChannel(draft.channel || 'linkedin')
+                        deleteDraft(draft.id)
+                        setShowDraftForm(true)
+                      }}
+                      style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'none', color: 'rgb(100,107,140)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Edit size={10} />Edit
+                    </button>
+                    <button onClick={() => deleteDraft(draft.id)}
+                      style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid rgba(248,113,133,0.2)', background: 'none', color: 'rgba(248,113,133,0.6)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Draft compose form */}
+        {showDraftForm && (
+          <div style={{ borderRadius: 10, border: '1px solid rgba(167,139,250,0.2)', background: 'rgba(167,139,250,0.04)', padding: '12px 14px' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'rgb(167,139,250)', marginBottom: 10 }}>
+              Save a draft — send when ready
+            </div>
+            {/* Channel picker */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+              {ALL_OUTREACH_CHANNELS.map(ch => (
+                <button key={ch.id} onClick={() => setDraftChannel(ch.id)}
+                  style={{ padding: '4px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${draftChannel === ch.id ? ch.color + '66' : 'rgba(255,255,255,0.08)'}`, background: draftChannel === ch.id ? ch.color + '18' : 'rgba(255,255,255,0.02)', color: draftChannel === ch.id ? ch.color : 'rgb(120,127,160)' }}>
+                  {ch.label}
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={draftText}
+              onChange={e => setDraftText(e.target.value)}
+              placeholder={`Write your ${ALL_OUTREACH_CHANNELS.find(c => c.id === draftChannel)?.label ?? ''} message here…`}
+              rows={5}
+              autoFocus
+              style={{ width: '100%', resize: 'vertical', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.25)', color: 'rgb(210,215,235)', fontSize: 12, padding: '10px 12px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', lineHeight: 1.6 }}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button onClick={saveDraft} disabled={savingDraft || !draftText.trim()}
+                style={{ flex: 1, padding: '7px 14px', borderRadius: 8, border: '1px solid rgba(167,139,250,0.4)', background: 'rgba(167,139,250,0.12)', color: '#c084fc', fontSize: 12, fontWeight: 600, cursor: (!draftText.trim() || savingDraft) ? 'not-allowed' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: !draftText.trim() ? 0.5 : 1 }}>
+                {savingDraft ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
+                Save draft
+              </button>
+              <button onClick={() => { setShowDraftForm(false); setDraftText('') }}
+                style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'none', color: 'rgb(100,107,140)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!showDraftForm && drafts.length === 0 && (
+          <p style={{ fontSize: 11, color: 'rgb(70,77,110)', margin: 0, fontStyle: 'italic' }}>
+            No draft — use &quot;Prepare message&quot; to write one for later
+          </p>
+        )}
       </div>
     </div>
   )
