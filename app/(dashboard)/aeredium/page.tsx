@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
@@ -130,7 +130,11 @@ function ScorePill({ score, label }: { score: number; label?: string }) {
 }
 
 export default function AerediumPage() {
-  const supabase = createClient()
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+  const getClient = () => {
+    if (!supabaseRef.current) supabaseRef.current = createClient()
+    return supabaseRef.current
+  }
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
   const [sort, setSort] = useState<SortKey>('total')
@@ -142,7 +146,7 @@ export default function AerediumPage() {
   // On mount: check which companies are already in the CRM
   useEffect(() => {
     const names = TARGETS.map(t => t.company)
-    supabase
+    getClient()
       .from('leads')
       .select('company_name')
       .in('company_name', names)
@@ -186,7 +190,7 @@ export default function AerediumPage() {
   const addToPipeline = async (t: Target) => {
     setAdding(t.company)
     try {
-      const { error } = await supabase.from('leads').insert({
+      const { error } = await getClient().from('leads').insert({
         company_name: t.company,
         website: t.website,
         twitter_url: null,

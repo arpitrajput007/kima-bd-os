@@ -28,7 +28,7 @@ import {
   DollarSign,
   Send,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 
 const navGroups: {
@@ -83,7 +83,7 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const [apiIssues, setApiIssues] = useState<string[]>([])
 
-  useState(() => {
+  useEffect(() => {
     const load = () => {
       try {
         const raw = localStorage.getItem('bd_api_issues')
@@ -94,7 +94,7 @@ export function Sidebar() {
     const handler = () => load()
     window.addEventListener('bd_api_health_update', handler)
     return () => window.removeEventListener('bd_api_health_update', handler)
-  })
+  }, [])
 
   return (
     <aside

@@ -35,12 +35,6 @@ async function getHunterContacts(website: string): Promise<string> {
   }
 }
 
-// Use service role key on the server so RLS doesn't block lead INSERT/SELECT ops.
-// NEXT_PUBLIC_SUPABASE_ANON_KEY is for client-side browser use only.
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 const CUSTOMER_CATEGORIES = [
   'Agentic Payments Customer',
@@ -366,6 +360,11 @@ Return this exact JSON:
 
 export async function POST(req: NextRequest) {
   try {
+    // Use service role key on the server so RLS doesn't block lead INSERT/SELECT ops.
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
     const { source_id, research_ai = 'claude' } = await req.json()
     if (!source_id) {
       return NextResponse.json({ error: 'source_id is required' }, { status: 400 })

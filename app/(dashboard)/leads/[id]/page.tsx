@@ -264,45 +264,82 @@ const ALL_OUTREACH_CHANNELS = [
 ]
 
 /* ── Timezone utilities — zero API calls, pure browser ───── */
-const REGION_TZ: Record<string, { tz: string; label: string }> = {
-  'North America':        { tz: 'America/New_York',    label: 'ET' },
-  'Europe':               { tz: 'Europe/London',       label: 'GMT/BST' },
-  'Asia':                 { tz: 'Asia/Singapore',      label: 'SGT' },
-  'Middle East':          { tz: 'Asia/Dubai',          label: 'GST' },
-  'MENA':                 { tz: 'Asia/Dubai',          label: 'GST' },
-  'Africa':               { tz: 'Africa/Lagos',        label: 'WAT' },
-  'Southeast Asia':       { tz: 'Asia/Bangkok',        label: 'ICT' },
-  'South Asia':           { tz: 'Asia/Kolkata',        label: 'IST' },
-  'Latin America':        { tz: 'America/Sao_Paulo',   label: 'BRT' },
-  'UAE-India corridor':   { tz: 'Asia/Dubai',          label: 'GST' },
-  'US-India corridor':    { tz: 'America/New_York',    label: 'ET' },
-  'EU-India corridor':    { tz: 'Europe/London',       label: 'GMT' },
+// Each entry: [keywords to match (lowercase), IANA tz, short label]
+const TZ_RULES: [string[], string, string][] = [
+  [['united states', 'us ', 'usa', 'north america', 'san francisco', 'new york', 'chicago', 'los angeles', 'us/eu', 'us-india', 'us-eu'], 'America/New_York', 'ET'],
+  [['canada', 'toronto', 'vancouver'],                             'America/Toronto',   'ET'],
+  [['united kingdom', 'uk ', 'london', 'eu-india', 'eu-uk'],      'Europe/London',     'GMT/BST'],
+  [['europe', 'eu ', 'berlin', 'paris', 'amsterdam', 'frankfurt', 'zurich', 'lisbon', 'madrid', 'rome', 'sweden', 'norway', 'denmark', 'finland', 'netherlands', 'belgium', 'austria', 'switzerland'], 'Europe/Berlin', 'CET'],
+  [['india', 'south asia', 'bangalore', 'bengaluru', 'mumbai', 'delhi', 'hyderabad', 'chennai', 'kolkata', 'uae-india'], 'Asia/Kolkata', 'IST'],
+  [['uae', 'dubai', 'abu dhabi', 'middle east', 'mena', 'saudi', 'bahrain', 'qatar', 'kuwait', 'oman'], 'Asia/Dubai', 'GST'],
+  [['singapore', 'southeast asia', 'sea ', 'malaysia', 'indonesia', 'thailand', 'vietnam', 'philippines', 'asia'], 'Asia/Singapore', 'SGT'],
+  [['japan', 'tokyo'],                                             'Asia/Tokyo',        'JST'],
+  [['china', 'beijing', 'shanghai', 'hong kong', 'shenzhen'],     'Asia/Shanghai',     'CST'],
+  [['korea', 'seoul'],                                             'Asia/Seoul',        'KST'],
+  [['australia', 'sydney', 'melbourne'],                           'Australia/Sydney',  'AEST'],
+  [['africa', 'nigeria', 'kenya', 'ghana', 'south africa'],        'Africa/Lagos',      'WAT'],
+  [['latin america', 'brazil', 'sao paulo', 'mexico', 'argentina', 'chile', 'colombia'], 'America/Sao_Paulo', 'BRT'],
+  [['global', 'worldwide', 'international'],                       'UTC',               'UTC'],
+]
+
+// TLD → timezone fallback when lead.region is null
+const TLD_RULES: [string[], string, string][] = [
+  [['.ae', '.sa', '.qa', '.bh', '.kw', '.om'],         'Asia/Dubai',       'GST'],
+  [['.in'],                                             'Asia/Kolkata',     'IST'],
+  [['.sg'],                                             'Asia/Singapore',   'SGT'],
+  [['.jp'],                                             'Asia/Tokyo',       'JST'],
+  [['.cn', '.hk', '.tw'],                               'Asia/Shanghai',    'CST'],
+  [['.kr'],                                             'Asia/Seoul',       'KST'],
+  [['.au'],                                             'Australia/Sydney', 'AEST'],
+  [['.uk', '.co.uk', '.gb'],                            'Europe/London',    'GMT/BST'],
+  [['.de', '.fr', '.nl', '.es', '.it', '.se', '.no', '.dk', '.fi', '.be', '.at', '.ch', '.eu'], 'Europe/Berlin', 'CET'],
+  [['.br', '.mx', '.ar', '.co', '.cl'],                 'America/Sao_Paulo','BRT'],
+  [['.ng', '.ke', '.gh', '.za'],                        'Africa/Lagos',     'WAT'],
+  [['.ca'],                                             'America/Toronto',  'ET'],
+]
+
+function resolveTimezone(region?: string | null, website?: string | null): { tz: string; label: string } | null {
+  if (region) {
+    const r = region.toLowerCase()
+    for (const [keywords, tz, label] of TZ_RULES) {
+      if (keywords.some(k => r.includes(k))) return { tz, label }
+    }
+  }
+  // Fallback: infer from website TLD
+  if (website) {
+    try {
+      const host = new URL(website.startsWith('http') ? website : `https://${website}`).hostname.toLowerCase()
+      for (const [tlds, tz, label] of TLD_RULES) {
+        if (tlds.some(tld => host.endsWith(tld))) return { tz, label }
+      }
+    } catch { /* ignore invalid URLs */ }
+  }
+  return null
 }
 
-function useRegionTime(region?: string | null) {
+function useRegionTime(region?: string | null, website?: string | null) {
   const [time, setTime] = useState<string | null>(null)
+  const entry = resolveTimezone(region, website)
   useEffect(() => {
-    const entry = region ? REGION_TZ[region] : null
     if (!entry) { setTime(null); return }
     const fmt = new Intl.DateTimeFormat('en-US', { timeZone: entry.tz, hour: 'numeric', minute: '2-digit', hour12: true, weekday: 'short' })
     const tick = () => setTime(fmt.format(new Date()))
     tick()
     const id = setInterval(tick, 30_000)
     return () => clearInterval(id)
-  }, [region])
-  const tzLabel = region ? REGION_TZ[region]?.label : null
-  return { time, tzLabel }
+  }, [entry?.tz])
+  return { time, tzLabel: entry?.label ?? null }
 }
 
-function ContactCard({ contact, leadId, region, onRefresh, onUpdate, refreshing }: {
-  contact: Contact; leadId: string; region?: string | null; onRefresh: () => void; onUpdate: () => void; refreshing: boolean
+function ContactCard({ contact, leadId, region, website, onRefresh, onUpdate, refreshing }: {
+  contact: Contact; leadId: string; region?: string | null; website?: string | null; onRefresh: () => void; onUpdate: () => void; refreshing: boolean
 }) {
   const supabase = createClient()
   const [enriching, setEnriching] = useState(false)
   const [pendingChannel, setPendingChannel] = useState<string | null>(null)
   const [pendingMessage, setPendingMessage] = useState('')
   const [saving, setSaving] = useState(false)
-  const { time: regionTime, tzLabel } = useRegionTime(region)
+  const { time: regionTime, tzLabel } = useRegionTime(region, website)
 
   // ── Draft state ──────────────────────────────────────
   const [drafts, setDrafts] = useState<OutreachMessage[]>([])
@@ -2317,7 +2354,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   </div>
                 ) : (
                   contacts.map(contact => (
-                    <ContactCard key={contact.id} contact={contact} leadId={lead.id} region={lead.region}
+                    <ContactCard key={contact.id} contact={contact} leadId={lead.id} region={lead.region} website={lead.website}
                       onRefresh={loadLead}
                       onUpdate={loadLead}
                       refreshing={aiAction === 'contacts'} />
