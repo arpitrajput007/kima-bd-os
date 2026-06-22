@@ -404,11 +404,13 @@ export async function POST(req: NextRequest) {
     if (synthesis.new_rules?.length > 0) {
       for (const rule of synthesis.new_rules.slice(0, 4)) {
         if (!rule.rule || rule.rule.length < 10) continue
+        // No approval gate — what you teach applies immediately. The reason is
+        // still recorded so each rule is auditable in the Agent Rules view.
         const { error } = await supabase.from('agent_rules').insert({
           rule_type: rule.rule_type || 'prioritize',
           rule: rule.rule,
           weight: rule.weight || 0,
-          status: 'pending_approval',
+          status: 'active',
           suggestion_reason: rule.reason || null,
         })
         if (!error) { rulesCreated++; createdRules.push(rule.rule) }
