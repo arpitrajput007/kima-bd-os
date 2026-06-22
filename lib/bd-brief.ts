@@ -6,7 +6,8 @@
 // ============================================================
 
 import { claudeJSON, CLAUDE_RESEARCH } from '@/lib/claude'
-import { PRODUCT_BRAIN } from '@/lib/kima-knowledge'
+import { PRODUCT_BRAIN, productFocusDirective, type LeadFocusInput } from '@/lib/kima-knowledge'
+import { fullMemory } from '@/lib/agent-memory'
 import type { BDBrief } from '@/lib/types'
 
 const SYSTEM = `You are a senior solutions architect and BD strategist for Kima, Aeredium, and Aergap — financial infrastructure companies.
@@ -133,9 +134,19 @@ Return this exact JSON structure:
   }
 }`
 
+  // Inject learned memory (rules/knowledge/feedback) + deterministic product
+  // focus so the brief reflects everything taught via Make Agent Learn and
+  // routes AI-agent companies to Aergap instead of defaulting to Kima.
+  const [memory, { directive }] = await Promise.all([
+    fullMemory({ tags: (lead.tags as string[] | null) || [] }),
+    Promise.resolve(productFocusDirective(lead as LeadFocusInput)),
+  ])
+
+  const system = `${SYSTEM}${memory}\n\n${directive}`
+
   return claudeJSON({
     model: CLAUDE_RESEARCH,
-    system: SYSTEM,
+    system,
     user,
     maxTokens: 2500,
   }) as Promise<BDBrief>
