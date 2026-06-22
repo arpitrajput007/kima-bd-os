@@ -263,11 +263,14 @@ const ALL_OUTREACH_CHANNELS = [
   { id: 'telegram', label: 'Telegram',    color: '#22d3ee' },
 ]
 
-function ContactCard({ contact, onRefresh, onUpdate, refreshing }: {
-  contact: Contact; onRefresh: () => void; onUpdate: () => void; refreshing: boolean
+function ContactCard({ contact, leadId, onRefresh, onUpdate, refreshing }: {
+  contact: Contact; leadId: string; onRefresh: () => void; onUpdate: () => void; refreshing: boolean
 }) {
   const supabase = createClient()
   const [enriching, setEnriching] = useState(false)
+  const [pendingChannel, setPendingChannel] = useState<string | null>(null)
+  const [pendingMessage, setPendingMessage] = useState('')
+  const [saving, setSaving] = useState(false)
   const initials = contact.name
     ? contact.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : '?'
@@ -291,23 +294,57 @@ function ContactCard({ contact, onRefresh, onUpdate, refreshing }: {
   const touchedSet = new Set(localTouched.map(t => t.channel))
 
   const toggleContactChannel = async (chId: string) => {
-    const alreadyTouched = touchedSet.has(chId)
-    const updated: ContactTouch[] = alreadyTouched
-      ? localTouched.filter(t => t.channel !== chId)
-      : [...localTouched, { channel: chId, contacted_at: new Date().toISOString() }]
+    if (touchedSet.has(chId)) {
+      // Already contacted — toggle off immediately
+      const updated = localTouched.filter(t => t.channel !== chId)
+      setLocalTouched(updated)
+      const { error } = await supabase.from('contacts').update({ contacted_channels: updated }).eq('id', contact.id)
+      if (error) { setLocalTouched(localTouched); toast.error('Could not save'); return }
+      toast.success('Removed from log')
+      onUpdate()
+    } else {
+      // Not yet marked — show inline message prompt
+      setPendingChannel(chId)
+      setPendingMessage('')
+    }
+  }
 
-    // Optimistic: flip colour immediately, no waiting
+  const saveTouch = async (skipMessage = false) => {
+    if (!pendingChannel) return
+    setSaving(true)
+    const chId = pendingChannel
+    const now = new Date().toISOString()
+    const updated: ContactTouch[] = [...localTouched, { channel: chId, contacted_at: now }]
+
+    // Optimistic
     setLocalTouched(updated)
+    setPendingChannel(null)
 
     const { error } = await supabase.from('contacts').update({ contacted_channels: updated }).eq('id', contact.id)
     if (error) {
-      setLocalTouched(localTouched) // revert on failure
+      setLocalTouched(localTouched)
+      setSaving(false)
       toast.error('Could not save — run the add-contact-channels.sql migration in Supabase')
-    } else {
-      const chLabel = ALL_OUTREACH_CHANNELS.find(c => c.id === chId)?.label || chId
-      toast.success(alreadyTouched ? 'Removed from log' : `✓ Contacted via ${chLabel}`)
-      onUpdate()
+      return
     }
+
+    const msg = pendingMessage.trim()
+    if (!skipMessage && msg) {
+      // Save the actual message to outreach_messages so Reachout Storage & AI learning can use it
+      await supabase.from('outreach_messages').insert({
+        lead_id: leadId,
+        contact_id: contact.id,
+        channel: chId,
+        message: msg,
+        status: 'sent',
+      })
+    }
+
+    const chLabel = ALL_OUTREACH_CHANNELS.find(c => c.id === chId)?.label || chId
+    toast.success(`✓ Contacted via ${chLabel}${!skipMessage && msg ? ' · message saved' : ''}`)
+    setSaving(false)
+    setPendingMessage('')
+    onUpdate()
   }
 
   // One-click enrich: search Exa for this person's profiles
@@ -441,6 +478,7 @@ function ContactCard({ contact, onRefresh, onUpdate, refreshing }: {
             const whenStr = touchData
               ? new Date(touchData.contacted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
               : ''
+            const isPending = pendingChannel === ch.id
             return (
               <button key={ch.id} onClick={() => toggleContactChannel(ch.id)}
                 title={touched ? `Contacted ${whenStr} · click to undo` : `Mark as contacted via ${ch.label}`}
@@ -448,9 +486,9 @@ function ContactCard({ contact, onRefresh, onUpdate, refreshing }: {
                   display: 'inline-flex', alignItems: 'center', gap: 5,
                   padding: '5px 11px', borderRadius: 8, fontSize: 11, fontWeight: 600,
                   cursor: 'pointer', fontFamily: 'inherit',
-                  border: `1px solid ${touched ? ch.color + '55' : 'rgba(255,255,255,0.08)'}`,
-                  background: touched ? ch.color + '18' : 'rgba(255,255,255,0.03)',
-                  color: touched ? ch.color : 'rgb(120,127,160)',
+                  border: `1px solid ${isPending ? ch.color + '99' : touched ? ch.color + '55' : 'rgba(255,255,255,0.08)'}`,
+                  background: isPending ? ch.color + '28' : touched ? ch.color + '18' : 'rgba(255,255,255,0.03)',
+                  color: touched || isPending ? ch.color : 'rgb(120,127,160)',
                   transition: 'all 0.15s',
                 }}>
                 {touched ? <CheckCircle2 size={11} /> : <Plus size={11} />}
@@ -462,6 +500,38 @@ function ContactCard({ contact, onRefresh, onUpdate, refreshing }: {
             )
           })}
         </div>
+
+        {/* Inline message capture — appears when a channel is clicked */}
+        {pendingChannel && (() => {
+          const ch = ALL_OUTREACH_CHANNELS.find(c => c.id === pendingChannel)
+          return (
+            <div style={{ marginTop: 12, borderRadius: 10, border: `1px solid ${ch?.color ?? '#a78bfa'}33`, background: 'rgba(255,255,255,0.02)', padding: '12px 14px' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: ch?.color ?? '#a78bfa', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <CheckCircle2 size={12} />
+                Contacted via {ch?.label} — paste message to save it
+              </div>
+              <textarea
+                value={pendingMessage}
+                onChange={e => setPendingMessage(e.target.value)}
+                placeholder="Paste the exact message you sent (optional — helps AI learn what works)..."
+                rows={4}
+                autoFocus
+                style={{ width: '100%', resize: 'vertical', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.25)', color: 'rgb(210,215,235)', fontSize: 12, padding: '10px 12px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+              />
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button onClick={() => saveTouch(false)} disabled={saving}
+                  style={{ flex: 1, padding: '7px 14px', borderRadius: 8, border: `1px solid ${ch?.color ?? '#a78bfa'}55`, background: `${ch?.color ?? '#a78bfa'}18`, color: ch?.color ?? '#a78bfa', fontSize: 12, fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  {saving ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
+                  {pendingMessage.trim() ? 'Save message & mark sent' : 'Mark as sent'}
+                </button>
+                <button onClick={() => { setPendingChannel(null); setPendingMessage('') }}
+                  style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'none', color: 'rgb(100,107,140)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )
+        })()}
       </div>
     </div>
   )
@@ -2018,7 +2088,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   </div>
                 ) : (
                   contacts.map(contact => (
-                    <ContactCard key={contact.id} contact={contact}
+                    <ContactCard key={contact.id} contact={contact} leadId={lead.id}
                       onRefresh={loadLead}
                       onUpdate={loadLead}
                       refreshing={aiAction === 'contacts'} />

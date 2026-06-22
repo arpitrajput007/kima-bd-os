@@ -26,6 +26,7 @@ import {
   PenLine,
   ShieldCheck,
   DollarSign,
+  Send,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -60,11 +61,12 @@ const navGroups: {
   {
     label: 'Automation',
     items: [
-      { href: '/sources',      label: 'Discovery Sources',  icon: Database },
-      { href: '/outreach',     label: 'Outreach Studio',    icon: MessageSquare },
-      { href: '/content',      label: 'Content Studio',     icon: PenLine, glow: true },
-      { href: '/agent-rules',  label: 'Agent Rules',        icon: Settings2 },
-      { href: '/feedback',     label: 'Feedback Memory',    icon: Brain },
+      { href: '/sources',            label: 'Discovery Sources',  icon: Database },
+      { href: '/outreach',           label: 'Outreach Studio',    icon: MessageSquare },
+      { href: '/reachout-storage',   label: 'Reachout Storage',   icon: Send },
+      { href: '/content',            label: 'Content Studio',     icon: PenLine, glow: true },
+      { href: '/agent-rules',        label: 'Agent Rules',        icon: Settings2 },
+      { href: '/feedback',           label: 'Feedback Memory',    icon: Brain },
     ],
   },
   {
