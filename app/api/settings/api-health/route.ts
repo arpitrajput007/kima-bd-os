@@ -117,6 +117,28 @@ async function checkTavily(key: string): Promise<APIHealth> {
   }
 }
 
+async function checkPerplexity(key: string): Promise<APIHealth> {
+  try {
+    // Minimal sonar call — cheapest way to verify the key works
+    const res = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model: 'sonar',
+        messages: [{ role: 'user', content: 'hi' }],
+        max_tokens: 1,
+      }),
+    })
+    if (res.ok) return { status: 'ok', detail: 'Connected · sonar-pro ready' }
+    if (res.status === 401 || res.status === 403) return { status: 'unauthorized', detail: 'Invalid API key' }
+    if (res.status === 402) return { status: 'exhausted', detail: 'Credits exhausted — check Perplexity billing' }
+    if (res.status === 429) return { status: 'rate_limited', detail: 'Rate limited — try again shortly' }
+    return { status: 'error', detail: `HTTP ${res.status}` }
+  } catch {
+    return { status: 'error', detail: 'Could not reach Perplexity API' }
+  }
+}
+
 async function checkApollo(key: string): Promise<APIHealth> {
   try {
     const res = await fetch('https://api.apollo.io/api/v1/auth/health', {
@@ -146,17 +168,19 @@ export async function GET(req: Request) {
   const ek = process.env.EXA_API_KEY
   const tk = process.env.TAVILY_API_KEY
   const apk = process.env.APOLLO_API_KEY
+  const ppk = process.env.PERPLEXITY_API_KEY
 
-  const [anthropic, openai, hunter, exa, tavily, apollo] = await Promise.all([
-    ak  ? checkAnthropic(ak)  : Promise.resolve(NOT_CONFIGURED),
-    ok  ? checkOpenAI(ok)     : Promise.resolve(NOT_CONFIGURED),
-    hk  ? checkHunter(hk)     : Promise.resolve(NOT_CONFIGURED),
-    ek  ? checkExa(ek)        : Promise.resolve(NOT_CONFIGURED),
-    tk  ? checkTavily(tk)     : Promise.resolve(NOT_CONFIGURED),
-    apk ? checkApollo(apk)    : Promise.resolve(NOT_CONFIGURED),
+  const [anthropic, openai, hunter, exa, tavily, apollo, perplexity] = await Promise.all([
+    ak  ? checkAnthropic(ak)   : Promise.resolve(NOT_CONFIGURED),
+    ok  ? checkOpenAI(ok)      : Promise.resolve(NOT_CONFIGURED),
+    hk  ? checkHunter(hk)      : Promise.resolve(NOT_CONFIGURED),
+    ek  ? checkExa(ek)         : Promise.resolve(NOT_CONFIGURED),
+    tk  ? checkTavily(tk)      : Promise.resolve(NOT_CONFIGURED),
+    apk ? checkApollo(apk)     : Promise.resolve(NOT_CONFIGURED),
+    ppk ? checkPerplexity(ppk) : Promise.resolve(NOT_CONFIGURED),
   ])
 
-  cache = { anthropic, openai, hunter, exa, tavily, apollo }
+  cache = { anthropic, openai, hunter, exa, tavily, apollo, perplexity }
   cacheAt = Date.now()
 
   return NextResponse.json(cache)

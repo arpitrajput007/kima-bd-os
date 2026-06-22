@@ -14,14 +14,15 @@ import type { APIStatus, APIHealth } from '@/app/api/settings/api-health/route'
 type AIProvider = 'claude' | 'openai'
 
 interface HealthResult {
-  anthropic: APIHealth
-  openai:    APIHealth
-  hunter:    APIHealth
-  exa:       APIHealth
-  tavily:    APIHealth
-  apollo:    APIHealth
-  _cached?:  boolean
-  _age_s?:   number
+  anthropic:  APIHealth
+  openai:     APIHealth
+  hunter:     APIHealth
+  exa:        APIHealth
+  tavily:     APIHealth
+  apollo:     APIHealth
+  perplexity: APIHealth
+  _cached?:   boolean
+  _age_s?:    number
 }
 
 const MODEL_INFO: Record<AIProvider, { label: string; subLabel: string; desc: string; color: string; models: string[] }> = {
@@ -50,8 +51,9 @@ const API_CFG: {
   { key: 'openai',    label: 'OpenAI (GPT-4o)',     envKey: 'OPENAI_API_KEY',    color: '#34d399', link: 'https://platform.openai.com/api-keys',          critical: true,  desc: 'Message drafting, co-pilot' },
   { key: 'exa',       label: 'Exa',                 envKey: 'EXA_API_KEY',       color: '#38bdf8', link: 'https://dashboard.exa.ai',                      critical: false, desc: 'Lead search & discovery' },
   { key: 'tavily',    label: 'Tavily',               envKey: 'TAVILY_API_KEY',    color: '#fbbf24', link: 'https://tavily.com',                            critical: false, desc: 'Web search & research' },
-  { key: 'apollo',    label: 'Apollo',               envKey: 'APOLLO_API_KEY',    color: '#fb923c', link: 'https://developer.apollo.io',                   critical: false, desc: 'Contact enrichment & email' },
-  { key: 'hunter',    label: 'Hunter.io',            envKey: 'HUNTER_API_KEY',    color: '#f472b6', link: 'https://hunter.io/api-keys',                    critical: false, desc: 'Email finder by domain' },
+  { key: 'apollo',      label: 'Apollo',               envKey: 'APOLLO_API_KEY',      color: '#fb923c', link: 'https://developer.apollo.io',                    critical: false, desc: 'Contact enrichment & email' },
+  { key: 'hunter',      label: 'Hunter.io',            envKey: 'HUNTER_API_KEY',      color: '#f472b6', link: 'https://hunter.io/api-keys',                     critical: false, desc: 'Email finder by domain' },
+  { key: 'perplexity',  label: 'Perplexity (Sonar)',   envKey: 'PERPLEXITY_API_KEY',  color: '#818cf8', link: 'https://www.perplexity.ai/settings/api',           critical: false, desc: 'Real-time web research with citations' },
 ]
 
 const STATUS_CFG: Record<APIStatus, { label: string; color: string; bg: string; border: string; icon: typeof CheckCircle2 }> = {
@@ -164,6 +166,7 @@ EXA_API_KEY=your_exa_key
 TAVILY_API_KEY=tvly-...
 APOLLO_API_KEY=your_apollo_key
 HUNTER_API_KEY=your_hunter_key
+PERPLEXITY_API_KEY=pplx-...
 NEXT_PUBLIC_APP_URL=http://localhost:3000`
     navigator.clipboard.writeText(t)
     setCopiedKey('template')

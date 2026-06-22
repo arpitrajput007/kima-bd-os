@@ -1,21 +1,13 @@
 // ============================================================
-// Real-time grounded research using OpenAI's web-search model.
+// Real-time grounded research using Perplexity Sonar API.
 //
-// Uses gpt-4o-search-preview — same OpenAI key you already have,
-// no extra signup, no minimum spend. Real-time web access + citations.
-//
-// Why this instead of Perplexity:
-//   - No $50 minimum — pay per token on your existing OpenAI account
-//   - Same quality: real-time search, grounded answers, source URLs
-//   - Zero new keys needed
-//
-// Fails soft — if OpenAI isn't configured, callers get empty strings.
+// sonar-pro: online search, deep research, citations included.
+// Falls back gracefully if PERPLEXITY_API_KEY is not set.
 // ============================================================
 
 export function perplexityConfigured(): boolean {
-  // Reuses the OpenAI key — always available if the agent is running.
-  return !!process.env.OPENAI_API_KEY &&
-    process.env.OPENAI_API_KEY !== 'your_openai_api_key_here'
+  return !!process.env.PERPLEXITY_API_KEY &&
+    process.env.PERPLEXITY_API_KEY !== 'your_perplexity_api_key_here'
 }
 
 export interface PerplexityResponse {
@@ -23,7 +15,7 @@ export interface PerplexityResponse {
   citations: string[]
 }
 
-// Core research call via OpenAI's gpt-4o-search-preview (real-time web search).
+// Core research call via Perplexity Sonar (real-time web search with citations).
 export async function perplexityResearch(
   prompt: string,
   systemPrompt?: string,
@@ -35,28 +27,25 @@ export async function perplexityResearch(
     if (systemPrompt) messages.push({ role: 'system', content: systemPrompt })
     messages.push({ role: 'user', content: prompt })
 
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+      },
       body: JSON.stringify({
-        model: opts.model ?? 'gpt-4o-search-preview',
+        model: opts.model ?? 'sonar-pro',
         messages,
         max_tokens: opts.maxTokens ?? 1000,
-        web_search_options: { search_context_size: 'medium' },
       }),
       signal: AbortSignal.timeout(35000),
     })
+
     if (!res.ok) return { content: '', citations: [] }
     const data = await res.json()
     const content: string = data?.choices?.[0]?.message?.content || ''
-
-    // Extract cited URLs from annotations (OpenAI search model format).
-    const annotations: { type: string; url_citation?: { url: string } }[] =
-      data?.choices?.[0]?.message?.annotations || []
-    const citations = annotations
-      .filter(a => a.type === 'url_citation' && a.url_citation?.url)
-      .map(a => a.url_citation!.url)
-      .filter((v, i, arr) => arr.indexOf(v) === i) // dedupe
+    // Perplexity returns citations as a top-level array of URLs
+    const citations: string[] = Array.isArray(data?.citations) ? data.citations : []
 
     return { content, citations }
   } catch { return { content: '', citations: [] } }
