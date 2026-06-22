@@ -265,14 +265,15 @@ const ALL_OUTREACH_CHANNELS = [
 
 /* ── Timezone utilities — zero API calls, pure browser ───── */
 // Each entry: [keywords to match (lowercase), IANA tz, short label]
+// Keywords are matched as whole words (word-boundary safe) to avoid e.g. "us" matching "australia"
 const TZ_RULES: [string[], string, string][] = [
-  [['united states', 'us ', 'usa', 'north america', 'san francisco', 'new york', 'chicago', 'los angeles', 'us/eu', 'us-india', 'us-eu'], 'America/New_York', 'ET'],
+  [['united states', 'usa', 'north america', 'san francisco', 'new york', 'chicago', 'los angeles', 'boston', 'seattle', 'austin', 'us/eu', 'us-india', 'us-eu', ' us,', ' us.', '(us)', 'u.s.'], 'America/New_York', 'ET'],
   [['canada', 'toronto', 'vancouver'],                             'America/Toronto',   'ET'],
-  [['united kingdom', 'uk ', 'london', 'eu-india', 'eu-uk'],      'Europe/London',     'GMT/BST'],
-  [['europe', 'eu ', 'berlin', 'paris', 'amsterdam', 'frankfurt', 'zurich', 'lisbon', 'madrid', 'rome', 'sweden', 'norway', 'denmark', 'finland', 'netherlands', 'belgium', 'austria', 'switzerland'], 'Europe/Berlin', 'CET'],
+  [['united kingdom', 'london', 'eu-india', 'eu-uk'],             'Europe/London',     'GMT/BST'],
+  [['europe', 'berlin', 'paris', 'amsterdam', 'frankfurt', 'zurich', 'lisbon', 'madrid', 'rome', 'sweden', 'norway', 'denmark', 'finland', 'netherlands', 'belgium', 'austria', 'switzerland'], 'Europe/Berlin', 'CET'],
   [['india', 'south asia', 'bangalore', 'bengaluru', 'mumbai', 'delhi', 'hyderabad', 'chennai', 'kolkata', 'uae-india'], 'Asia/Kolkata', 'IST'],
   [['uae', 'dubai', 'abu dhabi', 'middle east', 'mena', 'saudi', 'bahrain', 'qatar', 'kuwait', 'oman'], 'Asia/Dubai', 'GST'],
-  [['singapore', 'southeast asia', 'sea ', 'malaysia', 'indonesia', 'thailand', 'vietnam', 'philippines', 'asia'], 'Asia/Singapore', 'SGT'],
+  [['singapore', 'southeast asia', 'malaysia', 'indonesia', 'thailand', 'vietnam', 'philippines', 'asia'], 'Asia/Singapore', 'SGT'],
   [['japan', 'tokyo'],                                             'Asia/Tokyo',        'JST'],
   [['china', 'beijing', 'shanghai', 'hong kong', 'shenzhen'],     'Asia/Shanghai',     'CST'],
   [['korea', 'seoul'],                                             'Asia/Seoul',        'KST'],
@@ -298,14 +299,24 @@ const TLD_RULES: [string[], string, string][] = [
   [['.ca'],                                             'America/Toronto',  'ET'],
 ]
 
-function resolveTimezone(region?: string | null, website?: string | null): { tz: string; label: string } | null {
-  if (region) {
-    const r = region.toLowerCase()
-    for (const [keywords, tz, label] of TZ_RULES) {
-      if (keywords.some(k => r.includes(k))) return { tz, label }
+// Match a single text string against TZ_RULES keywords
+function matchTzRules(text: string): { tz: string; label: string } | null {
+  const t = ' ' + text.toLowerCase() + ' ' // pad for word-boundary matching on short tokens
+  for (const [keywords, tz, label] of TZ_RULES) {
+    if (keywords.some(k => t.includes(k.includes(' ') ? k : ` ${k} `) || t.includes(` ${k},`) || t.includes(` ${k}.`))) {
+      return { tz, label }
     }
   }
-  // Fallback: infer from website TLD
+  return null
+}
+
+// 3-tier lookup: region field → website TLD → hint text (description / evidence)
+function resolveTimezone(region?: string | null, website?: string | null, hint?: string | null): { tz: string; label: string } | null {
+  if (region) {
+    const m = matchTzRules(region)
+    if (m) return m
+  }
+  // Tier 2: website TLD
   if (website) {
     try {
       const host = new URL(website.startsWith('http') ? website : `https://${website}`).hostname.toLowerCase()
@@ -314,12 +325,17 @@ function resolveTimezone(region?: string | null, website?: string | null): { tz:
       }
     } catch { /* ignore invalid URLs */ }
   }
+  // Tier 3: keyword-scan description / evidence text
+  if (hint) {
+    const m = matchTzRules(hint)
+    if (m) return m
+  }
   return null
 }
 
-function useRegionTime(region?: string | null, website?: string | null) {
+function useRegionTime(region?: string | null, website?: string | null, hint?: string | null) {
   const [time, setTime] = useState<string | null>(null)
-  const entry = resolveTimezone(region, website)
+  const entry = resolveTimezone(region, website, hint)
   useEffect(() => {
     if (!entry) { setTime(null); return }
     const fmt = new Intl.DateTimeFormat('en-US', { timeZone: entry.tz, hour: 'numeric', minute: '2-digit', hour12: true, weekday: 'short' })
@@ -331,15 +347,15 @@ function useRegionTime(region?: string | null, website?: string | null) {
   return { time, tzLabel: entry?.label ?? null }
 }
 
-function ContactCard({ contact, leadId, region, website, onRefresh, onUpdate, refreshing }: {
-  contact: Contact; leadId: string; region?: string | null; website?: string | null; onRefresh: () => void; onUpdate: () => void; refreshing: boolean
+function ContactCard({ contact, leadId, region, website, hint, onRefresh, onUpdate, refreshing }: {
+  contact: Contact; leadId: string; region?: string | null; website?: string | null; hint?: string | null; onRefresh: () => void; onUpdate: () => void; refreshing: boolean
 }) {
   const supabase = createClient()
   const [enriching, setEnriching] = useState(false)
   const [pendingChannel, setPendingChannel] = useState<string | null>(null)
   const [pendingMessage, setPendingMessage] = useState('')
   const [saving, setSaving] = useState(false)
-  const { time: regionTime, tzLabel } = useRegionTime(region, website)
+  const { time: regionTime, tzLabel } = useRegionTime(region, website, hint)
 
   // ── Draft state ──────────────────────────────────────
   const [drafts, setDrafts] = useState<OutreachMessage[]>([])
@@ -2355,6 +2371,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 ) : (
                   contacts.map(contact => (
                     <ContactCard key={contact.id} contact={contact} leadId={lead.id} region={lead.region} website={lead.website}
+                      hint={[lead.description, lead.trigger_reason, lead.pain_point_evidence].filter(Boolean).join(' ')}
                       onRefresh={loadLead}
                       onUpdate={loadLead}
                       refreshing={aiAction === 'contacts'} />
