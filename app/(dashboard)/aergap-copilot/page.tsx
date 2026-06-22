@@ -7,7 +7,7 @@ import {
   Lightbulb, Check, BookOpen, ChevronDown,
   Shield, Target, Users, FileText,
   MessageSquare, Zap, TrendingUp, ClipboardList,
-  AlertTriangle, Brain,
+  AlertTriangle, Brain, Square,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -152,6 +152,7 @@ export default function AergapCopilotPage() {
   const endRef  = useRef<HTMLDivElement>(null)
   const histRef = useRef<{ role: 'user' | 'assistant'; content: string }[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
   const [ctx, setCtx] = useState({ knowledge: 0, rules: 0, agentic: 0 })
 
   const loadSessions = useCallback(async () => {
@@ -188,6 +189,12 @@ export default function AergapCopilotPage() {
     histRef.current = msgs.map(m => ({ role: m.role, content: m.content }))
   }
 
+  const stopGeneration = useCallback(() => {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setThinking(false)
+  }, [])
+
   const send = useCallback(async (text: string) => {
     const q = text.trim()
     if (!q || thinking) return
@@ -197,10 +204,14 @@ export default function AergapCopilotPage() {
     setInput(''); setThinking(true)
     if (textareaRef.current) { textareaRef.current.style.height = 'auto' }
 
+    const controller = new AbortController()
+    abortRef.current = controller
+
     try {
       const res = await fetch('/api/ai/aergap-copilot', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: q, session_id: sessionId, messages: histRef.current.slice(-16) }),
+        signal: controller.signal,
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -221,8 +232,12 @@ export default function AergapCopilotPage() {
         setTimeout(loadSessions, 500)
       }
     } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') return // user stopped
       toast.error(e instanceof Error ? e.message : 'Co-Pilot failed to respond')
-    } finally { setThinking(false) }
+    } finally {
+      abortRef.current = null
+      setThinking(false)
+    }
   }, [sessionId, thinking]) // eslint-disable-line
 
   const saveMemory = async (msgId: string, mem: MemorySuggestion) => {
@@ -404,6 +419,10 @@ export default function AergapCopilotPage() {
                       <Loader2 size={14} className="animate-spin" color={C.primary} />
                     </div>
                     <span style={{ fontSize: 13, color: 'rgb(130,137,170)' }}>Researching & thinking…</span>
+                    <button onClick={stopGeneration} title="Stop generation"
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(248,113,133,0.35)', background: 'rgba(248,113,133,0.1)', color: '#fb7185', fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>
+                      <Square size={10} fill="#fb7185" /> Stop
+                    </button>
                   </div>
                 )}
                 <div ref={endRef} />
@@ -429,10 +448,11 @@ export default function AergapCopilotPage() {
                   style={{ flex: 1, resize: 'none', maxHeight: 180, border: 'none', background: 'transparent', padding: '9px 10px', fontSize: 13.5, color: 'white', fontFamily: 'inherit', lineHeight: 1.5, outline: 'none' }}
                 />
                 <button
-                  onClick={() => send(input)}
-                  disabled={thinking || !input.trim()}
-                  style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 11, border: 'none', cursor: thinking || !input.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: thinking || !input.trim() ? C.primaryDim : C.primary, color: thinking || !input.trim() ? C.primary : '#001820', transition: 'all 0.15s' }}>
-                  {thinking ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                  onClick={thinking ? stopGeneration : () => send(input)}
+                  disabled={!thinking && !input.trim()}
+                  title={thinking ? 'Stop generation' : 'Send'}
+                  style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 11, border: 'none', cursor: !thinking && !input.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: thinking ? 'rgba(248,113,133,0.15)' : !input.trim() ? C.primaryDim : C.primary, color: thinking ? '#fb7185' : !input.trim() ? C.primary : '#001820', transition: 'all 0.15s' }}>
+                  {thinking ? <Square size={16} fill="#fb7185" /> : <Send size={16} />}
                 </button>
               </div>
               <div style={{ fontSize: 10.5, color: 'rgb(80,88,115)', marginTop: 6, textAlign: 'center' }}>

@@ -1469,11 +1469,19 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           updated_at: new Date().toISOString()
         }).eq('id', id); loadLead()
       } else if (action === 'contacts') {
-        // Delete all existing contacts and replace with fresh ones
+        // Preserve any contacted_channels before wiping contacts
+        const channelMap = new Map<string, ContactTouch[]>()
+        for (const c of contacts) {
+          if (c.name && c.contacted_channels?.length) {
+            channelMap.set(c.name.toLowerCase().trim(), c.contacted_channels)
+          }
+        }
+
         await supabase.from('contacts').delete().eq('lead_id', id)
 
         for (const c of (json.data.suggested_contacts || []).slice(0, 6)) {
           if (!c.name) continue // skip nameless contacts entirely
+          const savedChannels = channelMap.get(c.name.toLowerCase().trim())
           await supabase.from('contacts').insert({
             lead_id: id,
             name: c.name,
@@ -1485,6 +1493,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             linkedin_url: c.linkedin_url || null,
             twitter_url: c.twitter_url || null,
             github_url: c.github_url || null,
+            ...(savedChannels?.length ? { contacted_channels: savedChannels } : {}),
           })
         }
         loadLead()
@@ -1967,7 +1976,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 ) : (
                   contacts.map(contact => (
                     <ContactCard key={contact.id} contact={contact}
-                      onRefresh={() => runAI('contacts')}
+                      onRefresh={loadLead}
                       onUpdate={loadLead}
                       refreshing={aiAction === 'contacts'} />
                   ))
