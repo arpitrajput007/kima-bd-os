@@ -28,25 +28,46 @@ async function buildVisualPrompt(opts: {
 }): Promise<string> {
   const prompt = await claudeText({
     model: 'claude-sonnet-4-6',
-    maxTokens: 300,
-    system: `You write image generation prompts for gpt-image-1. You create dark, editorial, cinematic digital illustrations for Web3/crypto thought-leadership content. NO text in the image — text will be overlaid separately.
+    maxTokens: 500,
+    system: `You write cinematic image generation prompts for gpt-image-1. You specialize in dark, editorial, institutional-grade visuals for Web3/crypto thought-leadership content.
 
-Style rules:
-- Always dark background (deep navy, near-black)
-- Accent colors: electric purple (#7c3aed), electric blue (#3b82f6), or amber (#f59e0b) depending on tone
-- Cinematic, editorial quality — not cartoonish, not generic stock photo
-- Abstract or metaphorical — represents the concept, not a literal screenshot
-- Professional, institutional feel — suitable for a serious finance/tech audience
-- 16:9 landscape for LinkedIn, 1:1 square for tweet/X
+CRITICAL: NO text, letters, numbers, words, logos, or UI elements anywhere in the image. Pure visual only.
 
-Avoid: people's faces, text/writing, logos, clichéd "coins falling" imagery, pixelated/retro aesthetics`,
-    user: `Generate an image prompt for this incident:
+LIGHTING — pick one setup per image:
+- Rim/edge light: single dramatic light source from behind or side, subject silhouetted against deep dark background
+- Shaft of light: single beam cutting through volumetric fog or darkness
+- Bioluminescent glow: soft coloured light emanating from within a cracked or fractured object
+
+COLOUR PALETTE — pick one, do not mix:
+- NOIR: near-black background #080c18, electric purple accent #7c3aed, white specular highlights
+- BREACH: deep navy #0a0e1a, warning amber #f59e0b, cold steel-blue mid-tones
+- COLD: pitch black, ice blue #38bdf8, dark slate-grey reflections
+
+COMPOSITION:
+- Rule of thirds — primary subject slightly off-centre
+- Strong diagonal lines or geometric tension in foreground
+- Atmospheric perspective — sharp foreground, hazy depth
+- Intentional negative space (never cluttered)
+
+SUBJECT MATTER — abstract/metaphorical only, chosen to match the failure mechanism:
+- Broken chain or shattered padlock → key/custody compromise
+- Cracked vault door leaking light → treasury/fund exploit
+- Severed glowing network cables → bridge or oracle failure
+- Collapsing geometric lattice → smart contract exploit
+- Single dim node disconnected from a bright network → relayer/messaging failure
+- Fractured mirror reflecting distorted data → oracle manipulation
+
+QUALITY KEYWORDS to always append: ultra high resolution, 8K, photorealistic Octane render, cinematic colour grading, anamorphic lens flare, award-winning editorial photography, deep shadows, micro-detail textures
+
+AVOID: people's faces, coins, generic blockchain graphics, crypto logos, cartoonish style, text overlays, flat lighting, busy composition`,
+    user: `Write a gpt-image-1 prompt for this incident:
 Incident: ${opts.incident_summary}
 Root cause: ${opts.root_cause}
-Hook text: ${opts.hook}
-Post type: ${opts.post_type === 'linkedin' ? 'LinkedIn (16:9 landscape)' : 'X/Twitter (1:1 square)'}
+Hook: ${opts.hook}
+Format: ${opts.post_type === 'linkedin' ? '16:9 landscape (1536×1024)' : '1:1 square (1024×1024)'}
 
-Write ONLY the image prompt — no explanation, no quotes, just the prompt itself. Under 200 words. Make it visually striking and thematically aligned with the specific failure mechanism described.`,
+Pick the colour palette and subject matter that best matches the specific failure mechanism above.
+Write ONLY the image prompt — no preamble, no quotes, no explanation. 150–250 words. Be specific about lighting position, materials, atmosphere, and composition.`,
   })
   return prompt.trim()
 }
