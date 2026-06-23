@@ -7,7 +7,7 @@ import {
   Link2, CheckCheck, Image, Download,
   Zap, Hash, AlignLeft, AtSign, MessageCircle, X,
   Bookmark, BookmarkCheck, Trash2, ChevronDown, ChevronUp,
-  Clock, CheckCircle2, Filter, History, RotateCcw,
+  Clock, CheckCircle2, Filter, History, RotateCcw, GalleryHorizontalEnd,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -21,7 +21,7 @@ interface ContentResult {
   linkedin: ContentPost[]
 }
 type TabKey     = 'tweets' | 'thread' | 'linkedin'
-type PageView   = 'create' | 'saved' | 'sessions'
+type PageView   = 'create' | 'saved' | 'sessions' | 'media'
 type PostType   = 'tweet' | 'linkedin' | 'thread_tweet'
 type DraftStatus = 'saved' | 'posted'
 type FilterType  = 'all' | 'tweet' | 'linkedin' | 'thread_tweet'
@@ -37,6 +37,18 @@ interface ContentDraft {
   status: DraftStatus
   notes: string | null
   posted_at: string | null
+  created_at: string
+}
+
+interface ContentMedia {
+  id: string
+  storage_path: string
+  public_url: string
+  visual_prompt: string | null
+  incident_summary: string | null
+  hook: string | null
+  post_type: string | null
+  size: string | null
   created_at: string
 }
 
@@ -476,6 +488,28 @@ export default function ContentStudioPage() {
   const [sessions, setSessions]           = useState<ContentSession[]>([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
 
+  // Media gallery
+  const [media, setMedia]             = useState<ContentMedia[]>([])
+  const [mediaLoading, setMediaLoading] = useState(false)
+
+  const loadMedia = useCallback(async () => {
+    setMediaLoading(true)
+    try {
+      const res  = await fetch('/api/content-media')
+      const json = await res.json()
+      setMedia(json.media || [])
+    } catch { /* silent */ }
+    finally  { setMediaLoading(false) }
+  }, [])
+
+  useEffect(() => { loadMedia() }, [loadMedia])
+
+  const deleteMedia = async (id: string) => {
+    setMedia(prev => prev.filter(m => m.id !== id))
+    try { await fetch(`/api/content-media/${id}`, { method: 'DELETE' }) }
+    catch { /* already removed from UI */ }
+  }
+
   const loadSessions = useCallback(async () => {
     setSessionsLoading(true)
     try {
@@ -598,7 +632,8 @@ export default function ContentStudioPage() {
       if (!res.ok) throw new Error(json.error)
       setGraphicStates(prev => ({ ...prev, [postId]: { loading: false, url: json.image_url } }))
       setGraphicModal({ url: json.image_url, hook })
-      toast.success('Graphic ready')
+      toast.success(json.saved_to_gallery ? 'Graphic ready — saved to Media' : 'Graphic ready')
+      if (json.saved_to_gallery) loadMedia()
     } catch (err: unknown) {
       setGraphicStates(prev => ({ ...prev, [postId]: { loading: false, url: null } }))
       toast.error(err instanceof Error ? err.message : 'Graphic generation failed')
@@ -642,6 +677,7 @@ export default function ContentStudioPage() {
             { key: 'create',   label: 'Create' },
             { key: 'saved',    label: `Saved Drafts${savedCount > 0 ? ` (${savedCount})` : ''}` },
             { key: 'sessions', label: `Sessions${sessions.length > 0 ? ` (${sessions.length})` : ''}` },
+            { key: 'media',    label: `Media${media.length > 0 ? ` (${media.length})` : ''}` },
           ] as { key: PageView; label: string }[]).map(({ key, label }) => (
             <button key={key} onClick={() => setView(key)} style={{ padding: '5px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: view === key ? 'rgba(255,255,255,0.08)' : 'none', color: view === key ? 'white' : 'rgba(255,255,255,0.35)', transition: 'all 0.15s' }}>
               {label}
@@ -957,6 +993,101 @@ export default function ContentStudioPage() {
                         <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>No posts in this session</span>
                       ) : (
                         <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>{totalPosts} posts total — restore to view and save individual ones</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════
+          MEDIA GALLERY VIEW
+      ════════════════════════════════════════════════════════ */}
+      {view === 'media' && (
+        <div className="p-8">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'white', marginBottom: 3 }}>Media Gallery</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Every generated graphic is auto-saved here.</div>
+            </div>
+            <button onClick={loadMedia} disabled={mediaLoading} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, fontSize: 11, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.3)' }}>
+              <RefreshCw size={11} className={mediaLoading ? 'animate-spin' : ''} /> Refresh
+            </button>
+          </div>
+
+          {mediaLoading && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+              <Loader2 size={24} className="animate-spin" style={{ color: '#a78bfa' }} />
+            </div>
+          )}
+
+          {!mediaLoading && media.length === 0 && (
+            <div style={{ minHeight: 300, borderRadius: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(18,19,32,0.5)', border: '2px dashed rgba(255,255,255,0.06)' }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, marginBottom: 14, background: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <GalleryHorizontalEnd size={20} color="rgba(167,139,250,0.4)" />
+              </div>
+              <p style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 6 }}>No graphics yet</p>
+              <p style={{ fontSize: 12, color: 'rgb(90,95,130)', textAlign: 'center', lineHeight: 1.6, maxWidth: 300 }}>
+                Generate content and click the Graphic button on any post. Images are saved here automatically.
+              </p>
+              <button onClick={() => setView('create')} className="btn btn-primary mt-4" style={{ fontSize: 12, padding: '7px 16px' }}>
+                <Sparkles size={13} /> Go to Create
+              </button>
+            </div>
+          )}
+
+          {!mediaLoading && media.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+              {media.map(item => {
+                const typeColor = item.post_type === 'linkedin' ? '#60a5fa' : '#1da1f2'
+                const typeLabel = item.post_type === 'linkedin' ? 'LinkedIn' : 'X / Tweet'
+                return (
+                  <div key={item.id} style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(10,12,22,0.9)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+                    <div style={{ position: 'relative', background: '#000', aspectRatio: item.size === '1536x1024' ? '1536/1024' : '1/1' }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={item.public_url}
+                        alt={item.incident_summary || 'Generated graphic'}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      />
+                    </div>
+                    <div style={{ padding: '12px 14px 10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {item.post_type && (
+                            <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: `${typeColor}18`, border: `1px solid ${typeColor}33`, color: typeColor, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>
+                              {typeLabel}
+                            </span>
+                          )}
+                          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <Clock size={9} /> {timeAgo(item.created_at)}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <a
+                            href={item.public_url}
+                            download={`kima-graphic-${item.id.slice(0, 8)}.png`}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)', color: '#a78bfa', textDecoration: 'none', cursor: 'pointer' }}
+                          >
+                            <Download size={10} /> Save
+                          </a>
+                          <button
+                            onClick={() => { if (confirm('Delete this graphic?')) deleteMedia(item.id) }}
+                            style={{ display: 'flex', alignItems: 'center', padding: '4px 6px', borderRadius: 6, background: 'none', border: '1px solid rgba(248,113,113,0.15)', color: 'rgba(248,113,113,0.4)', cursor: 'pointer' }}
+                          >
+                            <Trash2 size={10} />
+                          </button>
+                        </div>
+                      </div>
+                      {item.incident_summary && (
+                        <div style={{ fontSize: 11, color: 'rgb(170,178,210)', lineHeight: 1.5 }}>
+                          {item.incident_summary.slice(0, 120)}{item.incident_summary.length > 120 ? '…' : ''}
+                        </div>
                       )}
                     </div>
                   </div>
