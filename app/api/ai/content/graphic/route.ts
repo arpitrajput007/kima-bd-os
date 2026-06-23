@@ -88,7 +88,6 @@ export async function POST(req: NextRequest) {
         n: 1,
         size,
         quality: 'hd',
-        style: 'vivid',
       }),
       signal: AbortSignal.timeout(60_000),
     })
