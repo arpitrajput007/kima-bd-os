@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ImageResponse } from 'next/og'
 import { createClient } from '@supabase/supabase-js'
+import { claudeJSON } from '@/lib/claude'
 import React from 'react'
 
 function db() {
@@ -17,6 +18,35 @@ function db() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
+}
+
+interface CardLabels {
+  badge: string        // top-right pill: "SECURITY INCIDENT" | "AGENTIC PAYMENTS" | etc.
+  panel1: string       // left panel header
+  panel2: string       // right panel header
+  accentColor: string  // hex — purple for incidents, blue for opportunity, amber for insight
+}
+
+const LABEL_PRESETS: Record<string, CardLabels> = {
+  security:  { badge: 'SECURITY INCIDENT',  panel1: 'WHAT HAPPENED',        panel2: 'HOW KIMA PREVENTS THIS', accentColor: '#7c3aed' },
+  agentic:   { badge: 'AGENTIC PAYMENTS',   panel1: 'THE OPPORTUNITY',       panel2: 'HOW KIMA ENABLES THIS',  accentColor: '#3b82f6' },
+  insight:   { badge: 'MARKET INSIGHT',     panel1: 'WHAT\'S HAPPENING',     panel2: 'KIMA\'S ROLE',           accentColor: '#f59e0b' },
+  product:   { badge: 'PRODUCT UPDATE',     panel1: 'WHAT WE BUILT',         panel2: 'WHY IT MATTERS',         accentColor: '#10b981' },
+  regulation:{ badge: 'REGULATORY UPDATE',  panel1: 'THE CHANGE',            panel2: 'WHAT THIS MEANS',        accentColor: '#f59e0b' },
+}
+
+async function classifyContent(incident_summary: string, kima_angle: string): Promise<CardLabels> {
+  try {
+    const result = await claudeJSON<{ type: string }>({
+      model: 'claude-haiku-4-5-20251001',
+      maxTokens: 60,
+      system: 'Classify the content type. Return JSON: { "type": "<one of: security, agentic, insight, product, regulation>" }. security = hack/exploit/breach. agentic = AI agents, autonomous payments, agentic commerce. insight = market trend, analysis, general Web3 observation. product = new feature, launch, integration. regulation = compliance, legal, policy change.',
+      user: `Summary: ${incident_summary}\nKima angle: ${kima_angle}`,
+    })
+    return LABEL_PRESETS[result.type] ?? LABEL_PRESETS.insight
+  } catch {
+    return LABEL_PRESETS.security
+  }
 }
 
 function trunc(text: string | null | undefined, n: number): string {
@@ -30,8 +60,9 @@ function buildCard(opts: {
   incident_summary: string
   solution: string
   isLinkedIn: boolean
+  labels: CardLabels
 }) {
-  const { hook, incident_summary, solution, isLinkedIn } = opts
+  const { hook, incident_summary, solution, isLinkedIn, labels } = opts
   const e = React.createElement
   const pad = isLinkedIn ? '44px 52px' : '52px 52px'
   const hlSize = isLinkedIn ? 28 : 34
@@ -72,11 +103,11 @@ function buildCard(opts: {
       ),
       e('div', {
         style: {
-          background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.3)',
+          background: `${labels.accentColor}1e`, border: `1px solid ${labels.accentColor}4d`,
           borderRadius: 6, padding: '4px 11px',
         },
       },
-        e('span', { style: { color: '#a78bfa', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em' } }, 'SECURITY INCIDENT'),
+        e('span', { style: { color: labels.accentColor, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em' } }, labels.badge),
       ),
     ),
 
@@ -101,7 +132,7 @@ function buildCard(opts: {
       },
         e('div', {
           style: { color: 'rgba(255,255,255,0.3)', fontSize: 9, fontWeight: 700, letterSpacing: '0.13em', marginBottom: 9 },
-        }, 'WHAT HAPPENED'),
+        }, labels.panel1),
         e('div', {
           style: { color: 'rgba(255,255,255,0.82)', fontSize: bodySize, lineHeight: 1.62 },
         }, trunc(incident_summary, 170)),
@@ -109,14 +140,14 @@ function buildCard(opts: {
       // Solution
       e('div', {
         style: {
-          flex: 1, background: 'rgba(124,58,237,0.08)',
-          border: '1px solid rgba(124,58,237,0.2)',
+          flex: 1, background: `${labels.accentColor}14`,
+          border: `1px solid ${labels.accentColor}33`,
           borderRadius: 12, padding: '16px 18px', display: 'flex', flexDirection: 'column',
         },
       },
         e('div', {
-          style: { color: '#a78bfa', fontSize: 9, fontWeight: 700, letterSpacing: '0.13em', marginBottom: 9 },
-        }, 'HOW KIMA PREVENTS THIS'),
+          style: { color: labels.accentColor, fontSize: 9, fontWeight: 700, letterSpacing: '0.13em', marginBottom: 9 },
+        }, labels.panel2),
         e('div', {
           style: { color: 'rgba(167,139,250,0.88)', fontSize: bodySize, lineHeight: 1.62 },
         }, trunc(solution, 170)),
@@ -190,7 +221,10 @@ export async function POST(req: NextRequest) {
   const size   = `${width}x${height}`
   const solution = kima_angle || root_cause || ''
 
-  const card = buildCard({ hook, incident_summary, solution, isLinkedIn })
+  // Classify content type to pick the right card labels (fast Haiku call)
+  const labels = await classifyContent(incident_summary, solution)
+
+  const card = buildCard({ hook, incident_summary, solution, isLinkedIn, labels })
 
   const imgResponse = new ImageResponse(card, { width, height })
   const buffer = Buffer.from(await imgResponse.arrayBuffer())
