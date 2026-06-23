@@ -1,17 +1,16 @@
 // ============================================================
 // /api/ai/content/graphic
 // ------------------------------------------------------------
-// Generates a branded social media graphic:
-//   1. Claude builds a precise image prompt
-//   2. gpt-image-1 generates a dark editorial illustration
-//   3. Image is uploaded to Supabase Storage (content-media bucket)
-//      and saved to content_media table for the gallery
-//   4. Returns public URL (or data URL fallback if storage fails)
+// Generates a branded infographic card (no AI image model needed).
+// Uses next/og (satori) to render a text-rich PNG directly from
+// incident data — clean, professional, ready to post on LinkedIn/X.
+// Saves to Supabase Storage + content_media table for the gallery.
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { ImageResponse } from 'next/og'
 import { createClient } from '@supabase/supabase-js'
-import { claudeText } from '@/lib/claude'
+import React from 'react'
 
 function db() {
   return createClient(
@@ -20,68 +19,127 @@ function db() {
   )
 }
 
-async function buildVisualPrompt(opts: {
-  incident_summary: string
-  root_cause: string
-  hook: string
-  post_type: 'tweet' | 'linkedin'
-}): Promise<string> {
-  const prompt = await claudeText({
-    model: 'claude-sonnet-4-6',
-    maxTokens: 500,
-    system: `You write cinematic image generation prompts for gpt-image-1. You specialize in dark, editorial, institutional-grade visuals for Web3/crypto thought-leadership content.
-
-CRITICAL: NO text, letters, numbers, words, logos, or UI elements anywhere in the image. Pure visual only.
-
-LIGHTING — pick one setup per image:
-- Rim/edge light: single dramatic light source from behind or side, subject silhouetted against deep dark background
-- Shaft of light: single beam cutting through volumetric fog or darkness
-- Bioluminescent glow: soft coloured light emanating from within a cracked or fractured object
-
-COLOUR PALETTE — pick one, do not mix:
-- NOIR: near-black background #080c18, electric purple accent #7c3aed, white specular highlights
-- BREACH: deep navy #0a0e1a, warning amber #f59e0b, cold steel-blue mid-tones
-- COLD: pitch black, ice blue #38bdf8, dark slate-grey reflections
-
-COMPOSITION:
-- Rule of thirds — primary subject slightly off-centre
-- Strong diagonal lines or geometric tension in foreground
-- Atmospheric perspective — sharp foreground, hazy depth
-- Intentional negative space (never cluttered)
-
-SUBJECT MATTER — abstract/metaphorical only, chosen to match the failure mechanism:
-- Broken chain or shattered padlock → key/custody compromise
-- Cracked vault door leaking light → treasury/fund exploit
-- Severed glowing network cables → bridge or oracle failure
-- Collapsing geometric lattice → smart contract exploit
-- Single dim node disconnected from a bright network → relayer/messaging failure
-- Fractured mirror reflecting distorted data → oracle manipulation
-
-QUALITY KEYWORDS to always append: ultra high resolution, 8K, photorealistic Octane render, cinematic colour grading, anamorphic lens flare, award-winning editorial photography, deep shadows, micro-detail textures
-
-AVOID: people's faces, coins, generic blockchain graphics, crypto logos, cartoonish style, text overlays, flat lighting, busy composition`,
-    user: `Write a gpt-image-1 prompt for this incident:
-Incident: ${opts.incident_summary}
-Root cause: ${opts.root_cause}
-Hook: ${opts.hook}
-Format: ${opts.post_type === 'linkedin' ? '16:9 landscape (1536×1024)' : '1:1 square (1024×1024)'}
-
-Pick the colour palette and subject matter that best matches the specific failure mechanism above.
-Write ONLY the image prompt — no preamble, no quotes, no explanation. 150–250 words. Be specific about lighting position, materials, atmosphere, and composition.`,
-  })
-  return prompt.trim()
+function trunc(text: string | null | undefined, n: number): string {
+  if (!text) return ''
+  return text.length > n ? text.slice(0, n - 1) + '…' : text
 }
 
-// Upload base64 PNG to Supabase Storage and save record to content_media table.
-// Returns public URL on success, null on failure (caller falls back to data URL).
-async function saveToGallery(opts: {
-  b64: string
-  visualPrompt: string
-  incident_summary: string
+// Builds the card as React elements (no .tsx file needed)
+function buildCard(opts: {
   hook: string
-  post_type: string
-  content_id: string | null
-  size: string
+  incident_summary: string
+  solution: string
+  isLinkedIn: boolean
+}) {
+  const { hook, incident_summary, solution, isLinkedIn } = opts
+  const e = React.createElement
+  const pad = isLinkedIn ? '44px 52px' : '52px 52px'
+  const hlSize = isLinkedIn ? 28 : 34
+  const bodySize = isLinkedIn ? 14 : 15
+  const dir = isLinkedIn ? 'row' : 'column'
+
+  return e('div', {
+    style: {
+      width: '100%', height: '100%',
+      background: 'linear-gradient(140deg, #07090f 0%, #0d1228 55%, #080c1a 100%)',
+      display: 'flex', flexDirection: 'column',
+      padding: pad, fontFamily: 'sans-serif', position: 'relative',
+    },
+  },
+    // Accent line at top
+    e('div', {
+      style: {
+        position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+        background: 'linear-gradient(90deg, #7c3aed 0%, #3b82f6 60%, transparent 100%)',
+      },
+    }),
+
+    // Header row
+    e('div', {
+      style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isLinkedIn ? 26 : 34 },
+    },
+      e('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+        e('div', {
+          style: {
+            width: 28, height: 28, borderRadius: 7,
+            background: 'rgba(124,58,237,0.25)', border: '1px solid rgba(124,58,237,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          },
+        }, e('span', { style: { fontSize: 14 } }, '⚡')),
+        e('span', {
+          style: { color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em' },
+        }, 'KIMA BD OS'),
+      ),
+      e('div', {
+        style: {
+          background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.3)',
+          borderRadius: 6, padding: '4px 11px',
+        },
+      },
+        e('span', { style: { color: '#a78bfa', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em' } }, 'SECURITY INCIDENT'),
+      ),
+    ),
+
+    // Headline with left accent bar
+    e('div', {
+      style: {
+        fontSize: hlSize, fontWeight: 800, color: 'white', lineHeight: 1.22,
+        marginBottom: isLinkedIn ? 22 : 30,
+        borderLeft: '3px solid #7c3aed', paddingLeft: 16,
+      },
+    }, trunc(hook, isLinkedIn ? 105 : 120)),
+
+    // Info cards (side by side on LinkedIn, stacked on X)
+    e('div', { style: { display: 'flex', flexDirection: dir, gap: 14, flex: 1 } },
+      // What happened
+      e('div', {
+        style: {
+          flex: 1, background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          borderRadius: 12, padding: '16px 18px', display: 'flex', flexDirection: 'column',
+        },
+      },
+        e('div', {
+          style: { color: 'rgba(255,255,255,0.3)', fontSize: 9, fontWeight: 700, letterSpacing: '0.13em', marginBottom: 9 },
+        }, 'WHAT HAPPENED'),
+        e('div', {
+          style: { color: 'rgba(255,255,255,0.82)', fontSize: bodySize, lineHeight: 1.62 },
+        }, trunc(incident_summary, 170)),
+      ),
+      // Solution
+      e('div', {
+        style: {
+          flex: 1, background: 'rgba(124,58,237,0.08)',
+          border: '1px solid rgba(124,58,237,0.2)',
+          borderRadius: 12, padding: '16px 18px', display: 'flex', flexDirection: 'column',
+        },
+      },
+        e('div', {
+          style: { color: '#a78bfa', fontSize: 9, fontWeight: 700, letterSpacing: '0.13em', marginBottom: 9 },
+        }, 'HOW KIMA PREVENTS THIS'),
+        e('div', {
+          style: { color: 'rgba(167,139,250,0.88)', fontSize: bodySize, lineHeight: 1.62 },
+        }, trunc(solution, 170)),
+      ),
+    ),
+
+    // Footer
+    e('div', {
+      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 20 },
+    },
+      e('span', { style: { color: 'rgba(255,255,255,0.15)', fontSize: 11 } }, 'kima.finance · aeredium.io'),
+      e('div', {
+        style: { background: 'linear-gradient(135deg, #7c3aed, #3b82f6)', borderRadius: 6, padding: '5px 13px' },
+      },
+        e('span', { style: { color: 'white', fontSize: 11, fontWeight: 700 } }, 'Kima Finance'),
+      ),
+    ),
+  )
+}
+
+async function saveToGallery(opts: {
+  b64: string; incident_summary: string
+  hook: string; post_type: string; content_id: string | null; size: string
 }): Promise<string | null> {
   try {
     const supabase = db()
@@ -89,7 +147,6 @@ async function saveToGallery(opts: {
     const fileName = `${Date.now()}-${safeId}.png`
     const buffer = Buffer.from(opts.b64, 'base64')
 
-    // Create bucket if it doesn't exist yet
     await supabase.storage.createBucket('content-media', { public: true }).catch(() => {})
 
     const { error: uploadError } = await supabase.storage
@@ -105,7 +162,7 @@ async function saveToGallery(opts: {
     await supabase.from('content_media').insert({
       storage_path: fileName,
       public_url: publicUrl,
-      visual_prompt: opts.visualPrompt,
+      visual_prompt: 'infographic-card',
       incident_summary: opts.incident_summary || null,
       hook: opts.hook || null,
       post_type: opts.post_type || null,
@@ -120,79 +177,33 @@ async function saveToGallery(opts: {
 }
 
 export async function POST(req: NextRequest) {
-  if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({ error: 'OpenAI API key not configured.' }, { status: 400 })
-  }
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ error: 'Anthropic API key not configured.' }, { status: 400 })
-  }
-
   const body = await req.json()
-  const { incident_summary, root_cause, hook, post_type = 'tweet', content_id } = body
+  const { incident_summary, root_cause, kima_angle, hook, post_type = 'tweet', content_id } = body
 
   if (!incident_summary || !hook) {
     return NextResponse.json({ error: 'incident_summary and hook are required.' }, { status: 400 })
   }
 
-  try {
-    const visualPrompt = await buildVisualPrompt({
-      incident_summary,
-      root_cause: root_cause || '',
-      hook,
-      post_type,
-    })
+  const isLinkedIn = post_type === 'linkedin'
+  const width  = isLinkedIn ? 1200 : 1024
+  const height = isLinkedIn ? 628  : 1024
+  const size   = `${width}x${height}`
+  const solution = kima_angle || root_cause || ''
 
-    console.log(`[graphic] prompt for ${content_id}:`, visualPrompt.slice(0, 120))
+  const card = buildCard({ hook, incident_summary, solution, isLinkedIn })
 
-    const size = post_type === 'linkedin' ? '1536x1024' : '1024x1024'
+  const imgResponse = new ImageResponse(card, { width, height })
+  const buffer = Buffer.from(await imgResponse.arrayBuffer())
+  const b64 = buffer.toString('base64')
 
-    const res = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-image-1',
-        prompt: visualPrompt,
-        n: 1,
-        size,
-        quality: 'high',
-      }),
-      signal: AbortSignal.timeout(60_000),
-    })
+  const publicUrl = await saveToGallery({ b64, incident_summary, hook, post_type, content_id, size })
+  const imageUrl = publicUrl ?? `data:image/png;base64,${b64}`
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({})) as { error?: { message?: string } }
-      const msg = err?.error?.message || `Image generation failed (${res.status})`
-      return NextResponse.json({ error: msg }, { status: res.status })
-    }
-
-    const data = await res.json() as { data?: Array<{ b64_json?: string }> }
-    const b64 = data.data?.[0]?.b64_json
-
-    if (!b64) {
-      return NextResponse.json({ error: 'No image returned.' }, { status: 500 })
-    }
-
-    // Try to save to gallery; fall back to data URL if storage not configured
-    const publicUrl = await saveToGallery({
-      b64, visualPrompt, incident_summary, hook, post_type, content_id, size,
-    })
-
-    const imageUrl = publicUrl ?? `data:image/png;base64,${b64}`
-
-    return NextResponse.json({
-      success: true,
-      image_url: imageUrl,
-      saved_to_gallery: !!publicUrl,
-      visual_prompt: visualPrompt,
-      size,
-      content_id,
-    })
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Graphic generation failed'
-    console.error('[graphic route error]', err)
-    return NextResponse.json({ error: msg }, { status: 500 })
-  }
+  return NextResponse.json({
+    success: true,
+    image_url: imageUrl,
+    saved_to_gallery: !!publicUrl,
+    size,
+    content_id,
+  })
 }

@@ -156,7 +156,7 @@ function GraphicModal({ url, hook, onClose }: { url: string; hook: string; onClo
               <Image size={11} color="#a78bfa" />
             </div>
             <span style={{ fontSize: 13, fontWeight: 700, color: 'white' }}>Generated Graphic</span>
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>DALL-E 3 · HD</span>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Infographic card</span>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button onClick={download} disabled={dl} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', color: '#a78bfa' }}>
@@ -165,19 +165,12 @@ function GraphicModal({ url, hook, onClose }: { url: string; hook: string; onClo
             <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', display: 'flex', padding: 4 }}><X size={16} /></button>
           </div>
         </div>
-        <div style={{ position: 'relative', background: '#000' }}>
+        <div style={{ background: '#000' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={url} alt="Generated graphic" style={{ width: '100%', display: 'block', maxHeight: '60vh', objectFit: 'contain' }} />
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)', padding: '40px 24px 20px' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'white', lineHeight: 1.55, maxWidth: '80%', whiteSpace: 'pre-wrap' }}>{hook.slice(0, 200)}{hook.length > 200 ? '…' : ''}</div>
-            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 16, height: 16, borderRadius: 4, background: 'rgba(167,139,250,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Zap size={9} color="white" fill="white" /></div>
-              <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>Kima BD OS</span>
-            </div>
-          </div>
+          <img src={url} alt="Generated graphic" style={{ width: '100%', display: 'block', maxHeight: '65vh', objectFit: 'contain' }} />
         </div>
         <div style={{ padding: '12px 18px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', lineHeight: 1.5 }}>Download the image and add your text in Canva or Figma. The overlay above is a preview only.</p>
+          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', lineHeight: 1.5 }}>Text and branding are embedded in the graphic. Download and post directly to LinkedIn or X.</p>
         </div>
       </div>
     </div>
@@ -627,7 +620,7 @@ export default function ContentStudioPage() {
     const hook = post.text.split(/\n\n+/)[0] || post.text.slice(0, 200)
     setGraphicStates(prev => ({ ...prev, [postId]: { loading: true, url: null } }))
     try {
-      const res  = await fetch('/api/ai/content/graphic', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ incident_summary: result.incident_summary, root_cause: result.root_cause, hook, post_type: postType, content_id: postId }) })
+      const res  = await fetch('/api/ai/content/graphic', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ incident_summary: result.incident_summary, root_cause: result.root_cause, kima_angle: result.kima_angle, hook, post_type: postType, content_id: postId }) })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
       setGraphicStates(prev => ({ ...prev, [postId]: { loading: false, url: json.image_url } }))
