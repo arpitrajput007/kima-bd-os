@@ -71,10 +71,10 @@ export async function POST(req: NextRequest) {
       post_type,
     })
 
-    console.log(`[graphic] DALL-E prompt for ${content_id}:`, visualPrompt.slice(0, 120))
+    console.log(`[graphic] image prompt for ${content_id}:`, visualPrompt.slice(0, 120))
 
-    // Step 2: DALL-E 3 generates the image
-    const size = post_type === 'linkedin' ? '1792x1024' : '1024x1024'
+    // Step 2: gpt-image-1 generates the image (returns base64)
+    const size = post_type === 'linkedin' ? '1536x1024' : '1024x1024'
 
     const res = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
@@ -83,36 +83,36 @@ export async function POST(req: NextRequest) {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'dall-e-3',
+        model: 'gpt-image-1',
         prompt: visualPrompt,
         n: 1,
         size,
-        quality: 'hd',
+        quality: 'high',
       }),
       signal: AbortSignal.timeout(60_000),
     })
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({})) as { error?: { message?: string } }
-      const msg = err?.error?.message || `DALL-E request failed (${res.status})`
+      const msg = err?.error?.message || `Image generation failed (${res.status})`
       return NextResponse.json({ error: msg }, { status: res.status })
     }
 
     const data = await res.json() as {
-      data?: Array<{ url?: string; revised_prompt?: string }>
+      data?: Array<{ b64_json?: string }>
     }
-    const imageUrl = data.data?.[0]?.url
-    const revisedPrompt = data.data?.[0]?.revised_prompt
+    const b64 = data.data?.[0]?.b64_json
 
-    if (!imageUrl) {
-      return NextResponse.json({ error: 'No image returned from DALL-E.' }, { status: 500 })
+    if (!b64) {
+      return NextResponse.json({ error: 'No image returned.' }, { status: 500 })
     }
+
+    const imageUrl = `data:image/png;base64,${b64}`
 
     return NextResponse.json({
       success: true,
       image_url: imageUrl,
       visual_prompt: visualPrompt,
-      revised_prompt: revisedPrompt,
       size,
       content_id,
     })
