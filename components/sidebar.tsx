@@ -27,20 +27,22 @@ import {
   ShieldCheck,
   DollarSign,
   Send,
+  Globe,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 
 const navGroups: {
   label: string
-  items: { href: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; glow?: boolean; voice?: boolean; cyan?: boolean }[]
+  items: { href: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; glow?: boolean; voice?: boolean; cyan?: boolean; orange?: boolean }[]
 }[] = [
 
   {
     label: 'Intelligence',
     items: [
       { href: '/copilot',         label: 'AI Co-Pilot',        icon: Bot, glow: true },
-      { href: '/aergap-copilot',  label: 'Aergap Co-Pilot',    icon: ShieldCheck, cyan: true },
+      { href: '/aergap-copilot',     label: 'Aergap Co-Pilot',      icon: ShieldCheck, cyan: true },
+      { href: '/aergap-web2-copilot', label: 'Web2 Co-Pilot',       icon: Globe,       orange: true },
       { href: '/today',           label: "Today's Plan",        icon: Sun },
       { href: '/dashboard',       label: 'BD Command Center',   icon: LayoutDashboard },
       { href: '/leads',           label: 'Lead Inbox',          icon: Inbox },
@@ -55,7 +57,8 @@ const navGroups: {
     items: [
       { href: '/aeredium',              label: 'Aeredium Targets',      icon: Shield,     glow: true },
       { href: '/agentic-payments',      label: 'Agentic Payments',      icon: CreditCard, glow: true },
-      { href: '/money-touching-agents', label: 'Money Touching Agents', icon: DollarSign, glow: true },
+      { href: '/money-touching-agents',  label: 'Money Touching Agents', icon: DollarSign, glow: true },
+      { href: '/web2-agent-companies',  label: 'Web2 Agent Companies',  icon: Globe,      orange: true },
     ],
   },
   {
@@ -145,7 +148,7 @@ export function Sidebar() {
             {collapsed && gi > 0 && (
               <div className="my-2 mx-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }} />
             )}
-            {group.items.map(({ href, label, icon: Icon, glow, voice, cyan }) => {
+            {group.items.map(({ href, label, icon: Icon, glow, voice, cyan, orange }) => {
               const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
               const hasApiAlert = href === '/settings' && apiIssues.length > 0
               return (
@@ -154,7 +157,11 @@ export function Sidebar() {
                   href={href}
                   className={cn('nav-item', isActive && 'active', collapsed && 'justify-center px-0')}
                   title={collapsed ? label : undefined}
-                  style={cyan && !isActive ? {
+                  style={orange && !isActive ? {
+                    background: 'rgba(249,115,22,0.07)',
+                    borderColor: 'rgba(249,115,22,0.22)',
+                    color: 'rgba(253,186,116,0.9)',
+                  } : cyan && !isActive ? {
                     background: 'rgba(6,182,212,0.07)',
                     borderColor: 'rgba(6,182,212,0.22)',
                     color: 'rgba(103,232,249,0.9)',
@@ -170,6 +177,12 @@ export function Sidebar() {
                 >
                   <Icon size={15} className="flex-shrink-0" />
                   {!collapsed && <span>{label}</span>}
+                  {!collapsed && orange && !isActive && (
+                    <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded"
+                      style={{ background: 'rgba(249,115,22,0.15)', color: '#fdba74' }}>
+                      NEW
+                    </span>
+                  )}
                   {!collapsed && cyan && !isActive && (
                     <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded"
                       style={{ background: 'rgba(6,182,212,0.15)', color: '#67e8f9' }}>
