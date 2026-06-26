@@ -249,12 +249,26 @@ function extractUrl(text: string): string | null {
   return match ? match[0] : null
 }
 
-// ── Agent memory ──────────────────────────────────────────────────────────────
+// ── Agent memory (Aergap-scoped only) ────────────────────────────────────────
+// Only pull knowledge tagged 'aergap' — never load Kima rules or knowledge.
 
 async function loadMemoryBlock(): Promise<string> {
   try {
-    const { fullMemory } = await import('@/lib/agent-memory')
-    return await fullMemory()
+    const { data } = await supabase
+      .from('agent_knowledge')
+      .select('title, content, knowledge_type')
+      .eq('status', 'active')
+      .contains('tags', ['aergap'])
+      .order('created_at', { ascending: false })
+      .limit(30)
+
+    if (!data || data.length === 0) return ''
+
+    const entries = (data as { title: string; content: string; knowledge_type: string }[])
+      .map(k => `[${k.knowledge_type.toUpperCase()}] ${k.title}\n${k.content.slice(0, 500)}`)
+      .join('\n\n---\n\n')
+
+    return `\n\n══ AERGAP LEARNED INTELLIGENCE (${data.length} entries) ══\n\n${entries}`
   } catch { return '' }
 }
 
@@ -342,7 +356,7 @@ async function autoTitle(sessionId: string, firstMsg: string, firstReply = '') {
     const snippet = `User: ${firstMsg.slice(0, 200)}${firstReply ? `\nAssistant: ${firstReply.slice(0, 200)}` : ''}`
     const c = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: `Generate a specific 4-7 word title for this BD conversation. Focus on the company name, person, product, or concrete goal — NOT generic phrases like "BD chat" or "Strategy Session". Examples of good titles: "Outreach to Skyfire's CEO", "Kima Fit for Stripe Agents", "Pitch Angle for Ramp Treasury".\n\nConversation:\n${snippet}\n\nReturn ONLY the title, no quotes, no punctuation at the end.` }],
+      messages: [{ role: 'user', content: `Generate a specific 4-7 word title for this BD conversation. Focus on the company name, person, product, or concrete goal — NOT generic phrases like "BD chat" or "Strategy Session". Examples of good titles: "Outreach to Skyfire's CEO", "Aergap Fit for Stripe Agents", "Pitch Angle for Ramp Treasury".\n\nConversation:\n${snippet}\n\nReturn ONLY the title, no quotes, no punctuation at the end.` }],
       max_tokens: 25, temperature: 0.4,
     })
     const raw = c.choices[0].message.content?.trim() || ''

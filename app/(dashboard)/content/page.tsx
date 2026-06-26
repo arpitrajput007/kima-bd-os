@@ -16,6 +16,9 @@ interface ContentResult {
   incident_summary: string
   root_cause: string
   kima_angle: string
+  why_this_matters: string
+  original_insight: string
+  engagement_hooks: string[]
   tweets: ContentPost[]
   thread: ContentPost[]
   linkedin: ContentPost[]
@@ -327,21 +330,36 @@ function LinkedInCard({ post, index, copied, onCopy, gs, onGenerateGraphic, onVi
   )
 }
 
-// ── Incident analysis bar ──────────────────────────────────────────────────────
+// ── Content analysis bar ───────────────────────────────────────────────────────
 function IncidentBar({ data }: { data: ContentResult }) {
+  const rows = [
+    { label: 'Summary',          text: data.incident_summary,  color: 'rgba(251,191,36,0.6)' },
+    { label: 'Why it matters',   text: data.why_this_matters,  color: 'rgba(167,139,250,0.65)' },
+    { label: 'Hidden problem',   text: data.root_cause,        color: 'rgba(248,113,113,0.65)' },
+    { label: 'Aergap angle',     text: data.kima_angle,        color: 'rgba(52,211,153,0.65)' },
+    { label: 'Original insight', text: data.original_insight,  color: 'rgba(96,165,250,0.65)' },
+  ].filter(r => r.text && r.text !== 'N/A')
+
   return (
-    <div style={{ borderRadius: 12, padding: '14px 16px', background: 'rgba(251,191,36,0.04)', border: '1px solid rgba(251,191,36,0.15)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ fontSize: 10, fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Agent Analysis</div>
-      {[
-        { label: 'Incident',           text: data.incident_summary },
-        { label: 'Root cause',         text: data.root_cause       },
-        { label: 'Kima/Aeredium angle',text: data.kima_angle       },
-      ].map(({ label, text }) => (
+    <div style={{ borderRadius: 12, padding: '14px 16px', background: 'rgba(251,191,36,0.04)', border: '1px solid rgba(251,191,36,0.12)', display: 'flex', flexDirection: 'column', gap: 9 }}>
+      <div style={{ fontSize: 10, fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Aergap Analysis</div>
+      {rows.map(({ label, text, color }) => (
         <div key={label} style={{ display: 'flex', gap: 8 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(251,191,36,0.6)', flexShrink: 0, minWidth: 110 }}>{label}</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color, flexShrink: 0, minWidth: 110 }}>{label}</span>
           <span style={{ fontSize: 12, color: 'rgb(200,205,230)', lineHeight: 1.5 }}>{text}</span>
         </div>
       ))}
+      {data.engagement_hooks && data.engagement_hooks.length > 0 && (
+        <div style={{ marginTop: 4, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Engagement hooks</div>
+          {data.engagement_hooks.map((hook, i) => (
+            <div key={i} style={{ display: 'flex', gap: 7, marginBottom: 4 }}>
+              <span style={{ color: 'rgba(167,139,250,0.5)', flexShrink: 0, marginTop: 1 }}>·</span>
+              <span style={{ fontSize: 11, color: 'rgb(155,160,195)', lineHeight: 1.5 }}>{hook}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -435,7 +453,7 @@ function SavedDraftCard({ draft, copied, onCopy, onMarkPosted, onDelete }: {
         <div style={{ margin: '0 14px 14px', padding: '10px 12px', borderRadius: 8, background: 'rgba(251,191,36,0.04)', border: '1px solid rgba(251,191,36,0.12)' }}>
           <div style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>Context</div>
           <div style={{ fontSize: 11, color: 'rgb(190,195,220)', lineHeight: 1.5 }}>{draft.incident_summary}</div>
-          {draft.kima_angle && <div style={{ fontSize: 11, color: 'rgba(167,139,250,0.7)', marginTop: 4, lineHeight: 1.5 }}>Angle: {draft.kima_angle}</div>}
+          {draft.kima_angle && draft.kima_angle !== 'N/A' && <div style={{ fontSize: 11, color: 'rgba(167,139,250,0.7)', marginTop: 4, lineHeight: 1.5 }}>Aergap angle: {draft.kima_angle}</div>}
         </div>
       )}
     </div>
@@ -522,6 +540,9 @@ export default function ContentStudioPage() {
       incident_summary: session.incident_summary || '',
       root_cause: session.root_cause || '',
       kima_angle: session.kima_angle || '',
+      why_this_matters: '',
+      original_insight: '',
+      engagement_hooks: [],
       tweets: session.tweets,
       thread: session.thread,
       linkedin: session.linkedin,
@@ -547,7 +568,7 @@ export default function ContentStudioPage() {
 
   // Generate content
   const generate = async () => {
-    if (!news.trim() && !url.trim()) { toast.error('Paste the news or a URL first'); return }
+    if (!news.trim() && !url.trim()) { toast.error('Paste the news, a URL, or any context first'); return }
     setLoading(true)
     setResult(null)
     setGraphicStates({})
@@ -660,7 +681,7 @@ export default function ContentStudioPage() {
         <div>
           <h1 className="text-xl font-bold text-white">Content Studio</h1>
           <p className="text-xs mt-0.5" style={{ color: 'rgb(100,100,120)' }}>
-            Incident → tweets, LinkedIn posts, graphics — all saved in one place
+            Any AI news → thought leadership content for Aergap — saved in one place
           </p>
         </div>
 
@@ -693,7 +714,7 @@ export default function ContentStudioPage() {
                   <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Zap size={13} color="#a78bfa" />
                   </div>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'white' }}>Incident Input</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'white' }}>Content Input</span>
                 </div>
 
                 <div style={{ marginBottom: 14 }}>
@@ -702,12 +723,12 @@ export default function ContentStudioPage() {
                     <Link2 size={12} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.25)' }} />
                     <input className="input-dark" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://rekt.news/... or a tweet URL" style={{ paddingLeft: 30, fontSize: 12 }} />
                   </div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.18)', marginTop: 5 }}>Reads full articles automatically · For tweets, paste the text below too</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.18)', marginTop: 5 }}>Reads full articles automatically · For tweets, paste the text below</div>
                 </div>
 
                 <div style={{ marginBottom: 18 }}>
                   <label style={{ display: 'block', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgb(130,135,170)', marginBottom: 6 }}>News / Context</label>
-                  <textarea className="input-dark" rows={7} value={news} onChange={e => setNews(e.target.value)} placeholder={"Paste the hack news, tweet text, or any context here.\n\nE.g.: Protocol X got hacked via compromised private keys. Lost $5M. Attacker drained the treasury through the bridge relayer."} style={{ fontSize: 12, resize: 'vertical', lineHeight: 1.6 }} />
+                  <textarea className="input-dark" rows={7} value={news} onChange={e => setNews(e.target.value)} placeholder={"Paste any AI news, funding announcement, product launch, research paper, regulation, or security incident here.\n\nE.g.: Anthropic launched computer-use agents with financial tooling. OpenAI raised $40B. A16z published a report on agentic AI risks."} style={{ fontSize: 12, resize: 'vertical', lineHeight: 1.6 }} />
                 </div>
 
                 <button onClick={generate} disabled={loading} className="btn btn-primary w-full justify-center" style={{ padding: '11px', fontSize: 13 }}>
@@ -718,7 +739,16 @@ export default function ContentStudioPage() {
               {/* Tips */}
               <div style={{ borderRadius: 12, padding: '14px 16px', background: 'rgba(167,139,250,0.05)', border: '1px solid rgba(167,139,250,0.12)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(167,139,250,0.7)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Works best with</div>
-                {['Bridge / relayer / oracle hack news', 'Private key or custody compromises', 'Smart contract exploits', 'Cross-chain messaging failures', 'AI agent / autonomous payment exploits'].map(tip => (
+                {[
+                  'AI agent news and infrastructure announcements',
+                  'Funding rounds in agentic AI companies',
+                  'Product launches — autonomous payments, MCP tooling, AI wallets',
+                  'Enterprise AI deployments and case studies',
+                  'AI regulations and compliance developments',
+                  'Research papers and benchmark reports',
+                  'Security incidents — crypto, AI, and autonomous systems',
+                  'Conference talks and industry shifts',
+                ].map(tip => (
                   <div key={tip} style={{ display: 'flex', alignItems: 'flex-start', gap: 7, marginBottom: 5 }}>
                     <span style={{ color: '#a78bfa', flexShrink: 0, marginTop: 1 }}>·</span>
                     <span style={{ fontSize: 11, color: 'rgb(150,155,190)', lineHeight: 1.5 }}>{tip}</span>
@@ -729,7 +759,7 @@ export default function ContentStudioPage() {
                     <Bookmark size={9} color="rgba(167,139,250,0.6)" />
                     <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(167,139,250,0.7)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Saving</span>
                   </div>
-                  <span style={{ fontSize: 11, color: 'rgb(130,135,170)', lineHeight: 1.5 }}>Click Save on any post to add it to Saved Drafts. Copy it to post when ready — mark it as posted to track it.</span>
+                  <span style={{ fontSize: 11, color: 'rgb(130,135,170)', lineHeight: 1.5 }}>Click Save on any post to add it to Saved Drafts. Copy to post when ready — mark as posted to track it.</span>
                 </div>
               </div>
             </div>
@@ -741,16 +771,16 @@ export default function ContentStudioPage() {
                   <div style={{ width: 56, height: 56, borderRadius: 14, marginBottom: 16, background: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <AlignLeft size={22} color="rgba(167,139,250,0.4)" />
                   </div>
-                  <p style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 6 }}>Paste an incident, get content</p>
-                  <p style={{ fontSize: 12, color: 'rgb(90,95,130)', maxWidth: 320, textAlign: 'center', lineHeight: 1.6 }}>Drop a hack story or rekt.news URL. Agent reads it, maps it to Kima/Aeredium solutions, and writes posts. Save the ones you like — post when ready.</p>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 6 }}>Paste any AI news, get thought leadership</p>
+                  <p style={{ fontSize: 12, color: 'rgb(90,95,130)', maxWidth: 340, textAlign: 'center', lineHeight: 1.6 }}>Drop a URL or paste any AI agent news, product launch, funding announcement, or research paper. The agent analyzes it through the Aergap governance lens and writes posts. Save the ones you like.</p>
                 </div>
               )}
 
               {loading && (
                 <div style={{ minHeight: 500, borderRadius: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(18,19,32,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <Loader2 size={32} className="animate-spin mb-4" style={{ color: '#a78bfa' }} />
-                  <p style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 4 }}>Reading the incident…</p>
-                  <p style={{ fontSize: 12, color: 'rgb(90,95,130)' }}>Analysing root cause and mapping to Kima/Aeredium solutions</p>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 4 }}>Analysing through the Aergap lens…</p>
+                  <p style={{ fontSize: 12, color: 'rgb(90,95,130)' }}>Identifying the governance gap and generating thought leadership content</p>
                 </div>
               )}
 
@@ -969,9 +999,9 @@ export default function ContentStudioPage() {
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'rgb(225,228,255)', lineHeight: 1.55, marginBottom: session.kima_angle ? 8 : 0 }}>
                         {preview.slice(0, 200)}{preview.length > 200 ? '…' : ''}
                       </div>
-                      {session.kima_angle && (
+                      {session.kima_angle && session.kima_angle !== 'N/A' && (
                         <div style={{ fontSize: 11, color: 'rgba(167,139,250,0.65)', lineHeight: 1.5 }}>
-                          Angle: {session.kima_angle.slice(0, 140)}{session.kima_angle.length > 140 ? '…' : ''}
+                          Aergap angle: {session.kima_angle.slice(0, 140)}{session.kima_angle.length > 140 ? '…' : ''}
                         </div>
                       )}
                       {session.source_url && (

@@ -28,11 +28,14 @@ interface CardLabels {
 }
 
 const LABEL_PRESETS: Record<string, CardLabels> = {
-  security:  { badge: 'SECURITY INCIDENT',  panel1: 'WHAT HAPPENED',        panel2: 'HOW KIMA PREVENTS THIS', accentColor: '#7c3aed' },
-  agentic:   { badge: 'AGENTIC PAYMENTS',   panel1: 'THE OPPORTUNITY',       panel2: 'HOW KIMA ENABLES THIS',  accentColor: '#3b82f6' },
-  insight:   { badge: 'MARKET INSIGHT',     panel1: 'WHAT\'S HAPPENING',     panel2: 'KIMA\'S ROLE',           accentColor: '#f59e0b' },
-  product:   { badge: 'PRODUCT UPDATE',     panel1: 'WHAT WE BUILT',         panel2: 'WHY IT MATTERS',         accentColor: '#10b981' },
-  regulation:{ badge: 'REGULATORY UPDATE',  panel1: 'THE CHANGE',            panel2: 'WHAT THIS MEANS',        accentColor: '#f59e0b' },
+  security:    { badge: 'SECURITY INCIDENT',   panel1: 'WHAT HAPPENED',         panel2: 'THE GOVERNANCE GAP',      accentColor: '#7c3aed' },
+  agentic:     { badge: 'AGENTIC AI',          panel1: 'THE DEVELOPMENT',        panel2: 'AERGAP\'S ROLE',          accentColor: '#3b82f6' },
+  insight:     { badge: 'MARKET INSIGHT',      panel1: 'WHAT\'S HAPPENING',      panel2: 'THE MISSING LAYER',       accentColor: '#f59e0b' },
+  product:     { badge: 'PRODUCT LAUNCH',      panel1: 'WHAT WAS BUILT',         panel2: 'THE GOVERNANCE QUESTION', accentColor: '#10b981' },
+  regulation:  { badge: 'REGULATORY UPDATE',   panel1: 'THE CHANGE',             panel2: 'WHAT THIS MEANS',         accentColor: '#f59e0b' },
+  governance:  { badge: 'AI GOVERNANCE',       panel1: 'THE CHALLENGE',          panel2: 'THE CONTROL LAYER',       accentColor: '#a78bfa' },
+  enterprise:  { badge: 'ENTERPRISE AI',       panel1: 'THE DEPLOYMENT',         panel2: 'THE ACCOUNTABILITY GAP',  accentColor: '#34d399' },
+  research:    { badge: 'RESEARCH FINDING',    panel1: 'THE FINDING',            panel2: 'THE IMPLICATION',         accentColor: '#fb923c' },
 }
 
 async function classifyContent(incident_summary: string, kima_angle: string): Promise<CardLabels> {
@@ -40,12 +43,12 @@ async function classifyContent(incident_summary: string, kima_angle: string): Pr
     const result = await claudeJSON<{ type: string }>({
       model: 'claude-haiku-4-5-20251001',
       maxTokens: 60,
-      system: 'Classify the content type. Return JSON: { "type": "<one of: security, agentic, insight, product, regulation>" }. security = hack/exploit/breach. agentic = AI agents, autonomous payments, agentic commerce. insight = market trend, analysis, general Web3 observation. product = new feature, launch, integration. regulation = compliance, legal, policy change.',
-      user: `Summary: ${incident_summary}\nKima angle: ${kima_angle}`,
+      system: 'Classify the content type. Return JSON: { "type": "<one of: security, agentic, insight, product, regulation, governance, enterprise, research>" }. security = hack/exploit/breach/incident. agentic = AI agents, autonomous payments, agentic commerce, MCP tooling. governance = AI governance, policy, accountability, audit, agent identity. enterprise = enterprise AI deployment, enterprise adoption. product = product launch, new feature, integration announcement. regulation = compliance, legal, policy change. research = research paper, benchmark, study findings. insight = market trend, analysis, general AI observation.',
+      user: `Summary: ${incident_summary}\nAngle: ${kima_angle}`,
     })
     return LABEL_PRESETS[result.type] ?? LABEL_PRESETS.insight
   } catch {
-    return LABEL_PRESETS.security
+    return LABEL_PRESETS.insight
   }
 }
 
@@ -99,7 +102,7 @@ function buildCard(opts: {
         }, e('span', { style: { fontSize: 14 } }, '⚡')),
         e('span', {
           style: { color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em' },
-        }, 'KIMA BD OS'),
+        }, 'AERGAP'),
       ),
       e('div', {
         style: {
@@ -158,11 +161,11 @@ function buildCard(opts: {
     e('div', {
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 20 },
     },
-      e('span', { style: { color: 'rgba(255,255,255,0.15)', fontSize: 11 } }, 'kima.finance · aeredium.io'),
+      e('span', { style: { color: 'rgba(255,255,255,0.15)', fontSize: 11 } }, 'aergap.io'),
       e('div', {
         style: { background: 'linear-gradient(135deg, #7c3aed, #3b82f6)', borderRadius: 6, padding: '5px 13px' },
       },
-        e('span', { style: { color: 'white', fontSize: 11, fontWeight: 700 } }, 'Kima Finance'),
+        e('span', { style: { color: 'white', fontSize: 11, fontWeight: 700 } }, 'Aergap'),
       ),
     ),
   )
