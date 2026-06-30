@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 import {
   Sparkles, Copy, RefreshCw, Loader2,
@@ -8,6 +9,7 @@ import {
   Zap, Hash, AlignLeft, AtSign, MessageCircle, X,
   Bookmark, BookmarkCheck, Trash2, ChevronDown, ChevronUp,
   Clock, CheckCircle2, Filter, History, RotateCcw, GalleryHorizontalEnd,
+  Brain, Send, Plus, MessageSquare,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -474,6 +476,275 @@ const FILTER_TABS: { key: FilterType; label: string }[] = [
   { key: 'thread_tweet', label: 'Thread'   },
 ]
 
+// ── Discuss Content panel ──────────────────────────────────────────────────────
+interface DiscussChatMsg { role: 'user' | 'assistant'; content: string }
+
+function DiscussRichText({ text }: { text: string }) {
+  const renderInline = (s: string, keyBase: string) =>
+    s.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+      part.startsWith('**') && part.endsWith('**')
+        ? <strong key={`${keyBase}-${i}`} style={{ color: 'white', fontWeight: 600 }}>{part.slice(2, -2)}</strong>
+        : <span key={`${keyBase}-${i}`}>{part}</span>
+    )
+  const lines = text.split('\n')
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      {lines.map((raw, i) => {
+        const line = raw.trimEnd()
+        if (!line.trim()) return <div key={i} style={{ height: 2 }} />
+        if (/^\s*[-*•]\s+/.test(line)) {
+          return (
+            <div key={i} style={{ display: 'flex', gap: 8, paddingLeft: 2 }}>
+              <span style={{ color: '#a78bfa', flexShrink: 0, lineHeight: 1.6 }}>•</span>
+              <span style={{ flex: 1, lineHeight: 1.6 }}>{renderInline(line.replace(/^\s*[-*•]\s+/, ''), `${i}`)}</span>
+            </div>
+          )
+        }
+        return <div key={i} style={{ lineHeight: 1.65 }}>{renderInline(line, `${i}`)}</div>
+      })}
+    </div>
+  )
+}
+
+function ContentDiscussPanel({ result, newsContext, sourceUrl, onClose }: {
+  result: ContentResult
+  newsContext: string
+  sourceUrl: string
+  onClose: () => void
+}) {
+  const [messages, setMessages] = useState<DiscussChatMsg[]>([])
+  const [input, setInput]       = useState('')
+  const [thinking, setThinking] = useState(false)
+  const [shown, setShown]       = useState(false)
+  const [mounted, setMounted]   = useState(false)
+  const scrollRef  = useRef<HTMLDivElement>(null)
+  const inputRef   = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    setMounted(true)
+    const t = requestAnimationFrame(() => setShown(true))
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const f = setTimeout(() => inputRef.current?.focus(), 120)
+    return () => { cancelAnimationFrame(t); clearTimeout(f); document.body.style.overflow = prev }
+  }, [])
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+  }, [messages, thinking])
+
+  const close = () => {
+    setShown(false)
+    setTimeout(onClose, 200)
+  }
+
+  const ask = async (q: string) => {
+    const question = q.trim()
+    if (!question || thinking) return
+
+    const next: DiscussChatMsg[] = [...messages, { role: 'user', content: question }]
+    setMessages(next)
+    setInput('')
+    if (inputRef.current) inputRef.current.style.height = 'auto'
+    setThinking(true)
+
+    try {
+      const res  = await fetch('/api/ai/content/discuss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: question,
+          messages,
+          content: {
+            incident_summary: result.incident_summary,
+            root_cause:       result.root_cause,
+            kima_angle:       result.kima_angle,
+            why_this_matters: result.why_this_matters,
+            original_insight: result.original_insight,
+            engagement_hooks: result.engagement_hooks,
+            tweets:           result.tweets,
+            thread:           result.thread,
+            linkedin:         result.linkedin,
+          },
+          source_news: newsContext || undefined,
+          source_url:  sourceUrl  || undefined,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      setMessages([...next, { role: 'assistant', content: json.reply }])
+    } catch (err: unknown) {
+      setMessages([...next, { role: 'assistant', content: `⚠️ ${err instanceof Error ? err.message : 'Something went wrong'}` }])
+    } finally {
+      setThinking(false)
+    }
+  }
+
+  const totalPosts = result.tweets.length + result.thread.length + result.linkedin.length
+  const starters = [
+    'Walk me through the reasoning for Tweet 1 — why this hook and angle?',
+    'Is the Aergap connection in these posts accurate and defensible?',
+    'Which post is the strongest and why? Which one needs work?',
+    'Flag anything I should double-check before posting this.',
+  ]
+
+  if (!mounted) return null
+
+  const panel = (
+    <div
+      onClick={close}
+      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: shown ? 'rgba(4,4,10,0.6)' : 'rgba(4,4,10,0)', backdropFilter: 'blur(3px)', display: 'flex', justifyContent: 'flex-end', transition: 'background 0.25s ease' }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: 'min(600px, 100vw)', height: '100dvh',
+          background: 'linear-gradient(180deg, rgb(17,18,28), rgb(12,12,19))',
+          borderLeft: '1px solid rgba(167,139,250,0.3)',
+          display: 'flex', flexDirection: 'column',
+          boxShadow: '-40px 0 90px rgba(0,0,0,0.65)',
+          transform: shown ? 'translateX(0)' : 'translateX(100%)',
+          transition: 'transform 0.28s cubic-bezier(0.22,1,0.36,1)',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Header */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: 'rgba(167,139,250,0.05)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, rgba(167,139,250,0.28), rgba(167,139,250,0.08))', border: '1px solid rgba(167,139,250,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Brain size={17} color="#a78bfa" />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>Discuss Content</div>
+              <div style={{ fontSize: 11, color: 'rgba(167,139,250,0.7)', marginTop: 1 }}>
+                {totalPosts} posts loaded · ask anything before you post
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={close}
+            style={{ width: 32, height: 32, borderRadius: 9, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Content context strip */}
+        <div style={{ padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.2)', flexShrink: 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 5 }}>
+            Content in review
+          </div>
+          <div style={{ fontSize: 12, color: 'rgb(185,188,215)', lineHeight: 1.55 }}>
+            {result.incident_summary.slice(0, 160)}{result.incident_summary.length > 160 ? '…' : ''}
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 7, flexWrap: 'wrap' as const }}>
+            {[
+              { n: result.tweets.length,  label: 'tweets',   c: '#1da1f2' },
+              { n: result.thread.length,  label: 'thread',   c: '#818cf8' },
+              { n: result.linkedin.length,label: 'LinkedIn', c: '#60a5fa' },
+            ].map(({ n, label, c }) => n > 0 && (
+              <span key={label} style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: `${c}14`, border: `1px solid ${c}33`, color: c, fontWeight: 700 }}>
+                {n} {label}
+              </span>
+            ))}
+            {result.kima_angle && result.kima_angle !== 'N/A' && (
+              <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', fontWeight: 700 }}>
+                Aergap angle present
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {messages.length === 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <p style={{ fontSize: 13, color: 'rgb(150,157,180)', lineHeight: 1.7, margin: 0 }}>
+                Ask me anything about the generated content — why a specific post says what it says, whether the Aergap connection is accurate, which posts are strongest, or get a sharper version of something.{' '}
+                <span style={{ color: 'rgba(167,139,250,0.8)' }}>I won't let you post something you don't fully understand.</span>
+              </p>
+              <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgb(100,107,140)', marginTop: 2 }}>Try asking</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {starters.map(s => (
+                  <button
+                    key={s}
+                    onClick={() => ask(s)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', borderRadius: 11, border: '1px solid rgba(167,139,250,0.2)', background: 'rgba(167,139,250,0.05)', padding: '11px 13px', fontSize: 12.5, color: 'rgb(210,200,240)', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1.45, transition: 'background 0.15s' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(167,139,250,0.1)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'rgba(167,139,250,0.05)')}
+                  >
+                    <Sparkles size={13} color="#a78bfa" style={{ flexShrink: 0 }} />
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {messages.map((m, i) => (
+            m.role === 'user' ? (
+              <div key={i} style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{ maxWidth: '85%', borderRadius: '14px 14px 4px 14px', padding: '10px 14px', fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.3)', color: 'rgb(228,218,252)' }}>
+                  {m.content}
+                </div>
+              </div>
+            ) : (
+              <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                  <Brain size={13} color="#a78bfa" />
+                </div>
+                <div style={{ flex: 1, minWidth: 0, borderRadius: '4px 14px 14px 14px', padding: '11px 14px', fontSize: 13, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgb(208,213,230)' }}>
+                  <DiscussRichText text={m.content} />
+                </div>
+              </div>
+            )
+          ))}
+
+          {thinking && (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Loader2 size={13} className="animate-spin" color="#a78bfa" />
+              </div>
+              <div style={{ fontSize: 12.5, color: 'rgba(167,139,250,0.7)', lineHeight: 1.5 }}>Reviewing the content…</div>
+            </div>
+          )}
+        </div>
+
+        {/* Composer */}
+        <div style={{ padding: '12px 16px 16px', borderTop: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', borderRadius: 13, border: '1px solid rgba(167,139,250,0.2)', background: 'rgba(167,139,250,0.04)', padding: 6 }}>
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={e => {
+                setInput(e.target.value)
+                e.target.style.height = 'auto'
+                e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px'
+              }}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(input) } }}
+              placeholder="Ask anything about this content…"
+              rows={1}
+              style={{ flex: 1, resize: 'none', maxHeight: 140, border: 'none', background: 'transparent', padding: '8px 10px', fontSize: 13, color: 'white', fontFamily: 'inherit', lineHeight: 1.5, outline: 'none' }}
+            />
+            <button
+              onClick={() => ask(input)}
+              disabled={thinking || !input.trim()}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, flexShrink: 0, borderRadius: 10, border: 'none', background: thinking || !input.trim() ? 'rgba(167,139,250,0.12)' : '#a78bfa', color: thinking || !input.trim() ? '#a78bfa' : 'rgb(8,4,16)', cursor: thinking || !input.trim() ? 'not-allowed' : 'pointer', transition: 'all 0.15s' }}
+            >
+              {thinking ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+            </button>
+          </div>
+          <div style={{ fontSize: 10.5, color: 'rgb(90,97,125)', marginTop: 7, textAlign: 'center' }}>
+            Enter to send · Shift+Enter for new line · close any time
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
+  return createPortal(panel, document.body)
+}
+
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function ContentStudioPage() {
   const [view, setView]         = useState<PageView>('create')
@@ -482,6 +753,7 @@ export default function ContentStudioPage() {
   const [loading, setLoading]   = useState(false)
   const [result, setResult]     = useState<ContentResult | null>(null)
   const [tab, setTab]           = useState<TabKey>('tweets')
+  const [discussOpen, setDiscussOpen] = useState(false)
   const { copied, copy }        = useCopy()
 
   // Graphic state
@@ -676,6 +948,16 @@ export default function ContentStudioPage() {
       {/* Graphic modal */}
       {graphicModal && <GraphicModal url={graphicModal.url} hook={graphicModal.hook} onClose={() => setGraphicModal(null)} />}
 
+      {/* Discuss Content panel */}
+      {discussOpen && result && (
+        <ContentDiscussPanel
+          result={result}
+          newsContext={news}
+          sourceUrl={url}
+          onClose={() => setDiscussOpen(false)}
+        />
+      )}
+
       {/* ── Page header ── */}
       <div className="page-header">
         <div>
@@ -803,6 +1085,13 @@ export default function ContentStudioPage() {
                     })}
                     <button onClick={generate} disabled={loading} style={{ marginLeft: 4, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 11px', borderRadius: 7, fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.3)', cursor: 'pointer' }} title="Regenerate">
                       <RefreshCw size={11} className={loading ? 'animate-spin' : ''} /> Regenerate
+                    </button>
+                    <button
+                      onClick={() => setDiscussOpen(true)}
+                      style={{ marginLeft: 4, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 11px', borderRadius: 7, fontSize: 11, fontWeight: 600, background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.28)', color: '#a78bfa', cursor: 'pointer' }}
+                      title="Discuss this content before posting"
+                    >
+                      <Brain size={11} /> Discuss
                     </button>
                   </div>
 

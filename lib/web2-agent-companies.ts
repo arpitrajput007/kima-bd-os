@@ -13,6 +13,9 @@ export type Web2Category =
   | 'Lending & Credit'
   | 'Audit & Compliance'
   | 'Infrastructure'
+  | 'Agentic Payments'
+  | 'Agent Governance'
+  | 'Robotics'
 
 export type GovernanceRisk = 'High' | 'Medium-High' | 'Medium' | 'Low'
 export type Web2Priority = 'Immediate Outreach' | 'Strong Prospect' | 'Monitor' | 'Competitive Intel'
@@ -49,6 +52,9 @@ export const WEB2_CATEGORIES: Web2Category[] = [
   'Lending & Credit',
   'Audit & Compliance',
   'Infrastructure',
+  'Agentic Payments',
+  'Agent Governance',
+  'Robotics',
 ]
 
 export const WEB2_CAT_COLORS: Record<Web2Category, { bg: string; border: string; text: string; bar: string }> = {
@@ -62,6 +68,9 @@ export const WEB2_CAT_COLORS: Record<Web2Category, { bg: string; border: string;
   'Lending & Credit':  { bg: 'rgba(163,230,53,0.1)',  border: 'rgba(163,230,53,0.25)',  text: 'rgb(163,230,53)',  bar: 'rgb(163,230,53)' },
   'Audit & Compliance':{ bg: 'rgba(244,114,182,0.1)', border: 'rgba(244,114,182,0.25)', text: 'rgb(244,114,182)', bar: 'rgb(244,114,182)' },
   'Infrastructure':    { bg: 'rgba(129,140,248,0.1)', border: 'rgba(129,140,248,0.25)', text: 'rgb(129,140,248)', bar: 'rgb(129,140,248)' },
+  'Agentic Payments':  { bg: 'rgba(45,212,191,0.1)',  border: 'rgba(45,212,191,0.25)',  text: 'rgb(45,212,191)',  bar: 'rgb(45,212,191)' },
+  'Agent Governance':  { bg: 'rgba(244,63,94,0.1)',   border: 'rgba(244,63,94,0.25)',   text: 'rgb(244,63,94)',   bar: 'rgb(244,63,94)' },
+  'Robotics':          { bg: 'rgba(232,121,249,0.1)', border: 'rgba(232,121,249,0.25)', text: 'rgb(232,121,249)', bar: 'rgb(232,121,249)' },
 }
 
 export const WEB2_COMPANIES: Web2Company[] = [
@@ -822,5 +831,187 @@ export const WEB2_COMPANIES: Web2Company[] = [
     triggerSignals: ['9 policies autonomously bound (public claim) — most advanced autonomous insurance agent in YC batch', 'State DOI compliance requirements automatic', 'YC-backed — fast decision cycle', 'Active YC network for intro'],
     decisionMaker: 'Founders via YC directory.',
     outreachAngle: '9 autonomous policy bindings means you\'ve proven the product. The next 9,000 will require DOI audit documentation. Aergap is the identity and audit layer that proves each autonomous binding was within licensed broker parameters — before the state examiner asks.',
+  },
+
+  // ── AERGAP BD TARGET LIST (imported) ─────────────────────────────────────
+
+  {
+    co: 'Nava', site: 'https://navalabs.ai', tier: 4,
+    cat: 'Agentic Payments', industry: 'Fintech – AI Agent Payment Verification',
+    stage: 'Startup', fitScore: 6, priority: 'Competitive Intel',
+    desc: 'Trust / verification layer for autonomous AI agent payments — holds agent funds in escrow until an on-chain verifier confirms the transaction matches user intent.',
+    agentDoes: 'Sits between AI financial agents and payment rails: when an agent proposes a transaction, funds are held in escrow until a verification framework confirms the outcome matches the user\'s stated intent — pass and it executes, fail and funds stay locked. Decision rationale is posted on-chain.',
+    highStakeActions: ['Escrow custody of agent transaction funds', 'Intent-verification gating before payment execution', 'On-chain logging of accept/reject decisions', 'Underwriting agent actions via native stablecoin'],
+    govRisk: 'High',
+    govReason: 'Near-identical thesis to Aergap\'s Pact / Triple-Gate model — pre-action verification before money moves. Approach as partnership / competitive intel, not a straightforward customer.',
+    whyAergap: 'COMPETITIVE INTEL / COOPETITION: Nava builds the escrow-and-verify half of agent payment trust on an on-chain (L3 Arbitrum) stack. Overlaps Aergap\'s execution gate. Track positioning; differentiate Aergap on off-chain enterprise policy enforcement, identity, and audit depth across Web2 finance workflows.',
+    triggerSignals: ['$8.3M seed (Apr 2026) co-led by Polychain and Archetype', 'Founders ex-EigenLayer (CEO Vyas Krishnan, first EigenLayer employee)', 'On-chain escrow + verification = direct thesis overlap with Aergap', 'Native stablecoin planned to underwrite agent actions'],
+    decisionMaker: 'Vyas Krishnan, Co-Founder & CEO (ex-EigenLayer Product Lead); co-founder Brianna Montgomery. Consider partnership / coopetition framing rather than a pure sales pitch.',
+    outreachAngle: 'You\'re building the trust layer for agent payments on-chain; Aergap builds it for enterprise Web2 finance workflows. Worth comparing notes on where the lines are before we both show up in the same evaluations — partner or coopetition, not pitch.',
+  },
+
+  {
+    co: 'Ralio', site: 'https://ralio.co', tier: 4,
+    cat: 'Agentic Payments', industry: 'Fintech – Agentic Business Payments',
+    stage: 'Startup', fitScore: 6, priority: 'Competitive Intel',
+    desc: 'The trust layer for agentic business payments — embeds guardrails, identity verification, and audit trails into agent payment infrastructure for procurement, payroll, and treasury.',
+    agentDoes: 'Sits between AI agents and payment rails (bank transfers, cards, stablecoins, Ralio Wallet), enforcing spend limits and rules, verifying identity, and writing full audit trails so money only moves when it should.',
+    highStakeActions: ['Spend-limit and rule enforcement on agent payments', 'Identity verification for paying agents', 'Audit-trail capture across payment rails', 'Wallet custody and payment execution'],
+    govRisk: 'High',
+    govReason: 'Pitch is almost word-for-word Aergap\'s own positioning applied to a narrower payments wedge — guardrails + identity + audit for agent money movement. Coopetition rather than a clean customer.',
+    whyAergap: 'COMPETITIVE INTEL / COOPETITION: Ralio is the closest agentic-payments analogue to Aergap in Europe. Fast-moving, lean team with urgent felt need. Track their guardrails/identity/audit positioning closely; differentiate Aergap on broader execution-gate scope beyond payments (any high-stakes agent action) and verticalized governance.',
+    triggerSignals: ['$2.5M pre-seed, 3x oversubscribed — largest agentic-payments pre-seed in Europe to date', 'Led by Sure Valley Ventures (Seed X, Love Ventures, Plug and Play, Antler)', 'Guardrails + identity + audit = near-identical positioning to Aergap', 'Founders ex-Alan / ex-Form3 — strong payments pedigree'],
+    decisionMaker: 'Ghali Bennani Laafiret & Leonardo Rosales, Co-Founders (London, UK). Good first-touch candidate, but frame as coopetition/intel given thesis overlap.',
+    outreachAngle: 'We\'re solving the same trust problem from different ends — you at the payment rail, Aergap across the full agent-action surface. Before the market frames us as competitors, worth a candid conversation about where collaboration beats collision.',
+  },
+
+  {
+    co: 'Natural', site: 'https://natural.co', tier: 2,
+    cat: 'Agentic Payments', industry: 'Fintech – Agentic Payments Infrastructure',
+    stage: 'Startup', fitScore: 8, priority: 'Strong Prospect',
+    desc: 'Payments infrastructure for agentic B2B transactions across logistics, property management, procurement, healthcare, and construction. Lean team running a design-partner-led GTM.',
+    agentDoes: 'Provides secure identity, authorization, and low-latency settlement so AI agents can autonomously execute payments, contracts, and business transactions — e.g. property-management agents paying contractors, logistics agents settling with truckers, procurement agents negotiating supplier payments.',
+    highStakeActions: ['Autonomous agent-initiated B2B payments', 'Authorization and approval-chain enforcement', 'Settlement across multiple verticals', 'Agent identity issuance for payment actions'],
+    govRisk: 'High',
+    govReason: 'Money moves autonomously across multiple high-stakes verticals (healthcare, construction, logistics). Approval chains exist but pre-action policy enforcement and independent audit are the open governance question as design partners scale.',
+    whyAergap: 'Natural is building the payment rail; Aergap is the policy + execution-gate + audit layer on top. Small lean team (5–10) already running a design-partner-led GTM motion — founders will recognize and respect the same approach. Strong co-sell / embed candidate where Aergap governs what each agent is allowed to pay, for how much, under what policy.',
+    triggerSignals: ['$9.8M seed co-led by Abstract and Human Capital (Forerunner, Terrain, Restive)', 'Already recruiting design partners across logistics, property, procurement, healthcare, construction', 'Lean team — fast decision cycle', 'Identity + authorization already core to the product (governance-aware)'],
+    decisionMaker: 'Kahlil Lalji, Co-Founder & CEO (with Eric Wang, Walt Leung). Explicitly recruiting design partners across verticals — a warm door for a governance partnership.',
+    outreachAngle: 'You\'re recruiting design partners to build the financial backbone for agents — Aergap is the policy and execution-gate layer that lets those agents pay autonomously without your enterprise customers losing sleep. Same design-partner playbook; worth 20 minutes?',
+  },
+
+  {
+    co: 'Slash', site: 'https://slash.com', tier: 3,
+    cat: 'Agentic Payments', industry: 'Fintech – AI Business Banking',
+    stage: 'Growth', fitScore: 6, priority: 'Monitor',
+    desc: 'AI financial agent (Twin) for business banking — executes payment workflows, invoice generation, and card issuance on top of a company\'s full Slash account.',
+    agentDoes: 'Twin acts as an AI chief of staff over a company\'s Slash account: directed via Slack, it executes payments, generates invoices, and issues new cards, drawing on real-time data across card spend, treasury, virtual accounts, and reimbursements.',
+    highStakeActions: ['Agent-initiated payments from business accounts', 'Card issuance on demand', 'Invoice generation with financial effect', 'Treasury and account-setting changes'],
+    govRisk: 'High',
+    govReason: 'A live AI agent moving money and issuing cards across real business accounts. Slash routes money-moving actions through existing approval workflows, but pre-action policy enforcement and independent audit of agent decisions remain the enterprise governance gap as it scales upmarket.',
+    whyAergap: 'Funded, live product with a real payment surface needing containment. Aergap\'s execution gate and audit trail map directly onto Twin\'s money-moving actions — the layer enterprise buyers will ask for before letting an agent issue cards or send payments. Verify exact funding/product details before outreach.',
+    triggerSignals: ['$100M Series C — reached unicorn status (Apr 2026)', 'Twin agent live, executing payments / invoices / card issuance', 'Money-moving actions already gated by approval workflows (governance-aware)', 'Scaling business-banking footprint'],
+    decisionMaker: 'Founders via company site — verify product/funding details directly before outreach.',
+    outreachAngle: 'Twin moves money and issues cards on a customer\'s say-so. As you move upmarket, security teams will ask what policy gates each agent action before it executes. Aergap is that pre-action gate and the immutable record behind it.',
+  },
+
+  {
+    co: 'Cedalio', site: 'https://cedalio.com', tier: 2,
+    cat: 'Agentic Payments', industry: 'Fintech – Office of the CFO / AP',
+    stage: 'Startup', fitScore: 8, priority: 'Strong Prospect',
+    desc: 'AI agent platform for the Office of the CFO — automates procurement and accounts payable end-to-end, from invoice intake to 3-way match to payment, before anything enters the ERP.',
+    agentDoes: 'Agents read every invoice, validate charges against published rates, flag billing errors, run 3-way match, and close the fiscal cycle — automating AP and procurement so finance teams govern rather than do the work.',
+    highStakeActions: ['Invoice-to-payment processing without manual steps', 'Tariff / rate validation and billing-error flagging', '3-way match and ERP write-back', 'Procurement workflow execution'],
+    govRisk: 'High',
+    govReason: 'Exactly the "agent moves money, needs policy and audit" surface Aergap targets. AP automation into live ERPs with autonomous matching and payment is a textbook control surface for SOX-style scrutiny.',
+    whyAergap: 'CFO-office buyer is a strong Aergap ICP. Cedalio automates the procurement-to-payment cycle that most needs pre-action policy enforcement and an independent audit trail. YC-backed and early — a clean design-partner conversation where Aergap gates which invoices/payments the agent can clear autonomously.',
+    triggerSignals: ['YC-backed', 'Live with enterprise customers (Ambev, Galicia, Falabella) cutting AP time ~80%', 'CFO-office ICP — direct fit for Aergap policy + audit', 'Invoice-to-3-way-match-to-payment = high-stakes money movement'],
+    decisionMaker: 'Founders via YC directory / company site. Early stage — founder is the right contact for a design-partner conversation.',
+    outreachAngle: 'You\'re moving finance teams from doing AP to governing it — Aergap is the governance layer that makes that real: pre-action policy on which invoices and payments your agents clear autonomously, plus an audit trail your customers\' controllers can show an auditor.',
+  },
+
+  {
+    co: 'Accend', site: 'https://withaccend.com', tier: 3,
+    cat: 'Lending & Credit', industry: 'Fintech – Commercial Underwriting',
+    stage: 'Startup', fitScore: 5, priority: 'Monitor',
+    desc: 'AI underwriting platform for commercial banks and fintechs — automates document intake, financial spreading, cash-flow modeling, and credit memos with audit-ready AI and human-in-the-loop accuracy. Serves Brex, Rippling, Rho, Column, Settle.',
+    agentDoes: 'Agents ingest application documents, spread financials and tax returns, model cash flow, draft credit memos, and support portfolio management for commercial customer underwriting at banks and fintechs.',
+    highStakeActions: ['Automated financial spreading and cash-flow modeling', 'Credit-memo generation feeding underwriting decisions', 'Document intake and validation', 'Portfolio-monitoring outputs'],
+    govRisk: 'Medium-High',
+    govReason: 'Not agent-payments exactly, but adjacent: AI decisions feeding commercial credit underwriting at regulated banks and fintechs, where audit-ready and explainable decisioning matters. Human-in-the-loop today lowers immediate risk.',
+    whyAergap: 'Adjacent / expansion conversation. Accend already serves real fintech customers (Brex, Rippling, Rho, Column, Settle) who care about audit-ready AI decisions — a strong reference-customer footprint. Aergap fits as the independent audit and policy layer if/when underwriting moves toward more autonomous decisioning.',
+    triggerSignals: ['$3.2M seed (Y Combinator, Adverb Ventures, General Catalyst, 645 Ventures)', 'Serves Brex, Rippling, Rho, Column, Settle — strong fintech reference base', '"Audit-ready AI" positioning — governance-aware', 'Founders ex-Brex Risk / Deutsche Bank / Credit Suisse'],
+    decisionMaker: 'Founders via YC directory / withaccend.com (HQ New York). Approach as an adjacent / expansion conversation.',
+    outreachAngle: 'Your "audit-ready AI" pitch is exactly the muscle Aergap strengthens. As your underwriting agents take on more decisioning, Aergap is the independent policy + audit layer your bank and fintech customers\' examiners will ask for.',
+  },
+
+  {
+    co: 'Geordie AI', site: 'https://geordie.ai', tier: 4,
+    cat: 'Agent Governance', industry: 'Security – Enterprise AI Agent Governance',
+    stage: 'Growth', fitScore: 5, priority: 'Competitive Intel',
+    desc: 'Enterprise AI governance platform — discovers, monitors, audits, and controls AI agent behavior across large organizations. RSAC 2026 Innovation Sandbox "Most Innovative Startup" winner.',
+    agentDoes: 'Agent-native security platform that automatically discovers agents running inside an enterprise, continuously analyzes their capabilities and behavior, and enforces a unified risk-assessment and policy-control framework for agent visibility, behavioral monitoring, permission management, and risk governance.',
+    highStakeActions: ['Enterprise-wide agent discovery and inventory', 'Behavioral monitoring and posture assessment', 'Permission management and risk control for agents', 'Policy enforcement across the agentic footprint'],
+    govRisk: 'Medium',
+    govReason: 'Closest direct category neighbor — an agent-governance platform overlapping Aergap\'s core. Well-funded and well-positioned; a partnership/integration conversation makes more sense than a straightforward sale.',
+    whyAergap: 'COMPETITIVE INTEL / PARTNERSHIP: Geordie governs agent visibility, behavior, and permissions at enterprise scale. Overlaps Aergap on policy control but appears observation/posture-led rather than pre-action execution-gate-led. Explore partnership angle first; differentiate Aergap on pre-action blocking and financial-workflow depth. Watch their roadmap closely.',
+    triggerSignals: ['$30M Series A led by Balderton (total ~$36.5M); RSAC 2026 Innovation Sandbox winner', '1,300% ARR growth in first five months of 2026', 'Direct category overlap with Aergap agent governance', 'Enterprise discovery + behavioral monitoring = adjacent, not identical, to execution gate'],
+    decisionMaker: 'N/A for a sales pitch — closest direct category neighbor. Explore partnership / integration first.',
+    outreachAngle: 'Competitive and partnership awareness. Geordie governs the agent footprint at the posture layer; Aergap gates the action before it happens. Understand their positioning before enterprise deals where both appear — and scope where integration beats overlap.',
+  },
+
+  {
+    co: 'Pivot', site: 'https://pivotapp.ai', tier: 2,
+    cat: 'Procurement', industry: 'Enterprise SaaS – Agentic Procurement',
+    stage: 'Growth', fitScore: 7, priority: 'Strong Prospect',
+    desc: 'AI operating system for enterprise procurement powered by agentic AI — sourcing, approvals, purchasing, invoicing, payments, budgets, and reporting in one platform. Processes ~$3B in invoices/year.',
+    agentDoes: 'Agentic AI autonomously triggers multi-step procurement workflows — e.g. routing a vendor contract for legal review, cross-checking budget headroom, and issuing a purchase order — without manual handholding, across sourcing, purchasing, invoicing, and payments.',
+    highStakeActions: ['Autonomous PO issuance against budgets', 'Vendor onboarding and contract routing', 'Invoice processing and payment workflows', 'Committed-spend tracking across the procurement lifecycle'],
+    govRisk: 'High',
+    govReason: 'Procurement agents handling vendor onboarding, PO issuance, and payments are a direct wedge match — a rogue PO, unauthorized vendor, or unchecked spend commitment is a procurement-fraud and control risk at enterprise scale ($3B invoices/year).',
+    whyAergap: 'Procurement is Aergap\'s named Tier-1 vertical and Pivot is funded enough to have real budget while still reachable at founder level. Aergap\'s execution gate on spend-committing agent actions plus an immutable audit trail is exactly what enterprise customers (DoorDash, Lemonade, Flix) will demand before letting agents commit spend.',
+    triggerSignals: ['$40M Series B (Forestay, Notion Capital); ~$70M total raised', 'Enterprise customers DoorDash, Lemonade, Flix across 25+ countries', 'Agentic workflows autonomously issue POs — direct spend-commit governance need', 'Deepening ERP / financial-system integrations'],
+    decisionMaker: 'Founders via pivotapp.ai (Paris, France) — funded enough to have real budget, still reachable at founder level.',
+    outreachAngle: 'When your agents autonomously issue a PO or onboard a vendor, enterprise procurement teams need to prove the action was within policy. Aergap is the pre-action gate and audit trail that turns agentic spend from a security-review blocker into a closer.',
+  },
+
+  {
+    co: 'ANSCER Robotics', site: 'https://anscer.com', tier: 3,
+    cat: 'Robotics', industry: 'Robotics – Warehouse / Factory Automation',
+    stage: 'Growth', fitScore: 6, priority: 'Monitor',
+    desc: 'Autonomous mobile robots and fleet-management software for factory and warehouse material movement. Expanding to US and Europe; can produce 1,000+ robots/year.',
+    agentDoes: 'AMRs autonomously move material across factory and warehouse floors, coordinated by fleet-management software with real-time monitoring, analytics, and robot-management dashboards.',
+    highStakeActions: ['Autonomous material movement in live facilities', 'Fleet-level task allocation and routing', 'Robot operation near humans and equipment', 'Fleet-wide stop / containment control'],
+    govRisk: 'Medium',
+    govReason: 'Physical autonomy on factory and warehouse floors — a malfunctioning or misrouted robot creates operational and safety risk. Fleet-level kill switch and containment map to Aergap\'s Containment pillar, but the fintech-side proof point comes first.',
+    whyAergap: 'Actively expanding to US/Europe; fleet-level kill switch and containment fit Aergap\'s Containment pillar directly. Approach once one fintech-side case study exists — the containment story for physical agents needs a proof point before it lands.',
+    triggerSignals: ['$5.4M Series A led by IAN Alpha Fund (Info Edge)', 'Expanding globally (Bengaluru HQ + Texas sales/support office)', 'Fleet management + containment = direct fit for Aergap Containment pillar', 'Manufacturing scale of 1,000+ robots/year'],
+    decisionMaker: 'Ribin Mathew, Ebin Sunny, Brijesh CA, Raj Mohan — Co-Founders (Bengaluru, India). Approach once a fintech-side case study exists.',
+    outreachAngle: 'A fleet-level kill switch is table stakes; proving every autonomous action stayed within policy is the next ask. When you\'re ready, Aergap is the containment + audit layer for physical agent fleets — best after a first reference proof point exists.',
+  },
+
+  {
+    co: 'Shifters', site: 'https://shiftersai.com', tier: 3,
+    cat: 'Robotics', industry: 'Robotics – Defense / Industrial Autonomy',
+    stage: 'Startup', fitScore: 6, priority: 'Monitor',
+    desc: 'AI-native quadruped ground robots (TRUST) and autonomy software (RITA / ARENA) for defense and industrial environments — supervised multi-robot operations under human oversight.',
+    agentDoes: 'TRUST quadruped robots execute reconnaissance, perimeter monitoring, and high-risk tasks; RITA translates operator intent into robotic tasking; ARENA coordinates navigation, sensing, and execution across robot teams — all under supervised autonomy.',
+    highStakeActions: ['Autonomous ground operations in dangerous environments', 'Operator-intent-to-action translation', 'Multi-robot coordination and execution', 'Payload-equipped task execution under human oversight'],
+    govRisk: 'Medium-High',
+    govReason: 'Physical autonomy in defense and industrial settings where mistakes have safety and mission consequences. Early enough to want safety/containment designed in before scale; supervised-autonomy posture is a governance-aware starting point.',
+    whyAergap: 'MVP-to-early product stage — good timing for a containment-by-design conversation before scale locks in architecture. Aergap\'s containment and audit layer maps to "what is each robot authorized to do, under whose supervision, on record" for supervised multi-robot operations.',
+    triggerSignals: ['$10.2M seed led by Ace Capital Partners (~$15M total)', 'Debuting product ecosystem at Eurosatory 2026', 'Supervised-autonomy + human-oversight posture = governance-aware', 'Expanding across US, Middle East, Europe'],
+    decisionMaker: 'Founders via shiftersai.com (Washington, DC; R&D near Tel Aviv, Israel). Early stage — good timing for containment-by-design.',
+    outreachAngle: 'You\'ve built supervised autonomy in from the start — Aergap is the layer that records and enforces it: which robot was authorized to do what, under whose supervision, provable after the fact. Easiest to design in now, before scale.',
+  },
+
+  {
+    co: 'Mbodi', site: 'https://mbodi.ai', tier: 3,
+    cat: 'Robotics', industry: 'Robotics – Industrial Embodied AI',
+    stage: 'Startup', fitScore: 5, priority: 'Monitor',
+    desc: 'Turns natural language into reliable robot actions for industrial automation via generative AI and agent orchestration. YC X25; commercializing with ABB.',
+    agentDoes: 'A universal agent framework lets operators teach robots new skills by talking to them, then executes those skills reliably in production — coordinating perception, reasoning, planning, and control across any robotic hardware.',
+    highStakeActions: ['Natural-language-to-robot-action execution', 'Skill learning and deployment to production robots', 'Cross-hardware perception/planning/control orchestration', 'Real-world physical task execution'],
+    govRisk: 'Medium-High',
+    govReason: 'Early-stage, real-world physical action surface with no visible governance layer yet. Translating language to robot action in industrial settings carries safety and operational risk as deployments scale.',
+    whyAergap: 'Very early stage — good for future pipeline; may be too early for a paid pilot now. Aergap becomes relevant as Mbodi\'s deployments scale (especially via the ABB partnership) and customers ask what each robot is authorized to do and how it\'s recorded. Monitor for production-deployment and enterprise-customer signals.',
+    triggerSignals: ['YC X25 batch', 'Commercialization partnership with ABB (leading robot manufacturer)', 'Language-to-action in industrial settings = physical risk surface', 'No visible governance layer yet'],
+    decisionMaker: 'Sebastian Peralta & Xavier Chi, Co-Founders (ex-Google). Very early — future pipeline, monitor for scale signals.',
+    outreachAngle: 'As you roll out with ABB, customers will ask what each robot is allowed to do and how that\'s proven. Aergap is the policy + audit layer for embodied agents — worth keeping on your radar as deployments move into production.',
+  },
+
+  {
+    co: 'Boost Robotics', site: 'https://boostrobotics.ai', tier: 3,
+    cat: 'Robotics', industry: 'Robotics – Data Center Operations',
+    stage: 'Startup', fitScore: 5, priority: 'Monitor',
+    desc: 'Autonomous mobile manipulation robots performing remote "robot remote hands" tasks — inspection, reboots, cable checks, and hardware swaps — in data centers, plus 24/7 security monitoring.',
+    agentDoes: 'Robots physically interact with data-center infrastructure to triage and resolve issues (cable checks, reboots, hardware swaps) and, between interventions, provide continuous security monitoring and operational analytics.',
+    highStakeActions: ['Physical intervention on live data-center hardware', 'Reboots and hardware swaps on production infrastructure', 'Autonomous navigation in critical facilities', 'Continuous security monitoring'],
+    govRisk: 'Medium-High',
+    govReason: 'Early-stage with real-world physical risk and no visible governance layer yet. A wrong reboot, cable action, or hardware swap on live data-center infrastructure can cause outages or data loss.',
+    whyAergap: 'Good for future pipeline once the core fintech wedge is proven. Aergap\'s containment and audit layer maps to "which robot performed which physical intervention on which rack, under what authorization" — relevant as Boost\'s deployments scale into production data centers.',
+    triggerSignals: ['YC X25 batch (San Francisco, founded 2025)', 'Physical intervention on live data-center infrastructure = high blast radius', 'No visible governance layer yet', 'Watch for enterprise / hyperscaler data-center deployments'],
+    decisionMaker: 'Founders via boostrobotics.ai (founders@boostrobotics.ai). Future pipeline — revisit once the core fintech wedge is proven.',
+    outreachAngle: 'A robot rebooting the wrong rack is an outage. As Boost scales into production data centers, Aergap is the containment and audit layer that proves which robot was authorized to touch which hardware — worth a conversation when enterprise deployments ramp.',
   },
 ]

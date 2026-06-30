@@ -246,6 +246,10 @@ export default function FollowUpNotifications() {
     setDismissed(prev => new Set([...prev, id]))
   }
 
+  const dismissAll = () => {
+    setDismissed(prev => new Set([...prev, ...leads.map(l => l.id)]))
+  }
+
   const reschedule = async (id: string, days: number) => {
     const lead = leads.find(l => l.id === id)
     if (!lead) return
@@ -313,6 +317,22 @@ export default function FollowUpNotifications() {
       // hide scrollbar but keep scrollability
       msOverflowStyle: 'none',
     } as React.CSSProperties}>
+      {/* ── header: hide all ── */}
+      <div style={{ width: 330, display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          onClick={dismissAll}
+          title="Hide all overdue follow-ups until next page load"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '5px 11px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+            background: 'rgba(20,21,35,0.95)', border: '1px solid rgba(255,255,255,0.1)',
+            color: 'rgb(160,165,200)', cursor: 'pointer', fontFamily: 'inherit',
+            backdropFilter: 'blur(20px)',
+          }}
+        >
+          <X size={12} /> Hide all
+        </button>
+      </div>
       {visible.slice(0, 5).map(lead => (
         <NotifCard
           key={lead.id}
