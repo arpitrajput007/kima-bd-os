@@ -9,8 +9,9 @@ import {
   Zap, Hash, AlignLeft, AtSign, MessageCircle, X,
   Bookmark, BookmarkCheck, Trash2, ChevronDown, ChevronUp,
   Clock, CheckCircle2, Filter, History, RotateCcw, GalleryHorizontalEnd,
-  Brain, Send, Plus, MessageSquare,
+  Brain, Send, Plus, MessageSquare, Lightbulb,
 } from 'lucide-react'
+import ReactionMode from '@/components/ReactionMode'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface ContentPost { id: string; text: string }
@@ -26,7 +27,7 @@ interface ContentResult {
   linkedin: ContentPost[]
 }
 type TabKey     = 'tweets' | 'thread' | 'linkedin'
-type PageView   = 'create' | 'saved' | 'sessions' | 'media'
+type PageView   = 'create' | 'saved' | 'sessions' | 'media' | 'reaction'
 type PostType   = 'tweet' | 'linkedin' | 'thread_tweet'
 type DraftStatus = 'saved' | 'posted'
 type FilterType  = 'all' | 'tweet' | 'linkedin' | 'thread_tweet'
@@ -970,13 +971,14 @@ export default function ContentStudioPage() {
         {/* Top-level view switcher */}
         <div style={{ display: 'flex', gap: 4, padding: '3px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
           {([
-            { key: 'create',   label: 'Create' },
+            { key: 'reaction', label: 'Reaction', icon: true },
+            { key: 'create',   label: 'Aergap Create' },
             { key: 'saved',    label: `Saved Drafts${savedCount > 0 ? ` (${savedCount})` : ''}` },
             { key: 'sessions', label: `Sessions${sessions.length > 0 ? ` (${sessions.length})` : ''}` },
             { key: 'media',    label: `Media${media.length > 0 ? ` (${media.length})` : ''}` },
-          ] as { key: PageView; label: string }[]).map(({ key, label }) => (
-            <button key={key} onClick={() => setView(key)} style={{ padding: '5px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: view === key ? 'rgba(255,255,255,0.08)' : 'none', color: view === key ? 'white' : 'rgba(255,255,255,0.35)', transition: 'all 0.15s' }}>
-              {label}
+          ] as { key: PageView; label: string; icon?: boolean }[]).map(({ key, label, icon }) => (
+            <button key={key} onClick={() => setView(key)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: key === 'reaction' && view !== 'reaction' ? '1px solid rgba(96,165,250,0.2)' : 'none', background: view === key ? (key === 'reaction' ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.08)') : 'none', color: view === key ? (key === 'reaction' ? '#60a5fa' : 'white') : key === 'reaction' ? 'rgba(96,165,250,0.6)' : 'rgba(255,255,255,0.35)', transition: 'all 0.15s' }}>
+              {icon && <Lightbulb size={11} />}{label}
             </button>
           ))}
         </div>
@@ -1314,6 +1316,11 @@ export default function ContentStudioPage() {
           )}
         </div>
       )}
+
+      {/* ════════════════════════════════════════════════════════
+          REACTION STUDIO VIEW
+      ════════════════════════════════════════════════════════ */}
+      {view === 'reaction' && <ReactionMode />}
 
       {/* ════════════════════════════════════════════════════════
           MEDIA GALLERY VIEW

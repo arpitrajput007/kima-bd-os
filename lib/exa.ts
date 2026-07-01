@@ -141,6 +141,54 @@ export async function exaFindPeople(
   }
 }
 
+// Search for recent news across multiple topic queries — used by Reaction Content Studio.
+// Runs all queries in parallel (Promise.allSettled), dedupes by URL, returns structured items.
+export async function exaNewsTopics(
+  queries: Array<{ topic: string; query: string }>,
+  daysBack = 7,
+  perQuery = 5
+): Promise<Array<{ topic: string; title: string; url: string; summary: string; publishedDate?: string }>> {
+  if (!exaConfigured()) return []
+  const since = new Date(Date.now() - daysBack * 86400000).toISOString().split('T')[0]
+  const exa = client()
+
+  const results = await Promise.allSettled(
+    queries.map(({ topic, query }) =>
+      exa.search(query, {
+        type: 'auto',
+        numResults: perQuery,
+        category: 'news',
+        startPublishedDate: since,
+        contents: { highlights: { numSentences: 2, highlightsPerUrl: 1 } as unknown as true },
+      } as Parameters<typeof exa.search>[1]).then(res => ({ topic, results: res.results || [] }))
+    )
+  )
+
+  const seen = new Set<string>()
+  const items: Array<{ topic: string; title: string; url: string; summary: string; publishedDate?: string }> = []
+
+  for (const r of results) {
+    if (r.status !== 'fulfilled') continue
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const item of r.value.results as any[]) {
+      if (!item.url || !item.title || seen.has(item.url)) continue
+      seen.add(item.url)
+      const summary = Array.isArray(item.highlights)
+        ? (item.highlights as string[]).join(' ')
+        : (item.text || '').slice(0, 300)
+      items.push({
+        topic: r.value.topic,
+        title: item.title as string,
+        url: item.url as string,
+        summary,
+        publishedDate: item.publishedDate as string | undefined,
+      })
+    }
+  }
+
+  return items
+}
+
 // Get full page content for known URLs (enrichment, not search).
 // On /contents, highlights/text are top-level (not nested in contents).
 export async function exaGetContents(urls: string[]): Promise<ExaResult[]> {

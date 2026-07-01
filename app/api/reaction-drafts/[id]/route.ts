@@ -1,0 +1,47 @@
+// PATCH  /api/reaction-drafts/[id] — update status (saved → posted)
+// DELETE /api/reaction-drafts/[id] — delete a draft
+
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+
+function db() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  const body = await req.json()
+  const update: Record<string, unknown> = {}
+  if (body.status !== undefined) update.status = body.status
+  if (body.status === 'posted')  update.posted_at = new Date().toISOString()
+
+  const { data, error } = await db()
+    .from('reaction_drafts')
+    .update(update)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ draft: data })
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  const { error } = await db()
+    .from('reaction_drafts')
+    .delete()
+    .eq('id', id)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ success: true })
+}
