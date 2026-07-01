@@ -31,6 +31,7 @@ import {
   FileDown,
   Clock,
   CalendarClock,
+  Lightbulb,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
@@ -71,6 +72,7 @@ const navGroups: {
     label: 'Reports',
     items: [
       { href: '/monthly-reports',   label: 'Monthly Performance',  icon: CalendarClock, glow: true },
+      { href: '/product-demand',   label: 'Product Demand',       icon: Lightbulb, glow: true },
       { href: '/export-reports',   label: 'Export Reports',       icon: FileDown },
       { href: '/reports',          label: 'Weekly Learning',      icon: BarChart3 },
     ],

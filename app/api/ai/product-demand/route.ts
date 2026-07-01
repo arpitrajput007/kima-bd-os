@@ -12,8 +12,8 @@
 import { NextResponse } from 'next/server'
 import { claudeJSON, CLAUDE_RESEARCH } from '@/lib/claude'
 import { createClient } from '@/lib/supabase/server'
-import { PRODUCT_DEMAND_CATEGORIES, blockerLabel } from '@/lib/monthly-reports-types'
-import type { MonthlyDeal } from '@/lib/monthly-reports-types'
+import { PRODUCT_DEMAND_CATEGORIES, blockerLabel, parseUsdMonthly } from '@/lib/monthly-reports-types'
+import type { MonthlyDeal, ProductDemandClient } from '@/lib/monthly-reports-types'
 
 interface DemandCluster {
   title: string
@@ -22,18 +22,35 @@ interface DemandCluster {
   companies: string[]
 }
 
+type DealRow = Pick<MonthlyDeal,
+  'id' | 'company_name' | 'product_feedback' | 'blockers' |
+  'expected_monthly_volume' | 'expected_yearly_volume' | 'estimated_revenue' | 'strategic_importance'
+>
+
+function clientDetailFor(deal: DealRow): ProductDemandClient {
+  const monthlyUsd = parseUsdMonthly(deal.expected_monthly_volume) ?? parseUsdMonthly(deal.expected_yearly_volume)
+  return {
+    company: deal.company_name,
+    deal_id: deal.id,
+    monthly_volume: deal.expected_monthly_volume || deal.expected_yearly_volume || undefined,
+    estimated_revenue: deal.estimated_revenue || undefined,
+    strategic_importance: deal.strategic_importance || undefined,
+    monthly_volume_usd: monthlyUsd,
+  }
+}
+
 export async function POST() {
   const supabase = await createClient()
 
   const { data: dealsData, error: dealsError } = await supabase
     .from('monthly_deals')
-    .select('id,company_name,product_feedback,blockers')
+    .select('id,company_name,product_feedback,blockers,expected_monthly_volume,expected_yearly_volume,estimated_revenue,strategic_importance')
 
   if (dealsError?.message?.includes('does not exist')) {
     return NextResponse.json({ error: 'Monthly deals table not set up yet.' }, { status: 400 })
   }
 
-  const deals = (dealsData || []) as Pick<MonthlyDeal, 'id' | 'company_name' | 'product_feedback' | 'blockers'>[]
+  const deals = (dealsData || []) as DealRow[]
 
   // Collect raw feedback snippets, tagged with which company said it.
   const snippets: { company: string; text: string }[] = []
@@ -86,20 +103,31 @@ Cluster these into distinct feature/product gaps. Return JSON:
 
   const { data: existingRows } = await supabase
     .from('product_feature_demand')
-    .select('id,title,description,category,companies,mention_count')
+    .select('id,title,description,category,companies,mention_count,client_details')
 
   const existing = existingRows || []
   const now = new Date().toISOString()
+  const dealsByCompany = new Map(deals.map(d => [d.company_name.trim().toLowerCase(), d]))
 
   for (const cluster of clusters) {
     const match = existing.find(e => e.title.trim().toLowerCase() === cluster.title.trim().toLowerCase())
     const companies = Array.from(new Set(cluster.companies))
+    // Always rebuild client_details for this cluster's companies from live deal data,
+    // so volume/revenue reflect the latest figures on the deal, not a stale snapshot.
+    const freshDetails = companies
+      .map(c => dealsByCompany.get(c.trim().toLowerCase()))
+      .filter((d): d is DealRow => !!d)
+      .map(clientDetailFor)
 
     if (match) {
       const mergedCompanies = Array.from(new Set([...(match.companies || []), ...companies]))
+      const existingDetails = ((match.client_details || []) as ProductDemandClient[])
+        .filter(cd => !companies.some(c => c.trim().toLowerCase() === cd.company.trim().toLowerCase()))
+      const mergedDetails = [...existingDetails, ...freshDetails]
       await supabase.from('product_feature_demand').update({
         description: cluster.description || match.description,
         companies: mergedCompanies,
+        client_details: mergedDetails,
         mention_count: mergedCompanies.length,
         last_seen: now,
       }).eq('id', match.id)
@@ -109,6 +137,7 @@ Cluster these into distinct feature/product gaps. Return JSON:
         description: cluster.description,
         category: cluster.category,
         companies,
+        client_details: freshDetails,
         mention_count: companies.length || 1,
         status: 'open',
         first_seen: now,

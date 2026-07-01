@@ -8,7 +8,7 @@ import {
   Plus, Search, Download, FileText, TrendingUp, Users,
   Trophy, XCircle, Calendar, BarChart2, Loader2, RefreshCw,
   Building2, ChevronDown, AlertCircle, Send, Reply, Sparkles,
-  Zap, Settings2, Target, DollarSign, Lightbulb, CheckCircle2,
+  Zap, Settings2, Target, DollarSign,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -16,9 +16,9 @@ import {
 import {
   DEAL_STATUSES, OUTREACH_CHANNELS, LEAD_TYPES,
   dealStatusMeta, fmtMonthYear, fmtMonthShort, currentMonthYear, last12Months,
-  blockerLabel, productDemandStatusMeta, productDemandCategoryLabel,
+  blockerLabel,
 } from '@/lib/monthly-reports-types'
-import type { MonthlyDeal, DealActivity, ProductFeatureDemand } from '@/lib/monthly-reports-types'
+import type { MonthlyDeal, DealActivity } from '@/lib/monthly-reports-types'
 import { getOutreachStats, EMPTY_OUTREACH_STATS } from '@/lib/monthly-outreach-stats'
 import type { OutreachStats } from '@/lib/monthly-outreach-stats'
 import { KpiCard, MiniBar, SectionHeader } from '@/components/monthly-reports/ui'
@@ -292,22 +292,9 @@ export default function MonthlyReportsPage() {
   const [outreachStats, setOutreachStats] = useState<OutreachStats>(EMPTY_OUTREACH_STATS)
   const [narrative, setNarrative]       = useState('')
   const [generatingNarrative, setGeneratingNarrative] = useState(false)
-  const [productDemand, setProductDemand]           = useState<ProductFeatureDemand[]>([])
-  const [demandSetupNeeded, setDemandSetupNeeded]   = useState(false)
-  const [analyzingDemand, setAnalyzingDemand]       = useState(false)
   const exportRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { setMounted(true) }, [])
-
-  const loadProductDemand = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('product_feature_demand')
-      .select('*')
-      .order('mention_count', { ascending: false })
-    if (error?.message?.includes('does not exist')) { setDemandSetupNeeded(true); return }
-    setDemandSetupNeeded(false)
-    setProductDemand((data || []) as ProductFeatureDemand[])
-  }, [supabase])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -339,27 +326,6 @@ export default function MonthlyReportsPage() {
   }, [month, supabase])
 
   useEffect(() => { load() }, [load])
-  useEffect(() => { loadProductDemand() }, [loadProductDemand])
-
-  async function analyzeProductDemand() {
-    setAnalyzingDemand(true)
-    try {
-      const res = await fetch('/api/ai/product-demand', { method: 'POST' })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || 'Failed to analyze feedback')
-      if (json.items) setProductDemand(json.items as ProductFeatureDemand[])
-      toast.success(json.message || `Backlog updated — ${json.items?.length ?? 0} item(s)`)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to analyze feedback')
-    } finally {
-      setAnalyzingDemand(false)
-    }
-  }
-
-  async function updateDemandStatus(id: string, status: string) {
-    setProductDemand(prev => prev.map(p => p.id === id ? { ...p, status: status as ProductFeatureDemand['status'] } : p))
-    await supabase.from('product_feature_demand').update({ status }).eq('id', id)
-  }
 
   // Close export dropdown on outside click
   useEffect(() => {
@@ -670,88 +636,6 @@ export default function MonthlyReportsPage() {
                   <p className="text-xs" style={{ color: 'rgb(100,106,135)' }}>
                     Generate an AI-written narrative covering activity, pipeline health, opportunities, and product insights for {fmtMonthYear(month)}.
                   </p>
-                )}
-              </div>
-            </div>
-
-            {/* ── Section 4.5: Product / Feature Demand ──────── */}
-            <div className="section-card">
-              <SectionHeader
-                icon={Lightbulb} iconColor="#fbbf24"
-                title="Product / Feature Demand"
-                subtitle="What prospects say we're missing — clustered from deal feedback &amp; blockers across all deals"
-                right={
-                  <button onClick={analyzeProductDemand} disabled={analyzingDemand} className="btn btn-ai" style={{ fontSize: '11px', gap: '6px' }}>
-                    {analyzingDemand ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
-                    {productDemand.length ? 'Re-analyze Feedback' : 'Analyze Feedback'}
-                  </button>
-                }
-              />
-              <div style={{ padding: '18px 22px' }}>
-                {demandSetupNeeded ? (
-                  <div className="rounded-xl p-4 flex gap-3" style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)' }}>
-                    <AlertCircle size={16} style={{ color: '#fbbf24', flexShrink: 0, marginTop: 1 }} />
-                    <p className="text-xs" style={{ color: 'rgb(180,170,120)' }}>
-                      Run <code className="px-1 py-0.5 rounded text-[11px]" style={{ background: 'rgba(255,255,255,0.07)' }}>supabase/add-product-feature-demand.sql</code> in your Supabase SQL editor to enable this section.
-                    </p>
-                  </div>
-                ) : productDemand.length === 0 ? (
-                  <p className="text-xs" style={{ color: 'rgb(100,106,135)' }}>
-                    Click &ldquo;Analyze Feedback&rdquo; to have AI read the Product Feedback and Blockers collected across every tracked deal, cluster them into distinct gaps, and build a running backlog here — so it&apos;s always clear what to improve next.
-                  </p>
-                ) : (
-                  <div className="space-y-2.5">
-                    {productDemand.map(item => {
-                      return (
-                        <div key={item.id} className="rounded-xl p-3.5" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                          <div className="flex items-start justify-between gap-3 mb-1.5">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-semibold text-white">{item.title}</span>
-                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ background: 'rgba(167,139,250,0.12)', color: '#a78bfa' }}>
-                                {productDemandCategoryLabel(item.category)}
-                              </span>
-                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgb(150,150,180)' }}>
-                                {item.mention_count}× mentioned
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              {(['open','planned','shipped','wont_fix'] as const).map(s => {
-                                const m = productDemandStatusMeta(s)
-                                const active = item.status === s
-                                return (
-                                  <button
-                                    key={s}
-                                    type="button"
-                                    onClick={() => updateDemandStatus(item.id, s)}
-                                    className="px-2 py-1 rounded-md text-[10px] font-medium transition-all"
-                                    style={active
-                                      ? { background: m.bg, border: `1px solid ${m.color}50`, color: m.color }
-                                      : { background: 'transparent', border: '1px solid rgba(255,255,255,0.07)', color: 'rgb(100,106,135)' }
-                                    }
-                                  >
-                                    {active && <CheckCircle2 size={9} className="inline mr-0.5" style={{ marginBottom: 1 }} />}
-                                    {m.label}
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          </div>
-                          {item.description && (
-                            <p className="text-xs mb-2" style={{ color: 'rgb(160,165,195)', lineHeight: 1.5 }}>{item.description}</p>
-                          )}
-                          {item.companies?.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {item.companies.map(c => (
-                                <span key={c} className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.04)', color: 'rgb(120,125,155)' }}>
-                                  {c}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
                 )}
               </div>
             </div>

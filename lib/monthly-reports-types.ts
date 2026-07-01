@@ -101,6 +101,15 @@ export interface DealBlocker {
   resolved: boolean
 }
 
+export interface ProductDemandClient {
+  company: string
+  deal_id?: string
+  monthly_volume?: string       // raw text, e.g. "$2M/month" — as entered on the deal
+  estimated_revenue?: string    // raw text, e.g. "$200K/year"
+  strategic_importance?: string
+  monthly_volume_usd?: number | null   // best-effort parsed monthly USD estimate
+}
+
 export interface ProductFeatureDemand {
   id: string
   title: string
@@ -108,6 +117,7 @@ export interface ProductFeatureDemand {
   category: ProductDemandCategory | string
   mention_count: number
   companies: string[]
+  client_details: ProductDemandClient[]
   status: ProductDemandStatus
   first_seen: string
   last_seen: string
@@ -199,6 +209,35 @@ export function productDemandStatusMeta(status: string) {
 
 export function productDemandCategoryLabel(category: string): string {
   return PRODUCT_DEMAND_CATEGORIES.find(c => c.value === category)?.label ?? category.replace(/_/g, ' ')
+}
+
+// Best-effort extraction of a monthly USD figure out of free-text volume/revenue
+// fields like "$2M/month", "$24M/year", "$500K", "2.5M". Returns null when the
+// text has no parseable amount — callers should treat the result as directional,
+// not authoritative (source data is a free-text field, not a structured number).
+export function parseUsdMonthly(text?: string | null): number | null {
+  if (!text) return null
+  const match = text.match(/([\d,]+(?:\.\d+)?)\s*([kmb])?/i)
+  if (!match) return null
+  const amount = parseFloat(match[1].replace(/,/g, ''))
+  if (!Number.isFinite(amount)) return null
+  const suffix = match[2]?.toLowerCase()
+  const multiplier = suffix === 'k' ? 1_000 : suffix === 'm' ? 1_000_000 : suffix === 'b' ? 1_000_000_000 : 1
+  let usd = amount * multiplier
+  if (/year|yr|annum|\/yr|\/y\b/i.test(text)) usd = usd / 12
+  return usd
+}
+
+export function fmtUsdCompact(n: number): string {
+  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(1).replace(/\.0$/, '')}B`
+  if (n >= 1_000_000)     return `$${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+  if (n >= 1_000)         return `$${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`
+  return `$${Math.round(n)}`
+}
+
+export function sumClientMonthlyVolume(clients: ProductDemandClient[]): { total: number; parsedCount: number } {
+  const parsed = clients.map(c => c.monthly_volume_usd).filter((v): v is number => v != null && v > 0)
+  return { total: parsed.reduce((a, b) => a + b, 0), parsedCount: parsed.length }
 }
 
 export function fmtMonthYear(my: string): string {
