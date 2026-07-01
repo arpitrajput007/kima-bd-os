@@ -26,6 +26,11 @@ export default function NewDealPage() {
           products_proposed:   data.products_proposed,
           product_feedback:    data.product_feedback,
           blockers:            data.blockers,
+          // "" is not a valid Postgres `date` — an unset close date must be null.
+          expected_close_date: data.expected_close_date || null,
+          // Nothing on this form is required — company_name is NOT NULL in the
+          // DB, so fall back to a placeholder rather than blocking the save.
+          company_name: data.company_name.trim() || 'Untitled Deal',
         })
         .select('id')
         .single()
@@ -34,7 +39,7 @@ export default function NewDealPage() {
       toast.success('Deal added successfully')
       router.push(`/monthly-reports/${created.id}`)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to save deal'
+      const msg = err instanceof Error ? err.message : (err as { message?: string })?.message || 'Failed to save deal'
       toast.error(msg)
       setSaving(false)
     }

@@ -60,7 +60,14 @@ export default function DealDetailPage() {
 
   async function handleSave(data: DealFormData) {
     setSaving(true)
-    const { error } = await supabase.from('monthly_deals').update(data).eq('id', params.id)
+    const { error } = await supabase.from('monthly_deals').update({
+      ...data,
+      // "" is not a valid Postgres `date` — an unset close date must be null.
+      expected_close_date: data.expected_close_date || null,
+      // Nothing on this form is required — company_name is NOT NULL in the
+      // DB, so fall back to a placeholder rather than blocking the save.
+      company_name: data.company_name.trim() || 'Untitled Deal',
+    }).eq('id', params.id)
     if (error) {
       toast.error(error.message)
       setSaving(false)

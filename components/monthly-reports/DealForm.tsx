@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { Loader2, ChevronDown, ChevronUp, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -69,8 +69,27 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn('input-dark', props.className)} />
 }
 
+// Grows with content so a long sentence is never stuck scrolling inside a
+// cramped fixed-height box — still manually resizable via the drag handle.
 function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} rows={props.rows ?? 3} className={cn('input-dark', props.className)} style={{ resize: 'vertical', ...props.style }} />
+  const ref = useRef<HTMLTextAreaElement | null>(null)
+
+  const autoGrow = useCallback((el: HTMLTextAreaElement | null) => {
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [])
+
+  return (
+    <textarea
+      {...props}
+      ref={el => { ref.current = el; autoGrow(el) }}
+      rows={props.rows ?? 3}
+      className={cn('input-dark', props.className)}
+      style={{ resize: 'vertical', overflow: 'hidden', minHeight: '2.6em', ...props.style }}
+      onInput={e => { autoGrow(e.currentTarget); props.onInput?.(e) }}
+    />
+  )
 }
 
 function Select({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
@@ -213,7 +232,6 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.company_name.trim()) return
     onSave(form)
   }
 
@@ -225,12 +243,11 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
       {/* ── 1. Company Information ─────────────────────── */}
       <SectionCard title="Company Information">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Company Name" required>
+          <Field label="Company Name">
             <Input
               value={form.company_name}
               onChange={e => set('company_name', e.target.value)}
               placeholder="e.g. Stripe, Binance, Coinbase"
-              required
             />
           </Field>
           <Field label="Individual Name">
@@ -344,7 +361,7 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
             <Textarea value={form.why_valuable} onChange={e => set('why_valuable', e.target.value)} placeholder="Network effects, brand value, market access, reference customer…" />
           </Field>
           <Field label="Which Kima / Aergap product fits best?">
-            <Input value={form.best_product_fit} onChange={e => set('best_product_fit', e.target.value)} placeholder="e.g. Aergap cross-chain settlement" />
+            <Textarea rows={2} value={form.best_product_fit} onChange={e => set('best_product_fit', e.target.value)} placeholder="e.g. Aergap cross-chain settlement" />
           </Field>
           <Field label="Long-term strategic value">
             <Textarea value={form.long_term_value} onChange={e => set('long_term_value', e.target.value)} placeholder="Partnership, ecosystem growth, data, integrations…" />
@@ -439,7 +456,8 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
                       <X size={12} />
                     </button>
                   </div>
-                  <Input
+                  <Textarea
+                    rows={2}
                     value={bl.notes || ''}
                     onChange={e => {
                       const updated = [...form.blockers]
@@ -477,7 +495,7 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
             <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: statusMeta.color }} />
             {statusMeta.label}
           </div>
-          <button type="submit" disabled={saving || !form.company_name.trim()} className="btn btn-ai" style={{ fontSize: '13px' }}>
+          <button type="submit" disabled={saving} className="btn btn-ai" style={{ fontSize: '13px' }}>
             {saving ? <><Loader2 size={13} className="animate-spin" />Saving…</> : 'Save Deal'}
           </button>
         </div>
