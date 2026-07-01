@@ -5,7 +5,7 @@ import { Loader2, ChevronDown, ChevronUp, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   DEAL_STATUSES, LEAD_TYPES, OUTREACH_CHANNELS,
-  BLOCKER_TYPES, KIMA_PRODUCTS, dealStatusMeta,
+  BLOCKER_TYPES, KIMA_PRODUCTS, dealStatusMeta, blockerLabel,
 } from '@/lib/monthly-reports-types'
 import type { MonthlyDeal, DealBlocker, DealProductFeedback } from '@/lib/monthly-reports-types'
 
@@ -194,6 +194,21 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
     } else {
       set('blockers', [...form.blockers, { type, notes: '', resolved: false }])
     }
+  }
+
+  const [customBlockerInput, setCustomBlockerInput] = useState('')
+
+  const addCustomBlocker = () => {
+    const label = customBlockerInput.trim()
+    if (!label) return
+    const slug = 'custom_' + label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+    if (!slug || form.blockers.some(b => b.type === slug)) { setCustomBlockerInput(''); return }
+    set('blockers', [...form.blockers, { type: slug, label, notes: '', resolved: false }])
+    setCustomBlockerInput('')
+  }
+
+  const removeBlocker = (type: string) => {
+    set('blockers', form.blockers.filter(b => b.type !== type))
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -388,25 +403,53 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
               )
             })}
           </div>
+
+          {/* Custom blocker input */}
+          <div className="flex items-center gap-2">
+            <Input
+              value={customBlockerInput}
+              onChange={e => setCustomBlockerInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomBlocker() } }}
+              placeholder="Other blocker — type your own and press Enter…"
+              className="flex-1"
+            />
+            <button
+              type="button"
+              onClick={addCustomBlocker}
+              disabled={!customBlockerInput.trim()}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex-shrink-0"
+              style={{ background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.35)', color: '#a78bfa', opacity: customBlockerInput.trim() ? 1 : 0.5 }}
+            >
+              + Add
+            </button>
+          </div>
+
           {form.blockers.length > 0 && (
             <div className="space-y-2 mt-3">
-              {form.blockers.map((bl, i) => {
-                const meta = BLOCKER_TYPES.find(b => b.value === bl.type)
-                return (
-                  <div key={bl.type} className="rounded-lg p-3" style={{ background: 'rgba(248,113,113,0.05)', border: '1px solid rgba(248,113,113,0.12)' }}>
-                    <div className="text-xs font-medium mb-1.5" style={{ color: '#f87171' }}>{meta?.label}</div>
-                    <Input
-                      value={bl.notes || ''}
-                      onChange={e => {
-                        const updated = [...form.blockers]
-                        updated[i] = { ...updated[i], notes: e.target.value }
-                        set('blockers', updated)
-                      }}
-                      placeholder="Notes on this blocker…"
-                    />
+              {form.blockers.map((bl, i) => (
+                <div key={bl.type} className="rounded-lg p-3" style={{ background: 'rgba(248,113,113,0.05)', border: '1px solid rgba(248,113,113,0.12)' }}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="text-xs font-medium" style={{ color: '#f87171' }}>{blockerLabel(bl)}</div>
+                    <button
+                      type="button"
+                      onClick={() => removeBlocker(bl.type)}
+                      className="flex items-center justify-center rounded"
+                      style={{ color: 'rgb(140,140,170)', width: 18, height: 18 }}
+                    >
+                      <X size={12} />
+                    </button>
                   </div>
-                )
-              })}
+                  <Input
+                    value={bl.notes || ''}
+                    onChange={e => {
+                      const updated = [...form.blockers]
+                      updated[i] = { ...updated[i], notes: e.target.value }
+                      set('blockers', updated)
+                    }}
+                    placeholder="Notes on this blocker…"
+                  />
+                </div>
+              ))}
             </div>
           )}
         </div>

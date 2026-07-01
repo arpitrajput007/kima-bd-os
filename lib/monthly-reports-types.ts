@@ -69,16 +69,50 @@ export const KIMA_PRODUCTS = [
   'Cross-border USDT/USDC settlement',
 ] as const
 
-export type DealStatus           = (typeof DEAL_STATUSES)[number]['value']
-export type LeadType             = (typeof LEAD_TYPES)[number]
-export type OutreachChannelValue = (typeof OUTREACH_CHANNELS)[number]['value']
-export type BlockerTypeValue     = (typeof BLOCKER_TYPES)[number]['value']
-export type ActivityTypeValue    = (typeof ACTIVITY_TYPES)[number]['value']
+export const PRODUCT_DEMAND_CATEGORIES = [
+  { value: 'feature_requested',        label: 'Feature Request'        },
+  { value: 'missing_functionality',    label: 'Missing Functionality'  },
+  { value: 'product_gaps',             label: 'Product Gap'            },
+  { value: 'integration_requested',    label: 'Integration'            },
+  { value: 'api_requirements',         label: 'API Requirement'        },
+  { value: 'compliance_requirements',  label: 'Compliance'             },
+  { value: 'technical_blockers',       label: 'Technical Blocker'      },
+] as const
+
+export const PRODUCT_DEMAND_STATUSES = [
+  { value: 'open',     label: 'Open',      color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
+  { value: 'planned',  label: 'Planned',   color: '#fbbf24', bg: 'rgba(251,191,36,0.12)'  },
+  { value: 'shipped',  label: 'Shipped',   color: '#34d399', bg: 'rgba(52,211,153,0.12)'  },
+  { value: 'wont_fix', label: "Won't Fix", color: '#6b7280', bg: 'rgba(107,114,128,0.12)' },
+] as const
+
+export type DealStatus            = (typeof DEAL_STATUSES)[number]['value']
+export type LeadType              = (typeof LEAD_TYPES)[number]
+export type OutreachChannelValue  = (typeof OUTREACH_CHANNELS)[number]['value']
+export type BlockerTypeValue      = (typeof BLOCKER_TYPES)[number]['value']
+export type ActivityTypeValue     = (typeof ACTIVITY_TYPES)[number]['value']
+export type ProductDemandCategory = (typeof PRODUCT_DEMAND_CATEGORIES)[number]['value']
+export type ProductDemandStatus   = (typeof PRODUCT_DEMAND_STATUSES)[number]['value']
 
 export interface DealBlocker {
-  type: BlockerTypeValue
+  type: string          // one of BLOCKER_TYPES values, or a custom slug
+  label?: string         // display label for custom blockers (not in BLOCKER_TYPES)
   notes?: string
   resolved: boolean
+}
+
+export interface ProductFeatureDemand {
+  id: string
+  title: string
+  description?: string
+  category: ProductDemandCategory | string
+  mention_count: number
+  companies: string[]
+  status: ProductDemandStatus
+  first_seen: string
+  last_seen: string
+  created_at: string
+  updated_at: string
 }
 
 export interface DealProductFeedback {
@@ -150,6 +184,21 @@ export interface DealActivity {
 
 export function dealStatusMeta(status: DealStatus) {
   return DEAL_STATUSES.find(s => s.value === status) ?? DEAL_STATUSES[0]
+}
+
+export function blockerLabel(b: DealBlocker): string {
+  const meta = BLOCKER_TYPES.find(t => t.value === b.type)
+  if (meta) return meta.label
+  if (b.label) return b.label
+  return b.type.replace(/^custom_/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+export function productDemandStatusMeta(status: string) {
+  return PRODUCT_DEMAND_STATUSES.find(s => s.value === status) ?? PRODUCT_DEMAND_STATUSES[0]
+}
+
+export function productDemandCategoryLabel(category: string): string {
+  return PRODUCT_DEMAND_CATEGORIES.find(c => c.value === category)?.label ?? category.replace(/_/g, ' ')
 }
 
 export function fmtMonthYear(my: string): string {

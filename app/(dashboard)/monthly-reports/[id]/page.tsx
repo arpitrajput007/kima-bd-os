@@ -13,7 +13,7 @@ import DealForm from '@/components/monthly-reports/DealForm'
 import type { DealFormData } from '@/components/monthly-reports/DealForm'
 import ActivityTimeline from '@/components/monthly-reports/ActivityTimeline'
 import type { NewActivityInput } from '@/components/monthly-reports/ActivityTimeline'
-import { dealStatusMeta, fmtMonthYear } from '@/lib/monthly-reports-types'
+import { dealStatusMeta, fmtMonthYear, blockerLabel } from '@/lib/monthly-reports-types'
 import type { MonthlyDeal, DealActivity } from '@/lib/monthly-reports-types'
 import { SectionHeader } from '@/components/monthly-reports/ui'
 
@@ -248,7 +248,7 @@ export default function DealDetailPage() {
               <div className="space-y-1.5" style={{ padding: '14px 20px' }}>
                 {deal.blockers.map(b => (
                   <div key={b.type} className="text-xs" style={{ color: b.resolved ? 'rgb(100,106,135)' : '#f87171', textDecoration: b.resolved ? 'line-through' : 'none' }}>
-                    {b.type.replace(/_/g, ' ')}{b.notes ? ` — ${b.notes}` : ''}
+                    {blockerLabel(b)}{b.notes ? ` — ${b.notes}` : ''}
                   </div>
                 ))}
               </div>

@@ -8,7 +8,7 @@ import {
   Plus, Search, Download, FileText, TrendingUp, Users,
   Trophy, XCircle, Calendar, BarChart2, Loader2, RefreshCw,
   Building2, ChevronDown, AlertCircle, Send, Reply, Sparkles,
-  Zap, Settings2, Target, DollarSign,
+  Zap, Settings2, Target, DollarSign, Lightbulb, CheckCircle2,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -16,8 +16,9 @@ import {
 import {
   DEAL_STATUSES, OUTREACH_CHANNELS, LEAD_TYPES,
   dealStatusMeta, fmtMonthYear, fmtMonthShort, currentMonthYear, last12Months,
+  blockerLabel, productDemandStatusMeta, productDemandCategoryLabel,
 } from '@/lib/monthly-reports-types'
-import type { MonthlyDeal, DealActivity } from '@/lib/monthly-reports-types'
+import type { MonthlyDeal, DealActivity, ProductFeatureDemand } from '@/lib/monthly-reports-types'
 import { getOutreachStats, EMPTY_OUTREACH_STATS } from '@/lib/monthly-outreach-stats'
 import type { OutreachStats } from '@/lib/monthly-outreach-stats'
 import { KpiCard, MiniBar, SectionHeader } from '@/components/monthly-reports/ui'
@@ -40,29 +41,48 @@ function dlFile(content: string, name: string, type: string) {
 }
 
 function exportCSV(deals: MonthlyDeal[], month: string) {
-  const rows = deals.map(d => ({
-    Company: d.company_name,
-    Individual: d.individual_name ?? '',
-    Designation: d.designation ?? '',
-    Country: d.country ?? '',
-    Industry: d.industry ?? '',
-    'Lead Type': d.lead_type ?? '',
-    Status: d.status.replace(/_/g, ' '),
-    'Strategic Importance': d.strategic_importance ?? '',
-    'Outreach Channel': d.outreach_channel ?? '',
-    'Expected Close': d.expected_close_date ?? '',
-    'Monthly Volume': d.expected_monthly_volume ?? '',
-    'Yearly Volume': d.expected_yearly_volume ?? '',
-    'Revenue Opportunity': d.estimated_revenue ?? '',
-    'Geographic Corridor': d.geographic_corridor ?? '',
-    'Products Interested': (d.products_interested ?? []).join('; '),
-    'Products Proposed': (d.products_proposed ?? []).join('; '),
-    'Business Impact': d.business_impact ?? '',
-    'Why Valuable': d.why_valuable ?? '',
-    'Best Product Fit': d.best_product_fit ?? '',
-    Notes: d.notes ?? '',
-    Created: d.created_at.slice(0, 10),
-  }))
+  const rows = deals.map(d => {
+    const pf = d.product_feedback || {}
+    const openBlockers = (d.blockers || []).filter(b => !b.resolved)
+    return {
+      Company: d.company_name,
+      Individual: d.individual_name ?? '',
+      Designation: d.designation ?? '',
+      Country: d.country ?? '',
+      Industry: d.industry ?? '',
+      'Lead Type': d.lead_type ?? '',
+      Status: d.status.replace(/_/g, ' '),
+      'Requirement': d.requirement ?? '',
+      'Problem Statement': d.problem_statement ?? '',
+      'Products Interested': (d.products_interested ?? []).join('; '),
+      'Products Proposed': (d.products_proposed ?? []).join('; '),
+      'Strategic Importance': d.strategic_importance ?? '',
+      'Outreach Channel': d.outreach_channel ?? '',
+      'Expected Close': d.expected_close_date ?? '',
+      'Monthly Volume': d.expected_monthly_volume ?? '',
+      'Yearly Volume': d.expected_yearly_volume ?? '',
+      'Revenue Opportunity': d.estimated_revenue ?? '',
+      'Geographic Corridor': d.geographic_corridor ?? '',
+      'End Users': d.end_users_count ?? '',
+      'Use Case': d.use_case ?? '',
+      'Business Impact': d.business_impact ?? '',
+      'Why Valuable': d.why_valuable ?? '',
+      'Best Product Fit': d.best_product_fit ?? '',
+      'Long-term Value': d.long_term_value ?? '',
+      'Feature Requested': pf.feature_requested ?? '',
+      'Missing Functionality': pf.missing_functionality ?? '',
+      'Product Gaps': pf.product_gaps ?? '',
+      'Integration Requested': pf.integration_requested ?? '',
+      'API Requirements': pf.api_requirements ?? '',
+      'Compliance Requirements': pf.compliance_requirements ?? '',
+      'Technical Blockers': pf.technical_blockers ?? '',
+      'Open Blockers': openBlockers.map(b => blockerLabel(b) + (b.notes ? ` (${b.notes})` : '')).join('; '),
+      'Owner': d.owner ?? '',
+      'Month': d.month_year ?? '',
+      Notes: d.notes ?? '',
+      Created: d.created_at.slice(0, 10),
+    }
+  })
   dlFile(toCSV(rows), `kima-bd-${month}.csv`, 'text/csv;charset=utf-8;')
 }
 
@@ -107,20 +127,22 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
     return `<tr><td>${meta?.label ?? k}</td><td>${v}</td></tr>`
   }).join('')
 
-  // Product feedback themes
+  // Product feedback themes — every filled field, not just a subset
   const pfItems: string[] = []
   deals.forEach(d => {
     const pf = d.product_feedback || {}
-    ;['feature_requested','missing_functionality','product_gaps','integration_requested'].forEach(key => {
-      const v = (pf as Record<string,string>)[key]
-      if (v) pfItems.push(`• ${v.slice(0,120)}`)
+    ;(['feature_requested','missing_functionality','product_gaps','integration_requested','api_requirements','compliance_requirements','technical_blockers'] as const).forEach(key => {
+      const v = pf[key]
+      if (v) pfItems.push(`• [${d.company_name}] ${v.slice(0,120)}`)
     })
   })
 
-  // Blockers summary
-  const blockerCount: Record<string, number> = {}
+  // Blockers summary — keyed by type, label resolved via blockerLabel (handles custom blockers)
+  const blockerCount: Record<string, { label: string; count: number }> = {}
   deals.forEach(d => (d.blockers || []).filter(b => !b.resolved).forEach(b => {
-    blockerCount[b.type] = (blockerCount[b.type] || 0) + 1
+    const key = b.type
+    if (!blockerCount[key]) blockerCount[key] = { label: blockerLabel(b), count: 0 }
+    blockerCount[key].count++
   }))
 
   // Next-month priorities (open deals with close date)
@@ -134,17 +156,23 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
     return `<span class="s-badge ${cls}">${s.replace(/_/g,' ')}</span>`
   }
 
-  const dealRows = deals.map(d => `
+  // Only fields the user actually filled in render a value — everything else stays a blank cell.
+  const dealRows = deals.map(d => {
+    const openBlockers = (d.blockers || []).filter(b => !b.resolved).map(b => blockerLabel(b)).join(', ')
+    return `
     <tr>
-      <td>${d.company_name}</td>
-      <td>${d.individual_name ?? '—'}</td>
-      <td>${d.lead_type ?? '—'}</td>
+      <td>${d.company_name ?? ''}</td>
+      <td>${d.individual_name ?? ''}</td>
+      <td>${d.country ?? ''}</td>
+      <td>${d.lead_type ?? ''}</td>
       <td>${statusBadge(d.status)}</td>
-      <td>${d.expected_monthly_volume ?? '—'}</td>
-      <td>${d.estimated_revenue ?? '—'}</td>
-      <td>${d.strategic_importance ?? '—'}</td>
-      <td>${d.expected_close_date ?? '—'}</td>
-    </tr>`).join('')
+      <td>${d.expected_monthly_volume ?? ''}</td>
+      <td>${d.estimated_revenue ?? ''}</td>
+      <td>${d.strategic_importance ?? ''}</td>
+      <td>${d.expected_close_date ?? ''}</td>
+      <td>${openBlockers}</td>
+    </tr>`
+  }).join('')
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>BD Report ${label}</title><style>${PDF_STYLE}</style></head><body>
   <div class="cover">
@@ -181,7 +209,7 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
     <div class="section">
       <div class="section-title">Full Pipeline — ${deals.length} Deals</div>
       <table>
-        <thead><tr><th>Company</th><th>Individual</th><th>Type</th><th>Status</th><th>Monthly Vol.</th><th>Revenue Opp.</th><th>Importance</th><th>Close Date</th></tr></thead>
+        <thead><tr><th>Company</th><th>Individual</th><th>Country</th><th>Type</th><th>Status</th><th>Monthly Vol.</th><th>Revenue Opp.</th><th>Importance</th><th>Close Date</th><th>Open Blockers</th></tr></thead>
         <tbody>${dealRows}</tbody>
       </table>
     </div>
@@ -199,7 +227,7 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
 
     ${Object.keys(blockerCount).length ? `<div class="section"><div class="section-title">Active Blockers</div>
       <table style="max-width:360px"><thead><tr><th>Blocker</th><th>Count</th></tr></thead><tbody>
-        ${Object.entries(blockerCount).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<tr><td>${k.replace(/_/g,' ')}</td><td>${v}</td></tr>`).join('')}
+        ${Object.values(blockerCount).sort((a,b)=>b.count-a.count).map(b=>`<tr><td>${b.label}</td><td>${b.count}</td></tr>`).join('')}
       </tbody></table>
     </div>` : ''}
 
@@ -264,9 +292,22 @@ export default function MonthlyReportsPage() {
   const [outreachStats, setOutreachStats] = useState<OutreachStats>(EMPTY_OUTREACH_STATS)
   const [narrative, setNarrative]       = useState('')
   const [generatingNarrative, setGeneratingNarrative] = useState(false)
+  const [productDemand, setProductDemand]           = useState<ProductFeatureDemand[]>([])
+  const [demandSetupNeeded, setDemandSetupNeeded]   = useState(false)
+  const [analyzingDemand, setAnalyzingDemand]       = useState(false)
   const exportRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { setMounted(true) }, [])
+
+  const loadProductDemand = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('product_feature_demand')
+      .select('*')
+      .order('mention_count', { ascending: false })
+    if (error?.message?.includes('does not exist')) { setDemandSetupNeeded(true); return }
+    setDemandSetupNeeded(false)
+    setProductDemand((data || []) as ProductFeatureDemand[])
+  }, [supabase])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -298,6 +339,27 @@ export default function MonthlyReportsPage() {
   }, [month, supabase])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => { loadProductDemand() }, [loadProductDemand])
+
+  async function analyzeProductDemand() {
+    setAnalyzingDemand(true)
+    try {
+      const res = await fetch('/api/ai/product-demand', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to analyze feedback')
+      if (json.items) setProductDemand(json.items as ProductFeatureDemand[])
+      toast.success(json.message || `Backlog updated — ${json.items?.length ?? 0} item(s)`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to analyze feedback')
+    } finally {
+      setAnalyzingDemand(false)
+    }
+  }
+
+  async function updateDemandStatus(id: string, status: string) {
+    setProductDemand(prev => prev.map(p => p.id === id ? { ...p, status: status as ProductFeatureDemand['status'] } : p))
+    await supabase.from('product_feature_demand').update({ status }).eq('id', id)
+  }
 
   // Close export dropdown on outside click
   useEffect(() => {
@@ -608,6 +670,88 @@ export default function MonthlyReportsPage() {
                   <p className="text-xs" style={{ color: 'rgb(100,106,135)' }}>
                     Generate an AI-written narrative covering activity, pipeline health, opportunities, and product insights for {fmtMonthYear(month)}.
                   </p>
+                )}
+              </div>
+            </div>
+
+            {/* ── Section 4.5: Product / Feature Demand ──────── */}
+            <div className="section-card">
+              <SectionHeader
+                icon={Lightbulb} iconColor="#fbbf24"
+                title="Product / Feature Demand"
+                subtitle="What prospects say we're missing — clustered from deal feedback &amp; blockers across all deals"
+                right={
+                  <button onClick={analyzeProductDemand} disabled={analyzingDemand} className="btn btn-ai" style={{ fontSize: '11px', gap: '6px' }}>
+                    {analyzingDemand ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                    {productDemand.length ? 'Re-analyze Feedback' : 'Analyze Feedback'}
+                  </button>
+                }
+              />
+              <div style={{ padding: '18px 22px' }}>
+                {demandSetupNeeded ? (
+                  <div className="rounded-xl p-4 flex gap-3" style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)' }}>
+                    <AlertCircle size={16} style={{ color: '#fbbf24', flexShrink: 0, marginTop: 1 }} />
+                    <p className="text-xs" style={{ color: 'rgb(180,170,120)' }}>
+                      Run <code className="px-1 py-0.5 rounded text-[11px]" style={{ background: 'rgba(255,255,255,0.07)' }}>supabase/add-product-feature-demand.sql</code> in your Supabase SQL editor to enable this section.
+                    </p>
+                  </div>
+                ) : productDemand.length === 0 ? (
+                  <p className="text-xs" style={{ color: 'rgb(100,106,135)' }}>
+                    Click &ldquo;Analyze Feedback&rdquo; to have AI read the Product Feedback and Blockers collected across every tracked deal, cluster them into distinct gaps, and build a running backlog here — so it&apos;s always clear what to improve next.
+                  </p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {productDemand.map(item => {
+                      return (
+                        <div key={item.id} className="rounded-xl p-3.5" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                          <div className="flex items-start justify-between gap-3 mb-1.5">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-semibold text-white">{item.title}</span>
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ background: 'rgba(167,139,250,0.12)', color: '#a78bfa' }}>
+                                {productDemandCategoryLabel(item.category)}
+                              </span>
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgb(150,150,180)' }}>
+                                {item.mention_count}× mentioned
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {(['open','planned','shipped','wont_fix'] as const).map(s => {
+                                const m = productDemandStatusMeta(s)
+                                const active = item.status === s
+                                return (
+                                  <button
+                                    key={s}
+                                    type="button"
+                                    onClick={() => updateDemandStatus(item.id, s)}
+                                    className="px-2 py-1 rounded-md text-[10px] font-medium transition-all"
+                                    style={active
+                                      ? { background: m.bg, border: `1px solid ${m.color}50`, color: m.color }
+                                      : { background: 'transparent', border: '1px solid rgba(255,255,255,0.07)', color: 'rgb(100,106,135)' }
+                                    }
+                                  >
+                                    {active && <CheckCircle2 size={9} className="inline mr-0.5" style={{ marginBottom: 1 }} />}
+                                    {m.label}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                          {item.description && (
+                            <p className="text-xs mb-2" style={{ color: 'rgb(160,165,195)', lineHeight: 1.5 }}>{item.description}</p>
+                          )}
+                          {item.companies?.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {item.companies.map(c => (
+                                <span key={c} className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.04)', color: 'rgb(120,125,155)' }}>
+                                  {c}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
                 )}
               </div>
             </div>
