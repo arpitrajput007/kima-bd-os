@@ -29,9 +29,23 @@ import {
   Send,
   Globe,
   FileDown,
+  Clock,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
+import { readTimeData } from '@/components/TimeTracker'
+
+function fmtSecs(s: number): string {
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  if (h === 0 && m === 0) return '< 1m'
+  if (h === 0) return `${m}m`
+  return m > 0 ? `${h}h ${m}m` : `${h}h`
+}
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10)
+}
 
 const navGroups: {
   label: string
@@ -84,6 +98,7 @@ const navGroups: {
     items: [
       { href: '/settings',       label: 'Settings',        icon: Settings   },
       { href: '/my-performance', label: 'My Performance',  icon: LineChart  },
+      { href: '/time-tracker',   label: 'Time Tracker',    icon: Clock      },
     ],
   },
 ]
@@ -92,6 +107,7 @@ export function Sidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
   const [apiIssues, setApiIssues] = useState<string[]>([])
+  const [todayTime, setTodayTime] = useState(0)
 
   useEffect(() => {
     const load = () => {
@@ -104,6 +120,16 @@ export function Sidebar() {
     const handler = () => load()
     window.addEventListener('bd_api_health_update', handler)
     return () => window.removeEventListener('bd_api_health_update', handler)
+  }, [])
+
+  useEffect(() => {
+    const load = () => {
+      const data = readTimeData()
+      setTodayTime(data[todayISO()]?.total || 0)
+    }
+    load()
+    window.addEventListener('kima_time_update', load)
+    return () => window.removeEventListener('kima_time_update', load)
   }, [])
 
   return (
@@ -228,12 +254,24 @@ export function Sidebar() {
 
       {/* ── Bottom ───────────────────────────────── */}
       <div className="p-3 border-t flex-shrink-0" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
-        {/* Agent activity mini */}
+        {/* Time today + agent activity */}
         {!collapsed && (
-          <div className="mb-2 px-3 py-2.5 rounded-lg flex items-center gap-2"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
-            <Activity size={12} style={{ color: 'rgb(167,139,250)' }} />
-            <span className="text-[11px]" style={{ color: 'rgb(130,130,160)' }}>Running daily discovery cron</span>
+          <div className="mb-2 space-y-1.5">
+            <div className="px-3 py-2.5 rounded-lg flex items-center justify-between"
+              style={{ background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.15)' }}>
+              <div className="flex items-center gap-2">
+                <Clock size={11} style={{ color: 'rgb(167,139,250)' }} />
+                <span className="text-[11px]" style={{ color: 'rgb(130,130,160)' }}>Today</span>
+              </div>
+              <span className="text-[12px] font-semibold" style={{ color: 'rgb(167,139,250)' }}>
+                {fmtSecs(todayTime)}
+              </span>
+            </div>
+            <div className="px-3 py-2.5 rounded-lg flex items-center gap-2"
+              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <Activity size={11} style={{ color: 'rgb(167,139,250)' }} />
+              <span className="text-[11px]" style={{ color: 'rgb(130,130,160)' }}>Running daily discovery cron</span>
+            </div>
           </div>
         )}
         <button

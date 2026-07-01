@@ -1,6 +1,7 @@
 import { Sidebar } from '@/components/sidebar'
 import AgentActivityLog from '@/components/AgentActivityLog'
 import FollowUpNotifications from '@/components/FollowUpNotifications'
+import TimeTracker from '@/components/TimeTracker'
 
 export default function DashboardLayout({
   children,
@@ -9,6 +10,7 @@ export default function DashboardLayout({
 }) {
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'rgb(10, 11, 16)' }}>
+      <TimeTracker />
       <Sidebar />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         {/* Top status banner — like Pocket Dashboard */}
