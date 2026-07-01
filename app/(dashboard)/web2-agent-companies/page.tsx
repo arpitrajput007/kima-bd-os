@@ -213,7 +213,7 @@ export default function Web2AgentCompaniesPage() {
             </div>
             <div>
               <h1 style={{ fontSize: 18, fontWeight: 700, color: 'rgb(240,242,255)', lineHeight: 1.2 }}>
-                Web2 Agent Companies
+                Web2 AI Agent Companies
               </h1>
               <p style={{ fontSize: 12, color: 'rgb(100,106,135)', marginTop: 2 }}>
                 {WEB2_COMPANIES.length} Web2 companies deploying autonomous AI agents — Aergap governance prospects

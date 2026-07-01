@@ -41,10 +41,8 @@ const PAGE_LABELS: Record<string, string> = {
   '/content':               'Content Studio',
   '/learn':                 'Make Agent Learn',
   '/voice':                 'Voice Chat',
-  '/aeredium':              'Aeredium Targets',
-  '/agentic-payments':      'Agentic Payments',
-  '/money-touching-agents': 'Money Touching Agents',
-  '/web2-agent-companies':  'Web2 Agent Companies',
+  '/web3-agent-companies':  'Web3 AI Agent Companies',
+  '/web2-agent-companies':  'Web2 AI Agent Companies',
   '/reachout-storage':      'Reachout Storage',
   '/settings':              'Settings',
 }

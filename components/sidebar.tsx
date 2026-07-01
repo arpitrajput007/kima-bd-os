@@ -21,11 +21,9 @@ import {
   Kanban,
   Bot,
   Shield,
-  CreditCard,
   LineChart,
   PenLine,
   ShieldCheck,
-  DollarSign,
   Send,
   Globe,
   FileDown,
@@ -80,10 +78,8 @@ const navGroups: {
   {
     label: 'AI Agents',
     items: [
-      { href: '/aeredium',              label: 'Aeredium Targets',      icon: Shield,     glow: true },
-      { href: '/agentic-payments',      label: 'Agentic Payments',      icon: CreditCard, glow: true },
-      { href: '/money-touching-agents',  label: 'Money Touching Agents', icon: DollarSign, glow: true },
-      { href: '/web2-agent-companies',  label: 'Web2 Agent Companies',  icon: Globe,      orange: true },
+      { href: '/web3-agent-companies', label: 'Web3 AI Agent Companies', icon: Shield,  glow: true },
+      { href: '/web2-agent-companies', label: 'Web2 AI Agent Companies', icon: Globe,   orange: true },
     ],
   },
   {
