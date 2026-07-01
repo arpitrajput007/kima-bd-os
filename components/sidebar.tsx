@@ -28,6 +28,7 @@ import {
   DollarSign,
   Send,
   Globe,
+  FileDown,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
@@ -47,9 +48,15 @@ const navGroups: {
       { href: '/dashboard',       label: 'BD Command Center',   icon: LayoutDashboard },
       { href: '/leads',           label: 'Lead Inbox',          icon: Inbox },
       { href: '/crm',             label: 'CRM',                 icon: Kanban },
-      { href: '/reports',         label: 'Weekly Reports',      icon: BarChart3 },
       { href: '/learn',           label: 'Make Agent Learn',    icon: BookOpen, glow: true },
       { href: '/voice',           label: 'Voice Chat',          icon: Mic, voice: true },
+    ],
+  },
+  {
+    label: 'Reports',
+    items: [
+      { href: '/export-reports',   label: 'Export Reports',       icon: FileDown },
+      { href: '/reports',          label: 'Weekly Learning',      icon: BarChart3 },
     ],
   },
   {
