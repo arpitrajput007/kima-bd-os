@@ -49,9 +49,14 @@ create table if not exists reaction_drafts (
 create index if not exists reaction_drafts_created_idx on reaction_drafts (created_at desc);
 create index if not exists reaction_drafts_status_idx  on reaction_drafts (status);
 
+create or replace function set_updated_at()
+returns trigger language plpgsql as $$
+begin new.updated_at = now(); return new; end;
+$$;
+
 create trigger reaction_drafts_updated_at
   before update on reaction_drafts
-  for each row execute procedure moddatetime(updated_at);
+  for each row execute function set_updated_at();
 
 alter table reaction_drafts enable row level security;
 create policy "anon_full_access_reaction_drafts"
