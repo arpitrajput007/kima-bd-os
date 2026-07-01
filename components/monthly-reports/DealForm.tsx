@@ -65,20 +65,17 @@ function Field({ label, required, children }: { label: string; required?: boolea
   )
 }
 
-const inputCls = "w-full rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:ring-1 transition-all"
-const inputStyle = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', '--tw-ring-color': 'rgba(167,139,250,0.4)' } as React.CSSProperties
-
 function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cn(inputCls, props.className)} style={{ ...inputStyle, ...props.style }} />
+  return <input {...props} className={cn('input-dark', props.className)} />
 }
 
 function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} rows={props.rows ?? 3} className={cn(inputCls, props.className)} style={{ ...inputStyle, resize: 'vertical', ...props.style }} />
+  return <textarea {...props} rows={props.rows ?? 3} className={cn('input-dark', props.className)} style={{ resize: 'vertical', ...props.style }} />
 }
 
 function Select({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select {...props} className={cn(inputCls, props.className)} style={{ ...inputStyle, ...props.style }}>
+    <select {...props} className={cn('input-dark', props.className)}>
       {children}
     </select>
   )
@@ -87,17 +84,17 @@ function Select({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectEle
 function SectionCard({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(22,22,34,0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div className="section-card">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-5 py-4 text-left"
-        style={{ borderBottom: open ? '1px solid rgba(255,255,255,0.06)' : 'none' }}
+        className="w-full flex items-center justify-between text-left"
+        style={{ padding: '16px 22px', borderBottom: open ? '1px solid var(--border)' : 'none' }}
       >
-        <span className="text-xs font-semibold" style={{ color: 'rgb(140,140,170)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{title}</span>
-        {open ? <ChevronUp size={14} style={{ color: 'rgb(100,100,120)' }} /> : <ChevronDown size={14} style={{ color: 'rgb(100,100,120)' }} />}
+        <span className="text-[13px] font-semibold text-white">{title}</span>
+        {open ? <ChevronUp size={14} style={{ color: 'rgb(100,106,135)' }} /> : <ChevronDown size={14} style={{ color: 'rgb(100,106,135)' }} />}
       </button>
-      {open && <div className="p-5">{children}</div>}
+      {open && <div style={{ padding: '18px 22px' }}>{children}</div>}
     </div>
   )
 }

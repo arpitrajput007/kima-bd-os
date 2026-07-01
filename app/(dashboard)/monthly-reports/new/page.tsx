@@ -53,7 +53,7 @@ export default function NewDealPage() {
           </p>
         </div>
       </div>
-      <div className="p-8">
+      <div style={{ padding: '28px 36px' }}>
         <DealForm
           defaultMonthYear={currentMonthYear()}
           saving={saving}

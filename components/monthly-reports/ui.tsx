@@ -1,0 +1,76 @@
+'use client'
+
+import { ArrowUpRight } from 'lucide-react'
+
+// ── Shared visual primitives for the Monthly Reports feature ────
+// Mirrors the KpiCard / MiniBar / section-card-header pattern used
+// across the app's flagship dashboards (see my-performance/page.tsx)
+// so this feature reads at the same polish level as the rest of the app.
+
+export function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
+  const pct = max > 0 ? Math.min(Math.round((value / max) * 100), 100) : 0
+  return (
+    <div style={{ height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+      <div style={{
+        height: '100%', borderRadius: 3,
+        width: `${pct}%`,
+        background: color,
+        transition: 'width 0.8s cubic-bezier(.16,1,.3,1)',
+      }} />
+    </div>
+  )
+}
+
+export function KpiCard({
+  label, value, sub, color, icon: Icon, loading,
+}: {
+  label: string
+  value: string | number
+  sub?: string
+  color: string
+  icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>
+  loading?: boolean
+}) {
+  return (
+    <div className="stat-card" style={{ position: 'relative', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: color, opacity: 0.5, borderRadius: '14px 14px 0 0' }} />
+      <div className="flex items-start justify-between mb-3">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: color + '15', border: `1px solid ${color}22` }}>
+          <Icon size={16} style={{ color }} />
+        </div>
+        <ArrowUpRight size={13} style={{ color, opacity: 0.4 }} />
+      </div>
+      <div className="text-[26px] font-bold tabular-nums leading-none text-white mb-1" style={loading ? { opacity: 0.18 } : {}}>
+        {loading ? '—' : value}
+      </div>
+      <div className="text-[11px] font-medium" style={{ color: 'rgb(100,106,135)' }}>{label}</div>
+      {sub && <div className="text-[10px] font-semibold mt-1" style={{ color }}>{sub}</div>}
+    </div>
+  )
+}
+
+export function SectionHeader({
+  icon: Icon, iconColor, title, subtitle, right,
+}: {
+  icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>
+  iconColor: string
+  title: string
+  subtitle?: string
+  right?: React.ReactNode
+}) {
+  return (
+    <div className="section-card-header">
+      <div className="flex items-center gap-2.5">
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: iconColor + '18' }}>
+          <Icon size={14} style={{ color: iconColor }} />
+        </div>
+        <div>
+          <div className="text-[13px] font-semibold text-white">{title}</div>
+          {subtitle && <div className="text-[11px]" style={{ color: 'rgb(100,106,135)' }}>{subtitle}</div>}
+        </div>
+      </div>
+      {right}
+    </div>
+  )
+}

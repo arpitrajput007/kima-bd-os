@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -8,15 +8,19 @@ import {
   Plus, Search, Download, FileText, TrendingUp, Users,
   Trophy, XCircle, Calendar, BarChart2, Loader2, RefreshCw,
   Building2, ChevronDown, AlertCircle, Send, Reply, Sparkles,
+  Zap, Settings2, Target, DollarSign,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+} from 'recharts'
 import {
   DEAL_STATUSES, OUTREACH_CHANNELS, LEAD_TYPES,
-  dealStatusMeta, fmtMonthYear, currentMonthYear, last12Months,
+  dealStatusMeta, fmtMonthYear, fmtMonthShort, currentMonthYear, last12Months,
 } from '@/lib/monthly-reports-types'
 import type { MonthlyDeal, DealActivity } from '@/lib/monthly-reports-types'
 import { getOutreachStats, EMPTY_OUTREACH_STATS } from '@/lib/monthly-outreach-stats'
 import type { OutreachStats } from '@/lib/monthly-outreach-stats'
+import { KpiCard, MiniBar, SectionHeader } from '@/components/monthly-reports/ui'
 
 // ── Export helpers ─────────────────────────────────────────────
 
@@ -215,7 +219,7 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
   setTimeout(() => win.print(), 600)
 }
 
-// ── Status badge ───────────────────────────────────────────────
+// ── Badges ───────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
   const m = dealStatusMeta(status as never)
@@ -234,6 +238,14 @@ function ImportanceBadge({ v }: { v?: string }) {
   return <span className="text-[10px] font-semibold" style={{ color }}>{v.toUpperCase()}</span>
 }
 
+const STATUS_ICON: Record<string, React.ComponentType<{ size?: number; style?: React.CSSProperties }>> = {
+  new: Building2, contacted: Send, discovery: Search, demo: Zap,
+  technical_discussion: Settings2, proposal_sent: FileText,
+  negotiation: TrendingUp, closed_won: Trophy, closed_lost: XCircle,
+}
+
+const TREND_MONTHS = 6
+
 // ── Page ───────────────────────────────────────────────────────
 
 export default function MonthlyReportsPage() {
@@ -241,7 +253,9 @@ export default function MonthlyReportsPage() {
   const [month, setMonth]         = useState(currentMonthYear())
   const [deals, setDeals]         = useState<MonthlyDeal[]>([])
   const [activities, setActivities] = useState<DealActivity[]>([])
+  const [trendRows, setTrendRows] = useState<{ month_year: string; status: string }[]>([])
   const [loading, setLoading]     = useState(true)
+  const [mounted, setMounted]     = useState(false)
   const [search, setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [typeFilter, setTypeFilter]     = useState('all')
@@ -252,33 +266,33 @@ export default function MonthlyReportsPage() {
   const [generatingNarrative, setGeneratingNarrative] = useState(false)
   const exportRef = useRef<HTMLDivElement>(null)
 
+  useEffect(() => { setMounted(true) }, [])
+
   const load = useCallback(async () => {
     setLoading(true)
     setNarrative('')
-    const { data, error } = await supabase
-      .from('monthly_deals')
-      .select('*')
-      .eq('month_year', month)
-      .order('updated_at', { ascending: false })
+    const trendMonths = last12Months().slice(0, TREND_MONTHS).reverse()
 
-    if (error?.message?.includes('does not exist')) {
+    const [dealsRes, trendRes] = await Promise.all([
+      supabase.from('monthly_deals').select('*').eq('month_year', month).order('updated_at', { ascending: false }),
+      supabase.from('monthly_deals').select('month_year,status').in('month_year', trendMonths),
+    ])
+
+    if (dealsRes.error?.message?.includes('does not exist')) {
       setSetupNeeded(true); setLoading(false); return
     }
-    const dealList = (data || []) as MonthlyDeal[]
+    const dealList = (dealsRes.data || []) as MonthlyDeal[]
     setDeals(dealList)
     setSetupNeeded(false)
+    setTrendRows((trendRes.data || []) as { month_year: string; status: string }[])
 
-    if (dealList.length) {
-      const { data: acts } = await supabase
-        .from('deal_activities')
-        .select('id,deal_id,activity_type,created_at')
-        .in('deal_id', dealList.map(d => d.id))
-      setActivities((acts || []) as DealActivity[])
-    } else {
-      setActivities([])
-    }
-
-    const stats = await getOutreachStats(supabase, month)
+    const [actsRes, stats] = await Promise.all([
+      dealList.length
+        ? supabase.from('deal_activities').select('id,deal_id,activity_type,created_at').in('deal_id', dealList.map(d => d.id))
+        : Promise.resolve({ data: [] as DealActivity[] }),
+      getOutreachStats(supabase, month),
+    ])
+    setActivities((actsRes.data || []) as DealActivity[])
     setOutreachStats(stats)
     setLoading(false)
   }, [month, supabase])
@@ -299,14 +313,35 @@ export default function MonthlyReportsPage() {
   const active   = deals.filter(d => !['closed_won','closed_lost'].includes(d.status)).length
   const won      = deals.filter(d => d.status === 'closed_won').length
   const lost     = deals.filter(d => d.status === 'closed_lost').length
-  const meetings = activities.filter(a => a.activity_type === 'meeting').length
-  const followUps = activities.filter(a => a.activity_type === 'follow_up').length
-  const uniqueCos = new Set(deals.map(d => d.company_name)).size
-  const uniqueIndividuals = new Set(deals.map(d => d.individual_name).filter(Boolean)).size
+  const meetings = activities.filter(a => a.activity_type === 'meeting').length + outreachStats.meetingsBooked
+  const followUps = activities.filter(a => a.activity_type === 'follow_up').length + outreachStats.followUpsSent
 
   // Channel breakdown (raw outreach touches + deal-level channel)
   const channelCounts: Record<string, number> = { ...outreachStats.channelBreakdown }
   deals.forEach(d => { if (d.outreach_channel) channelCounts[d.outreach_channel] = (channelCounts[d.outreach_channel] || 0) + 1 })
+  const maxChannel = Math.max(...Object.values(channelCounts), 1)
+
+  // Status distribution for the pipeline funnel
+  const statusCounts: Record<string, number> = {}
+  deals.forEach(d => { statusCounts[d.status] = (statusCounts[d.status] || 0) + 1 })
+
+  // Strategic importance mix
+  const importanceCounts = { high: 0, medium: 0, low: 0 }
+  deals.forEach(d => { const k = d.strategic_importance as keyof typeof importanceCounts; if (k && importanceCounts[k] !== undefined) importanceCounts[k]++ })
+  const volumeFilled  = deals.filter(d => d.expected_monthly_volume || d.expected_yearly_volume).length
+  const revenueFilled = deals.filter(d => d.estimated_revenue).length
+
+  // 6-month trend
+  const trendMonths = useMemo(() => last12Months().slice(0, TREND_MONTHS).reverse(), [])
+  const trend = trendMonths.map(m => {
+    const rows = trendRows.filter(r => r.month_year === m)
+    return {
+      label: fmtMonthShort(m),
+      won: rows.filter(r => r.status === 'closed_won').length,
+      active: rows.filter(r => !['closed_won', 'closed_lost'].includes(r.status)).length,
+      lost: rows.filter(r => r.status === 'closed_lost').length,
+    }
+  })
 
   // Filtered deals
   const filtered = deals.filter(d => {
@@ -321,24 +356,6 @@ export default function MonthlyReportsPage() {
   })
 
   const months = last12Months()
-
-  const outreachKpiCards = [
-    { label: 'Total Outreach',        value: outreachStats.totalOutreach,        icon: Send,      color: '#22d3ee', bg: 'rgba(34,211,238,0.08)',  border: 'rgba(34,211,238,0.2)'  },
-    { label: 'Companies Contacted',   value: outreachStats.companiesContacted,   icon: Building2, color: '#67e8f9', bg: 'rgba(6,182,212,0.08)',   border: 'rgba(6,182,212,0.2)'   },
-    { label: 'Individuals Contacted', value: outreachStats.individualsContacted, icon: Users,     color: '#c084fc', bg: 'rgba(192,132,252,0.08)', border: 'rgba(192,132,252,0.2)' },
-    { label: 'Replies',               value: outreachStats.replies,              icon: Reply,     color: '#34d399', bg: 'rgba(52,211,153,0.08)',  border: 'rgba(52,211,153,0.2)'  },
-  ]
-
-  const kpiCards = [
-    { label: 'Total Deals',        value: total,            icon: Building2,  color: '#a78bfa', bg: 'rgba(139,92,246,0.08)',  border: 'rgba(139,92,246,0.2)'  },
-    { label: 'Active Pipeline',     value: active,           icon: TrendingUp, color: '#60a5fa', bg: 'rgba(96,165,250,0.08)',  border: 'rgba(96,165,250,0.2)'  },
-    { label: 'Won',                 value: won,              icon: Trophy,     color: '#34d399', bg: 'rgba(52,211,153,0.08)',  border: 'rgba(52,211,153,0.2)'  },
-    { label: 'Lost',                value: lost,             icon: XCircle,    color: '#f87171', bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.2)' },
-    { label: 'Companies (Deals)',   value: uniqueCos,        icon: Users,      color: '#67e8f9', bg: 'rgba(6,182,212,0.08)',  border: 'rgba(6,182,212,0.2)'   },
-    { label: 'Individuals (Deals)', value: uniqueIndividuals,icon: Users,      color: '#c084fc', bg: 'rgba(192,132,252,0.08)', border: 'rgba(192,132,252,0.2)' },
-    { label: 'Meetings',            value: meetings + outreachStats.meetingsBooked, icon: Calendar, color: '#fb923c', bg: 'rgba(251,146,60,0.08)',  border: 'rgba(251,146,60,0.2)'  },
-    { label: 'Follow-ups',          value: followUps + outreachStats.followUpsSent, icon: BarChart2, color: '#fbbf24', bg: 'rgba(251,191,36,0.08)',  border: 'rgba(251,191,36,0.2)'  },
-  ]
 
   async function generateNarrative() {
     setGeneratingNarrative(true)
@@ -364,13 +381,13 @@ export default function MonthlyReportsPage() {
       <div className="page-header flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-bold text-white">Monthly BD Performance</h1>
-          <p className="text-xs mt-0.5" style={{ color: 'rgb(100,100,120)' }}>
+          <p className="text-xs mt-0.5" style={{ color: 'rgb(100,106,135)' }}>
             Track deals, pipeline, and business impact — generate shareable monthly reports.
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={load} disabled={loading} className="btn btn-ghost" style={{ fontSize: '12px', gap: '6px' }}>
-            {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+          <button onClick={load} disabled={loading} className="btn btn-secondary" style={{ padding: '7px 10px', fontSize: '12px' }}>
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
           </button>
 
           {/* Month selector */}
@@ -390,7 +407,7 @@ export default function MonthlyReportsPage() {
           <div className="relative" ref={exportRef}>
             <button
               onClick={() => setExportOpen(!exportOpen)}
-              className="btn btn-ghost flex items-center gap-1.5"
+              className="btn btn-secondary flex items-center gap-1.5"
               style={{ fontSize: '12px' }}
             >
               <Download size={12} />Export<ChevronDown size={10} />
@@ -424,7 +441,7 @@ export default function MonthlyReportsPage() {
         </div>
       </div>
 
-      <div className="p-8 space-y-6">
+      <div style={{ padding: '28px 36px', display: 'flex', flexDirection: 'column', gap: 26 }}>
 
         {/* ── Setup banner ──────────────────────────────── */}
         {setupNeeded && (
@@ -439,202 +456,318 @@ export default function MonthlyReportsPage() {
           </div>
         )}
 
-        {/* ── Outreach KPI cards ────────────────────────── */}
         {!setupNeeded && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {outreachKpiCards.map(({ label, value, icon: Icon, color, bg, border }) => (
-              <div key={label} className="rounded-xl p-3.5 flex flex-col gap-2"
-                style={{ background: bg, border: `1px solid ${border}` }}>
-                <Icon size={13} style={{ color }} />
-                <div className="text-xl font-bold" style={{ color }}>{value}</div>
-                <div className="text-[10px] font-medium" style={{ color: 'rgb(100,100,130)' }}>{label}</div>
+          <>
+            {/* ── Section 1: Hero KPI Cards ─────────────────── */}
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'rgb(80,85,115)' }}>
+                {fmtMonthYear(month)} — Overview
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* ── Deal KPI cards ────────────────────────────── */}
-        {!setupNeeded && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-            {kpiCards.map(({ label, value, icon: Icon, color, bg, border }) => (
-              <div key={label} className="rounded-xl p-3.5 flex flex-col gap-2"
-                style={{ background: bg, border: `1px solid ${border}` }}>
-                <Icon size={13} style={{ color }} />
-                <div className="text-xl font-bold" style={{ color }}>{value}</div>
-                <div className="text-[10px] font-medium" style={{ color: 'rgb(100,100,130)' }}>{label}</div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+                <KpiCard label="Total Outreach"        value={outreachStats.totalOutreach}        color="#22d3ee" icon={Send}      loading={loading} />
+                <KpiCard label="Companies Contacted"   value={outreachStats.companiesContacted}   color="#67e8f9" icon={Building2} loading={loading} />
+                <KpiCard label="Individuals Contacted" value={outreachStats.individualsContacted} color="#c084fc" icon={Users}     loading={loading} />
+                <KpiCard label="Replies"               value={outreachStats.replies}              color="#34d399" icon={Reply}     loading={loading}
+                  sub={outreachStats.totalOutreach > 0 ? `${Math.round((outreachStats.replies / outreachStats.totalOutreach) * 100)}% reply rate` : undefined} />
+                <KpiCard label="Active Pipeline"       value={active}                              color="#60a5fa" icon={TrendingUp} loading={loading} />
+                <KpiCard label="Won"                   value={won}                                 color="#4ade80" icon={Trophy}    loading={loading} />
+                <KpiCard label="Lost"                  value={lost}                                color="#f87171" icon={XCircle}   loading={loading} />
+                <KpiCard label="Meetings"              value={meetings}                            color="#fb923c" icon={Calendar}  loading={loading}
+                  sub={`${followUps} follow-ups`} />
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* ── AI Monthly Summary ────────────────────────── */}
-        {!setupNeeded && (
-          <div className="rounded-xl p-5" style={{ background: 'rgba(124,58,237,0.05)', border: '1px solid rgba(167,139,250,0.15)' }}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-[10px] font-semibold" style={{ color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.08em' }}>AI Monthly Summary</div>
-              <button onClick={generateNarrative} disabled={generatingNarrative} className="btn btn-ai" style={{ fontSize: '11px', gap: '6px' }}>
-                {generatingNarrative ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
-                {narrative ? 'Regenerate' : 'Generate Summary'}
-              </button>
             </div>
-            {narrative ? (
-              <p className="text-xs whitespace-pre-line" style={{ color: 'rgb(200,200,225)', lineHeight: 1.7 }}>{narrative}</p>
-            ) : (
-              <p className="text-xs" style={{ color: 'rgb(100,100,120)' }}>
-                Generate an AI-written narrative covering activity, pipeline health, opportunities, and product insights for {fmtMonthYear(month)}.
-              </p>
-            )}
-          </div>
-        )}
 
-        {/* ── Channel breakdown ──────────────────────────── */}
-        {!setupNeeded && Object.keys(channelCounts).length > 0 && (
-          <div className="rounded-xl p-4" style={{ background: 'rgba(22,22,34,0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="text-[10px] font-semibold mb-3" style={{ color: 'rgb(110,110,140)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Outreach by Channel</div>
-            <div className="flex flex-wrap gap-3">
-              {OUTREACH_CHANNELS.map(ch => {
-                const count = channelCounts[ch.value] || 0
-                if (!count) return null
-                return (
-                  <div key={ch.value} className="flex items-center gap-1.5">
-                    <span className="text-sm font-bold" style={{ color: '#a78bfa' }}>{count}</span>
-                    <span className="text-xs" style={{ color: 'rgb(110,110,140)' }}>{ch.label}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ── Filters ───────────────────────────────────── */}
-        {!setupNeeded && (
-          <div className="flex gap-2 flex-wrap items-center">
-            <div className="relative flex-1 min-w-48">
-              <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'rgb(90,90,110)' }} />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search company, individual, country…"
-                className="w-full pl-8 pr-3 py-2 rounded-lg text-xs outline-none"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'white' }}
+            {/* ── Section 2: Pipeline Status ─────────────────── */}
+            <div className="section-card">
+              <SectionHeader
+                icon={Target} iconColor="#fbbf24"
+                title="Pipeline Status"
+                subtitle={`Where every tracked deal stands this month · ${total} total`}
               />
-            </div>
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="rounded-lg px-3 py-2 text-xs outline-none"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgb(180,180,210)' }}
-            >
-              <option value="all">All Statuses</option>
-              {DEAL_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
-            <select
-              value={typeFilter}
-              onChange={e => setTypeFilter(e.target.value)}
-              className="rounded-lg px-3 py-2 text-xs outline-none"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgb(180,180,210)' }}
-            >
-              <option value="all">All Types</option>
-              {LEAD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-        )}
-
-        {/* ── Deal list ─────────────────────────────────── */}
-        {loading ? (
-          <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: '#a78bfa' }} /></div>
-        ) : setupNeeded ? null : filtered.length === 0 ? (
-          <div className="text-center py-16">
-            <Building2 size={36} className="mx-auto mb-3 opacity-20" style={{ color: '#a78bfa' }} />
-            <p className="text-sm font-medium text-white mb-1">
-              {deals.length === 0 ? `No deals for ${fmtMonthYear(month)}` : 'No matching deals'}
-            </p>
-            <p className="text-xs mb-5" style={{ color: 'rgb(90,90,110)' }}>
-              {deals.length === 0 ? 'Start tracking your BD activities by adding your first deal.' : 'Try adjusting your filters.'}
-            </p>
-            {deals.length === 0 && (
-              <Link href="/monthly-reports/new" className="btn btn-ai" style={{ fontSize: '13px', textDecoration: 'none', display: 'inline-flex', gap: '6px' }}>
-                <Plus size={13} />Add Your First Deal
-              </Link>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <div className="text-xs mb-3" style={{ color: 'rgb(90,90,110)' }}>{filtered.length} deal{filtered.length !== 1 ? 's' : ''}</div>
-            {filtered.map(deal => {
-              const actCount = activities.filter(a => a.deal_id === deal.id).length
-              const hasBlockers = (deal.blockers || []).some(b => !b.resolved)
-              return (
-                <Link
-                  key={deal.id}
-                  href={`/monthly-reports/${deal.id}`}
-                  className="block rounded-xl p-4 transition-all"
-                  style={{ background: 'rgba(22,22,34,0.8)', border: '1px solid rgba(255,255,255,0.06)', textDecoration: 'none' }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(167,139,250,0.3)')}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)')}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className="text-sm font-semibold text-white">{deal.company_name}</span>
-                        <StatusBadge status={deal.status} />
-                        {deal.lead_type && (
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded"
-                            style={{ background: 'rgba(255,255,255,0.06)', color: 'rgb(150,150,180)' }}>
-                            {deal.lead_type}
-                          </span>
-                        )}
-                        <ImportanceBadge v={deal.strategic_importance} />
-                        {hasBlockers && (
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded"
-                            style={{ background: 'rgba(248,113,113,0.12)', color: '#f87171' }}>
-                            ⚠ Blocker
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 flex-wrap">
-                        {deal.individual_name && (
-                          <span className="text-xs" style={{ color: 'rgb(140,140,170)' }}>
-                            {deal.individual_name}{deal.designation ? ` · ${deal.designation}` : ''}
-                          </span>
-                        )}
-                        {deal.country && <span className="text-xs" style={{ color: 'rgb(110,110,140)' }}>{deal.country}</span>}
-                        {deal.industry && <span className="text-xs" style={{ color: 'rgb(110,110,140)' }}>{deal.industry}</span>}
-                      </div>
-                      {(deal.products_proposed?.length || deal.products_interested?.length) ? (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {(deal.products_proposed || deal.products_interested || []).slice(0, 3).map(p => (
-                            <span key={p} className="text-[10px] px-1.5 py-0.5 rounded"
-                              style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
-                              {p}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
+              <div style={{ padding: '18px 22px 20px' }}>
+                {total > 0 ? (
+                  <>
+                    <div style={{ height: 22, borderRadius: 11, display: 'flex', gap: 2, overflow: 'hidden', marginBottom: 10 }}>
+                      {DEAL_STATUSES.filter(s => statusCounts[s.value] > 0).map(s => (
+                        <div key={s.value}
+                          title={`${s.label}: ${statusCounts[s.value]}`}
+                          style={{ flex: statusCounts[s.value], background: s.color, borderRadius: 3, minWidth: 3 }} />
+                      ))}
                     </div>
-                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                      {deal.expected_close_date && (
-                        <div className="flex items-center gap-1 text-[10px]" style={{ color: 'rgb(110,110,140)' }}>
-                          <Calendar size={10} />
-                          {new Date(deal.expected_close_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                    <div className="flex flex-wrap gap-3 mb-5">
+                      {DEAL_STATUSES.filter(s => statusCounts[s.value] > 0).map(s => (
+                        <div key={s.value} className="flex items-center gap-1.5">
+                          <div style={{ width: 8, height: 8, borderRadius: 2, background: s.color }} />
+                          <span className="text-[10px]" style={{ color: 'rgb(100,106,135)' }}>{s.label}</span>
                         </div>
-                      )}
-                      {deal.expected_monthly_volume && (
-                        <div className="text-[10px] font-medium" style={{ color: '#34d399' }}>
-                          {deal.expected_monthly_volume}/mo
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="mb-4 p-4 rounded-xl text-center text-[12px]" style={{ color: 'rgb(100,106,135)', background: 'rgba(255,255,255,0.025)' }}>
+                    No deals tracked for {fmtMonthYear(month)} yet — add one to see your pipeline.
+                  </div>
+                )}
+                <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2.5">
+                  {DEAL_STATUSES.map(s => {
+                    const count = statusCounts[s.value] || 0
+                    const Icon = STATUS_ICON[s.value] ?? Building2
+                    return (
+                      <div key={s.value} style={{
+                        padding: '12px 14px', borderRadius: 10,
+                        background: count > 0 ? s.color + '09' : 'rgba(255,255,255,0.02)',
+                        border: `1px solid ${count > 0 ? s.color + '28' : 'rgba(255,255,255,0.05)'}`,
+                      }}>
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <Icon size={11} style={{ color: count > 0 ? s.color : 'rgb(80,85,110)' }} />
+                          <span className="text-[10px] font-semibold" style={{ color: count > 0 ? s.color : 'rgb(80,85,110)' }}>{s.label}</span>
                         </div>
-                      )}
-                      {actCount > 0 && (
-                        <div className="text-[10px]" style={{ color: 'rgb(90,90,110)' }}>
-                          {actCount} activit{actCount !== 1 ? 'ies' : 'y'}
-                        </div>
-                      )}
+                        <div className="text-[22px] font-bold tabular-nums leading-none text-white">{count}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* ── Section 3: Channel + Business Potential ────── */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="section-card">
+                <SectionHeader
+                  icon={Send} iconColor="#34d399"
+                  title="Outreach by Channel"
+                  subtitle="All touches — deal-level + raw outreach"
+                  right={<span className="text-[15px] font-bold text-white tabular-nums">{Object.values(channelCounts).reduce((a, b) => a + b, 0)}</span>}
+                />
+                <div style={{ padding: '16px 22px', display: 'flex', flexDirection: 'column', gap: 11 }}>
+                  {Object.keys(channelCounts).length === 0 ? (
+                    <p className="text-xs text-center py-4" style={{ color: 'rgb(90,90,110)' }}>No channel activity logged yet.</p>
+                  ) : OUTREACH_CHANNELS.filter(c => channelCounts[c.value] > 0).map(c => (
+                    <div key={c.value}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[12px] font-medium" style={{ color: 'rgb(160,165,195)' }}>{c.label}</span>
+                        <span className="text-[14px] font-bold tabular-nums text-white">{channelCounts[c.value]}</span>
+                      </div>
+                      <MiniBar value={channelCounts[c.value]} max={maxChannel} color="#a78bfa" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="section-card">
+                <SectionHeader
+                  icon={DollarSign} iconColor="#4ade80"
+                  title="Business Potential"
+                  subtitle="Strategic importance mix &amp; data completeness"
+                />
+                <div style={{ padding: '16px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {([
+                    { label: 'High Importance',   value: importanceCounts.high,   color: '#fbbf24' },
+                    { label: 'Medium Importance', value: importanceCounts.medium, color: '#60a5fa' },
+                    { label: 'Low Importance',    value: importanceCounts.low,    color: '#9ca3af' },
+                  ]).map(({ label, value, color }) => (
+                    <div key={label}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[12px] font-medium" style={{ color: 'rgb(160,165,195)' }}>{label}</span>
+                        <span className="text-[14px] font-bold tabular-nums text-white">{value}</span>
+                      </div>
+                      <MiniBar value={value} max={Math.max(total, 1)} color={color} />
+                    </div>
+                  ))}
+                  <div className="grid grid-cols-2 gap-3 mt-1">
+                    <div style={{ padding: '11px 13px', borderRadius: 10, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div className="text-[10px] font-medium mb-1.5" style={{ color: 'rgb(100,106,135)' }}>Volume Estimated</div>
+                      <div className="text-[20px] font-bold tabular-nums text-white leading-none">{volumeFilled}<span style={{ fontSize: 12, fontWeight: 500, color: 'rgb(80,85,110)' }}> / {total}</span></div>
+                    </div>
+                    <div style={{ padding: '11px 13px', borderRadius: 10, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div className="text-[10px] font-medium mb-1.5" style={{ color: 'rgb(100,106,135)' }}>Revenue Estimated</div>
+                      <div className="text-[20px] font-bold tabular-nums text-white leading-none">{revenueFilled}<span style={{ fontSize: 12, fontWeight: 500, color: 'rgb(80,85,110)' }}> / {total}</span></div>
                     </div>
                   </div>
-                </Link>
-              )
-            })}
-          </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Section 4: AI Monthly Summary ──────────────── */}
+            <div className="section-card">
+              <SectionHeader
+                icon={Sparkles} iconColor="#a78bfa"
+                title="AI Monthly Summary"
+                subtitle="Activity, pipeline health, opportunities &amp; product insights — auto-written"
+                right={
+                  <button onClick={generateNarrative} disabled={generatingNarrative} className="btn btn-ai" style={{ fontSize: '11px', gap: '6px' }}>
+                    {generatingNarrative ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                    {narrative ? 'Regenerate' : 'Generate Summary'}
+                  </button>
+                }
+              />
+              <div style={{ padding: '18px 22px' }}>
+                {narrative ? (
+                  <p className="text-xs whitespace-pre-line" style={{ color: 'rgb(200,200,225)', lineHeight: 1.7 }}>{narrative}</p>
+                ) : (
+                  <p className="text-xs" style={{ color: 'rgb(100,106,135)' }}>
+                    Generate an AI-written narrative covering activity, pipeline health, opportunities, and product insights for {fmtMonthYear(month)}.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* ── Section 5: 6-Month Trend ────────────────────── */}
+            <div className="section-card">
+              <SectionHeader
+                icon={BarChart2} iconColor="#60a5fa"
+                title="Pipeline Trend"
+                subtitle={`Deals by outcome per month · last ${TREND_MONTHS} months`}
+              />
+              <div style={{ padding: '16px 22px 24px' }}>
+                {mounted && !loading ? (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={trend} barGap={3} barCategoryGap="28%">
+                      <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'rgb(100,106,135)' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 10, fill: 'rgb(100,106,135)' }} axisLine={false} tickLine={false} width={22} allowDecimals={false} />
+                      <Tooltip
+                        contentStyle={{ background: 'rgb(20,22,33)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 9, fontSize: 12, color: 'rgb(160,165,195)' }}
+                        labelStyle={{ color: 'rgb(200,205,235)', fontWeight: 600, marginBottom: 4 }}
+                        cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                      />
+                      <Bar dataKey="won"    name="Won"    stackId="a" fill="#4ade80" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="active" name="Active" stackId="a" fill="#60a5fa" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="lost"   name="Lost"   stackId="a" fill="#f87171" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="text-[12px]" style={{ color: 'rgb(100,106,135)' }}>Loading chart…</div>
+                  </div>
+                )}
+                <div className="flex items-center gap-5 mt-3">
+                  {[{ label: 'Won', color: '#4ade80' }, { label: 'Active', color: '#60a5fa' }, { label: 'Lost', color: '#f87171' }].map(l => (
+                    <div key={l.label} className="flex items-center gap-1.5">
+                      <div style={{ width: 10, height: 10, borderRadius: 3, background: l.color }} />
+                      <span className="text-[11px]" style={{ color: 'rgb(100,106,135)' }}>{l.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* ── Filters ─────────────────────────────────────── */}
+            <div className="flex gap-2 flex-wrap items-center">
+              <div className="relative flex-1 min-w-48">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'rgb(90,90,110)' }} />
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search company, individual, country…"
+                  className="input-dark"
+                  style={{ paddingLeft: 32 }}
+                />
+              </div>
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="input-dark" style={{ width: 'auto' }}>
+                <option value="all">All Statuses</option>
+                {DEAL_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+              <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="input-dark" style={{ width: 'auto' }}>
+                <option value="all">All Types</option>
+                {LEAD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+
+            {/* ── Deal list ───────────────────────────────────── */}
+            {loading ? (
+              <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: '#a78bfa' }} /></div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-16">
+                <Building2 size={36} className="mx-auto mb-3 opacity-20" style={{ color: '#a78bfa' }} />
+                <p className="text-sm font-medium text-white mb-1">
+                  {deals.length === 0 ? `No deals for ${fmtMonthYear(month)}` : 'No matching deals'}
+                </p>
+                <p className="text-xs mb-5" style={{ color: 'rgb(90,90,110)' }}>
+                  {deals.length === 0 ? 'Start tracking your BD activities by adding your first deal.' : 'Try adjusting your filters.'}
+                </p>
+                {deals.length === 0 && (
+                  <Link href="/monthly-reports/new" className="btn btn-ai" style={{ fontSize: '13px', textDecoration: 'none', display: 'inline-flex', gap: '6px' }}>
+                    <Plus size={13} />Add Your First Deal
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="text-xs mb-1" style={{ color: 'rgb(90,90,110)' }}>{filtered.length} deal{filtered.length !== 1 ? 's' : ''}</div>
+                {filtered.map(deal => {
+                  const actCount = activities.filter(a => a.deal_id === deal.id).length
+                  const hasBlockers = (deal.blockers || []).some(b => !b.resolved)
+                  return (
+                    <Link
+                      key={deal.id}
+                      href={`/monthly-reports/${deal.id}`}
+                      className="block rounded-xl p-4 card-hover"
+                      style={{ background: 'rgba(22,22,34,0.8)', border: '1px solid rgba(255,255,255,0.06)', textDecoration: 'none' }}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="text-sm font-semibold text-white">{deal.company_name}</span>
+                            <StatusBadge status={deal.status} />
+                            {deal.lead_type && (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+                                style={{ background: 'rgba(255,255,255,0.06)', color: 'rgb(150,150,180)' }}>
+                                {deal.lead_type}
+                              </span>
+                            )}
+                            <ImportanceBadge v={deal.strategic_importance} />
+                            {hasBlockers && (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+                                style={{ background: 'rgba(248,113,113,0.12)', color: '#f87171' }}>
+                                ⚠ Blocker
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 flex-wrap">
+                            {deal.individual_name && (
+                              <span className="text-xs" style={{ color: 'rgb(140,140,170)' }}>
+                                {deal.individual_name}{deal.designation ? ` · ${deal.designation}` : ''}
+                              </span>
+                            )}
+                            {deal.country && <span className="text-xs" style={{ color: 'rgb(110,110,140)' }}>{deal.country}</span>}
+                            {deal.industry && <span className="text-xs" style={{ color: 'rgb(110,110,140)' }}>{deal.industry}</span>}
+                          </div>
+                          {(deal.products_proposed?.length || deal.products_interested?.length) ? (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {(deal.products_proposed || deal.products_interested || []).slice(0, 3).map(p => (
+                                <span key={p} className="text-[10px] px-1.5 py-0.5 rounded"
+                                  style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
+                                  {p}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                          {deal.expected_close_date && (
+                            <div className="flex items-center gap-1 text-[10px]" style={{ color: 'rgb(110,110,140)' }}>
+                              <Calendar size={10} />
+                              {new Date(deal.expected_close_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                            </div>
+                          )}
+                          {deal.expected_monthly_volume && (
+                            <div className="text-[10px] font-medium" style={{ color: '#34d399' }}>
+                              {deal.expected_monthly_volume}/mo
+                            </div>
+                          )}
+                          {actCount > 0 && (
+                            <div className="text-[10px]" style={{ color: 'rgb(90,90,110)' }}>
+                              {actCount} activit{actCount !== 1 ? 'ies' : 'y'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

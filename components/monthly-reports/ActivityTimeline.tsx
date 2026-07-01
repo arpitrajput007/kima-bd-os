@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { Loader2, Plus, Calendar, Clock } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { ACTIVITY_TYPES, OUTREACH_CHANNELS, activityTypeMeta } from '@/lib/monthly-reports-types'
 import type { DealActivity, ActivityTypeValue } from '@/lib/monthly-reports-types'
 
@@ -18,9 +17,6 @@ interface Props {
   saving: boolean
   onAdd: (input: NewActivityInput) => void
 }
-
-const inputCls = "w-full rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:ring-1 transition-all"
-const inputStyle = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', '--tw-ring-color': 'rgba(167,139,250,0.4)' } as React.CSSProperties
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -53,7 +49,7 @@ export default function ActivityTimeline({ activities, saving, onAdd }: Props) {
   return (
     <div className="space-y-4">
       {/* ── Add activity ──────────────────────────────── */}
-      <form onSubmit={submit} className="rounded-xl p-4 space-y-3" style={{ background: 'rgba(22,22,34,0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
+      <form onSubmit={submit} className="rounded-xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="flex flex-wrap gap-2">
           {ACTIVITY_TYPES.map(t => (
             <button
@@ -75,13 +71,13 @@ export default function ActivityTimeline({ activities, saving, onAdd }: Props) {
           onChange={e => setContent(e.target.value)}
           rows={2}
           placeholder={needsFollowUp ? 'What needs to happen on the follow-up…' : 'Add a note…'}
-          className={inputCls}
-          style={{ ...inputStyle, resize: 'vertical' }}
+          className="input-dark"
+          style={{ resize: 'vertical' }}
         />
 
         <div className="flex flex-wrap items-center gap-3">
           {needsChannel && (
-            <select value={channel} onChange={e => setChannel(e.target.value)} className={cn(inputCls, 'w-auto')} style={inputStyle}>
+            <select value={channel} onChange={e => setChannel(e.target.value)} className="input-dark" style={{ width: 'auto' }}>
               <option value="">Channel…</option>
               {OUTREACH_CHANNELS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
@@ -91,8 +87,8 @@ export default function ActivityTimeline({ activities, saving, onAdd }: Props) {
               type="date"
               value={nextFollowUp}
               onChange={e => setNextFollowUp(e.target.value)}
-              className={cn(inputCls, 'w-auto')}
-              style={inputStyle}
+              className="input-dark"
+              style={{ width: 'auto' }}
             />
           )}
           <button

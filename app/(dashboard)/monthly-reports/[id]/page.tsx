@@ -6,8 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import {
-  ArrowLeft, Loader2, Pencil, Trash2,
-  DollarSign, TrendingUp, AlertTriangle, Lightbulb,
+  ArrowLeft, Loader2, Pencil, Trash2, Building2, Target,
+  DollarSign, TrendingUp, AlertTriangle, Lightbulb, Activity, StickyNote,
 } from 'lucide-react'
 import DealForm from '@/components/monthly-reports/DealForm'
 import type { DealFormData } from '@/components/monthly-reports/DealForm'
@@ -15,12 +15,13 @@ import ActivityTimeline from '@/components/monthly-reports/ActivityTimeline'
 import type { NewActivityInput } from '@/components/monthly-reports/ActivityTimeline'
 import { dealStatusMeta, fmtMonthYear } from '@/lib/monthly-reports-types'
 import type { MonthlyDeal, DealActivity } from '@/lib/monthly-reports-types'
+import { SectionHeader } from '@/components/monthly-reports/ui'
 
 function InfoRow({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: 'rgb(90,90,110)' }}>{label}</div>
+      <div className="text-[10px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: 'rgb(100,106,135)' }}>{label}</div>
       <div className="text-sm" style={{ color: 'rgb(200,200,225)' }}>{value}</div>
     </div>
   )
@@ -114,7 +115,7 @@ export default function DealDetailPage() {
             <p className="text-xs mt-0.5" style={{ color: 'rgb(100,100,120)' }}>{deal.company_name}</p>
           </div>
         </div>
-        <div className="p-8">
+        <div style={{ padding: '28px 36px' }}>
           <DealForm initialData={deal} defaultMonthYear={deal.month_year} saving={saving} onSave={handleSave} onCancel={() => setEditing(false)} />
         </div>
       </div>
@@ -144,20 +145,21 @@ export default function DealDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setEditing(true)} className="btn btn-ghost" style={{ fontSize: '12px', gap: '6px' }}>
+          <button onClick={() => setEditing(true)} className="btn btn-secondary" style={{ padding: '7px 14px', fontSize: '12px' }}>
             <Pencil size={12} />Edit
           </button>
-          <button onClick={handleDelete} disabled={deleting} className="btn btn-ghost" style={{ fontSize: '12px', gap: '6px', color: '#f87171' }}>
+          <button onClick={handleDelete} disabled={deleting} className="btn btn-danger" style={{ padding: '7px 14px', fontSize: '12px' }}>
             {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}Delete
           </button>
         </div>
       </div>
 
-      <div className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div style={{ padding: '28px 36px' }} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* ── Left: details ─────────────────────────────── */}
         <div className="lg:col-span-2 space-y-5">
-          <div className="rounded-xl p-5" style={{ background: 'rgba(22,22,34,0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="section-card">
+            <SectionHeader icon={Building2} iconColor="#a78bfa" title="Company Information" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4" style={{ padding: '18px 22px' }}>
               <InfoRow label="Individual" value={deal.individual_name ? `${deal.individual_name}${deal.designation ? ` · ${deal.designation}` : ''}` : undefined} />
               <InfoRow label="Country" value={deal.country} />
               <InfoRow label="Industry" value={deal.industry} />
@@ -168,81 +170,98 @@ export default function DealDetailPage() {
           </div>
 
           {(deal.requirement || deal.problem_statement) && (
-            <div className="rounded-xl p-5 space-y-4" style={{ background: 'rgba(22,22,34,0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <InfoRow label="Requirement" value={deal.requirement} />
-              <InfoRow label="Problem Statement" value={deal.problem_statement} />
-              {!!(deal.products_interested?.length) && (
-                <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'rgb(90,90,110)' }}>Products Interested In</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {deal.products_interested.map(p => (
-                      <span key={p} className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>{p}</span>
-                    ))}
+            <div className="section-card">
+              <SectionHeader icon={Target} iconColor="#60a5fa" title="Opportunity Details" />
+              <div className="space-y-4" style={{ padding: '18px 22px' }}>
+                <InfoRow label="Requirement" value={deal.requirement} />
+                <InfoRow label="Problem Statement" value={deal.problem_statement} />
+                {!!(deal.products_interested?.length) && (
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'rgb(100,106,135)' }}>Products Interested In</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {deal.products_interested.map(p => (
+                        <span key={p} className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>{p}</span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
 
-          <div className="rounded-xl p-5" style={{ background: 'rgba(22,22,34,0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="text-[10px] font-semibold uppercase tracking-wide mb-3" style={{ color: 'rgb(90,90,110)' }}>Activity Timeline</div>
-            <ActivityTimeline activities={activities} saving={addingActivity} onAdd={handleAddActivity} />
+          <div className="section-card">
+            <SectionHeader icon={Activity} iconColor="#22d3ee" title="Activity Timeline" subtitle="Notes, follow-ups, meetings &amp; channel touches" />
+            <div style={{ padding: '18px 22px' }}>
+              <ActivityTimeline activities={activities} saving={addingActivity} onAdd={handleAddActivity} />
+            </div>
           </div>
         </div>
 
         {/* ── Right: business potential + feedback ───────── */}
         <div className="space-y-5">
-          <div className="rounded-xl p-5 space-y-3" style={{ background: 'rgba(22,22,34,0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="text-[10px] font-semibold uppercase tracking-wide mb-1 flex items-center gap-1.5" style={{ color: 'rgb(90,90,110)' }}>
-              <DollarSign size={11} />Business Potential
+          <div className="section-card">
+            <SectionHeader icon={DollarSign} iconColor="#4ade80" title="Business Potential" />
+            <div className="space-y-3" style={{ padding: '18px 22px' }}>
+              <InfoRow label="Monthly Volume" value={deal.expected_monthly_volume} />
+              <InfoRow label="Yearly Volume" value={deal.expected_yearly_volume} />
+              <InfoRow label="Revenue Opportunity" value={deal.estimated_revenue} />
+              <InfoRow label="Geographic Corridor" value={deal.geographic_corridor} />
+              {deal.strategic_importance && <InfoRow label="Strategic Importance" value={deal.strategic_importance.toUpperCase()} />}
             </div>
-            <InfoRow label="Monthly Volume" value={deal.expected_monthly_volume} />
-            <InfoRow label="Yearly Volume" value={deal.expected_yearly_volume} />
-            <InfoRow label="Revenue Opportunity" value={deal.estimated_revenue} />
-            <InfoRow label="Geographic Corridor" value={deal.geographic_corridor} />
-            {deal.strategic_importance && <InfoRow label="Strategic Importance" value={deal.strategic_importance.toUpperCase()} />}
           </div>
 
           {(deal.business_impact || deal.why_valuable || deal.long_term_value) && (
-            <div className="rounded-xl p-5 space-y-3" style={{ background: 'rgba(22,22,34,0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="text-[10px] font-semibold uppercase tracking-wide flex items-center gap-1.5" style={{ color: 'rgb(90,90,110)' }}>
-                <TrendingUp size={11} />Business Impact
+            <div className="section-card">
+              <SectionHeader icon={TrendingUp} iconColor="#60a5fa" title="Business Impact" />
+              <div className="space-y-3" style={{ padding: '18px 22px' }}>
+                <InfoRow label="Impact" value={deal.business_impact} />
+                <InfoRow label="Why Valuable" value={deal.why_valuable} />
+                <InfoRow label="Long-term Value" value={deal.long_term_value} />
               </div>
-              <InfoRow label="Impact" value={deal.business_impact} />
-              <InfoRow label="Why Valuable" value={deal.why_valuable} />
-              <InfoRow label="Long-term Value" value={deal.long_term_value} />
             </div>
           )}
 
           {deal.product_feedback && Object.values(deal.product_feedback).some(Boolean) && (
-            <div className="rounded-xl p-5 space-y-3" style={{ background: 'rgba(34,211,238,0.05)', border: '1px solid rgba(34,211,238,0.15)' }}>
-              <div className="text-[10px] font-semibold uppercase tracking-wide flex items-center gap-1.5" style={{ color: '#67e8f9' }}>
-                <Lightbulb size={11} />Product Feedback
+            <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(34,211,238,0.05)', border: '1px solid rgba(34,211,238,0.15)' }}>
+              <div className="flex items-center gap-2.5 px-5 py-3.5" style={{ borderBottom: '1px solid rgba(34,211,238,0.12)' }}>
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(34,211,238,0.15)' }}>
+                  <Lightbulb size={14} style={{ color: '#67e8f9' }} />
+                </div>
+                <div className="text-[13px] font-semibold" style={{ color: '#67e8f9' }}>Product Feedback</div>
               </div>
-              {Object.entries(deal.product_feedback).filter(([, v]) => v).map(([k, v]) => (
-                <InfoRow key={k} label={k.replace(/_/g, ' ')} value={v as string} />
-              ))}
+              <div className="space-y-3" style={{ padding: '16px 20px' }}>
+                {Object.entries(deal.product_feedback).filter(([, v]) => v).map(([k, v]) => (
+                  <InfoRow key={k} label={k.replace(/_/g, ' ')} value={v as string} />
+                ))}
+              </div>
             </div>
           )}
 
           {!!(deal.blockers?.length) && (
-            <div className="rounded-xl p-5 space-y-2" style={{ background: 'rgba(248,113,113,0.05)', border: '1px solid rgba(248,113,113,0.15)' }}>
-              <div className="text-[10px] font-semibold uppercase tracking-wide flex items-center gap-1.5 mb-1" style={{ color: '#f87171' }}>
-                <AlertTriangle size={11} />Blockers
-              </div>
-              {deal.blockers.map(b => (
-                <div key={b.type} className="text-xs" style={{ color: b.resolved ? 'rgb(100,100,120)' : '#f87171', textDecoration: b.resolved ? 'line-through' : 'none' }}>
-                  {b.type.replace(/_/g, ' ')}{b.notes ? ` — ${b.notes}` : ''}
+            <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(248,113,113,0.05)', border: '1px solid rgba(248,113,113,0.15)' }}>
+              <div className="flex items-center gap-2.5 px-5 py-3.5" style={{ borderBottom: '1px solid rgba(248,113,113,0.12)' }}>
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(248,113,113,0.15)' }}>
+                  <AlertTriangle size={14} style={{ color: '#f87171' }} />
                 </div>
-              ))}
+                <div className="text-[13px] font-semibold" style={{ color: '#f87171' }}>Blockers</div>
+              </div>
+              <div className="space-y-1.5" style={{ padding: '14px 20px' }}>
+                {deal.blockers.map(b => (
+                  <div key={b.type} className="text-xs" style={{ color: b.resolved ? 'rgb(100,106,135)' : '#f87171', textDecoration: b.resolved ? 'line-through' : 'none' }}>
+                    {b.type.replace(/_/g, ' ')}{b.notes ? ` — ${b.notes}` : ''}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
           {deal.notes && (
-            <div className="rounded-xl p-5" style={{ background: 'rgba(22,22,34,0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'rgb(90,90,110)' }}>Notes</div>
-              <p className="text-xs" style={{ color: 'rgb(180,180,210)' }}>{deal.notes}</p>
-              {deal.owner && <p className="text-[10px] mt-2" style={{ color: 'rgb(90,90,110)' }}>Owner: {deal.owner}</p>}
+            <div className="section-card">
+              <SectionHeader icon={StickyNote} iconColor="#fbbf24" title="Notes" />
+              <div style={{ padding: '18px 22px' }}>
+                <p className="text-xs" style={{ color: 'rgb(180,180,210)' }}>{deal.notes}</p>
+                {deal.owner && <p className="text-[10px] mt-2" style={{ color: 'rgb(100,106,135)' }}>Owner: {deal.owner}</p>}
+              </div>
             </div>
           )}
         </div>
