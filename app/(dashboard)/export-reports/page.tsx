@@ -247,7 +247,7 @@ function revenueCSVRows(leads: Lead[]) {
 
 function revenueHTML(leads: Lead[], generatedAt: string, quarter: string): string {
   const won = leads.filter(l => l.status === 'won')
-  const inProgress = leads.filter(l => ['negotiating','proposal_sent','integration'].includes(l.status))
+  const inProgress = leads.filter(l => ['meeting_booked','proposal_sent','negotiating','integration'].includes(l.status))
   const meetings = leads.filter(l => l.status === 'meeting_booked')
   const lost = leads.filter(l => l.status === 'lost')
 
@@ -326,22 +326,24 @@ export default function ExportReportsPage() {
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString()
 
     const [{ data: pipeline }, { data: competitor }, { data: revenue }] = await Promise.all([
+      // Pipeline: all active pipeline leads (any age) + new leads discovered this week
       supabase
         .from('leads')
         .select('*')
         .or(`status.in.(contacted,replied,meeting_booked,proposal_sent,negotiating,integration,won,lost),created_at.gte.${sevenDaysAgo}`)
         .order('lead_score', { ascending: false }),
+      // Competitor: leads with competitor OR current_providers data from last 90 days
       supabase
         .from('leads')
         .select('*')
         .gte('created_at', ninetyDaysAgo)
-        .not('competitor_or_current_provider', 'is', null)
+        .or('competitor_or_current_provider.not.is.null,current_providers.not.is.null')
         .order('lead_score', { ascending: false }),
+      // Revenue: ALL leads in pipeline/closed stages regardless of age — QTR snapshot of the full funnel
       supabase
         .from('leads')
         .select('*')
-        .in('status', ['won', 'negotiating', 'proposal_sent', 'integration', 'meeting_booked', 'lost'])
-        .gte('created_at', ninetyDaysAgo)
+        .in('status', ['won', 'lost', 'negotiating', 'proposal_sent', 'integration', 'meeting_booked'])
         .order('updated_at', { ascending: false }),
     ])
 
@@ -429,7 +431,7 @@ export default function ExportReportsPage() {
       key: 'competitor',
       icon: Target,
       title: 'QTR Competitor Intelligence Report',
-      subtitle: 'Leads tracked with known competitor or current provider data from the last 90 days. Shows competitor frequency, products we\'d displace, and pain severity.',
+      subtitle: 'Leads from the last 90 days where a competitor or current provider is identified. Shows competitor frequency, products we\'d displace, and pain severity.',
       color: '#67e8f9',
       bg: 'rgba(6,182,212,0.06)',
       border: 'rgba(6,182,212,0.18)',
@@ -443,13 +445,13 @@ export default function ExportReportsPage() {
       key: 'revenue',
       icon: TrendingUp,
       title: 'QTR Revenue Attribution from Sales',
-      subtitle: 'Deals in active sales stages or closed (won/lost) in the last 90 days. Includes revenue potential, BD verdict, and product attribution.',
+      subtitle: 'All deals currently in meeting, proposal, negotiation, or integration stage, plus any won/lost deals. Includes revenue potential, BD verdict, and product attribution.',
       color: '#34d399',
       bg: 'rgba(52,211,153,0.06)',
       border: 'rgba(52,211,153,0.18)',
       stats: [
         { label: 'Won', value: revenueLeads.filter(l => l.status === 'won').length },
-        { label: 'In Progress', value: revenueLeads.filter(l => ['negotiating','proposal_sent','integration'].includes(l.status)).length },
+        { label: 'Meeting / Proposal / Negotiating', value: revenueLeads.filter(l => ['meeting_booked','proposal_sent','negotiating','integration'].includes(l.status)).length },
         { label: 'Lost', value: revenueLeads.filter(l => l.status === 'lost').length },
       ],
     },
