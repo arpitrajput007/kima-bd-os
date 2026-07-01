@@ -26,7 +26,6 @@ export const EXA_TOPIC_QUERIES: Array<{ topic: string; query: string }> = [
   { topic: 'Treasury',          query: 'treasury automation crypto blockchain enterprise 2025' },
   { topic: 'Security',          query: 'crypto hack exploit vulnerability DeFi 2025' },
   { topic: 'Fundraising',       query: 'crypto AI startup funding round investment 2025' },
-  { topic: 'Regulations',       query: 'crypto AI regulation SEC CFTC MiCA policy 2025' },
   { topic: 'Developer Tooling', query: 'crypto developer tooling SDK infrastructure launch 2025' },
   { topic: 'Product Launches',  query: 'crypto AI product launch announcement 2025' },
   { topic: 'Enterprise',        query: 'enterprise blockchain adoption institutional crypto 2025' },
@@ -42,7 +41,6 @@ const RSS_FEEDS: Array<{ url: string; topic: string; source: string }> = [
   { url: 'https://www.coindesk.com/arc/outboundfeeds/rss/',                            topic: 'Crypto',       source: 'CoinDesk'       },
   { url: 'https://www.paymentsdive.com/feeds/news/',                                   topic: 'Payments',     source: 'Payments Dive'  },
   { url: 'https://governance.aave.com/posts.rss',                                      topic: 'DeFi',         source: 'Aave Governance'},
-  { url: 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&owner=include&count=10&output=atom', topic: 'Regulations', source: 'SEC.gov' },
   { url: 'https://blog.lido.fi/rss/',                                                  topic: 'DeFi',         source: 'Lido Blog'      },
   { url: 'https://news.curve.finance/rss',                                             topic: 'DeFi',         source: 'Curve News'     },
 ]

@@ -30,6 +30,7 @@ async function loadItems() {
     .from('reaction_news_feed')
     .select('*')
     .gte('created_at', since)
+    .neq('topic', 'Regulations')
     .order('published_at', { ascending: false, nullsFirst: false })
     .limit(200)
   return data || []

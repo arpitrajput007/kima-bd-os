@@ -6,7 +6,7 @@ import {
   RefreshCw, Loader2, Sparkles, Copy, CheckCheck,
   ArrowLeft, Bookmark, BookmarkCheck, Trash2, CheckCircle2,
   Clock, ChevronDown, ChevronUp, Zap, Rss, Hash, MessageSquare,
-  Lightbulb, Filter,
+  Lightbulb, Filter, CheckSquare, Square, X,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -73,6 +73,27 @@ function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length
 }
 
+function dayLabel(iso: string | null): string {
+  const d = iso ? new Date(iso) : new Date()
+  const now = new Date()
+  const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+  const diffDays = Math.round((startOfDay(now) - startOfDay(d)) / 86400000)
+  if (diffDays <= 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return d.toLocaleDateString('en-US', { weekday: 'long' })
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined })
+}
+
+function groupItemsByDay<T extends { published_at: string | null; created_at: string }>(items: T[]) {
+  const map = new Map<string, T[]>()
+  for (const item of items) {
+    const label = dayLabel(item.published_at || item.created_at)
+    if (!map.has(label)) map.set(label, [])
+    map.get(label)!.push(item)
+  }
+  return Array.from(map.entries()).map(([label, items]) => ({ label, items }))
+}
+
 const TOPIC_COLORS: Record<string, { color: string; bg: string; border: string }> = {
   'AI Agents':        { color: '#a78bfa', bg: 'rgba(167,139,250,0.1)',  border: 'rgba(167,139,250,0.25)' },
   'Agentic AI':       { color: '#a78bfa', bg: 'rgba(167,139,250,0.1)',  border: 'rgba(167,139,250,0.25)' },
@@ -86,7 +107,6 @@ const TOPIC_COLORS: Record<string, { color: string; bg: string; border: string }
   'Stablecoins':      { color: '#fbbf24', bg: 'rgba(251,191,36,0.1)',   border: 'rgba(251,191,36,0.25)'  },
   'Payments':         { color: '#22d3ee', bg: 'rgba(34,211,238,0.1)',   border: 'rgba(34,211,238,0.25)'  },
   'Treasury':         { color: '#22d3ee', bg: 'rgba(34,211,238,0.1)',   border: 'rgba(34,211,238,0.25)'  },
-  'Regulations':      { color: '#fb923c', bg: 'rgba(251,146,60,0.1)',   border: 'rgba(251,146,60,0.25)'  },
   'Developer Tooling':{ color: '#e879f9', bg: 'rgba(232,121,249,0.1)',  border: 'rgba(232,121,249,0.25)' },
   'Enterprise':       { color: '#94a3b8', bg: 'rgba(148,163,184,0.1)',  border: 'rgba(148,163,184,0.25)' },
   'Product Launches': { color: '#34d399', bg: 'rgba(52,211,153,0.1)',   border: 'rgba(52,211,153,0.25)'  },
@@ -148,20 +168,36 @@ function CollapsibleSection({ title, icon, children, accent = '#a78bfa' }: {
 }
 
 // ── News item card ─────────────────────────────────────────────────────────────
-function NewsCard({ item, onReact }: { item: ReactionNewsItem; onReact: (item: ReactionNewsItem) => void }) {
+function NewsCard({ item, onReact, onDelete, selectMode, selected, onToggleSelect }: {
+  item: ReactionNewsItem
+  onReact: (item: ReactionNewsItem) => void
+  onDelete: (id: string) => void
+  selectMode: boolean
+  selected: boolean
+  onToggleSelect: (id: string) => void
+}) {
   const c = topicColor(item.topic)
   const sourceName = item.source && item.source !== 'exa' ? item.source : item.topic
   return (
-    <div style={{
-      borderRadius: 12,
-      border: `1px solid ${item.used ? 'rgba(255,255,255,0.04)' : c.border}`,
-      background: 'rgba(12,13,22,0.9)',
-      padding: '14px 16px',
-      display: 'flex', flexDirection: 'column', gap: 10,
-      opacity: item.used ? 0.6 : 1,
-      transition: 'border-color 0.15s',
-    }}>
+    <div
+      onClick={selectMode ? () => onToggleSelect(item.id) : undefined}
+      style={{
+        borderRadius: 12,
+        border: `1px solid ${selected ? 'rgba(96,165,250,0.5)' : item.used ? 'rgba(255,255,255,0.04)' : c.border}`,
+        background: selected ? 'rgba(96,165,250,0.06)' : 'rgba(12,13,22,0.9)',
+        padding: '14px 16px',
+        display: 'flex', flexDirection: 'column', gap: 10,
+        opacity: item.used && !selectMode ? 0.6 : 1,
+        transition: 'border-color 0.15s',
+        cursor: selectMode ? 'pointer' : 'default',
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, justifyContent: 'space-between' }}>
+        {selectMode && (
+          <div style={{ flexShrink: 0, marginTop: 2, color: selected ? '#60a5fa' : 'rgba(255,255,255,0.25)' }}>
+            {selected ? <CheckSquare size={16} /> : <Square size={16} />}
+          </div>
+        )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7, flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <TopicBadge topic={item.topic} />
@@ -186,12 +222,23 @@ function NewsCard({ item, onReact }: { item: ReactionNewsItem; onReact: (item: R
             </div>
           )}
         </div>
-        <button
-          onClick={() => onReact(item)}
-          style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: `${c.color}18`, border: `1px solid ${c.border}`, color: c.color, cursor: 'pointer', whiteSpace: 'nowrap', marginTop: 2 }}
-        >
-          <Sparkles size={11} /> React
-        </button>
+        {!selectMode && (
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+            <button
+              onClick={() => onReact(item)}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: `${c.color}18`, border: `1px solid ${c.border}`, color: c.color, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              <Sparkles size={11} /> React
+            </button>
+            <button
+              onClick={() => onDelete(item.id)}
+              title="Delete"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 8, background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.15)', color: 'rgba(248,113,113,0.5)', cursor: 'pointer' }}
+            >
+              <Trash2 size={11} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -585,6 +632,8 @@ export default function ReactionMode() {
   const [drafts, setDrafts]           = useState<ReactionDraft[]>([])
   const [draftsLoading, setDraftsLoading] = useState(false)
   const [filterStatus, setFilterStatus] = useState<'all' | 'saved' | 'posted'>('all')
+  const [selectMode, setSelectMode]   = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const { copied, copy }              = useCopy()
 
   const loadFeed = useCallback(async () => {
@@ -647,6 +696,42 @@ export default function ReactionMode() {
     setDrafts(prev => prev.filter(d => d.id !== id))
     try { await fetch(`/api/reaction-drafts/${id}`, { method: 'DELETE' }) }
     catch { /* already removed from UI */ }
+  }
+
+  const deleteNewsItems = async (ids: string[]) => {
+    if (ids.length === 0) return
+    const idSet = new Set(ids)
+    setItems(prev => prev.filter(i => !idSet.has(i.id)))
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      ids.forEach(id => next.delete(id))
+      return next
+    })
+    try {
+      const res = await fetch('/api/reaction/news-items', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      })
+      if (!res.ok) throw new Error('Delete failed')
+      toast.success(ids.length > 1 ? `Deleted ${ids.length} items` : 'Item deleted')
+    } catch {
+      toast.error('Delete failed')
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const exitSelectMode = () => {
+    setSelectMode(false)
+    setSelectedIds(new Set())
   }
 
   // Unique topics from loaded items
@@ -719,14 +804,43 @@ export default function ReactionMode() {
                 )
               })}
             </div>
-            <button
-              onClick={refreshFeed}
-              disabled={refreshing}
-              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.5)' }}
-            >
-              <RefreshCw size={11} className={refreshing ? 'animate-spin' : ''} />
-              {refreshing ? 'Fetching…' : 'Refresh'}
-            </button>
+            {selectMode ? (
+              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+                  {selectedIds.size} selected
+                </span>
+                <button
+                  onClick={() => deleteNewsItems(Array.from(selectedIds))}
+                  disabled={selectedIds.size === 0}
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: selectedIds.size === 0 ? 'not-allowed' : 'pointer', border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.1)', color: '#f87171', opacity: selectedIds.size === 0 ? 0.5 : 1 }}
+                >
+                  <Trash2 size={11} /> Delete
+                </button>
+                <button
+                  onClick={exitSelectMode}
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.5)' }}
+                >
+                  <X size={11} /> Cancel
+                </button>
+              </div>
+            ) : (
+              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  onClick={() => setSelectMode(true)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.5)' }}
+                >
+                  <CheckSquare size={11} /> Select
+                </button>
+                <button
+                  onClick={refreshFeed}
+                  disabled={refreshing}
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.5)' }}
+                >
+                  <RefreshCw size={11} className={refreshing ? 'animate-spin' : ''} />
+                  {refreshing ? 'Fetching…' : 'Refresh'}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Loading */}
@@ -761,11 +875,32 @@ export default function ReactionMode() {
             </div>
           )}
 
-          {/* News item list */}
+          {/* News item list, grouped by day */}
           {!loadingFeed && filteredItems.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {filteredItems.map(item => (
-                <NewsCard key={item.id} item={item} onReact={handleReact} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+              {groupItemsByDay(filteredItems).map(group => (
+                <div key={group.label}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      {group.label}
+                    </span>
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>{group.items.length}</span>
+                    <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {group.items.map(item => (
+                      <NewsCard
+                        key={item.id}
+                        item={item}
+                        onReact={handleReact}
+                        onDelete={id => deleteNewsItems([id])}
+                        selectMode={selectMode}
+                        selected={selectedIds.has(item.id)}
+                        onToggleSelect={toggleSelect}
+                      />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}
