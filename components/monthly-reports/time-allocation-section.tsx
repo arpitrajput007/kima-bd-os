@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Plus, Trash2, Clock } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
-import { SectionHeader } from './ui'
+import { SectionHeader, AiFixButton } from './ui'
 import type { TimeAllocation } from '@/lib/monthly-reports-types'
 
 export const TIME_PIE_COLORS = [
@@ -62,6 +62,7 @@ export function TimeAllocationSection({
             style={{ flex: '2 1 220px' }}
             onKeyDown={e => { if (e.key === 'Enter') submit() }}
           />
+          <AiFixButton value={responsibility} onFixed={setResponsibility} />
           <input
             value={percentage}
             onChange={e => setPercentage(e.target.value)}
