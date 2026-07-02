@@ -23,7 +23,7 @@ import {
 import type { MonthlyDeal, DealActivity, TimeAllocation } from '@/lib/monthly-reports-types'
 import { getOutreachStats, EMPTY_OUTREACH_STATS } from '@/lib/monthly-outreach-stats'
 import type { OutreachStats } from '@/lib/monthly-outreach-stats'
-import { KpiCard, MiniBar, SectionHeader } from '@/components/monthly-reports/ui'
+import { KpiCard, MiniBar, SectionHeader, InlineEditableNumber } from '@/components/monthly-reports/ui'
 import { TimeAllocationSection, timeByResponsibility, TIME_PIE_COLORS } from '@/components/monthly-reports/time-allocation-section'
 
 // PostgREST reports a missing table as code PGRST205 ("Could not find the
@@ -106,7 +106,7 @@ function pdfStatusColors(status: string): { bg: string; text: string } {
   return { bg: '#f3f4f6', text: '#6b7280' }
 }
 
-function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: string, outreach: OutreachStats, timeEntries: TimeAllocation[], narrative?: string, kpiOverrides: Record<string, number> = {}) {
+function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: string, outreach: OutreachStats, timeEntries: TimeAllocation[], narrative?: string, kpiOverrides: Record<string, number> = {}, categoryOverrides: Record<string, number> = {}) {
   const label = fmtMonthYear(month)
   const won     = deals.filter(d => d.status === 'closed_won')
   const lost    = deals.filter(d => d.status === 'closed_lost')
@@ -126,6 +126,7 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
   const heroWon                 = kpiOverrides.won ?? won.length
   const heroLost                = kpiOverrides.lost ?? lost.length
   const heroMeetings            = kpiOverrides.meetings ?? meetings
+  const heroFollowUps           = kpiOverrides.follow_ups ?? followUps
 
   // Channel breakdown (deal-level channel + raw outreach touches)
   const ch: Record<string, number> = { ...outreach.channelBreakdown }
@@ -137,7 +138,7 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
 
   // Companies contacted by category
   const categoryRows = Object.entries(outreach.companyCategoryBreakdown).sort((a, b) => b[1] - a[1])
-    .map(([k, v]) => [k, String(v)])
+    .map(([k, v]) => [k, String(categoryOverrides[k] ?? v)])
 
   // Time allocation — by responsibility, as % of time
   const timeByResp = timeByResponsibility(timeEntries)
@@ -222,7 +223,7 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
     ['Total Deals', deals.length], ['Companies (Deals)', uniqueCos],
     ['Active', heroActive], ['Won', heroWon],
     ['Lost', heroLost], ['Meetings', heroMeetings],
-    ['Follow-ups', followUps],
+    ['Follow-ups', heroFollowUps],
   ]
   const KPI_COLS = 4, KPI_GAP = 4, KPI_ROW_H = 19
   const kpiColW = (CONTENT_W - KPI_GAP * (KPI_COLS - 1)) / KPI_COLS
@@ -444,6 +445,7 @@ export default function MonthlyReportsPage() {
   const [generatingNarrative, setGeneratingNarrative] = useState(false)
   const [overrides, setOverrides]       = useState<Record<string, number>>({})
   const [fakeOverrides, setFakeOverrides] = useState<Record<string, number>>({})
+  const [categoryOverrides, setCategoryOverrides] = useState<Record<string, number>>({})
   const [timeEntries, setTimeEntries]   = useState<TimeAllocation[]>([])
   const [trackingSetupNeeded, setTrackingSetupNeeded] = useState(false)
   const exportRef = useRef<HTMLDivElement>(null)
@@ -510,32 +512,12 @@ export default function MonthlyReportsPage() {
   const kpiValue = (key: string, computed: number) => overrides[key] ?? computed
 
   // Presentation-mode ("fake") layer — session-only, never written to the database.
-  // Editing one Overview KPI scales the other KPIs in its funnel by the same ratio;
-  // Reset to Real Numbers clears the whole layer at once.
-  const OUTREACH_FUNNEL = ['total_outreach', 'companies_contacted', 'individuals_contacted', 'replies', 'meetings']
-  const PIPELINE_FUNNEL = ['active_pipeline', 'won', 'lost']
-  const funnelFor = (key: string) => OUTREACH_FUNNEL.includes(key) ? OUTREACH_FUNNEL : PIPELINE_FUNNEL.includes(key) ? PIPELINE_FUNNEL : [key]
-  const baseKpiValues: Record<string, number> = {
-    total_outreach: kpiValue('total_outreach', outreachStats.totalOutreach),
-    companies_contacted: kpiValue('companies_contacted', outreachStats.companiesContacted),
-    individuals_contacted: kpiValue('individuals_contacted', outreachStats.individualsContacted),
-    replies: kpiValue('replies', outreachStats.replies),
-    active_pipeline: kpiValue('active_pipeline', active),
-    won: kpiValue('won', won),
-    lost: kpiValue('lost', lost),
-    meetings: kpiValue('meetings', meetings),
-  }
+  // Each KPI is edited independently; Reset to Real Numbers clears the whole layer at once.
   const displayValue = (key: string, computed: number) => fakeOverrides[key] ?? kpiValue(key, computed)
+  const displayTotalOutreach = displayValue('total_outreach', outreachStats.totalOutreach)
+  const displayCompaniesContacted = displayValue('companies_contacted', outreachStats.companiesContacted)
   function applyFakeEdit(key: string, newValue: number) {
-    const base = baseKpiValues[key] ?? 0
-    const ratio = base !== 0 ? newValue / base : null
-    setFakeOverrides(prev => {
-      const next = { ...prev }
-      funnelFor(key).forEach(k => {
-        next[k] = k === key ? newValue : ratio !== null ? Math.round((baseKpiValues[k] ?? 0) * ratio) : baseKpiValues[k] ?? 0
-      })
-      return next
-    })
+    setFakeOverrides(prev => ({ ...prev, [key]: newValue }))
   }
   function resetFakeEdit(key: string) {
     setFakeOverrides(prev => {
@@ -546,6 +528,7 @@ export default function MonthlyReportsPage() {
   }
   function resetAllFakeEdits() {
     setFakeOverrides({})
+    setCategoryOverrides({})
   }
 
   async function addTimeEntry(responsibility: string, percentage: number) {
@@ -670,7 +653,7 @@ export default function MonthlyReportsPage() {
                   <FileText size={12} style={{ color: '#60a5fa' }} />Export Excel (CSV)
                 </button>
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
-                <button onClick={() => { exportPDF(deals, activities, month, outreachStats, timeEntries, narrative || undefined, fakeOverrides); setExportOpen(false) }}
+                <button onClick={() => { exportPDF(deals, activities, month, outreachStats, timeEntries, narrative || undefined, fakeOverrides, categoryOverrides); setExportOpen(false) }}
                   className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs hover:bg-white/5 text-left transition-colors"
                   style={{ color: 'rgb(180,180,210)' }}>
                   <FileText size={12} style={{ color: '#a78bfa' }} />Export PDF Report
@@ -708,7 +691,7 @@ export default function MonthlyReportsPage() {
                 <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgb(80,85,115)' }}>
                   {fmtMonthYear(month)} — Overview
                 </div>
-                {Object.keys(fakeOverrides).length > 0 && (
+                {(Object.keys(fakeOverrides).length > 0 || Object.keys(categoryOverrides).length > 0) && (
                   <button onClick={resetAllFakeEdits} className="btn btn-secondary flex items-center gap-1.5" style={{ fontSize: '11px', padding: '5px 10px' }}>
                     <RotateCcw size={11} />Reset to Real Numbers
                   </button>
@@ -722,7 +705,7 @@ export default function MonthlyReportsPage() {
                 <KpiCard label="Individuals Contacted" value={displayValue('individuals_contacted', outreachStats.individualsContacted)} color="#c084fc" icon={Users}     loading={loading}
                   editable isOverridden={fakeOverrides.individuals_contacted != null} onEditSave={v => applyFakeEdit('individuals_contacted', v)} onResetOverride={() => resetFakeEdit('individuals_contacted')} />
                 <KpiCard label="Replies"               value={displayValue('replies', outreachStats.replies)}                          color="#34d399" icon={Reply}     loading={loading}
-                  sub={outreachStats.totalOutreach > 0 ? `${Math.round((outreachStats.replies / outreachStats.totalOutreach) * 100)}% reply rate` : undefined}
+                  sub={displayTotalOutreach > 0 ? `${Math.round((displayValue('replies', outreachStats.replies) / displayTotalOutreach) * 100)}% reply rate` : undefined}
                   editable isOverridden={fakeOverrides.replies != null} onEditSave={v => applyFakeEdit('replies', v)} onResetOverride={() => resetFakeEdit('replies')} />
                 <KpiCard label="Active Pipeline"       value={displayValue('active_pipeline', active)}                                  color="#60a5fa" icon={TrendingUp} loading={loading}
                   editable isOverridden={fakeOverrides.active_pipeline != null} onEditSave={v => applyFakeEdit('active_pipeline', v)} onResetOverride={() => resetFakeEdit('active_pipeline')} />
@@ -731,8 +714,9 @@ export default function MonthlyReportsPage() {
                 <KpiCard label="Lost"                  value={displayValue('lost', lost)}                                              color="#f87171" icon={XCircle}   loading={loading}
                   editable isOverridden={fakeOverrides.lost != null} onEditSave={v => applyFakeEdit('lost', v)} onResetOverride={() => resetFakeEdit('lost')} />
                 <KpiCard label="Meetings"              value={displayValue('meetings', meetings)}                                      color="#fb923c" icon={Calendar}  loading={loading}
-                  sub={`${followUps} follow-ups`}
                   editable isOverridden={fakeOverrides.meetings != null} onEditSave={v => applyFakeEdit('meetings', v)} onResetOverride={() => resetFakeEdit('meetings')} />
+                <KpiCard label="Follow-ups"            value={displayValue('follow_ups', followUps)}                                   color="#facc15" icon={Reply}     loading={loading}
+                  editable isOverridden={fakeOverrides.follow_ups != null} onEditSave={v => applyFakeEdit('follow_ups', v)} onResetOverride={() => resetFakeEdit('follow_ups')} />
               </div>
             </div>
 
@@ -742,22 +726,35 @@ export default function MonthlyReportsPage() {
                 icon={Building2} iconColor="#67e8f9"
                 title="Companies Contacted by Category"
                 subtitle="Industry breakdown of unique companies reached out to this month"
-                right={<span className="text-[15px] font-bold text-white tabular-nums">{outreachStats.companiesContacted}</span>}
+                right={<span className="text-[15px] font-bold text-white tabular-nums">{displayCompaniesContacted}</span>}
               />
               <div style={{ padding: '16px 22px', display: 'flex', flexDirection: 'column', gap: 11 }}>
                 {Object.keys(outreachStats.companyCategoryBreakdown).length === 0 ? (
                   <p className="text-xs text-center py-4" style={{ color: 'rgb(90,90,110)' }}>
                     No categorized outreach yet — categories come from each lead&apos;s industry.
                   </p>
-                ) : Object.entries(outreachStats.companyCategoryBreakdown).sort((a, b) => b[1] - a[1]).map(([cat, count]) => (
-                  <div key={cat}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[12px] font-medium" style={{ color: 'rgb(160,165,195)' }}>{cat}</span>
-                      <span className="text-[14px] font-bold tabular-nums text-white">{count}</span>
-                    </div>
-                    <MiniBar value={count} max={Math.max(...Object.values(outreachStats.companyCategoryBreakdown), 1)} color="#67e8f9" />
-                  </div>
-                ))}
+                ) : (() => {
+                  const categoryEntries = Object.entries(outreachStats.companyCategoryBreakdown).sort((a, b) => b[1] - a[1])
+                  const categoryMax = Math.max(...categoryEntries.map(([cat, count]) => categoryOverrides[cat] ?? count), 1)
+                  return categoryEntries.map(([cat, count]) => {
+                    const val = categoryOverrides[cat] ?? count
+                    return (
+                      <div key={cat}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[12px] font-medium" style={{ color: 'rgb(160,165,195)' }}>{cat}</span>
+                          <InlineEditableNumber
+                            value={val}
+                            color="#67e8f9"
+                            isOverridden={categoryOverrides[cat] != null}
+                            onSave={v => setCategoryOverrides(prev => ({ ...prev, [cat]: v }))}
+                            onReset={() => setCategoryOverrides(prev => { const next = { ...prev }; delete next[cat]; return next })}
+                          />
+                        </div>
+                        <MiniBar value={val} max={categoryMax} color="#67e8f9" />
+                      </div>
+                    )
+                  })
+                })()}
               </div>
             </div>
 

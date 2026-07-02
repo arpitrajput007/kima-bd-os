@@ -104,6 +104,62 @@ export function KpiCard({
   )
 }
 
+/** Small inline pencil-to-edit number used in list rows (e.g. category/channel breakdowns). */
+export function InlineEditableNumber({
+  value, color, isOverridden, onSave, onReset,
+}: {
+  value: number
+  color: string
+  isOverridden?: boolean
+  onSave: (value: number) => void
+  onReset?: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  function startEdit() {
+    setDraft(String(value))
+    setEditing(true)
+  }
+  function save() {
+    const n = Number(draft)
+    if (Number.isFinite(n)) onSave(n)
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <input
+          autoFocus
+          type="number"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
+          className="input-dark"
+          style={{ padding: '2px 6px', fontSize: 13, height: 24, width: 64 }}
+        />
+        <button onClick={save} title="Save" style={{ color: '#4ade80', flexShrink: 0 }}><Check size={12} /></button>
+        <button onClick={() => setEditing(false)} title="Cancel" style={{ color: '#f87171', flexShrink: 0 }}><X size={12} /></button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-[14px] font-bold tabular-nums text-white">{value}</span>
+      <button onClick={startEdit} title="Edit value" className="flex items-center justify-center" style={{ color, opacity: 0.5 }}>
+        <Pencil size={11} />
+      </button>
+      {isOverridden && onReset && (
+        <button onClick={onReset} title="Reset to calculated value" style={{ color: 'rgb(100,106,135)', opacity: 0.7 }}>
+          <RotateCcw size={10} />
+        </button>
+      )}
+    </div>
+  )
+}
+
 export function SectionHeader({
   icon: Icon, iconColor, title, subtitle, right,
 }: {
