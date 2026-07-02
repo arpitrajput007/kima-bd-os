@@ -13,6 +13,7 @@ export interface OutreachStats {
   meetingsBooked: number
   followUpsSent: number
   channelBreakdown: Record<string, number>
+  companyCategoryBreakdown: Record<string, number>
 }
 
 export const EMPTY_OUTREACH_STATS: OutreachStats = {
@@ -23,6 +24,7 @@ export const EMPTY_OUTREACH_STATS: OutreachStats = {
   meetingsBooked: 0,
   followUpsSent: 0,
   channelBreakdown: {},
+  companyCategoryBreakdown: {},
 }
 
 export function monthDateRange(monthYear: string): { start: string; end: string } {
@@ -74,6 +76,19 @@ export async function getOutreachStats(
   const repliesInMonth = msgs.filter(m => m.status === 'replied').length
   const meetingsBooked = acts.filter(a => a.type === 'meeting').length
 
+  // Category breakdown of the companies contacted — grouped by leads.industry_category
+  const companyCategoryBreakdown: Record<string, number> = {}
+  if (companySet.size > 0) {
+    const { data: catRows } = await supabase
+      .from('leads')
+      .select('id, industry_category')
+      .in('id', Array.from(companySet))
+    ;(catRows || []).forEach(r => {
+      const cat = (r.industry_category as string | null)?.trim() || 'Uncategorized'
+      companyCategoryBreakdown[cat] = (companyCategoryBreakdown[cat] || 0) + 1
+    })
+  }
+
   return {
     totalOutreach: msgs.length,
     companiesContacted: companySet.size,
@@ -82,5 +97,6 @@ export async function getOutreachStats(
     meetingsBooked,
     followUpsSent: acts.filter(a => a.type === 'follow_up').length,
     channelBreakdown,
+    companyCategoryBreakdown,
   }
 }

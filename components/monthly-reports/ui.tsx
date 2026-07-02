@@ -1,6 +1,7 @@
 'use client'
 
-import { ArrowUpRight } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowUpRight, Pencil, Check, X, RotateCcw } from 'lucide-react'
 
 // ── Shared visual primitives for the Monthly Reports feature ────
 // Mirrors the KpiCard / MiniBar / section-card-header pattern used
@@ -23,6 +24,7 @@ export function MiniBar({ value, max, color }: { value: number; max: number; col
 
 export function KpiCard({
   label, value, sub, color, icon: Icon, loading,
+  editable, isOverridden, onEditSave, onResetOverride,
 }: {
   label: string
   value: string | number
@@ -30,7 +32,26 @@ export function KpiCard({
   color: string
   icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>
   loading?: boolean
+  /** Show a pencil icon that opens an inline numeric editor. */
+  editable?: boolean
+  /** Whether the current value is a manual override (shows a reset control). */
+  isOverridden?: boolean
+  onEditSave?: (value: number) => void
+  onResetOverride?: () => void
 }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  function startEdit() {
+    setDraft(String(value))
+    setEditing(true)
+  }
+  function save() {
+    const n = Number(draft)
+    if (Number.isFinite(n)) onEditSave?.(n)
+    setEditing(false)
+  }
+
   return (
     <div className="stat-card" style={{ position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: color, opacity: 0.5, borderRadius: '14px 14px 0 0' }} />
@@ -39,12 +60,45 @@ export function KpiCard({
           style={{ background: color + '15', border: `1px solid ${color}22` }}>
           <Icon size={16} style={{ color }} />
         </div>
-        <ArrowUpRight size={13} style={{ color, opacity: 0.4 }} />
+        {editable && !editing ? (
+          <button onClick={startEdit} title="Edit value" className="flex items-center justify-center"
+            style={{ width: 20, height: 20, borderRadius: 6, color, opacity: 0.5 }}>
+            <Pencil size={12} />
+          </button>
+        ) : !editing ? (
+          <ArrowUpRight size={13} style={{ color, opacity: 0.4 }} />
+        ) : null}
       </div>
-      <div className="text-[26px] font-bold tabular-nums leading-none text-white mb-1" style={loading ? { opacity: 0.18 } : {}}>
-        {loading ? '—' : value}
+
+      {editing ? (
+        <div className="flex items-center gap-1.5 mb-1">
+          <input
+            autoFocus
+            type="number"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
+            className="input-dark"
+            style={{ padding: '4px 8px', fontSize: 16, height: 30, width: '100%' }}
+          />
+          <button onClick={save} title="Save" style={{ color: '#4ade80', flexShrink: 0 }}><Check size={14} /></button>
+          <button onClick={() => setEditing(false)} title="Cancel" style={{ color: '#f87171', flexShrink: 0 }}><X size={14} /></button>
+        </div>
+      ) : (
+        <div className="text-[26px] font-bold tabular-nums leading-none text-white mb-1" style={loading ? { opacity: 0.18 } : {}}>
+          {loading ? '—' : value}
+        </div>
+      )}
+
+      <div className="flex items-center gap-1.5">
+        <div className="text-[11px] font-medium" style={{ color: 'rgb(100,106,135)' }}>{label}</div>
+        {isOverridden && !editing && (
+          <button onClick={onResetOverride} title="Reset to calculated value"
+            style={{ color: 'rgb(100,106,135)', opacity: 0.7, flexShrink: 0 }}>
+            <RotateCcw size={10} />
+          </button>
+        )}
       </div>
-      <div className="text-[11px] font-medium" style={{ color: 'rgb(100,106,135)' }}>{label}</div>
       {sub && <div className="text-[10px] font-semibold mt-1" style={{ color }}>{sub}</div>}
     </div>
   )

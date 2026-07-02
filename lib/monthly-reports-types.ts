@@ -190,6 +190,17 @@ export interface DealActivity {
   created_at: string
 }
 
+export interface TimeAllocation {
+  id: string
+  month_year: string
+  company_name: string
+  responsibility: string
+  hours: number
+  notes?: string
+  created_at: string
+  updated_at: string
+}
+
 // ── Helpers ──────────────────────────────────────────────────────
 
 export function dealStatusMeta(status: DealStatus) {

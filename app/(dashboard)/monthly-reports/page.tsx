@@ -18,10 +18,18 @@ import {
   dealStatusMeta, fmtMonthYear, fmtMonthShort, currentMonthYear, last12Months,
   blockerLabel,
 } from '@/lib/monthly-reports-types'
-import type { MonthlyDeal, DealActivity } from '@/lib/monthly-reports-types'
+import type { MonthlyDeal, DealActivity, TimeAllocation } from '@/lib/monthly-reports-types'
 import { getOutreachStats, EMPTY_OUTREACH_STATS } from '@/lib/monthly-outreach-stats'
 import type { OutreachStats } from '@/lib/monthly-outreach-stats'
 import { KpiCard, MiniBar, SectionHeader } from '@/components/monthly-reports/ui'
+import { TimeAllocationSection, timeByCompany, TIME_PIE_COLORS } from '@/components/monthly-reports/time-allocation-section'
+
+// PostgREST reports a missing table as code PGRST205 ("Could not find the
+// table ... in the schema cache"), not a "does not exist" message.
+function isMissingTableError(error?: { code?: string; message?: string } | null): boolean {
+  if (!error) return false
+  return error.code === 'PGRST205' || !!error.message?.includes('schema cache')
+}
 
 // ── Export helpers ─────────────────────────────────────────────
 
@@ -110,7 +118,20 @@ const PDF_STYLE = `
   @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 `
 
-function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: string, outreach: OutreachStats, narrative?: string) {
+function buildConicGradient(items: { name: string; value: number }[], colors: string[]): string | null {
+  const total = items.reduce((a, b) => a + b.value, 0)
+  if (!total) return null
+  let acc = 0
+  const stops = items.map((it, i) => {
+    const start = (acc / total) * 360
+    acc += it.value
+    const end = (acc / total) * 360
+    return `${colors[i % colors.length]} ${start}deg ${end}deg`
+  })
+  return `conic-gradient(${stops.join(', ')})`
+}
+
+function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: string, outreach: OutreachStats, timeEntries: TimeAllocation[], narrative?: string) {
   const label = fmtMonthYear(month)
   const won     = deals.filter(d => d.status === 'closed_won')
   const lost    = deals.filter(d => d.status === 'closed_lost')
@@ -126,6 +147,16 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
     const meta = OUTREACH_CHANNELS.find(c => c.value === k)
     return `<tr><td>${meta?.label ?? k}</td><td>${v}</td></tr>`
   }).join('')
+
+  // Companies contacted by category
+  const categoryRows = Object.entries(outreach.companyCategoryBreakdown).sort((a,b)=>b[1]-a[1])
+    .map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')
+
+  // Time allocation — by company
+  const timeByCo = timeByCompany(timeEntries)
+  const totalTimeHours = timeByCo.reduce((a,b) => a + b.value, 0)
+  const timeGradient = buildConicGradient(timeByCo, TIME_PIE_COLORS)
+  const timeRows = timeByCo.map((c, i) => `<tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${TIME_PIE_COLORS[i % TIME_PIE_COLORS.length]};margin-right:6px"></span>${c.name}</td><td>${c.value}h</td><td>${totalTimeHours ? Math.round((c.value/totalTimeHours)*100) : 0}%</td></tr>`).join('')
 
   // Product feedback themes — every filled field, not just a subset
   const pfItems: string[] = []
@@ -204,6 +235,17 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
 
     ${chRows ? `<div class="section"><div class="section-title">Outreach by Channel</div>
       <table style="max-width:320px"><thead><tr><th>Channel</th><th>Count</th></tr></thead><tbody>${chRows}</tbody></table>
+    </div>` : ''}
+
+    ${categoryRows ? `<div class="section"><div class="section-title">Companies Contacted by Category</div>
+      <table style="max-width:320px"><thead><tr><th>Category</th><th>Count</th></tr></thead><tbody>${categoryRows}</tbody></table>
+    </div>` : ''}
+
+    ${timeByCo.length ? `<div class="section"><div class="section-title">Time Allocation — ${totalTimeHours}h logged</div>
+      <div style="display:flex;align-items:center;gap:28px;flex-wrap:wrap">
+        <div style="width:140px;height:140px;border-radius:50%;background:${timeGradient ?? '#e5e7eb'};flex-shrink:0"></div>
+        <table style="max-width:340px"><thead><tr><th>Company</th><th>Hours</th><th>%</th></tr></thead><tbody>${timeRows}</tbody></table>
+      </div>
     </div>` : ''}
 
     <div class="section">
@@ -292,6 +334,9 @@ export default function MonthlyReportsPage() {
   const [outreachStats, setOutreachStats] = useState<OutreachStats>(EMPTY_OUTREACH_STATS)
   const [narrative, setNarrative]       = useState('')
   const [generatingNarrative, setGeneratingNarrative] = useState(false)
+  const [overrides, setOverrides]       = useState<Record<string, number>>({})
+  const [timeEntries, setTimeEntries]   = useState<TimeAllocation[]>([])
+  const [trackingSetupNeeded, setTrackingSetupNeeded] = useState(false)
   const exportRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { setMounted(true) }, [])
@@ -301,18 +346,25 @@ export default function MonthlyReportsPage() {
     setNarrative('')
     const trendMonths = last12Months().slice(0, TREND_MONTHS).reverse()
 
-    const [dealsRes, trendRes] = await Promise.all([
+    const [dealsRes, trendRes, overridesRes, timeRes] = await Promise.all([
       supabase.from('monthly_deals').select('*').eq('month_year', month).order('updated_at', { ascending: false }),
       supabase.from('monthly_deals').select('month_year,status').in('month_year', trendMonths),
+      supabase.from('monthly_report_overrides').select('overrides').eq('month_year', month).maybeSingle(),
+      supabase.from('time_allocations').select('*').eq('month_year', month).order('created_at', { ascending: false }),
     ])
 
-    if (dealsRes.error?.message?.includes('does not exist')) {
+    if (isMissingTableError(dealsRes.error)) {
       setSetupNeeded(true); setLoading(false); return
     }
     const dealList = (dealsRes.data || []) as MonthlyDeal[]
     setDeals(dealList)
     setSetupNeeded(false)
     setTrendRows((trendRes.data || []) as { month_year: string; status: string }[])
+
+    const trackingMissing = isMissingTableError(overridesRes.error) || isMissingTableError(timeRes.error)
+    setTrackingSetupNeeded(trackingMissing)
+    setOverrides((overridesRes.data?.overrides as Record<string, number>) || {})
+    setTimeEntries((timeRes.data || []) as TimeAllocation[])
 
     const [actsRes, stats] = await Promise.all([
       dealList.length
@@ -343,6 +395,35 @@ export default function MonthlyReportsPage() {
   const lost     = deals.filter(d => d.status === 'closed_lost').length
   const meetings = activities.filter(a => a.activity_type === 'meeting').length + outreachStats.meetingsBooked
   const followUps = activities.filter(a => a.activity_type === 'follow_up').length + outreachStats.followUpsSent
+
+  // Manual overrides — any Overview KPI can be pinned to a fixed number instead of
+  // the auto-computed value (e.g. outreach logged outside the tracked systems).
+  const kpiValue = (key: string, computed: number) => overrides[key] ?? computed
+  async function saveOverride(key: string, value: number) {
+    const next = { ...overrides, [key]: value }
+    setOverrides(next)
+    const { error } = await supabase.from('monthly_report_overrides').upsert({ month_year: month, overrides: next }, { onConflict: 'month_year' })
+    if (error) toast.error('Failed to save — run supabase/add-time-tracking-and-overrides.sql')
+  }
+  async function resetOverride(key: string) {
+    const next = { ...overrides }
+    delete next[key]
+    setOverrides(next)
+    const { error } = await supabase.from('monthly_report_overrides').upsert({ month_year: month, overrides: next }, { onConflict: 'month_year' })
+    if (error) toast.error('Failed to reset override')
+  }
+
+  async function addTimeEntry(company: string, responsibility: string, hours: number) {
+    const { data, error } = await supabase.from('time_allocations')
+      .insert({ month_year: month, company_name: company, responsibility, hours }).select().single()
+    if (error) { toast.error('Failed to save — run supabase/add-time-tracking-and-overrides.sql'); return }
+    setTimeEntries(prev => [data as TimeAllocation, ...prev])
+  }
+  async function deleteTimeEntry(id: string) {
+    setTimeEntries(prev => prev.filter(e => e.id !== id))
+    const { error } = await supabase.from('time_allocations').delete().eq('id', id)
+    if (error) toast.error('Failed to delete entry')
+  }
 
   // Channel breakdown (raw outreach touches + deal-level channel)
   const channelCounts: Record<string, number> = { ...outreachStats.channelBreakdown }
@@ -454,7 +535,7 @@ export default function MonthlyReportsPage() {
                   <FileText size={12} style={{ color: '#60a5fa' }} />Export Excel (CSV)
                 </button>
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
-                <button onClick={() => { exportPDF(deals, activities, month, outreachStats, narrative || undefined); setExportOpen(false) }}
+                <button onClick={() => { exportPDF(deals, activities, month, outreachStats, timeEntries, narrative || undefined); setExportOpen(false) }}
                   className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs hover:bg-white/5 text-left transition-colors"
                   style={{ color: 'rgb(180,180,210)' }}>
                   <FileText size={12} style={{ color: '#a78bfa' }} />Export PDF Report
@@ -492,16 +573,49 @@ export default function MonthlyReportsPage() {
                 {fmtMonthYear(month)} — Overview
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-                <KpiCard label="Total Outreach"        value={outreachStats.totalOutreach}        color="#22d3ee" icon={Send}      loading={loading} />
-                <KpiCard label="Companies Contacted"   value={outreachStats.companiesContacted}   color="#67e8f9" icon={Building2} loading={loading} />
-                <KpiCard label="Individuals Contacted" value={outreachStats.individualsContacted} color="#c084fc" icon={Users}     loading={loading} />
-                <KpiCard label="Replies"               value={outreachStats.replies}              color="#34d399" icon={Reply}     loading={loading}
-                  sub={outreachStats.totalOutreach > 0 ? `${Math.round((outreachStats.replies / outreachStats.totalOutreach) * 100)}% reply rate` : undefined} />
-                <KpiCard label="Active Pipeline"       value={active}                              color="#60a5fa" icon={TrendingUp} loading={loading} />
-                <KpiCard label="Won"                   value={won}                                 color="#4ade80" icon={Trophy}    loading={loading} />
-                <KpiCard label="Lost"                  value={lost}                                color="#f87171" icon={XCircle}   loading={loading} />
-                <KpiCard label="Meetings"              value={meetings}                            color="#fb923c" icon={Calendar}  loading={loading}
-                  sub={`${followUps} follow-ups`} />
+                <KpiCard label="Total Outreach"        value={kpiValue('total_outreach', outreachStats.totalOutreach)}             color="#22d3ee" icon={Send}      loading={loading}
+                  editable isOverridden={overrides.total_outreach != null} onEditSave={v => saveOverride('total_outreach', v)} onResetOverride={() => resetOverride('total_outreach')} />
+                <KpiCard label="Companies Contacted"   value={kpiValue('companies_contacted', outreachStats.companiesContacted)}   color="#67e8f9" icon={Building2} loading={loading}
+                  editable isOverridden={overrides.companies_contacted != null} onEditSave={v => saveOverride('companies_contacted', v)} onResetOverride={() => resetOverride('companies_contacted')} />
+                <KpiCard label="Individuals Contacted" value={kpiValue('individuals_contacted', outreachStats.individualsContacted)} color="#c084fc" icon={Users}     loading={loading}
+                  editable isOverridden={overrides.individuals_contacted != null} onEditSave={v => saveOverride('individuals_contacted', v)} onResetOverride={() => resetOverride('individuals_contacted')} />
+                <KpiCard label="Replies"               value={kpiValue('replies', outreachStats.replies)}                          color="#34d399" icon={Reply}     loading={loading}
+                  sub={outreachStats.totalOutreach > 0 ? `${Math.round((outreachStats.replies / outreachStats.totalOutreach) * 100)}% reply rate` : undefined}
+                  editable isOverridden={overrides.replies != null} onEditSave={v => saveOverride('replies', v)} onResetOverride={() => resetOverride('replies')} />
+                <KpiCard label="Active Pipeline"       value={kpiValue('active_pipeline', active)}                                  color="#60a5fa" icon={TrendingUp} loading={loading}
+                  editable isOverridden={overrides.active_pipeline != null} onEditSave={v => saveOverride('active_pipeline', v)} onResetOverride={() => resetOverride('active_pipeline')} />
+                <KpiCard label="Won"                   value={kpiValue('won', won)}                                                color="#4ade80" icon={Trophy}    loading={loading}
+                  editable isOverridden={overrides.won != null} onEditSave={v => saveOverride('won', v)} onResetOverride={() => resetOverride('won')} />
+                <KpiCard label="Lost"                  value={kpiValue('lost', lost)}                                              color="#f87171" icon={XCircle}   loading={loading}
+                  editable isOverridden={overrides.lost != null} onEditSave={v => saveOverride('lost', v)} onResetOverride={() => resetOverride('lost')} />
+                <KpiCard label="Meetings"              value={kpiValue('meetings', meetings)}                                      color="#fb923c" icon={Calendar}  loading={loading}
+                  sub={`${followUps} follow-ups`}
+                  editable isOverridden={overrides.meetings != null} onEditSave={v => saveOverride('meetings', v)} onResetOverride={() => resetOverride('meetings')} />
+              </div>
+            </div>
+
+            {/* ── Section 1.5: Companies Contacted by Category ── */}
+            <div className="section-card">
+              <SectionHeader
+                icon={Building2} iconColor="#67e8f9"
+                title="Companies Contacted by Category"
+                subtitle="Industry breakdown of unique companies reached out to this month"
+                right={<span className="text-[15px] font-bold text-white tabular-nums">{outreachStats.companiesContacted}</span>}
+              />
+              <div style={{ padding: '16px 22px', display: 'flex', flexDirection: 'column', gap: 11 }}>
+                {Object.keys(outreachStats.companyCategoryBreakdown).length === 0 ? (
+                  <p className="text-xs text-center py-4" style={{ color: 'rgb(90,90,110)' }}>
+                    No categorized outreach yet — categories come from each lead&apos;s industry.
+                  </p>
+                ) : Object.entries(outreachStats.companyCategoryBreakdown).sort((a, b) => b[1] - a[1]).map(([cat, count]) => (
+                  <div key={cat}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[12px] font-medium" style={{ color: 'rgb(160,165,195)' }}>{cat}</span>
+                      <span className="text-[14px] font-bold tabular-nums text-white">{count}</span>
+                    </div>
+                    <MiniBar value={count} max={Math.max(...Object.values(outreachStats.companyCategoryBreakdown), 1)} color="#67e8f9" />
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -615,6 +729,14 @@ export default function MonthlyReportsPage() {
                 </div>
               </div>
             </div>
+
+            {/* ── Section 3.5: Time Allocation ────────────────── */}
+            <TimeAllocationSection
+              entries={timeEntries}
+              onAdd={addTimeEntry}
+              onDelete={deleteTimeEntry}
+              setupNeeded={trackingSetupNeeded}
+            />
 
             {/* ── Section 4: AI Monthly Summary ──────────────── */}
             <div className="section-card">
