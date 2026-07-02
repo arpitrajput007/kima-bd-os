@@ -8,7 +8,7 @@ import {
   Plus, Search, Download, FileText, TrendingUp, Users,
   Trophy, XCircle, Calendar, BarChart2, Loader2, RefreshCw,
   Building2, ChevronDown, AlertCircle, Send, Reply, Sparkles,
-  Zap, Settings2, Target, DollarSign,
+  Zap, Settings2, Target, DollarSign, RotateCcw,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -131,7 +131,7 @@ function buildConicGradient(items: { name: string; value: number }[], colors: st
   return `conic-gradient(${stops.join(', ')})`
 }
 
-function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: string, outreach: OutreachStats, timeEntries: TimeAllocation[], narrative?: string) {
+function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: string, outreach: OutreachStats, timeEntries: TimeAllocation[], narrative?: string, kpiOverrides: Record<string, number> = {}) {
   const label = fmtMonthYear(month)
   const won     = deals.filter(d => d.status === 'closed_won')
   const lost    = deals.filter(d => d.status === 'closed_lost')
@@ -139,6 +139,18 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
   const meetings   = activities.filter(a => a.activity_type === 'meeting').length + outreach.meetingsBooked
   const followUps  = activities.filter(a => a.activity_type === 'follow_up').length + outreach.followUpsSent
   const uniqueCos  = new Set(deals.map(d => d.company_name)).size
+
+  // Hero KPI badges reflect whatever's currently on screen (including any
+  // unsaved presentation-mode edits) — everything below (deal tables, wins,
+  // blockers) always reflects the real underlying records.
+  const heroTotalOutreach       = kpiOverrides.total_outreach ?? outreach.totalOutreach
+  const heroCompaniesContacted  = kpiOverrides.companies_contacted ?? outreach.companiesContacted
+  const heroIndividualsContacted = kpiOverrides.individuals_contacted ?? outreach.individualsContacted
+  const heroReplies             = kpiOverrides.replies ?? outreach.replies
+  const heroActive              = kpiOverrides.active_pipeline ?? active.length
+  const heroWon                 = kpiOverrides.won ?? won.length
+  const heroLost                = kpiOverrides.lost ?? lost.length
+  const heroMeetings            = kpiOverrides.meetings ?? meetings
 
   // Channel breakdown (deal-level channel + raw outreach touches)
   const ch: Record<string, number> = { ...outreach.channelBreakdown }
@@ -215,16 +227,16 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
     <div class="section">
       <div class="section-title">Executive Summary</div>
       <div class="kpi-row">
-        <div class="kpi"><div class="num">${outreach.totalOutreach}</div><div class="lbl">Total Outreach</div></div>
-        <div class="kpi"><div class="num">${outreach.companiesContacted}</div><div class="lbl">Companies Contacted</div></div>
-        <div class="kpi"><div class="num">${outreach.individualsContacted}</div><div class="lbl">Individuals Contacted</div></div>
-        <div class="kpi"><div class="num">${outreach.replies}</div><div class="lbl">Replies</div></div>
+        <div class="kpi"><div class="num">${heroTotalOutreach}</div><div class="lbl">Total Outreach</div></div>
+        <div class="kpi"><div class="num">${heroCompaniesContacted}</div><div class="lbl">Companies Contacted</div></div>
+        <div class="kpi"><div class="num">${heroIndividualsContacted}</div><div class="lbl">Individuals Contacted</div></div>
+        <div class="kpi"><div class="num">${heroReplies}</div><div class="lbl">Replies</div></div>
         <div class="kpi"><div class="num">${deals.length}</div><div class="lbl">Total Deals</div></div>
         <div class="kpi"><div class="num">${uniqueCos}</div><div class="lbl">Companies (Deals)</div></div>
-        <div class="kpi"><div class="num">${active.length}</div><div class="lbl">Active</div></div>
-        <div class="kpi"><div class="num">${won.length}</div><div class="lbl">Won</div></div>
-        <div class="kpi"><div class="num">${lost.length}</div><div class="lbl">Lost</div></div>
-        <div class="kpi"><div class="num">${meetings}</div><div class="lbl">Meetings</div></div>
+        <div class="kpi"><div class="num">${heroActive}</div><div class="lbl">Active</div></div>
+        <div class="kpi"><div class="num">${heroWon}</div><div class="lbl">Won</div></div>
+        <div class="kpi"><div class="num">${heroLost}</div><div class="lbl">Lost</div></div>
+        <div class="kpi"><div class="num">${heroMeetings}</div><div class="lbl">Meetings</div></div>
         <div class="kpi"><div class="num">${followUps}</div><div class="lbl">Follow-ups</div></div>
       </div>
     </div>
@@ -335,6 +347,7 @@ export default function MonthlyReportsPage() {
   const [narrative, setNarrative]       = useState('')
   const [generatingNarrative, setGeneratingNarrative] = useState(false)
   const [overrides, setOverrides]       = useState<Record<string, number>>({})
+  const [fakeOverrides, setFakeOverrides] = useState<Record<string, number>>({})
   const [timeEntries, setTimeEntries]   = useState<TimeAllocation[]>([])
   const [trackingSetupNeeded, setTrackingSetupNeeded] = useState(false)
   const exportRef = useRef<HTMLDivElement>(null)
@@ -396,21 +409,47 @@ export default function MonthlyReportsPage() {
   const meetings = activities.filter(a => a.activity_type === 'meeting').length + outreachStats.meetingsBooked
   const followUps = activities.filter(a => a.activity_type === 'follow_up').length + outreachStats.followUpsSent
 
-  // Manual overrides — any Overview KPI can be pinned to a fixed number instead of
-  // the auto-computed value (e.g. outreach logged outside the tracked systems).
+  // Real value for a KPI — any persisted override (e.g. outreach logged outside the
+  // tracked systems) takes precedence over the auto-computed number.
   const kpiValue = (key: string, computed: number) => overrides[key] ?? computed
-  async function saveOverride(key: string, value: number) {
-    const next = { ...overrides, [key]: value }
-    setOverrides(next)
-    const { error } = await supabase.from('monthly_report_overrides').upsert({ month_year: month, overrides: next }, { onConflict: 'month_year' })
-    if (error) toast.error('Failed to save — run supabase/add-time-tracking-and-overrides.sql')
+
+  // Presentation-mode ("fake") layer — session-only, never written to the database.
+  // Editing one Overview KPI scales the other KPIs in its funnel by the same ratio;
+  // Reset to Real Numbers clears the whole layer at once.
+  const OUTREACH_FUNNEL = ['total_outreach', 'companies_contacted', 'individuals_contacted', 'replies', 'meetings']
+  const PIPELINE_FUNNEL = ['active_pipeline', 'won', 'lost']
+  const funnelFor = (key: string) => OUTREACH_FUNNEL.includes(key) ? OUTREACH_FUNNEL : PIPELINE_FUNNEL.includes(key) ? PIPELINE_FUNNEL : [key]
+  const baseKpiValues: Record<string, number> = {
+    total_outreach: kpiValue('total_outreach', outreachStats.totalOutreach),
+    companies_contacted: kpiValue('companies_contacted', outreachStats.companiesContacted),
+    individuals_contacted: kpiValue('individuals_contacted', outreachStats.individualsContacted),
+    replies: kpiValue('replies', outreachStats.replies),
+    active_pipeline: kpiValue('active_pipeline', active),
+    won: kpiValue('won', won),
+    lost: kpiValue('lost', lost),
+    meetings: kpiValue('meetings', meetings),
   }
-  async function resetOverride(key: string) {
-    const next = { ...overrides }
-    delete next[key]
-    setOverrides(next)
-    const { error } = await supabase.from('monthly_report_overrides').upsert({ month_year: month, overrides: next }, { onConflict: 'month_year' })
-    if (error) toast.error('Failed to reset override')
+  const displayValue = (key: string, computed: number) => fakeOverrides[key] ?? kpiValue(key, computed)
+  function applyFakeEdit(key: string, newValue: number) {
+    const base = baseKpiValues[key] ?? 0
+    const ratio = base !== 0 ? newValue / base : null
+    setFakeOverrides(prev => {
+      const next = { ...prev }
+      funnelFor(key).forEach(k => {
+        next[k] = k === key ? newValue : ratio !== null ? Math.round((baseKpiValues[k] ?? 0) * ratio) : baseKpiValues[k] ?? 0
+      })
+      return next
+    })
+  }
+  function resetFakeEdit(key: string) {
+    setFakeOverrides(prev => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }
+  function resetAllFakeEdits() {
+    setFakeOverrides({})
   }
 
   async function addTimeEntry(responsibility: string, percentage: number) {
@@ -535,7 +574,7 @@ export default function MonthlyReportsPage() {
                   <FileText size={12} style={{ color: '#60a5fa' }} />Export Excel (CSV)
                 </button>
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
-                <button onClick={() => { exportPDF(deals, activities, month, outreachStats, timeEntries, narrative || undefined); setExportOpen(false) }}
+                <button onClick={() => { exportPDF(deals, activities, month, outreachStats, timeEntries, narrative || undefined, fakeOverrides); setExportOpen(false) }}
                   className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs hover:bg-white/5 text-left transition-colors"
                   style={{ color: 'rgb(180,180,210)' }}>
                   <FileText size={12} style={{ color: '#a78bfa' }} />Export PDF Report
@@ -569,28 +608,35 @@ export default function MonthlyReportsPage() {
           <>
             {/* ── Section 1: Hero KPI Cards ─────────────────── */}
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'rgb(80,85,115)' }}>
-                {fmtMonthYear(month)} — Overview
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgb(80,85,115)' }}>
+                  {fmtMonthYear(month)} — Overview
+                </div>
+                {Object.keys(fakeOverrides).length > 0 && (
+                  <button onClick={resetAllFakeEdits} className="btn btn-secondary flex items-center gap-1.5" style={{ fontSize: '11px', padding: '5px 10px' }}>
+                    <RotateCcw size={11} />Reset to Real Numbers
+                  </button>
+                )}
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-                <KpiCard label="Total Outreach"        value={kpiValue('total_outreach', outreachStats.totalOutreach)}             color="#22d3ee" icon={Send}      loading={loading}
-                  editable isOverridden={overrides.total_outreach != null} onEditSave={v => saveOverride('total_outreach', v)} onResetOverride={() => resetOverride('total_outreach')} />
-                <KpiCard label="Companies Contacted"   value={kpiValue('companies_contacted', outreachStats.companiesContacted)}   color="#67e8f9" icon={Building2} loading={loading}
-                  editable isOverridden={overrides.companies_contacted != null} onEditSave={v => saveOverride('companies_contacted', v)} onResetOverride={() => resetOverride('companies_contacted')} />
-                <KpiCard label="Individuals Contacted" value={kpiValue('individuals_contacted', outreachStats.individualsContacted)} color="#c084fc" icon={Users}     loading={loading}
-                  editable isOverridden={overrides.individuals_contacted != null} onEditSave={v => saveOverride('individuals_contacted', v)} onResetOverride={() => resetOverride('individuals_contacted')} />
-                <KpiCard label="Replies"               value={kpiValue('replies', outreachStats.replies)}                          color="#34d399" icon={Reply}     loading={loading}
+                <KpiCard label="Total Outreach"        value={displayValue('total_outreach', outreachStats.totalOutreach)}             color="#22d3ee" icon={Send}      loading={loading}
+                  editable isOverridden={fakeOverrides.total_outreach != null} onEditSave={v => applyFakeEdit('total_outreach', v)} onResetOverride={() => resetFakeEdit('total_outreach')} />
+                <KpiCard label="Companies Contacted"   value={displayValue('companies_contacted', outreachStats.companiesContacted)}   color="#67e8f9" icon={Building2} loading={loading}
+                  editable isOverridden={fakeOverrides.companies_contacted != null} onEditSave={v => applyFakeEdit('companies_contacted', v)} onResetOverride={() => resetFakeEdit('companies_contacted')} />
+                <KpiCard label="Individuals Contacted" value={displayValue('individuals_contacted', outreachStats.individualsContacted)} color="#c084fc" icon={Users}     loading={loading}
+                  editable isOverridden={fakeOverrides.individuals_contacted != null} onEditSave={v => applyFakeEdit('individuals_contacted', v)} onResetOverride={() => resetFakeEdit('individuals_contacted')} />
+                <KpiCard label="Replies"               value={displayValue('replies', outreachStats.replies)}                          color="#34d399" icon={Reply}     loading={loading}
                   sub={outreachStats.totalOutreach > 0 ? `${Math.round((outreachStats.replies / outreachStats.totalOutreach) * 100)}% reply rate` : undefined}
-                  editable isOverridden={overrides.replies != null} onEditSave={v => saveOverride('replies', v)} onResetOverride={() => resetOverride('replies')} />
-                <KpiCard label="Active Pipeline"       value={kpiValue('active_pipeline', active)}                                  color="#60a5fa" icon={TrendingUp} loading={loading}
-                  editable isOverridden={overrides.active_pipeline != null} onEditSave={v => saveOverride('active_pipeline', v)} onResetOverride={() => resetOverride('active_pipeline')} />
-                <KpiCard label="Won"                   value={kpiValue('won', won)}                                                color="#4ade80" icon={Trophy}    loading={loading}
-                  editable isOverridden={overrides.won != null} onEditSave={v => saveOverride('won', v)} onResetOverride={() => resetOverride('won')} />
-                <KpiCard label="Lost"                  value={kpiValue('lost', lost)}                                              color="#f87171" icon={XCircle}   loading={loading}
-                  editable isOverridden={overrides.lost != null} onEditSave={v => saveOverride('lost', v)} onResetOverride={() => resetOverride('lost')} />
-                <KpiCard label="Meetings"              value={kpiValue('meetings', meetings)}                                      color="#fb923c" icon={Calendar}  loading={loading}
+                  editable isOverridden={fakeOverrides.replies != null} onEditSave={v => applyFakeEdit('replies', v)} onResetOverride={() => resetFakeEdit('replies')} />
+                <KpiCard label="Active Pipeline"       value={displayValue('active_pipeline', active)}                                  color="#60a5fa" icon={TrendingUp} loading={loading}
+                  editable isOverridden={fakeOverrides.active_pipeline != null} onEditSave={v => applyFakeEdit('active_pipeline', v)} onResetOverride={() => resetFakeEdit('active_pipeline')} />
+                <KpiCard label="Won"                   value={displayValue('won', won)}                                                color="#4ade80" icon={Trophy}    loading={loading}
+                  editable isOverridden={fakeOverrides.won != null} onEditSave={v => applyFakeEdit('won', v)} onResetOverride={() => resetFakeEdit('won')} />
+                <KpiCard label="Lost"                  value={displayValue('lost', lost)}                                              color="#f87171" icon={XCircle}   loading={loading}
+                  editable isOverridden={fakeOverrides.lost != null} onEditSave={v => applyFakeEdit('lost', v)} onResetOverride={() => resetFakeEdit('lost')} />
+                <KpiCard label="Meetings"              value={displayValue('meetings', meetings)}                                      color="#fb923c" icon={Calendar}  loading={loading}
                   sub={`${followUps} follow-ups`}
-                  editable isOverridden={overrides.meetings != null} onEditSave={v => saveOverride('meetings', v)} onResetOverride={() => resetOverride('meetings')} />
+                  editable isOverridden={fakeOverrides.meetings != null} onEditSave={v => applyFakeEdit('meetings', v)} onResetOverride={() => resetFakeEdit('meetings')} />
               </div>
             </div>
 
