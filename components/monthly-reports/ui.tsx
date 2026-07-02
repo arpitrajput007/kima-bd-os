@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowUpRight, Pencil, Check, X, RotateCcw } from 'lucide-react'
+import { toast } from 'sonner'
+import { ArrowUpRight, Pencil, Check, X, RotateCcw, Loader2, Wand2 } from 'lucide-react'
 
 // ── Shared visual primitives for the Monthly Reports feature ────
 // Mirrors the KpiCard / MiniBar / section-card-header pattern used
@@ -157,6 +158,45 @@ export function InlineEditableNumber({
         </button>
       )}
     </div>
+  )
+}
+
+// Sends a free-text field to Claude to clean up grammar/phrasing without
+// changing its meaning — for BD reps typing quick notes in imperfect English.
+export function AiFixButton({ value, onFixed }: { value: string; onFixed: (text: string) => void }) {
+  const [loading, setLoading] = useState(false)
+
+  const fix = async () => {
+    if (!value.trim() || loading) return
+    setLoading(true)
+    try {
+      const res = await fetch('/api/ai/fix-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: value }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Could not fix text')
+      onFixed(data.fixed)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not fix text')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={fix}
+      disabled={!value.trim() || loading}
+      className="btn btn-ai flex-shrink-0"
+      style={{ padding: '3px 10px', fontSize: '11px', gap: '5px' }}
+      title="Clean up grammar & phrasing with AI"
+    >
+      {loading ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
+      AI Fix
+    </button>
   )
 }
 

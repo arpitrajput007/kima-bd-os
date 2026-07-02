@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
-import { toast } from 'sonner'
 import {
-  Loader2, ChevronDown, ChevronUp, X, SlidersHorizontal, Wand2,
+  Loader2, ChevronDown, ChevronUp, X, SlidersHorizontal,
   Building2, ListChecks, Target, TrendingUp, BarChart3, MessageSquare,
   AlertTriangle, FileText, Settings2,
 } from 'lucide-react'
@@ -14,6 +13,7 @@ import {
 } from '@/lib/monthly-reports-types'
 import type { MonthlyDeal, DealBlocker, DealProductFeedback } from '@/lib/monthly-reports-types'
 import CustomizeFieldsModal from './CustomizeFieldsModal'
+import { AiFixButton } from './ui'
 import {
   getHiddenFields, setHiddenFields as persistHiddenFields,
   getHiddenSections, setHiddenSections as persistHiddenSections,
@@ -78,45 +78,6 @@ function Field({ label, required, action, children }: { label: string; required?
       </div>
       {children}
     </div>
-  )
-}
-
-// Sends a free-text field to Claude to clean up grammar/phrasing without
-// changing its meaning — for BD reps typing quick notes in imperfect English.
-function AiFixButton({ value, onFixed }: { value: string; onFixed: (text: string) => void }) {
-  const [loading, setLoading] = useState(false)
-
-  const fix = async () => {
-    if (!value.trim() || loading) return
-    setLoading(true)
-    try {
-      const res = await fetch('/api/ai/fix-text', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: value }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Could not fix text')
-      onFixed(data.fixed)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not fix text')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={fix}
-      disabled={!value.trim() || loading}
-      className="btn btn-ai flex-shrink-0"
-      style={{ padding: '3px 10px', fontSize: '11px', gap: '5px' }}
-      title="Clean up grammar & phrasing with AI"
-    >
-      {loading ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
-      AI Fix
-    </button>
   )
 }
 

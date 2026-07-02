@@ -10,7 +10,7 @@ import {
   Plus, Search, Download, FileText, TrendingUp, Users,
   Trophy, XCircle, Calendar, BarChart2, Loader2, RefreshCw,
   Building2, ChevronDown, AlertCircle, Send, Reply, Sparkles,
-  Zap, Settings2, Target, DollarSign, RotateCcw,
+  Zap, Settings2, Target, DollarSign, RotateCcw, Check,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -23,7 +23,7 @@ import {
 import type { MonthlyDeal, DealActivity, TimeAllocation } from '@/lib/monthly-reports-types'
 import { getOutreachStats, EMPTY_OUTREACH_STATS } from '@/lib/monthly-outreach-stats'
 import type { OutreachStats } from '@/lib/monthly-outreach-stats'
-import { KpiCard, MiniBar, SectionHeader, InlineEditableNumber } from '@/components/monthly-reports/ui'
+import { KpiCard, MiniBar, SectionHeader, InlineEditableNumber, AiFixButton } from '@/components/monthly-reports/ui'
 import { TimeAllocationSection, timeByResponsibility, TIME_PIE_COLORS } from '@/components/monthly-reports/time-allocation-section'
 
 // PostgREST reports a missing table as code PGRST205 ("Could not find the
@@ -31,6 +31,14 @@ import { TimeAllocationSection, timeByResponsibility, TIME_PIE_COLORS } from '@/
 function isMissingTableError(error?: { code?: string; message?: string } | null): boolean {
   if (!error) return false
   return error.code === 'PGRST205' || !!error.message?.includes('schema cache')
+}
+
+// A missing column can surface either via PostgREST's schema-cache message
+// (isMissingTableError above) or as a raw Postgres "undefined_column" error
+// (42703) when selecting it directly by name.
+function isMissingColumnError(error?: { code?: string; message?: string } | null): boolean {
+  if (!error) return false
+  return error.code === '42703' || isMissingTableError(error)
 }
 
 // ── Export helpers ─────────────────────────────────────────────
@@ -448,6 +456,10 @@ export default function MonthlyReportsPage() {
   const [categoryOverrides, setCategoryOverrides] = useState<Record<string, number>>({})
   const [timeEntries, setTimeEntries]   = useState<TimeAllocation[]>([])
   const [trackingSetupNeeded, setTrackingSetupNeeded] = useState(false)
+  const [priorityNotes, setPriorityNotes] = useState('')
+  const [savedPriorityNotes, setSavedPriorityNotes] = useState('')
+  const [savingPriorityNotes, setSavingPriorityNotes] = useState(false)
+  const [prioritiesSetupNeeded, setPrioritiesSetupNeeded] = useState(false)
   const exportRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { setMounted(true) }, [])
@@ -457,11 +469,12 @@ export default function MonthlyReportsPage() {
     setNarrative('')
     const trendMonths = last12Months().slice(0, TREND_MONTHS).reverse()
 
-    const [dealsRes, trendRes, overridesRes, timeRes] = await Promise.all([
+    const [dealsRes, trendRes, overridesRes, timeRes, notesRes] = await Promise.all([
       supabase.from('monthly_deals').select('*').eq('month_year', month).order('updated_at', { ascending: false }),
       supabase.from('monthly_deals').select('month_year,status').in('month_year', trendMonths),
       supabase.from('monthly_report_overrides').select('overrides').eq('month_year', month).maybeSingle(),
       supabase.from('time_allocations').select('*').eq('month_year', month).order('created_at', { ascending: false }),
+      supabase.from('monthly_report_overrides').select('next_month_priorities_notes').eq('month_year', month).maybeSingle(),
     ])
 
     if (isMissingTableError(dealsRes.error)) {
@@ -476,6 +489,11 @@ export default function MonthlyReportsPage() {
     setTrackingSetupNeeded(trackingMissing)
     setOverrides((overridesRes.data?.overrides as Record<string, number>) || {})
     setTimeEntries((timeRes.data || []) as TimeAllocation[])
+
+    setPrioritiesSetupNeeded(isMissingColumnError(notesRes.error))
+    const notes = (notesRes.data as { next_month_priorities_notes?: string } | null)?.next_month_priorities_notes || ''
+    setPriorityNotes(notes)
+    setSavedPriorityNotes(notes)
 
     const [actsRes, stats] = await Promise.all([
       dealList.length
@@ -599,6 +617,25 @@ export default function MonthlyReportsPage() {
       toast.error(err instanceof Error ? err.message : 'Failed to generate summary')
     } finally {
       setGeneratingNarrative(false)
+    }
+  }
+
+  async function savePriorityNotes() {
+    setSavingPriorityNotes(true)
+    try {
+      const { error } = await supabase
+        .from('monthly_report_overrides')
+        .upsert({ month_year: month, next_month_priorities_notes: priorityNotes }, { onConflict: 'month_year' })
+      if (error) {
+        if (isMissingColumnError(error)) setPrioritiesSetupNeeded(true)
+        throw error
+      }
+      setSavedPriorityNotes(priorityNotes)
+      toast.success('Priorities saved')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save priorities')
+    } finally {
+      setSavingPriorityNotes(false)
     }
   }
 
@@ -898,6 +935,43 @@ export default function MonthlyReportsPage() {
                     Generate an AI-written narrative covering activity, pipeline health, opportunities, and product insights for {fmtMonthYear(month)}.
                   </p>
                 )}
+              </div>
+            </div>
+
+            {/* ── Section 4.5: Next Month Priorities (your notes) ── */}
+            <div className="section-card">
+              <SectionHeader
+                icon={Target} iconColor="#fbbf24"
+                title="Next Month Priorities"
+                subtitle="Your own plans, priorities & focus areas for next month"
+                right={
+                  <div className="flex items-center gap-2">
+                    <AiFixButton value={priorityNotes} onFixed={setPriorityNotes} />
+                    <button
+                      onClick={savePriorityNotes}
+                      disabled={savingPriorityNotes || priorityNotes === savedPriorityNotes}
+                      className="btn btn-secondary"
+                      style={{ fontSize: '11px', gap: '6px' }}
+                    >
+                      {savingPriorityNotes ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+                      Save
+                    </button>
+                  </div>
+                }
+              />
+              <div style={{ padding: '18px 22px 20px' }}>
+                {prioritiesSetupNeeded && (
+                  <div className="mb-4 p-3.5 rounded-xl text-[11px]" style={{ color: 'rgb(180,170,120)', background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)' }}>
+                    Run <code className="px-1 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.07)' }}>supabase/add-next-month-priorities-notes.sql</code> in your Supabase SQL editor to save your priorities.
+                  </div>
+                )}
+                <textarea
+                  value={priorityNotes}
+                  onChange={e => setPriorityNotes(e.target.value)}
+                  placeholder="What are your priorities, plans, and focus areas for next month?"
+                  className="input-dark w-full"
+                  style={{ minHeight: 120, resize: 'vertical', lineHeight: 1.6, fontSize: '12.5px' }}
+                />
               </div>
             </div>
 
