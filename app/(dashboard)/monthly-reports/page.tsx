@@ -22,7 +22,7 @@ import type { MonthlyDeal, DealActivity, TimeAllocation } from '@/lib/monthly-re
 import { getOutreachStats, EMPTY_OUTREACH_STATS } from '@/lib/monthly-outreach-stats'
 import type { OutreachStats } from '@/lib/monthly-outreach-stats'
 import { KpiCard, MiniBar, SectionHeader } from '@/components/monthly-reports/ui'
-import { TimeAllocationSection, timeByCompany, TIME_PIE_COLORS } from '@/components/monthly-reports/time-allocation-section'
+import { TimeAllocationSection, timeByResponsibility, TIME_PIE_COLORS } from '@/components/monthly-reports/time-allocation-section'
 
 // PostgREST reports a missing table as code PGRST205 ("Could not find the
 // table ... in the schema cache"), not a "does not exist" message.
@@ -152,11 +152,11 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
   const categoryRows = Object.entries(outreach.companyCategoryBreakdown).sort((a,b)=>b[1]-a[1])
     .map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')
 
-  // Time allocation — by company
-  const timeByCo = timeByCompany(timeEntries)
-  const totalTimeHours = timeByCo.reduce((a,b) => a + b.value, 0)
-  const timeGradient = buildConicGradient(timeByCo, TIME_PIE_COLORS)
-  const timeRows = timeByCo.map((c, i) => `<tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${TIME_PIE_COLORS[i % TIME_PIE_COLORS.length]};margin-right:6px"></span>${c.name}</td><td>${c.value}h</td><td>${totalTimeHours ? Math.round((c.value/totalTimeHours)*100) : 0}%</td></tr>`).join('')
+  // Time allocation — by responsibility, as % of time
+  const timeByResp = timeByResponsibility(timeEntries)
+  const totalTimePct = timeByResp.reduce((a,b) => a + b.value, 0)
+  const timeGradient = buildConicGradient(timeByResp, TIME_PIE_COLORS)
+  const timeRows = timeByResp.map((c, i) => `<tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${TIME_PIE_COLORS[i % TIME_PIE_COLORS.length]};margin-right:6px"></span>${c.name}</td><td>${c.value}%</td></tr>`).join('')
 
   // Product feedback themes — every filled field, not just a subset
   const pfItems: string[] = []
@@ -241,10 +241,10 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
       <table style="max-width:320px"><thead><tr><th>Category</th><th>Count</th></tr></thead><tbody>${categoryRows}</tbody></table>
     </div>` : ''}
 
-    ${timeByCo.length ? `<div class="section"><div class="section-title">Time Allocation — ${totalTimeHours}h logged</div>
+    ${timeByResp.length ? `<div class="section"><div class="section-title">Time Allocation — ${totalTimePct}% of time logged</div>
       <div style="display:flex;align-items:center;gap:28px;flex-wrap:wrap">
         <div style="width:140px;height:140px;border-radius:50%;background:${timeGradient ?? '#e5e7eb'};flex-shrink:0"></div>
-        <table style="max-width:340px"><thead><tr><th>Company</th><th>Hours</th><th>%</th></tr></thead><tbody>${timeRows}</tbody></table>
+        <table style="max-width:340px"><thead><tr><th>Responsibility</th><th>%</th></tr></thead><tbody>${timeRows}</tbody></table>
       </div>
     </div>` : ''}
 
@@ -413,10 +413,10 @@ export default function MonthlyReportsPage() {
     if (error) toast.error('Failed to reset override')
   }
 
-  async function addTimeEntry(company: string, responsibility: string, hours: number) {
+  async function addTimeEntry(responsibility: string, percentage: number) {
     const { data, error } = await supabase.from('time_allocations')
-      .insert({ month_year: month, company_name: company, responsibility, hours }).select().single()
-    if (error) { toast.error('Failed to save — run supabase/add-time-tracking-and-overrides.sql'); return }
+      .insert({ month_year: month, responsibility, percentage }).select().single()
+    if (error) { toast.error('Failed to save — run supabase/simplify-time-allocations.sql'); return }
     setTimeEntries(prev => [data as TimeAllocation, ...prev])
   }
   async function deleteTimeEntry(id: string) {

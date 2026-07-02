@@ -193,9 +193,8 @@ export interface DealActivity {
 export interface TimeAllocation {
   id: string
   month_year: string
-  company_name: string
   responsibility: string
-  hours: number
+  percentage: number
   notes?: string
   created_at: string
   updated_at: string

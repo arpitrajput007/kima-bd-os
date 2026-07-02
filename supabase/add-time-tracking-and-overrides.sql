@@ -3,13 +3,12 @@
 -- Monthly BD Performance report. Run this in the Supabase SQL editor.
 -- ============================================================
 
--- 1. Time Allocation — where BD time went this month (company + responsibility + hours)
+-- 1. Time Allocation — where time went this month, by responsibility, as a % of time
 CREATE TABLE IF NOT EXISTS time_allocations (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   month_year     text NOT NULL,
-  company_name   text NOT NULL,
   responsibility text NOT NULL,
-  hours          numeric NOT NULL DEFAULT 0 CHECK (hours >= 0),
+  percentage     numeric NOT NULL DEFAULT 0 CHECK (percentage >= 0 AND percentage <= 100),
   notes          text,
   created_at     timestamptz DEFAULT now(),
   updated_at     timestamptz DEFAULT now()
