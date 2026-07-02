@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import {
   Plus, Search, Download, FileText, TrendingUp, Users,
   Trophy, XCircle, Calendar, BarChart2, Loader2, RefreshCw,
@@ -94,41 +96,14 @@ function exportCSV(deals: MonthlyDeal[], month: string) {
   dlFile(toCSV(rows), `kima-bd-${month}.csv`, 'text/csv;charset=utf-8;')
 }
 
-const PDF_STYLE = `
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:0;color:#1a1a2e;background:#fff}
-  .cover{background:#0f0e17;color:#fff;padding:48px 56px 36px}
-  .cover h1{margin:16px 0 4px;font-size:26px;font-weight:700}
-  .cover .sub{font-size:13px;color:rgba(255,255,255,0.45);margin-top:6px}
-  .badge{display:inline-block;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;font-size:9px;font-weight:700;padding:3px 9px;border-radius:4px;letter-spacing:.05em;margin-right:8px}
-  .body{padding:36px 56px}
-  .section{margin-bottom:32px}
-  .section-title{font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid #e5e7eb}
-  .kpi-row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:8px}
-  .kpi{background:#f7f6fc;border:1px solid #e0dcf0;border-radius:8px;padding:12px 18px;min-width:110px}
-  .kpi .num{font-size:22px;font-weight:700;color:#5b21b6}
-  .kpi .lbl{font-size:10px;color:#6b7280;margin-top:2px}
-  table{width:100%;border-collapse:collapse;font-size:11px}
-  thead th{background:#f3f4f6;color:#374151;font-weight:600;text-align:left;padding:7px 12px;white-space:nowrap;border-bottom:2px solid #e5e7eb}
-  tbody tr:nth-child(even){background:#fafafa}
-  tbody td{padding:7px 12px;border-bottom:1px solid #f0f0f0;color:#374151;vertical-align:top}
-  .s-badge{display:inline-block;font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px}
-  .won{background:#d1fae5;color:#065f46}.lost{background:#fee2e2;color:#991b1b}
-  .active{background:#dbeafe;color:#1e40af}.other{background:#f3f4f6;color:#6b7280}
-  .footer{margin-top:32px;padding-top:14px;border-top:1px solid #e5e7eb;font-size:10px;color:#9ca3af}
-  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-`
+type PdfDoc = jsPDF & { lastAutoTable: { finalY: number } }
 
-function buildConicGradient(items: { name: string; value: number }[], colors: string[]): string | null {
-  const total = items.reduce((a, b) => a + b.value, 0)
-  if (!total) return null
-  let acc = 0
-  const stops = items.map((it, i) => {
-    const start = (acc / total) * 360
-    acc += it.value
-    const end = (acc / total) * 360
-    return `${colors[i % colors.length]} ${start}deg ${end}deg`
-  })
-  return `conic-gradient(${stops.join(', ')})`
+// Status → badge colors used in the pipeline table (mirrors the on-screen StatusBadge palette).
+function pdfStatusColors(status: string): { bg: string; text: string } {
+  if (status === 'closed_won') return { bg: '#d1fae5', text: '#065f46' }
+  if (status === 'closed_lost') return { bg: '#fee2e2', text: '#991b1b' }
+  if (['contacted', 'discovery', 'demo', 'technical_discussion', 'proposal_sent', 'negotiation'].includes(status)) return { bg: '#dbeafe', text: '#1e40af' }
+  return { bg: '#f3f4f6', text: '#6b7280' }
 }
 
 function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: string, outreach: OutreachStats, timeEntries: TimeAllocation[], narrative?: string, kpiOverrides: Record<string, number> = {}) {
@@ -155,20 +130,18 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
   // Channel breakdown (deal-level channel + raw outreach touches)
   const ch: Record<string, number> = { ...outreach.channelBreakdown }
   deals.forEach(d => { if (d.outreach_channel) ch[d.outreach_channel] = (ch[d.outreach_channel] || 0) + 1 })
-  const chRows = Object.entries(ch).sort((a,b)=>b[1]-a[1]).map(([k,v]) => {
+  const chRows = Object.entries(ch).sort((a, b) => b[1] - a[1]).map(([k, v]) => {
     const meta = OUTREACH_CHANNELS.find(c => c.value === k)
-    return `<tr><td>${meta?.label ?? k}</td><td>${v}</td></tr>`
-  }).join('')
+    return [meta?.label ?? k, String(v)]
+  })
 
   // Companies contacted by category
-  const categoryRows = Object.entries(outreach.companyCategoryBreakdown).sort((a,b)=>b[1]-a[1])
-    .map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')
+  const categoryRows = Object.entries(outreach.companyCategoryBreakdown).sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => [k, String(v)])
 
   // Time allocation — by responsibility, as % of time
   const timeByResp = timeByResponsibility(timeEntries)
-  const totalTimePct = timeByResp.reduce((a,b) => a + b.value, 0)
-  const timeGradient = buildConicGradient(timeByResp, TIME_PIE_COLORS)
-  const timeRows = timeByResp.map((c, i) => `<tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${TIME_PIE_COLORS[i % TIME_PIE_COLORS.length]};margin-right:6px"></span>${c.name}</td><td>${c.value}%</td></tr>`).join('')
+  const totalTimePct = timeByResp.reduce((a, b) => a + b.value, 0)
 
   // Product feedback themes — every filled field, not just a subset
   const pfItems: string[] = []
@@ -176,7 +149,7 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
     const pf = d.product_feedback || {}
     ;(['feature_requested','missing_functionality','product_gaps','integration_requested','api_requirements','compliance_requirements','technical_blockers'] as const).forEach(key => {
       const v = pf[key]
-      if (v) pfItems.push(`• [${d.company_name}] ${v.slice(0,120)}`)
+      if (v) pfItems.push(`${d.company_name}: ${v.slice(0, 140)}`)
     })
   })
 
@@ -191,114 +164,237 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
   // Next-month priorities (open deals with close date)
   const priorities = active
     .filter(d => d.expected_close_date)
-    .sort((a,b) => (a.expected_close_date ?? '') < (b.expected_close_date ?? '') ? -1 : 1)
+    .sort((a, b) => (a.expected_close_date ?? '') < (b.expected_close_date ?? '') ? -1 : 1)
     .slice(0, 5)
 
-  function statusBadge(s: string) {
-    const cls = s === 'closed_won' ? 'won' : s === 'closed_lost' ? 'lost' : ['contacted','discovery','demo','technical_discussion','proposal_sent','negotiation'].includes(s) ? 'active' : 'other'
-    return `<span class="s-badge ${cls}">${s.replace(/_/g,' ')}</span>`
+  // ── Document setup ────────────────────────────────────────────
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' }) as PdfDoc
+  const PAGE_W = 210, PAGE_H = 297, MARGIN = 14, CONTENT_W = PAGE_W - MARGIN * 2, FOOTER_H = 16
+  let y = 0
+
+  function newContinuationPage() {
+    doc.addPage()
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor('#7c3aed')
+    doc.text('KIMA FINANCE', MARGIN, MARGIN)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor('#9ca3af')
+    doc.text(`Monthly BD Performance Report — ${label}`, PAGE_W - MARGIN, MARGIN, { align: 'right' })
+    doc.setDrawColor('#e5e7eb'); doc.setLineWidth(0.3)
+    doc.line(MARGIN, MARGIN + 2, PAGE_W - MARGIN, MARGIN + 2)
+    y = MARGIN + 10
+  }
+  function ensureSpace(needed: number) {
+    if (y + needed > PAGE_H - FOOTER_H) newContinuationPage()
+  }
+  function sectionTitle(title: string, reserve: number = 0) {
+    ensureSpace(9 + reserve)
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor('#6b7280')
+    doc.text(title.toUpperCase(), MARGIN, y)
+    doc.setDrawColor('#e5e7eb'); doc.setLineWidth(0.3)
+    doc.line(MARGIN, y + 2.2, PAGE_W - MARGIN, y + 2.2)
+    y += 9
+  }
+  const tableTheme = {
+    theme: 'plain' as const,
+    styles: { fontSize: 8.5, cellPadding: 2.6, textColor: '#374151', lineColor: '#f0f0f0', lineWidth: 0.2, overflow: 'linebreak' as const },
+    headStyles: { fillColor: '#f3f4f6', textColor: '#374151', fontStyle: 'bold' as const },
+    alternateRowStyles: { fillColor: '#fafafa' },
   }
 
-  // Only fields the user actually filled in render a value — everything else stays a blank cell.
-  const dealRows = deals.map(d => {
-    const openBlockers = (d.blockers || []).filter(b => !b.resolved).map(b => blockerLabel(b)).join(', ')
-    return `
-    <tr>
-      <td>${d.company_name ?? ''}</td>
-      <td>${d.individual_name ?? ''}</td>
-      <td>${d.country ?? ''}</td>
-      <td>${d.lead_type ?? ''}</td>
-      <td>${statusBadge(d.status)}</td>
-      <td>${d.expected_monthly_volume ?? ''}</td>
-      <td>${d.estimated_revenue ?? ''}</td>
-      <td>${d.strategic_importance ?? ''}</td>
-      <td>${d.expected_close_date ?? ''}</td>
-      <td>${openBlockers}</td>
-    </tr>`
-  }).join('')
+  // ── Cover band ─────────────────────────────────────────────────
+  doc.setFillColor('#0f0e17')
+  doc.rect(0, 0, PAGE_W, 36, 'F')
+  doc.setFillColor('#6d28d9')
+  doc.roundedRect(MARGIN, 9, 28, 6.4, 1.2, 1.2, 'F')
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor('#ffffff')
+  doc.text('KIMA FINANCE', MARGIN + 14, 13.3, { align: 'center' })
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor('#a29bc4')
+  doc.text('Confidential', MARGIN + 33, 13.3)
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(19); doc.setTextColor('#ffffff')
+  doc.text('Monthly BD Performance Report', MARGIN, 23.5)
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor('#a29bc4')
+  doc.text(`${label}   ·   Generated ${new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })}   ·   Kima BD OS`, MARGIN, 30.5)
+  y = 46
 
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>BD Report ${label}</title><style>${PDF_STYLE}</style></head><body>
-  <div class="cover">
-    <span class="badge">KIMA FINANCE</span><span style="font-size:10px;color:rgba(255,255,255,.35)">Confidential</span>
-    <h1>Monthly BD Performance Report</h1>
-    <div class="sub">${label} &nbsp;·&nbsp; Generated ${new Date().toLocaleString('en-US',{dateStyle:'long',timeStyle:'short'})} &nbsp;·&nbsp; Kima BD OS</div>
-  </div>
-  <div class="body">
-    <div class="section">
-      <div class="section-title">Executive Summary</div>
-      <div class="kpi-row">
-        <div class="kpi"><div class="num">${heroTotalOutreach}</div><div class="lbl">Total Outreach</div></div>
-        <div class="kpi"><div class="num">${heroCompaniesContacted}</div><div class="lbl">Companies Contacted</div></div>
-        <div class="kpi"><div class="num">${heroIndividualsContacted}</div><div class="lbl">Individuals Contacted</div></div>
-        <div class="kpi"><div class="num">${heroReplies}</div><div class="lbl">Replies</div></div>
-        <div class="kpi"><div class="num">${deals.length}</div><div class="lbl">Total Deals</div></div>
-        <div class="kpi"><div class="num">${uniqueCos}</div><div class="lbl">Companies (Deals)</div></div>
-        <div class="kpi"><div class="num">${heroActive}</div><div class="lbl">Active</div></div>
-        <div class="kpi"><div class="num">${heroWon}</div><div class="lbl">Won</div></div>
-        <div class="kpi"><div class="num">${heroLost}</div><div class="lbl">Lost</div></div>
-        <div class="kpi"><div class="num">${heroMeetings}</div><div class="lbl">Meetings</div></div>
-        <div class="kpi"><div class="num">${followUps}</div><div class="lbl">Follow-ups</div></div>
-      </div>
-    </div>
+  // ── Executive Summary ─────────────────────────────────────────
+  const kpis: [string, number][] = [
+    ['Total Outreach', heroTotalOutreach], ['Companies Contacted', heroCompaniesContacted],
+    ['Individuals Contacted', heroIndividualsContacted], ['Replies', heroReplies],
+    ['Total Deals', deals.length], ['Companies (Deals)', uniqueCos],
+    ['Active', heroActive], ['Won', heroWon],
+    ['Lost', heroLost], ['Meetings', heroMeetings],
+    ['Follow-ups', followUps],
+  ]
+  const KPI_COLS = 4, KPI_GAP = 4, KPI_ROW_H = 19
+  const kpiColW = (CONTENT_W - KPI_GAP * (KPI_COLS - 1)) / KPI_COLS
+  const kpiRows = Math.ceil(kpis.length / KPI_COLS)
+  sectionTitle('Executive Summary', kpiRows * (KPI_ROW_H + KPI_GAP))
+  kpis.forEach(([kLabel, val], i) => {
+    const col = i % KPI_COLS, row = Math.floor(i / KPI_COLS)
+    const x = MARGIN + col * (kpiColW + KPI_GAP)
+    const cardY = y + row * (KPI_ROW_H + KPI_GAP)
+    doc.setFillColor('#f7f6fc'); doc.setDrawColor('#e0dcf0'); doc.setLineWidth(0.25)
+    doc.roundedRect(x, cardY, kpiColW, KPI_ROW_H, 2, 2, 'FD')
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor('#5b21b6')
+    doc.text(String(val), x + 5, cardY + 10.5)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor('#6b7280')
+    doc.text(kLabel, x + 5, cardY + 15.8, { maxWidth: kpiColW - 8 })
+  })
+  y += kpiRows * (KPI_ROW_H + KPI_GAP) + 5
 
-    ${narrative ? `<div class="section"><div class="section-title">AI Monthly Summary</div>
-      <div style="font-size:12px;color:#374151;line-height:1.7;white-space:pre-line">${narrative}</div>
-    </div>` : ''}
+  // ── AI Monthly Summary ────────────────────────────────────────
+  if (narrative) {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5)
+    const lines = doc.splitTextToSize(narrative, CONTENT_W)
+    sectionTitle('AI Monthly Summary', Math.min(lines.length, 8) * 4.8 + 4)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor('#374151')
+    doc.text(lines, MARGIN, y, { lineHeightFactor: 1.5 })
+    y += lines.length * 4.8 + 8
+  }
 
-    ${chRows ? `<div class="section"><div class="section-title">Outreach by Channel</div>
-      <table style="max-width:320px"><thead><tr><th>Channel</th><th>Count</th></tr></thead><tbody>${chRows}</tbody></table>
-    </div>` : ''}
+  // ── Outreach by Channel + Companies Contacted by Category (side by side) ──
+  if (chRows.length || categoryRows.length) {
+    sectionTitle('Outreach Breakdown', Math.max(chRows.length, categoryRows.length) * 6.2)
+    const halfW = (CONTENT_W - 8) / 2
+    const blockStartY = y
+    let leftEnd = y, rightEnd = y
+    if (chRows.length) {
+      autoTable(doc, { ...tableTheme, startY: y, margin: { left: MARGIN }, tableWidth: halfW,
+        head: [['Channel', 'Count']], body: chRows, columnStyles: { 1: { cellWidth: 20, halign: 'right' } } })
+      leftEnd = doc.lastAutoTable.finalY
+    }
+    if (categoryRows.length) {
+      autoTable(doc, { ...tableTheme, startY: blockStartY, margin: { left: MARGIN + halfW + 8 }, tableWidth: halfW,
+        head: [['Category', 'Count']], body: categoryRows, columnStyles: { 1: { cellWidth: 20, halign: 'right' } } })
+      rightEnd = doc.lastAutoTable.finalY
+    }
+    y = Math.max(leftEnd, rightEnd) + 8
+  }
 
-    ${categoryRows ? `<div class="section"><div class="section-title">Companies Contacted by Category</div>
-      <table style="max-width:320px"><thead><tr><th>Category</th><th>Count</th></tr></thead><tbody>${categoryRows}</tbody></table>
-    </div>` : ''}
+  // ── Time Allocation ────────────────────────────────────────────
+  if (timeByResp.length) {
+    sectionTitle(`Time Allocation — ${totalTimePct}% of Time Logged`, timeByResp.length * 8)
+    autoTable(doc, {
+      ...tableTheme, startY: y, margin: { left: MARGIN },
+      head: [['Responsibility', '%']],
+      body: timeByResp.map(t => [t.name, `${t.value}%`]),
+      styles: { ...tableTheme.styles, cellPadding: { top: 3, bottom: 3, right: 3, left: 8 } },
+      columnStyles: { 1: { cellWidth: 20, halign: 'right', fontStyle: 'bold' } },
+      didDrawCell: data => {
+        if (data.section === 'body' && data.column.index === 0) {
+          doc.setFillColor(TIME_PIE_COLORS[data.row.index % TIME_PIE_COLORS.length])
+          doc.circle(data.cell.x + 3, data.cell.y + data.cell.height / 2, 1.1, 'F')
+        }
+      },
+    })
+    y = doc.lastAutoTable.finalY + 8
+  }
 
-    ${timeByResp.length ? `<div class="section"><div class="section-title">Time Allocation — ${totalTimePct}% of time logged</div>
-      <div style="display:flex;align-items:center;gap:28px;flex-wrap:wrap">
-        <div style="width:140px;height:140px;border-radius:50%;background:${timeGradient ?? '#e5e7eb'};flex-shrink:0"></div>
-        <table style="max-width:340px"><thead><tr><th>Responsibility</th><th>%</th></tr></thead><tbody>${timeRows}</tbody></table>
-      </div>
-    </div>` : ''}
+  // ── Full Pipeline ──────────────────────────────────────────────
+  sectionTitle(`Full Pipeline — ${deals.length} Deal${deals.length === 1 ? '' : 's'}`, 10)
+  autoTable(doc, {
+    ...tableTheme, startY: y, margin: { left: MARGIN, top: MARGIN + 10 },
+    head: [['Company', 'Individual', 'Country', 'Type', 'Status', 'Monthly Vol.', 'Revenue Opp.', 'Importance', 'Close Date', 'Open Blockers']],
+    body: deals.map(d => [
+      d.company_name ?? '', d.individual_name ?? '', d.country ?? '', d.lead_type ?? '',
+      dealStatusMeta(d.status).label, d.expected_monthly_volume ?? '', d.estimated_revenue ?? '',
+      d.strategic_importance ?? '', d.expected_close_date ?? '',
+      (d.blockers || []).filter(b => !b.resolved).map(b => blockerLabel(b)).join(', '),
+    ]),
+    styles: { ...tableTheme.styles, fontSize: 7.5 },
+    headStyles: { ...tableTheme.headStyles, fontSize: 7.5 },
+    columnStyles: {
+      0: { cellWidth: 22, fontStyle: 'bold', textColor: '#1a1a2e' }, 1: { cellWidth: 19 },
+      2: { cellWidth: 18 }, 3: { cellWidth: 10 }, 4: { cellWidth: 19 }, 5: { cellWidth: 15 },
+      6: { cellWidth: 16 }, 7: { cellWidth: 15 }, 8: { cellWidth: 19 }, 9: { cellWidth: 29 },
+    },
+    didParseCell: data => {
+      if (data.section === 'body' && data.column.index === 4) {
+        const s = pdfStatusColors(deals[data.row.index].status)
+        data.cell.styles.fillColor = s.bg
+        data.cell.styles.textColor = s.text
+        data.cell.styles.fontStyle = 'bold'
+      }
+    },
+    didDrawPage: data => { if (data.pageNumber > 1) newContinuationPage() },
+  })
+  y = doc.lastAutoTable.finalY + 8
 
-    <div class="section">
-      <div class="section-title">Full Pipeline — ${deals.length} Deals</div>
-      <table>
-        <thead><tr><th>Company</th><th>Individual</th><th>Country</th><th>Type</th><th>Status</th><th>Monthly Vol.</th><th>Revenue Opp.</th><th>Importance</th><th>Close Date</th><th>Open Blockers</th></tr></thead>
-        <tbody>${dealRows}</tbody>
-      </table>
-    </div>
+  // ── Wins This Month ────────────────────────────────────────────
+  if (won.length) {
+    sectionTitle('Wins This Month', 20)
+    won.forEach(d => {
+      const desc = (d.business_impact || d.why_valuable || '').slice(0, 220)
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5)
+      const descLines: string[] = desc ? doc.splitTextToSize(desc, CONTENT_W - 12) : []
+      const cardH = 8 + descLines.length * 4.2 + 3
+      ensureSpace(cardH + 3)
+      doc.setFillColor('#f0fdf4')
+      doc.rect(MARGIN, y, CONTENT_W, cardH, 'F')
+      doc.setFillColor('#34d399')
+      doc.rect(MARGIN, y, 1.2, cardH, 'F')
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor('#1a1a2e')
+      doc.text(d.company_name + (d.individual_name ? `   ·   ${d.individual_name}` : ''), MARGIN + 5, y + 6)
+      if (descLines.length) {
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor('#374151')
+        doc.text(descLines, MARGIN + 5, y + 11)
+      }
+      y += cardH + 3
+    })
+    y += 4
+  }
 
-    ${won.length ? `<div class="section"><div class="section-title">Wins This Month</div>
-      ${won.map(d => `<div style="margin-bottom:8px;padding:10px 14px;background:#f0fdf4;border-left:3px solid #34d399;border-radius:4px">
-        <strong>${d.company_name}</strong> ${d.individual_name ? `· ${d.individual_name}` : ''}<br>
-        <span style="font-size:11px;color:#374151">${d.business_impact?.slice(0,200) ?? d.why_valuable?.slice(0,200) ?? ''}</span>
-      </div>`).join('')}
-    </div>` : ''}
+  // ── Product Feedback Collected ─────────────────────────────────
+  if (pfItems.length) {
+    sectionTitle(`Product Feedback Collected (${pfItems.length} Items)`, 10)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor('#374151')
+    pfItems.slice(0, 12).forEach(item => {
+      const lines: string[] = doc.splitTextToSize(`•  ${item}`, CONTENT_W - 4)
+      ensureSpace(lines.length * 4.3 + 1.5)
+      doc.text(lines, MARGIN, y + 3)
+      y += lines.length * 4.3 + 1.5
+    })
+    y += 4
+  }
 
-    ${pfItems.length ? `<div class="section"><div class="section-title">Product Feedback Collected (${pfItems.length} items)</div>
-      <div style="font-size:11px;color:#374151;line-height:1.8">${pfItems.slice(0,12).join('<br>')}</div>
-    </div>` : ''}
+  // ── Active Blockers ────────────────────────────────────────────
+  if (Object.keys(blockerCount).length) {
+    sectionTitle('Active Blockers', Object.keys(blockerCount).length * 6.2)
+    autoTable(doc, {
+      ...tableTheme, startY: y, margin: { left: MARGIN }, tableWidth: 100,
+      head: [['Blocker', 'Count']],
+      body: Object.values(blockerCount).sort((a, b) => b.count - a.count).map(b => [b.label, String(b.count)]),
+      headStyles: { fillColor: '#fef2f2', textColor: '#991b1b', fontStyle: 'bold' },
+      columnStyles: { 1: { cellWidth: 18, halign: 'right' } },
+    })
+    y = doc.lastAutoTable.finalY + 8
+  }
 
-    ${Object.keys(blockerCount).length ? `<div class="section"><div class="section-title">Active Blockers</div>
-      <table style="max-width:360px"><thead><tr><th>Blocker</th><th>Count</th></tr></thead><tbody>
-        ${Object.values(blockerCount).sort((a,b)=>b.count-a.count).map(b=>`<tr><td>${b.label}</td><td>${b.count}</td></tr>`).join('')}
-      </tbody></table>
-    </div>` : ''}
+  // ── Next Month Priorities ──────────────────────────────────────
+  if (priorities.length) {
+    sectionTitle('Next Month Priorities', priorities.length * 6.5)
+    priorities.forEach(d => {
+      ensureSpace(6.5)
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor('#1a1a2e')
+      doc.text(d.company_name, MARGIN, y + 3.5)
+      const w = doc.getTextWidth(d.company_name)
+      doc.setFont('helvetica', 'normal'); doc.setTextColor('#6b7280')
+      doc.text(`   —   ${dealStatusMeta(d.status).label}   ·   Close: ${d.expected_close_date}`, MARGIN + w, y + 3.5)
+      y += 6.5
+    })
+  }
 
-    ${priorities.length ? `<div class="section"><div class="section-title">Next Month Priorities</div>
-      ${priorities.map(d => `<div style="margin-bottom:6px;font-size:11px;color:#374151">
-        <strong>${d.company_name}</strong> — ${d.status.replace(/_/g,' ')} · Close: ${d.expected_close_date}
-      </div>`).join('')}
-    </div>` : ''}
+  // ── Footer on every page ───────────────────────────────────────
+  const pageCount = doc.getNumberOfPages()
+  for (let p = 1; p <= pageCount; p++) {
+    doc.setPage(p)
+    doc.setDrawColor('#e5e7eb'); doc.setLineWidth(0.2)
+    doc.line(MARGIN, PAGE_H - 13, PAGE_W - MARGIN, PAGE_H - 13)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor('#9ca3af')
+    doc.text(`Kima BD OS   ·   Monthly BD Performance Report   ·   ${label}`, MARGIN, PAGE_H - 8)
+    doc.text(`Page ${p} of ${pageCount}`, PAGE_W - MARGIN, PAGE_H - 8, { align: 'right' })
+  }
 
-    <div class="footer">Kima BD OS · Monthly BD Performance Report · ${label}</div>
-  </div>
-</body></html>`
-
-  const win = window.open('', '_blank')
-  if (!win) { toast.error('Pop-up blocked — allow pop-ups for PDF'); return }
-  win.document.write(html); win.document.close(); win.focus()
-  setTimeout(() => win.print(), 600)
+  doc.save(`kima-bd-report-${month}.pdf`)
 }
 
 // ── Badges ───────────────────────────────────────────────────────
