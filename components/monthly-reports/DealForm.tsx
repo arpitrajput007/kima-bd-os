@@ -1,7 +1,12 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
-import { Loader2, ChevronDown, ChevronUp, X, SlidersHorizontal } from 'lucide-react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
+import { toast } from 'sonner'
+import {
+  Loader2, ChevronDown, ChevronUp, X, SlidersHorizontal, Wand2,
+  Building2, ListChecks, Target, TrendingUp, BarChart3, MessageSquare,
+  AlertTriangle, FileText, Settings2,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   DEAL_STATUSES, LEAD_TYPES, OUTREACH_CHANNELS,
@@ -62,14 +67,56 @@ interface Props {
 
 // ── UI Helpers ─────────────────────────────────────────────────
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function Field({ label, required, action, children }: { label: string; required?: boolean; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-medium mb-1.5" style={{ color: 'rgb(140,140,170)' }}>
-        {label}{required && <span style={{ color: '#f87171' }}> *</span>}
-      </label>
+      <div className="flex items-center justify-between gap-3 mb-1.5">
+        <label className="block text-xs font-medium" style={{ color: 'rgb(140,140,170)' }}>
+          {label}{required && <span style={{ color: '#f87171' }}> *</span>}
+        </label>
+        {action}
+      </div>
       {children}
     </div>
+  )
+}
+
+// Sends a free-text field to Claude to clean up grammar/phrasing without
+// changing its meaning — for BD reps typing quick notes in imperfect English.
+function AiFixButton({ value, onFixed }: { value: string; onFixed: (text: string) => void }) {
+  const [loading, setLoading] = useState(false)
+
+  const fix = async () => {
+    if (!value.trim() || loading) return
+    setLoading(true)
+    try {
+      const res = await fetch('/api/ai/fix-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: value }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Could not fix text')
+      onFixed(data.fixed)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not fix text')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={fix}
+      disabled={!value.trim() || loading}
+      className="btn btn-ai flex-shrink-0"
+      style={{ padding: '3px 10px', fontSize: '11px', gap: '5px' }}
+      title="Clean up grammar & phrasing with AI"
+    >
+      {loading ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
+      AI Fix
+    </button>
   )
 }
 
@@ -108,20 +155,49 @@ function Select({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectEle
   )
 }
 
-function SectionCard({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+function SectionCard({
+  title, subtitle, icon: Icon, step, defaultOpen = true, children,
+}: {
+  title: string
+  subtitle?: string
+  icon?: React.ComponentType<{ size?: number; style?: React.CSSProperties }>
+  step?: number
+  defaultOpen?: boolean
+  children: React.ReactNode
+}) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="section-card">
+    <div className="section-card card-hover">
       <button
         type="button"
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between text-left"
-        style={{ padding: '16px 22px', borderBottom: open ? '1px solid var(--border)' : 'none' }}
+        style={{ padding: '15px 22px', borderBottom: open ? '1px solid var(--border)' : 'none' }}
       >
-        <span className="text-[13px] font-semibold text-white">{title}</span>
+        <div className="flex items-center gap-3">
+          {Icon && (
+            <div
+              className="flex items-center justify-center flex-shrink-0"
+              style={{ width: 30, height: 30, borderRadius: 9, background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.22)' }}
+            >
+              <Icon size={14} style={{ color: 'rgb(167,139,250)' }} />
+            </div>
+          )}
+          <div>
+            <div className="flex items-center gap-2">
+              {step != null && (
+                <span className="mono" style={{ fontSize: '10px', color: 'rgb(90,96,125)' }}>
+                  {String(step).padStart(2, '0')}
+                </span>
+              )}
+              <span className="text-[13px] font-semibold text-white">{title}</span>
+            </div>
+            {subtitle && <p className="text-[11px] mt-0.5" style={{ color: 'rgb(100,106,135)' }}>{subtitle}</p>}
+          </div>
+        </div>
         {open ? <ChevronUp size={14} style={{ color: 'rgb(100,106,135)' }} /> : <ChevronDown size={14} style={{ color: 'rgb(100,106,135)' }} />}
       </button>
-      {open && <div style={{ padding: '18px 22px' }}>{children}</div>}
+      {open && <div style={{ padding: '20px 22px' }}>{children}</div>}
     </div>
   )
 }
@@ -268,18 +344,55 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
   const sec = (key: string) => !hiddenSections.has(key)
   const fld = (key: string) => !hiddenFields.has(key)
 
+  // Rough signal of how well-qualified this deal is — mirrors what a BD lead
+  // would actually want to see filled in before calling a deal "worked".
+  const completeness = useMemo(() => {
+    const checks = [
+      !!form.company_name.trim(),
+      !!form.lead_type,
+      !!form.requirement.trim(),
+      !!form.problem_statement.trim(),
+      form.products_interested.length > 0,
+      !!(form.expected_monthly_volume.trim() || form.expected_yearly_volume.trim() || form.estimated_revenue.trim()),
+      !!form.geographic_corridor.trim(),
+      !!form.use_case.trim(),
+      !!form.outreach_channel,
+      !!form.expected_close_date,
+    ]
+    const filled = checks.filter(Boolean).length
+    return { pct: Math.round((filled / checks.length) * 100), filled, total: checks.length }
+  }, [form])
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
 
-      <div className="flex justify-end">
-        <button type="button" onClick={() => setShowCustomize(true)} className="btn btn-ghost" style={{ fontSize: '12px', gap: '6px' }}>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 flex-1" style={{ maxWidth: 320 }}>
+          <div className="flex-1 rounded-full overflow-hidden" style={{ height: 5, background: 'rgba(255,255,255,0.06)' }}>
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${completeness.pct}%`,
+                background: completeness.pct >= 70
+                  ? 'linear-gradient(90deg, #34d399, #10b981)'
+                  : completeness.pct >= 35
+                  ? 'linear-gradient(90deg, #fbbf24, #f59e0b)'
+                  : 'linear-gradient(90deg, #7c3aed, #a78bfa)',
+              }}
+            />
+          </div>
+          <span className="text-[11px] font-medium flex-shrink-0" style={{ color: 'rgb(120,120,150)' }}>
+            {completeness.pct}% qualified
+          </span>
+        </div>
+        <button type="button" onClick={() => setShowCustomize(true)} className="btn btn-ghost flex-shrink-0" style={{ fontSize: '12px', gap: '6px' }}>
           <SlidersHorizontal size={13} />Customize Fields
         </button>
       </div>
 
       {/* ── 1. Company Information ─────────────────────── */}
       {sec('company') && (
-      <SectionCard title="Company Information">
+      <SectionCard title="Company Information" subtitle="Who you're talking to" icon={Building2} step={1}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {fld('company_name') && (
           <Field label="Company Name">
@@ -321,7 +434,7 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
 
       {/* ── 2. Lead Classification ──────────────────────── */}
       {sec('classification') && (
-      <SectionCard title="Lead Classification">
+      <SectionCard title="Lead Classification" subtitle="Where this deal sits in the pipeline" icon={ListChecks} step={2}>
         <div className="space-y-4">
           {fld('lead_type') && (
           <Field label="Lead Type">
@@ -363,15 +476,21 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
 
       {/* ── 3. Opportunity Details ─────────────────────── */}
       {sec('opportunity') && (
-      <SectionCard title="Opportunity Details">
+      <SectionCard title="Opportunity Details" subtitle="What they need and why" icon={Target} step={3}>
         <div className="space-y-4">
           {fld('requirement') && (
-          <Field label="Requirement — What are they looking for?">
+          <Field
+            label="Requirement — What are they looking for?"
+            action={<AiFixButton value={form.requirement} onFixed={v => set('requirement', v)} />}
+          >
             <Textarea value={form.requirement} onChange={e => set('requirement', e.target.value)} placeholder="Describe their specific requirement…" />
           </Field>
           )}
           {fld('problem_statement') && (
-          <Field label="Problem Statement — What problem are they solving?">
+          <Field
+            label="Problem Statement — What problem are they solving?"
+            action={<AiFixButton value={form.problem_statement} onFixed={v => set('problem_statement', v)} />}
+          >
             <Textarea value={form.problem_statement} onChange={e => set('problem_statement', e.target.value)} placeholder="Explain the core problem they're trying to solve…" />
           </Field>
           )}
@@ -391,7 +510,7 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
 
       {/* ── 4. Business Potential ──────────────────────── */}
       {sec('potential') && (
-      <SectionCard title="Business Potential">
+      <SectionCard title="Business Potential" subtitle="Size the opportunity" icon={TrendingUp} step={4}>
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {fld('expected_monthly_volume') && (
@@ -442,7 +561,7 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
 
       {/* ── 5. Business Impact ─────────────────────────── */}
       {sec('impact') && (
-      <SectionCard title="Business Impact" defaultOpen={false}>
+      <SectionCard title="Business Impact" subtitle="Why this deal matters strategically" icon={BarChart3} step={5} defaultOpen={false}>
         <div className="space-y-4">
           {fld('business_impact') && (
           <Field label="What business can this opportunity bring?">
@@ -470,7 +589,7 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
 
       {/* ── 6. Product Feedback ────────────────────────── */}
       {sec('feedback') && (
-      <SectionCard title="Product Feedback from Prospect" defaultOpen={false}>
+      <SectionCard title="Product Feedback from Prospect" subtitle="What the prospect said about our product" icon={MessageSquare} step={6} defaultOpen={false}>
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {fld('feature_requested') && (
@@ -515,46 +634,47 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
 
       {/* ── 7. Blockers ────────────────────────────────── */}
       {sec('blockers') && (
-      <SectionCard title="Deal Blockers" defaultOpen={false}>
+      <SectionCard title="Deal Blockers" subtitle="What's slowing this deal down" icon={AlertTriangle} step={7} defaultOpen={false}>
         <div className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            {BLOCKER_TYPES.map(b => {
-              const active = form.blockers.some(bl => bl.type === b.value)
-              return (
-                <button
-                  key={b.value}
-                  type="button"
-                  onClick={() => toggleBlocker(b.value)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                  style={active
-                    ? { background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.4)', color: '#f87171' }
-                    : { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgb(130,130,160)' }
-                  }
-                >
-                  {active && <X size={10} />}{b.label}
-                </button>
-              )
-            })}
+          {/* Suggested blocker dropdown */}
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'rgb(140,140,170)' }}>
+              Pick a common blocker
+            </label>
+            <Select
+              value=""
+              onChange={e => { if (e.target.value) toggleBlocker(e.target.value) }}
+            >
+              <option value="">Select a blocker…</option>
+              {BLOCKER_TYPES.filter(b => !form.blockers.some(bl => bl.type === b.value)).map(b => (
+                <option key={b.value} value={b.value}>{b.label}</option>
+              ))}
+            </Select>
           </div>
 
-          {/* Custom blocker input */}
-          <div className="flex items-center gap-2">
-            <Input
-              value={customBlockerInput}
-              onChange={e => setCustomBlockerInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomBlocker() } }}
-              placeholder="Other blocker — type your own and press Enter…"
-              className="flex-1"
-            />
-            <button
-              type="button"
-              onClick={addCustomBlocker}
-              disabled={!customBlockerInput.trim()}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex-shrink-0"
-              style={{ background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.35)', color: '#a78bfa', opacity: customBlockerInput.trim() ? 1 : 0.5 }}
-            >
-              + Add
-            </button>
+          {/* Custom blocker input — for anything not in the list above */}
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'rgb(140,140,170)' }}>
+              Not listed? Add it manually
+            </label>
+            <div className="flex items-center gap-2">
+              <Input
+                value={customBlockerInput}
+                onChange={e => setCustomBlockerInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomBlocker() } }}
+                placeholder="Type your own blocker and press Enter…"
+                className="flex-1"
+              />
+              <button
+                type="button"
+                onClick={addCustomBlocker}
+                disabled={!customBlockerInput.trim()}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex-shrink-0"
+                style={{ background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.35)', color: '#a78bfa', opacity: customBlockerInput.trim() ? 1 : 0.5 }}
+              >
+                + Add
+              </button>
+            </div>
           </div>
 
           {form.blockers.length > 0 && (
@@ -592,7 +712,7 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
 
       {/* ── 8. Notes ───────────────────────────────────── */}
       {sec('notes') && (
-      <SectionCard title="Additional Notes" defaultOpen={false}>
+      <SectionCard title="Additional Notes" subtitle="Anything else worth capturing" icon={FileText} step={8} defaultOpen={false}>
         <div className="space-y-4">
           {fld('notes') && (
           <Field label="Notes">
@@ -610,7 +730,7 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
 
       {/* ── 9. Custom Fields ─────────────────────────────── */}
       {customFieldDefs.length > 0 && (
-      <SectionCard title="Custom Fields" defaultOpen={false}>
+      <SectionCard title="Custom Fields" subtitle="Fields you've added for this workspace" icon={Settings2} defaultOpen={false}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {customFieldDefs.map(cf => (
             <Field key={cf.key} label={cf.label}>
@@ -636,7 +756,22 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
       )}
 
       {/* ── Actions ────────────────────────────────────── */}
-      <div className="flex items-center justify-between pt-2 pb-6">
+      <div
+        className="flex items-center justify-between"
+        style={{
+          position: 'sticky',
+          bottom: 0,
+          marginLeft: -36,
+          marginRight: -36,
+          marginTop: 8,
+          padding: '14px 36px',
+          background: 'rgba(10,11,16,0.92)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderTop: '1px solid var(--border)',
+          zIndex: 10,
+        }}
+      >
         <button type="button" onClick={onCancel} className="btn btn-ghost" style={{ fontSize: '13px' }}>
           Cancel
         </button>
