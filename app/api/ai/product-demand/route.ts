@@ -58,8 +58,8 @@ export async function POST() {
     const pf = d.product_feedback || {}
     Object.values(pf).forEach(v => { if (v) snippets.push({ company: d.company_name, text: v }) })
     ;(d.blockers || [])
-      .filter(b => !b.resolved && (b.type === 'technical' || b.type === 'product_limitation' || b.type.startsWith('custom_')) && b.notes)
-      .forEach(b => snippets.push({ company: d.company_name, text: `${blockerLabel(b)}: ${b.notes}` }))
+      .filter(b => !b.resolved && (b.type === 'technical' || b.type === 'product_limitation' || b.type.startsWith('custom_')) && (b.notes || b.label))
+      .forEach(b => snippets.push({ company: d.company_name, text: b.notes ? `${blockerLabel(b)}: ${b.notes}` : blockerLabel(b) }))
   })
 
   if (snippets.length === 0) {

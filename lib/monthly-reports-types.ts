@@ -169,6 +169,7 @@ export interface MonthlyDeal {
   // Structured feedback & blockers (JSONB in DB)
   product_feedback?: DealProductFeedback
   blockers?: DealBlocker[]
+  custom_fields?: Record<string, string>
   // Outreach
   outreach_channel?: string
   // Meta

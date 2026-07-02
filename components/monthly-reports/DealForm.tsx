@@ -1,13 +1,20 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
-import { Loader2, ChevronDown, ChevronUp, X } from 'lucide-react'
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { Loader2, ChevronDown, ChevronUp, X, SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   DEAL_STATUSES, LEAD_TYPES, OUTREACH_CHANNELS,
   BLOCKER_TYPES, KIMA_PRODUCTS, dealStatusMeta, blockerLabel,
 } from '@/lib/monthly-reports-types'
 import type { MonthlyDeal, DealBlocker, DealProductFeedback } from '@/lib/monthly-reports-types'
+import CustomizeFieldsModal from './CustomizeFieldsModal'
+import {
+  getHiddenFields, setHiddenFields as persistHiddenFields,
+  getHiddenSections, setHiddenSections as persistHiddenSections,
+  getCustomFields, setCustomFields as persistCustomFields,
+} from '@/lib/deal-form-config'
+import type { CustomFieldDef } from '@/lib/deal-form-config'
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -42,6 +49,7 @@ export interface DealFormData {
   month_year: string
   owner: string
   notes: string
+  custom_fields: Record<string, string>
 }
 
 interface Props {
@@ -198,6 +206,7 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
     month_year:               d.month_year || defaultMonthYear,
     owner:                    d.owner || '',
     notes:                    d.notes || '',
+    custom_fields:            d.custom_fields || {},
   })
 
   const set = (field: keyof DealFormData, value: unknown) =>
@@ -205,6 +214,25 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
 
   const setPF = (field: keyof DealProductFeedback, value: string) =>
     setForm(prev => ({ ...prev, product_feedback: { ...prev.product_feedback, [field]: value } }))
+
+  const setCF = (key: string, value: string) =>
+    setForm(prev => ({ ...prev, custom_fields: { ...prev.custom_fields, [key]: value } }))
+
+  // ── Field/section customization (localStorage-backed) ──────────
+  const [hiddenFields, setHiddenFieldsState]     = useState<Set<string>>(new Set())
+  const [hiddenSections, setHiddenSectionsState] = useState<Set<string>>(new Set())
+  const [customFieldDefs, setCustomFieldDefsState] = useState<CustomFieldDef[]>([])
+  const [showCustomize, setShowCustomize] = useState(false)
+
+  useEffect(() => {
+    setHiddenFieldsState(new Set(getHiddenFields()))
+    setHiddenSectionsState(new Set(getHiddenSections()))
+    setCustomFieldDefsState(getCustomFields())
+  }, [])
+
+  const updateHiddenFields = (keys: Set<string>) => { setHiddenFieldsState(keys); persistHiddenFields([...keys]) }
+  const updateHiddenSections = (keys: Set<string>) => { setHiddenSectionsState(keys); persistHiddenSections([...keys]) }
+  const updateCustomFieldDefs = (defs: CustomFieldDef[]) => { setCustomFieldDefsState(defs); persistCustomFields(defs) }
 
   const toggleBlocker = (type: string) => {
     const exists = form.blockers.find(b => b.type === type)
@@ -237,12 +265,23 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
 
   const statusMeta = dealStatusMeta(form.status as never)
 
+  const sec = (key: string) => !hiddenSections.has(key)
+  const fld = (key: string) => !hiddenFields.has(key)
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
 
+      <div className="flex justify-end">
+        <button type="button" onClick={() => setShowCustomize(true)} className="btn btn-ghost" style={{ fontSize: '12px', gap: '6px' }}>
+          <SlidersHorizontal size={13} />Customize Fields
+        </button>
+      </div>
+
       {/* ── 1. Company Information ─────────────────────── */}
+      {sec('company') && (
       <SectionCard title="Company Information">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {fld('company_name') && (
           <Field label="Company Name">
             <Input
               value={form.company_name}
@@ -250,97 +289,145 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
               placeholder="e.g. Stripe, Binance, Coinbase"
             />
           </Field>
+          )}
+          {fld('individual_name') && (
           <Field label="Individual Name">
             <Input value={form.individual_name} onChange={e => set('individual_name', e.target.value)} placeholder="Contact person's name" />
           </Field>
+          )}
+          {fld('designation') && (
           <Field label="Designation / Role">
             <Input value={form.designation} onChange={e => set('designation', e.target.value)} placeholder="e.g. Head of Payments, CTO" />
           </Field>
+          )}
+          {fld('website') && (
           <Field label="Website">
             <Input value={form.website} onChange={e => set('website', e.target.value)} placeholder="https://" type="url" />
           </Field>
+          )}
+          {fld('industry') && (
           <Field label="Industry">
             <Input value={form.industry} onChange={e => set('industry', e.target.value)} placeholder="e.g. Fintech, DeFi, Gaming" />
           </Field>
+          )}
+          {fld('country') && (
           <Field label="Country">
             <Input value={form.country} onChange={e => set('country', e.target.value)} placeholder="e.g. UAE, Singapore, USA" />
           </Field>
+          )}
         </div>
       </SectionCard>
+      )}
 
       {/* ── 2. Lead Classification ──────────────────────── */}
+      {sec('classification') && (
       <SectionCard title="Lead Classification">
         <div className="space-y-4">
+          {fld('lead_type') && (
           <Field label="Lead Type">
             <RadioGroup options={LEAD_TYPES} value={form.lead_type} onChange={v => set('lead_type', v)} />
           </Field>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {fld('status') && (
             <Field label="Deal Status">
               <Select value={form.status} onChange={e => set('status', e.target.value)}>
                 {DEAL_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </Select>
             </Field>
+            )}
+            {fld('outreach_channel') && (
             <Field label="Primary Outreach Channel">
               <Select value={form.outreach_channel} onChange={e => set('outreach_channel', e.target.value)}>
                 <option value="">Select channel…</option>
                 {OUTREACH_CHANNELS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </Select>
             </Field>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {fld('expected_close_date') && (
             <Field label="Expected Close Date">
               <Input value={form.expected_close_date} onChange={e => set('expected_close_date', e.target.value)} type="date" />
             </Field>
+            )}
+            {fld('month_year') && (
             <Field label="Reporting Month">
               <Input value={form.month_year} onChange={e => set('month_year', e.target.value)} type="month" />
             </Field>
+            )}
           </div>
         </div>
       </SectionCard>
+      )}
 
       {/* ── 3. Opportunity Details ─────────────────────── */}
+      {sec('opportunity') && (
       <SectionCard title="Opportunity Details">
         <div className="space-y-4">
+          {fld('requirement') && (
           <Field label="Requirement — What are they looking for?">
             <Textarea value={form.requirement} onChange={e => set('requirement', e.target.value)} placeholder="Describe their specific requirement…" />
           </Field>
+          )}
+          {fld('problem_statement') && (
           <Field label="Problem Statement — What problem are they solving?">
             <Textarea value={form.problem_statement} onChange={e => set('problem_statement', e.target.value)} placeholder="Explain the core problem they're trying to solve…" />
           </Field>
+          )}
+          {fld('products_interested') && (
           <Field label="Products They Are Interested In">
             <MultiChip options={KIMA_PRODUCTS} selected={form.products_interested} onChange={v => set('products_interested', v)} />
           </Field>
+          )}
+          {fld('products_proposed') && (
           <Field label="Products We Proposed">
             <MultiChip options={KIMA_PRODUCTS} selected={form.products_proposed} onChange={v => set('products_proposed', v)} />
           </Field>
+          )}
         </div>
       </SectionCard>
+      )}
 
       {/* ── 4. Business Potential ──────────────────────── */}
+      {sec('potential') && (
       <SectionCard title="Business Potential">
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {fld('expected_monthly_volume') && (
             <Field label="Expected Monthly Volume">
               <Input value={form.expected_monthly_volume} onChange={e => set('expected_monthly_volume', e.target.value)} placeholder="e.g. $2M/month" />
             </Field>
+            )}
+            {fld('expected_yearly_volume') && (
             <Field label="Expected Yearly Volume">
               <Input value={form.expected_yearly_volume} onChange={e => set('expected_yearly_volume', e.target.value)} placeholder="e.g. $24M/year" />
             </Field>
+            )}
+            {fld('estimated_revenue') && (
             <Field label="Estimated Revenue Opportunity">
               <Input value={form.estimated_revenue} onChange={e => set('estimated_revenue', e.target.value)} placeholder="e.g. $200K/year" />
             </Field>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {fld('geographic_corridor') && (
             <Field label="Geographic Corridor">
               <Input value={form.geographic_corridor} onChange={e => set('geographic_corridor', e.target.value)} placeholder="e.g. UAE → India, US → EU" />
             </Field>
+            )}
+            {fld('end_users_count') && (
             <Field label="Number of End Users (if known)">
               <Input value={form.end_users_count} onChange={e => set('end_users_count', e.target.value)} placeholder="e.g. 50,000 users" />
             </Field>
+            )}
           </div>
+          {fld('use_case') && (
           <Field label="Use Case">
             <Textarea value={form.use_case} onChange={e => set('use_case', e.target.value)} placeholder="Describe the specific use case for Kima's products…" />
           </Field>
+          )}
+          {fld('strategic_importance') && (
           <Field label="Strategic Importance">
             <RadioGroup
               options={[{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }]}
@@ -348,57 +435,86 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
               onChange={v => set('strategic_importance', v)}
             />
           </Field>
+          )}
         </div>
       </SectionCard>
+      )}
 
       {/* ── 5. Business Impact ─────────────────────────── */}
+      {sec('impact') && (
       <SectionCard title="Business Impact" defaultOpen={false}>
         <div className="space-y-4">
+          {fld('business_impact') && (
           <Field label="What business can this opportunity bring?">
             <Textarea value={form.business_impact} onChange={e => set('business_impact', e.target.value)} placeholder="Quantify the impact: revenue, volume, strategic positioning…" />
           </Field>
+          )}
+          {fld('why_valuable') && (
           <Field label="Why is this customer valuable?">
             <Textarea value={form.why_valuable} onChange={e => set('why_valuable', e.target.value)} placeholder="Network effects, brand value, market access, reference customer…" />
           </Field>
+          )}
+          {fld('best_product_fit') && (
           <Field label="Which Kima / Aergap product fits best?">
             <Textarea rows={2} value={form.best_product_fit} onChange={e => set('best_product_fit', e.target.value)} placeholder="e.g. Aergap cross-chain settlement" />
           </Field>
+          )}
+          {fld('long_term_value') && (
           <Field label="Long-term strategic value">
             <Textarea value={form.long_term_value} onChange={e => set('long_term_value', e.target.value)} placeholder="Partnership, ecosystem growth, data, integrations…" />
           </Field>
+          )}
         </div>
       </SectionCard>
+      )}
 
       {/* ── 6. Product Feedback ────────────────────────── */}
+      {sec('feedback') && (
       <SectionCard title="Product Feedback from Prospect" defaultOpen={false}>
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {fld('feature_requested') && (
             <Field label="Feature Requested">
               <Textarea rows={2} value={form.product_feedback.feature_requested || ''} onChange={e => setPF('feature_requested', e.target.value)} placeholder="Specific features they asked for…" />
             </Field>
+            )}
+            {fld('missing_functionality') && (
             <Field label="Missing Functionality">
               <Textarea rows={2} value={form.product_feedback.missing_functionality || ''} onChange={e => setPF('missing_functionality', e.target.value)} placeholder="What's missing from our current offering…" />
             </Field>
+            )}
+            {fld('product_gaps') && (
             <Field label="Product Gaps Identified">
               <Textarea rows={2} value={form.product_feedback.product_gaps || ''} onChange={e => setPF('product_gaps', e.target.value)} placeholder="Gaps compared to competitors…" />
             </Field>
+            )}
+            {fld('integration_requested') && (
             <Field label="Integration Requested">
               <Textarea rows={2} value={form.product_feedback.integration_requested || ''} onChange={e => setPF('integration_requested', e.target.value)} placeholder="Third-party integrations they need…" />
             </Field>
+            )}
+            {fld('api_requirements') && (
             <Field label="API Requirements">
               <Textarea rows={2} value={form.product_feedback.api_requirements || ''} onChange={e => setPF('api_requirements', e.target.value)} placeholder="API capabilities they need…" />
             </Field>
+            )}
+            {fld('compliance_requirements') && (
             <Field label="Compliance Requirements">
               <Textarea rows={2} value={form.product_feedback.compliance_requirements || ''} onChange={e => setPF('compliance_requirements', e.target.value)} placeholder="Regulatory or compliance needs…" />
             </Field>
+            )}
           </div>
+          {fld('technical_blockers') && (
           <Field label="Technical Blockers">
             <Textarea rows={2} value={form.product_feedback.technical_blockers || ''} onChange={e => setPF('technical_blockers', e.target.value)} placeholder="Technical limitations that block the deal…" />
           </Field>
+          )}
         </div>
       </SectionCard>
+      )}
 
       {/* ── 7. Blockers ────────────────────────────────── */}
+      {sec('blockers') && (
       <SectionCard title="Deal Blockers" defaultOpen={false}>
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
@@ -472,18 +588,52 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
           )}
         </div>
       </SectionCard>
+      )}
 
       {/* ── 8. Notes ───────────────────────────────────── */}
+      {sec('notes') && (
       <SectionCard title="Additional Notes" defaultOpen={false}>
         <div className="space-y-4">
+          {fld('notes') && (
           <Field label="Notes">
             <Textarea rows={4} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional context, next steps, or observations…" />
           </Field>
+          )}
+          {fld('owner') && (
           <Field label="Owner / Assigned To">
             <Input value={form.owner} onChange={e => set('owner', e.target.value)} placeholder="e.g. Arpit" />
           </Field>
+          )}
         </div>
       </SectionCard>
+      )}
+
+      {/* ── 9. Custom Fields ─────────────────────────────── */}
+      {customFieldDefs.length > 0 && (
+      <SectionCard title="Custom Fields" defaultOpen={false}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {customFieldDefs.map(cf => (
+            <Field key={cf.key} label={cf.label}>
+              {cf.type === 'textarea'
+                ? <Textarea rows={2} value={form.custom_fields[cf.key] || ''} onChange={e => setCF(cf.key, e.target.value)} placeholder="Your answer…" />
+                : <Input value={form.custom_fields[cf.key] || ''} onChange={e => setCF(cf.key, e.target.value)} placeholder="Your answer…" />}
+            </Field>
+          ))}
+        </div>
+      </SectionCard>
+      )}
+
+      {showCustomize && (
+        <CustomizeFieldsModal
+          onClose={() => setShowCustomize(false)}
+          hiddenFields={hiddenFields}
+          hiddenSections={hiddenSections}
+          customFields={customFieldDefs}
+          onHiddenFieldsChange={updateHiddenFields}
+          onHiddenSectionsChange={updateHiddenSections}
+          onCustomFieldsChange={updateCustomFieldDefs}
+        />
+      )}
 
       {/* ── Actions ────────────────────────────────────── */}
       <div className="flex items-center justify-between pt-2 pb-6">
