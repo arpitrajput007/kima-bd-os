@@ -114,7 +114,7 @@ function pdfStatusColors(status: string): { bg: string; text: string } {
   return { bg: '#f3f4f6', text: '#6b7280' }
 }
 
-function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: string, outreach: OutreachStats, timeEntries: TimeAllocation[], narrative?: string, kpiOverrides: Record<string, number> = {}, categoryOverrides: Record<string, number> = {}) {
+function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: string, outreach: OutreachStats, timeEntries: TimeAllocation[], narrative?: string, kpiOverrides: Record<string, number> = {}, categoryOverrides: Record<string, number> = {}, priorityNotes?: string) {
   const label = fmtMonthYear(month)
   const won     = deals.filter(d => d.status === 'closed_won')
   const lost    = deals.filter(d => d.status === 'closed_lost')
@@ -379,8 +379,15 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
   }
 
   // ── Next Month Priorities ──────────────────────────────────────
-  if (priorities.length) {
-    sectionTitle('Next Month Priorities', priorities.length * 6.5)
+  if (priorityNotes || priorities.length) {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5)
+    const noteLines = priorityNotes ? doc.splitTextToSize(priorityNotes, CONTENT_W) : []
+    sectionTitle('Next Month Priorities', noteLines.length * 4.8 + (noteLines.length ? 4 : 0) + priorities.length * 6.5)
+    if (noteLines.length) {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor('#374151')
+      doc.text(noteLines, MARGIN, y, { lineHeightFactor: 1.5 })
+      y += noteLines.length * 4.8 + 4
+    }
     priorities.forEach(d => {
       ensureSpace(6.5)
       doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor('#1a1a2e')
@@ -690,7 +697,7 @@ export default function MonthlyReportsPage() {
                   <FileText size={12} style={{ color: '#60a5fa' }} />Export Excel (CSV)
                 </button>
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
-                <button onClick={() => { exportPDF(deals, activities, month, outreachStats, timeEntries, narrative || undefined, fakeOverrides, categoryOverrides); setExportOpen(false) }}
+                <button onClick={() => { exportPDF(deals, activities, month, outreachStats, timeEntries, narrative || undefined, fakeOverrides, categoryOverrides, priorityNotes || undefined); setExportOpen(false) }}
                   className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs hover:bg-white/5 text-left transition-colors"
                   style={{ color: 'rgb(180,180,210)' }}>
                   <FileText size={12} style={{ color: '#a78bfa' }} />Export PDF Report
