@@ -183,10 +183,8 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
 
   function newContinuationPage() {
     doc.addPage()
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor('#7c3aed')
-    doc.text('KIMA FINANCE', MARGIN, MARGIN)
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor('#9ca3af')
-    doc.text(`Monthly BD Performance Report — ${label}`, PAGE_W - MARGIN, MARGIN, { align: 'right' })
+    doc.text(`Aeredium Monthly BD Performance Report — ${label}`, PAGE_W - MARGIN, MARGIN, { align: 'right' })
     doc.setDrawColor('#e5e7eb'); doc.setLineWidth(0.3)
     doc.line(MARGIN, MARGIN + 2, PAGE_W - MARGIN, MARGIN + 2)
     y = MARGIN + 10
@@ -212,14 +210,10 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
   // ── Cover band ─────────────────────────────────────────────────
   doc.setFillColor('#0f0e17')
   doc.rect(0, 0, PAGE_W, 36, 'F')
-  doc.setFillColor('#6d28d9')
-  doc.roundedRect(MARGIN, 9, 28, 6.4, 1.2, 1.2, 'F')
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor('#ffffff')
-  doc.text('KIMA FINANCE', MARGIN + 14, 13.3, { align: 'center' })
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor('#a29bc4')
-  doc.text('Confidential', MARGIN + 33, 13.3)
+  doc.text('Confidential', MARGIN, 13.3)
   doc.setFont('helvetica', 'bold'); doc.setFontSize(19); doc.setTextColor('#ffffff')
-  doc.text('Monthly BD Performance Report', MARGIN, 23.5)
+  doc.text('Aeredium Monthly BD Performance Report', MARGIN, 23.5)
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor('#a29bc4')
   doc.text(`${label}   ·   Generated ${new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })}   ·   Kima BD OS`, MARGIN, 30.5)
   y = 46
@@ -406,7 +400,7 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
     doc.setDrawColor('#e5e7eb'); doc.setLineWidth(0.2)
     doc.line(MARGIN, PAGE_H - 13, PAGE_W - MARGIN, PAGE_H - 13)
     doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor('#9ca3af')
-    doc.text(`Kima BD OS   ·   Monthly BD Performance Report   ·   ${label}`, MARGIN, PAGE_H - 8)
+    doc.text(`Kima BD OS   ·   Aeredium Monthly BD Performance Report   ·   ${label}`, MARGIN, PAGE_H - 8)
     doc.text(`Page ${p} of ${pageCount}`, PAGE_W - MARGIN, PAGE_H - 8, { align: 'right' })
   }
 
