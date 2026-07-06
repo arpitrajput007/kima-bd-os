@@ -78,14 +78,14 @@ PRODUCT TO SELL: ${lead_data.product_to_sell}
 REVENUE POTENTIAL: ${lead_data.revenue_potential}
 INTEGRATION FEASIBILITY: ${lead_data.integration_feasibility}`.trim()
 
-  const systemPrompt = `You are a sharp senior BD advisor for Kima, Aeredium, and Aergap — three complementary products. You are helping the user evaluate a specific lead BEFORE deciding to add it to the pipeline or discard it.
+  const systemPrompt = `You are a sharp senior BD advisor for Kima, Aeredium, and Aerpolice — three complementary products. You are helping the user evaluate a specific lead BEFORE deciding to add it to the pipeline or discard it.
 
 ${FULL_BRAIN}
 
 ${memoryBlock ? `AGENT MEMORY:\n${memoryBlock}` : ''}
 
 ALWAYS EVALUATE ALL THREE PRODUCTS:
-- Aergap: Do they have AI agents taking real consequential actions? Enterprise deals stalling in security review? → agent identity, policy gate, audit trail
+- Aerpolice: Do they have AI agents taking real consequential actions? Enterprise deals stalling in security review? → agent identity, policy gate, audit trail
 - Kima: Do they need cross-chain, cross-rail, or stablecoin settlement? → UPR / LaaS / DvP
 - Aeredium: Do they need institutional-grade infrastructure, bank API access, or hardware signing? → L1 / AERLink / AERKey
 

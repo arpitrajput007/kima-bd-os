@@ -5,7 +5,7 @@
 // how Kima / Aeredium can work with a specific company.
 //
 // KEY: This route is customer-category aware:
-//   - "Agentic Payments Customer" → Agentic Payments + Aergap playbook
+//   - "Agentic Payments Customer" → Agentic Payments + Aerpolice playbook
 //   - Everything else → Settlement / cross-chain playbook
 //
 // Also injects agent memory (learned knowledge + active rules)
@@ -50,7 +50,7 @@ MANDATORY RULES FOR THIS LEAD:
 2. The three gaps: (a) narrow settlement rails, (b) software-level mandate enforcement, (c) no verifiable audit trail. Map which ones apply to this company.
 3. Kima's role: single-API settlement across any rail for agent-initiated transactions.
 4. Aeredium's role: TEE-attested execution gate + AERKey threshold ECDSA = hardware-level policy enforcement + cryptographic audit trail.
-5. If Aergap is a competitor or in their stack, explicitly address the "governance sidecar vs. full stack" angle.
+5. If Aerpolice is a competitor or in their stack, explicitly address the "governance sidecar vs. full stack" angle.
 6. Do NOT generate cross-chain settlement use cases unless the company explicitly does cross-chain work AND it's relevant to agent flows.
 7. Use the ANUM framework (Authority, Need, Urgency, Money) lens when describing "why now" — enterprise deals stalling in security review is the strongest urgency signal.
 `
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     lead.industry_category ? (lead.industry_category as string).toLowerCase().replace(/\s+/g, '_') : '',
     isAgenticLead(cats) ? 'agentic' : '',
     isAgenticLead(cats) ? 'agent' : '',
-    isAgenticLead(cats) ? 'aergap' : '',
+    isAgenticLead(cats) ? 'aerpolice' : '',
   ].filter(Boolean)
 
   // ── Load agent memory (learned knowledge + rules) ────────────
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
   // ── Category routing block ───────────────────────────────────
   const routingBlock = categoryRoutingBlock(lead as Record<string, unknown>)
 
-  const system = `You are a senior solutions architect for Kima, Aeredium, and Aergap.
+  const system = `You are a senior solutions architect for Kima, Aeredium, and Aerpolice.
 
 ${PRODUCT_BRAIN}
 
@@ -155,7 +155,7 @@ If a use case cannot answer "What exactly triggered this? Which exact feature? W
 HONESTY RULES:
 - Only generate use cases where the fit is genuine. 2 deeply concrete use cases beat 3 forced ones.
 - Pick the RIGHT product for each scenario. Do not shoehorn all three products into every use case.
-- For Aergap scenarios, the trigger is usually an agent attempting an action that hits a policy boundary (amount threshold, recipient not on whitelist, unusual transaction). Show the policy evaluation → approval → execution → audit flow.
+- For Aerpolice scenarios, the trigger is usually an agent attempting an action that hits a policy boundary (amount threshold, recipient not on whitelist, unusual transaction). Show the policy evaluation → approval → execution → audit flow.
 - If Aeredium genuinely isn't needed in a use case, leave its products out — don't force it.
 
 Return ONLY valid JSON — no markdown, no text outside the array.`
@@ -204,7 +204,7 @@ Return a JSON array of 2-3 use case objects in this EXACT structure:
     ],
     "products_used": [
       {
-        "product": "Kima | Aeredium | Aergap",
+        "product": "Kima | Aeredium | Aerpolice",
         "features": ["Exact features used, e.g. 'Atomic settlement', 'Cross-system interoperability', 'Instant settlement', 'MPC custody', 'Execution Gate', 'Policy enforcement', 'Immutable audit trail'"],
         "why": "Why THESE features matter for THIS company's specific situation — explain the necessity, not the feature. E.g. 'Without atomic settlement the firm risks a half-completed transfer leaving capital stranded mid-trade while the arbitrage window closes.'"
       }

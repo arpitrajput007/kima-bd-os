@@ -10,7 +10,7 @@ import { PRODUCT_BRAIN, productFocusDirective, type LeadFocusInput } from '@/lib
 import { fullMemory } from '@/lib/agent-memory'
 import type { BDBrief } from '@/lib/types'
 
-const SYSTEM = `You are a senior solutions architect and BD strategist for Kima, Aeredium, and Aergap — financial infrastructure companies.
+const SYSTEM = `You are a senior solutions architect and BD strategist for Kima, Aeredium, and Aerpolice — financial infrastructure companies.
 
 ${PRODUCT_BRAIN}
 
@@ -67,7 +67,7 @@ PAIN EVIDENCE (what makes this pain credible): ${lead.pain_point_evidence || 'N/
 PRODUCT FIT ANALYSIS:
 - Kima fit: ${lead.kima_fit || 'N/A'}
 - Aeredium fit: ${lead.aeredium_fit || 'N/A'}
-- Aergap fit (AI-agent governance): ${lead.aergap_fit || 'N/A'}
+- Aerpolice fit (AI-agent governance): ${lead.aerpolice_fit || 'N/A'}
 - Agent control angle: ${lead.agent_control_angle || 'N/A'}
 - Settlement angle: ${lead.settlement_angle || 'N/A'}
 - Security angle: ${lead.security_angle || 'N/A'}
@@ -101,7 +101,7 @@ Return this exact JSON structure:
     "Top 3 operational problems specific to ${lead.company_name}'s situation. Each as one punchy sentence. Traceable to their actual workflow or stack — NOT generic industry problems."
   ],
   "opportunity": {
-    "products": ["Only list products with genuine fit: 'Kima', 'Aeredium', 'Aergap'. If none fit strongly, list the best one with caveats. If truly no fit, say ['No clear fit at this time']."],
+    "products": ["Only list products with genuine fit: 'Kima', 'Aeredium', 'Aerpolice'. If none fit strongly, list the best one with caveats. If truly no fit, say ['No clear fit at this time']."],
     "gap_solved": "One sentence: what specific gap in ${lead.company_name}'s current setup does our product fill? Name their actual limitation.",
     "why_they_care": "One sentence: what concrete business outcome do they get? (not features — outcomes: faster settlement, new corridor opened, compliance unlocked, cost reduced by X%)",
     "why_not_the_others": "One sentence: briefly explain why the other products are less relevant for this specific company right now."
@@ -116,7 +116,7 @@ Return this exact JSON structure:
     ],
     "products_used": [
       {
-        "product": "Kima | Aeredium | Aergap",
+        "product": "Kima | Aeredium | Aerpolice",
         "features": ["Exact features used — e.g. 'Atomic settlement', 'MPC custody', 'Execution Gate', 'Immutable audit trail'"],
         "why": "Why THESE features matter for THIS company specifically — explain the necessity. E.g. 'Without atomic settlement, a half-completed transfer would strand capital mid-trade.' Not just 'provides MPC'."
       }
@@ -138,7 +138,7 @@ Return this exact JSON structure:
 
   // Inject learned memory (rules/knowledge/feedback) + deterministic product
   // focus so the brief reflects everything taught via Make Agent Learn and
-  // routes AI-agent companies to Aergap instead of defaulting to Kima.
+  // routes AI-agent companies to Aerpolice instead of defaulting to Kima.
   const [memory, { directive }] = await Promise.all([
     fullMemory({ tags: (lead.tags as string[] | null) || [] }),
     Promise.resolve(productFocusDirective(lead as LeadFocusInput)),

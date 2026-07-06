@@ -339,13 +339,13 @@ function IncidentBar({ data }: { data: ContentResult }) {
     { label: 'Summary',          text: data.incident_summary,  color: 'rgba(251,191,36,0.6)' },
     { label: 'Why it matters',   text: data.why_this_matters,  color: 'rgba(167,139,250,0.65)' },
     { label: 'Hidden problem',   text: data.root_cause,        color: 'rgba(248,113,113,0.65)' },
-    { label: 'Aergap angle',     text: data.kima_angle,        color: 'rgba(52,211,153,0.65)' },
+    { label: 'Aerpolice angle',     text: data.kima_angle,        color: 'rgba(52,211,153,0.65)' },
     { label: 'Original insight', text: data.original_insight,  color: 'rgba(96,165,250,0.65)' },
   ].filter(r => r.text && r.text !== 'N/A')
 
   return (
     <div style={{ borderRadius: 12, padding: '14px 16px', background: 'rgba(251,191,36,0.04)', border: '1px solid rgba(251,191,36,0.12)', display: 'flex', flexDirection: 'column', gap: 9 }}>
-      <div style={{ fontSize: 10, fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Aergap Analysis</div>
+      <div style={{ fontSize: 10, fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Aerpolice Analysis</div>
       {rows.map(({ label, text, color }) => (
         <div key={label} style={{ display: 'flex', gap: 8 }}>
           <span style={{ fontSize: 10, fontWeight: 700, color, flexShrink: 0, minWidth: 110 }}>{label}</span>
@@ -456,7 +456,7 @@ function SavedDraftCard({ draft, copied, onCopy, onMarkPosted, onDelete }: {
         <div style={{ margin: '0 14px 14px', padding: '10px 12px', borderRadius: 8, background: 'rgba(251,191,36,0.04)', border: '1px solid rgba(251,191,36,0.12)' }}>
           <div style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>Context</div>
           <div style={{ fontSize: 11, color: 'rgb(190,195,220)', lineHeight: 1.5 }}>{draft.incident_summary}</div>
-          {draft.kima_angle && draft.kima_angle !== 'N/A' && <div style={{ fontSize: 11, color: 'rgba(167,139,250,0.7)', marginTop: 4, lineHeight: 1.5 }}>Aergap angle: {draft.kima_angle}</div>}
+          {draft.kima_angle && draft.kima_angle !== 'N/A' && <div style={{ fontSize: 11, color: 'rgba(167,139,250,0.7)', marginTop: 4, lineHeight: 1.5 }}>Aerpolice angle: {draft.kima_angle}</div>}
         </div>
       )}
     </div>
@@ -584,7 +584,7 @@ function ContentDiscussPanel({ result, newsContext, sourceUrl, onClose }: {
   const totalPosts = result.tweets.length + result.thread.length + result.linkedin.length
   const starters = [
     'Walk me through the reasoning for Tweet 1 — why this hook and angle?',
-    'Is the Aergap connection in these posts accurate and defensible?',
+    'Is the Aerpolice connection in these posts accurate and defensible?',
     'Which post is the strongest and why? Which one needs work?',
     'Flag anything I should double-check before posting this.',
   ]
@@ -650,7 +650,7 @@ function ContentDiscussPanel({ result, newsContext, sourceUrl, onClose }: {
             ))}
             {result.kima_angle && result.kima_angle !== 'N/A' && (
               <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 4, background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', fontWeight: 700 }}>
-                Aergap angle present
+                Aerpolice angle present
               </span>
             )}
           </div>
@@ -661,7 +661,7 @@ function ContentDiscussPanel({ result, newsContext, sourceUrl, onClose }: {
           {messages.length === 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <p style={{ fontSize: 13, color: 'rgb(150,157,180)', lineHeight: 1.7, margin: 0 }}>
-                Ask me anything about the generated content — why a specific post says what it says, whether the Aergap connection is accurate, which posts are strongest, or get a sharper version of something.{' '}
+                Ask me anything about the generated content — why a specific post says what it says, whether the Aerpolice connection is accurate, which posts are strongest, or get a sharper version of something.{' '}
                 <span style={{ color: 'rgba(167,139,250,0.8)' }}>I won't let you post something you don't fully understand.</span>
               </p>
               <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgb(100,107,140)', marginTop: 2 }}>Try asking</div>
@@ -964,7 +964,7 @@ export default function ContentStudioPage() {
         <div>
           <h1 className="text-xl font-bold text-white">Content Studio</h1>
           <p className="text-xs mt-0.5" style={{ color: 'rgb(100,100,120)' }}>
-            Any AI news → thought leadership content for Aergap — saved in one place
+            Any AI news → thought leadership content for Aerpolice — saved in one place
           </p>
         </div>
 
@@ -972,7 +972,7 @@ export default function ContentStudioPage() {
         <div style={{ display: 'flex', gap: 4, padding: '3px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
           {([
             { key: 'reaction', label: 'Reaction', icon: true },
-            { key: 'create',   label: 'Aergap Create' },
+            { key: 'create',   label: 'Aerpolice Create' },
             { key: 'saved',    label: `Saved Drafts${savedCount > 0 ? ` (${savedCount})` : ''}` },
             { key: 'sessions', label: `Sessions${sessions.length > 0 ? ` (${sessions.length})` : ''}` },
             { key: 'media',    label: `Media${media.length > 0 ? ` (${media.length})` : ''}` },
@@ -1056,14 +1056,14 @@ export default function ContentStudioPage() {
                     <AlignLeft size={22} color="rgba(167,139,250,0.4)" />
                   </div>
                   <p style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 6 }}>Paste any AI news, get thought leadership</p>
-                  <p style={{ fontSize: 12, color: 'rgb(90,95,130)', maxWidth: 340, textAlign: 'center', lineHeight: 1.6 }}>Drop a URL or paste any AI agent news, product launch, funding announcement, or research paper. The agent analyzes it through the Aergap governance lens and writes posts. Save the ones you like.</p>
+                  <p style={{ fontSize: 12, color: 'rgb(90,95,130)', maxWidth: 340, textAlign: 'center', lineHeight: 1.6 }}>Drop a URL or paste any AI agent news, product launch, funding announcement, or research paper. The agent analyzes it through the Aerpolice governance lens and writes posts. Save the ones you like.</p>
                 </div>
               )}
 
               {loading && (
                 <div style={{ minHeight: 500, borderRadius: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(18,19,32,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <Loader2 size={32} className="animate-spin mb-4" style={{ color: '#a78bfa' }} />
-                  <p style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 4 }}>Analysing through the Aergap lens…</p>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 4 }}>Analysing through the Aerpolice lens…</p>
                   <p style={{ fontSize: 12, color: 'rgb(90,95,130)' }}>Identifying the governance gap and generating thought leadership content</p>
                 </div>
               )}
@@ -1292,7 +1292,7 @@ export default function ContentStudioPage() {
                       </div>
                       {session.kima_angle && session.kima_angle !== 'N/A' && (
                         <div style={{ fontSize: 11, color: 'rgba(167,139,250,0.65)', lineHeight: 1.5 }}>
-                          Aergap angle: {session.kima_angle.slice(0, 140)}{session.kima_angle.length > 140 ? '…' : ''}
+                          Aerpolice angle: {session.kima_angle.slice(0, 140)}{session.kima_angle.length > 140 ? '…' : ''}
                         </div>
                       )}
                       {session.source_url && (

@@ -226,7 +226,7 @@ async function generateAutoDrafts(leadId: string, draftingProvider: AIProvider =
 
   const { directive: focusDirective } = productFocusDirective(lead as LeadFocusInput)
 
-  const systemPrompt = `You are Arpit, leading BD/partnerships for Kima, Aeredium, and Aergap. You write your own outreach DMs by hand after researching each prospect.
+  const systemPrompt = `You are Arpit, leading BD/partnerships for Kima, Aeredium, and Aerpolice. You write your own outreach DMs by hand after researching each prospect.
 
 ${PRODUCT_BRAIN}
 
@@ -312,7 +312,7 @@ async function generateFollowup(leadId: string, stage: number, draftingProvider:
   const { directive: focusDirective } = productFocusDirective(lead as LeadFocusInput)
 
   const isFinal = stage >= MAX_FOLLOWUPS - 1
-  const systemPrompt = `You are Arpit, leading BD/partnerships for Kima, Aeredium, and Aergap. You're writing a SHORT follow-up to someone who hasn't replied yet. You are not annoyed and not pushy — just persistent and useful.
+  const systemPrompt = `You are Arpit, leading BD/partnerships for Kima, Aeredium, and Aerpolice. You're writing a SHORT follow-up to someone who hasn't replied yet. You are not annoyed and not pushy — just persistent and useful.
 
 ${PRODUCT_BRAIN}
 
@@ -436,7 +436,7 @@ export async function POST(req: NextRequest) {
     business_model: pain_point,
   } as LeadFocusInput)
 
-  const systemPrompt = `You are writing BD outreach messages for Arpit, who leads BD/partnerships for Kima, Aeredium, and Aergap.
+  const systemPrompt = `You are writing BD outreach messages for Arpit, who leads BD/partnerships for Kima, Aeredium, and Aerpolice.
 
 ${PRODUCT_BRAIN}
 

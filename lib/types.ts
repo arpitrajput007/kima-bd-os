@@ -147,7 +147,7 @@ export interface BDBrief {
   how_money_moves:      string      // short paragraph on fund/value flow
   pain_points:          string[]    // top 3 operational problems
   opportunity: {
-    products:           string[]    // ["Kima", "Aeredium", "Aergap"] — only what applies
+    products:           string[]    // ["Kima", "Aeredium", "Aerpolice"] — only what applies
     gap_solved:         string      // one sentence
     why_they_care:      string      // one sentence on business outcome
   }
@@ -171,7 +171,7 @@ export interface BDBrief {
 // Which product + which exact features + WHY each feature matters.
 // This is what makes a use case operationally believable rather than abstract.
 export interface UseCaseProduct {
-  product: 'Kima' | 'Aeredium' | 'Aergap'
+  product: 'Kima' | 'Aeredium' | 'Aerpolice'
   features: string[]   // exact capabilities used (e.g. "Atomic settlement", "MPC custody")
   why: string          // why each feature is necessary for THIS company's situation
 }
@@ -225,7 +225,7 @@ export interface Lead {
   pain_point_evidence_type?: 'verified_source' | 'agent_analysis' | 'inferred'
   kima_fit?: string
   aeredium_fit?: string
-  aergap_fit?: string
+  aerpolice_fit?: string
   agent_control_angle?: string
   suggested_use_case?: string
   trigger_reason?: string

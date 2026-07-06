@@ -30,7 +30,7 @@ const supabase = createClient(
 // The PRODUCT_BRAIN now includes the CONSULTANT_FRAMEWORK which
 // instructs the model to understand the company BEFORE evaluating
 // product fit. This is the most important quality lever.
-const SYS_BASE = `You are a senior solutions consultant and BD strategist for Kima, Aeredium, and Aergap — financial infrastructure companies.
+const SYS_BASE = `You are a senior solutions consultant and BD strategist for Kima, Aeredium, and Aerpolice — financial infrastructure companies.
 
 ${PRODUCT_BRAIN}
 
@@ -163,7 +163,7 @@ AEREDIUM (institutional-grade L1 infrastructure):
 - Check: are they serving banks or institutions? Do they have throughput needs or regulatory requirements that justify this?
 - Verdict options: strong_fit | moderate_fit | weak_fit | no_fit
 
-AERGAP (governance for AI agents with financial authority):
+AERPOLICE (governance for AI agents with financial authority):
 - Does this company have autonomous AI agents that move money, approve payments, or take consequential financial actions?
 - "Uses AI" is NOT sufficient. The agents must have economic authority.
 - Check: are agents executing financial transactions, or only recommending them?
@@ -185,15 +185,15 @@ Return JSON:
     "security_angle": "TEE/compliance/throughput angle specific to their situation, or null",
     "risk_angle": "Risk reduction angle, or null"
   },
-  "aergap": {
+  "aerpolice": {
     "verdict": "strong_fit|moderate_fit|weak_fit|no_fit",
-    "aergap_fit": "Specific reasoning — do they have agents with financial authority? What governance gap exists?",
+    "aerpolice_fit": "Specific reasoning — do they have agents with financial authority? What governance gap exists?",
     "agent_control_angle": "Specific control/governance angle, or null"
   },
   "combined_opportunity": "Is there a genuine case for combining products? Be specific. If not, say so clearly.",
   "strategic_hypotheses": [
     "If they expand into X, then Kima becomes relevant because...",
-    "When they add agent-based automation, Aergap will matter because..."
+    "When they add agent-based automation, Aerpolice will matter because..."
   ],
   "honest_assessment": "One paragraph. Plain English. Is this a real opportunity? Which product and why? If weak or no fit across the board, say that clearly. The BD team needs honest signal, not manufactured confidence.",
   "competitor_context": "Are any of our products in competition with something they already have? Be explicit."
@@ -403,7 +403,7 @@ export async function POST(req: NextRequest) {
     // Runs AFTER company understanding + pain — this is the key change.
     type FitSection = Record<string, unknown>
     type FitResult = {
-      kima?: FitSection; aeredium?: FitSection; aergap?: FitSection
+      kima?: FitSection; aeredium?: FitSection; aerpolice?: FitSection
       combined_opportunity?: string; strategic_hypotheses?: string[]
       honest_assessment?: string; competitor_context?: string
     }
@@ -415,7 +415,7 @@ export async function POST(req: NextRequest) {
     const fitSum = fitData ? JSON.stringify({
       kima_verdict:     fitData.kima?.verdict,
       aeredium_verdict: fitData.aeredium?.verdict,
-      aergap_verdict:   fitData.aergap?.verdict,
+      aerpolice_verdict:   fitData.aerpolice?.verdict,
       honest_assessment: fitData.honest_assessment,
     }) : 'Fit evaluation: not available'
 
@@ -433,9 +433,9 @@ export async function POST(req: NextRequest) {
       if (ae.security_angle) patch3.security_angle = ae.security_angle
       if (ae.risk_angle)     patch3.risk_angle    = ae.risk_angle
 
-      // Aergap fit was evaluated but previously thrown away — persist it now.
-      const ag = fitData.aergap ?? {}
-      if (ag.aergap_fit)          patch3.aergap_fit          = ag.aergap_fit
+      // Aerpolice fit was evaluated but previously thrown away — persist it now.
+      const ag = fitData.aerpolice ?? {}
+      if (ag.aerpolice_fit)          patch3.aerpolice_fit          = ag.aerpolice_fit
       if (ag.agent_control_angle) patch3.agent_control_angle = ag.agent_control_angle
 
       // Store honest_assessment in competitor_context field (re-purposed for

@@ -67,7 +67,7 @@ export default function Web2AgentCompaniesPage() {
       if (tierFilter !== 'All' && a.tier !== tierFilter) return false
       if (search) {
         const q = search.toLowerCase()
-        const blob = [a.co, a.desc, a.agentDoes, a.govReason, a.whyAergap, a.decisionMaker, a.industry, ...a.highStakeActions, ...a.triggerSignals].join(' ').toLowerCase()
+        const blob = [a.co, a.desc, a.agentDoes, a.govReason, a.whyAerpolice, a.decisionMaker, a.industry, ...a.highStakeActions, ...a.triggerSignals].join(' ').toLowerCase()
         if (!blob.includes(q)) return false
       }
       return true
@@ -90,7 +90,7 @@ export default function Web2AgentCompaniesPage() {
     setEnriching(s => new Set([...s, coName]))
     const a1 = actStart({ tool: 'Claude',        action: 'Research + Classify + Fit Analysis', page: `Web2 Agents — ${coName}`, timestamp: Date.now() })
     const a2 = actStart({ tool: 'ContactFinder', action: 'Find Contacts',                      page: `Web2 Agents — ${coName}`, timestamp: Date.now() })
-    const a3 = actStart({ tool: 'Claude',        action: 'Aergap Use Cases',                   page: `Web2 Agents — ${coName}`, timestamp: Date.now() })
+    const a3 = actStart({ tool: 'Claude',        action: 'Aerpolice Use Cases',                   page: `Web2 Agents — ${coName}`, timestamp: Date.now() })
     const t0 = Date.now()
 
     fetch('/api/ai/enrich-lead', {
@@ -104,7 +104,7 @@ export default function Web2AgentCompaniesPage() {
         if (res.success) {
           actFinish(a1, 'success', 'Research complete', Math.round(enrichDur * 0.55))
           actFinish(a2, 'success', 'Contacts saved',    Math.round(enrichDur * 0.45))
-          toast(`${coName} enriched — generating Aergap use cases…`, { icon: '⚡' })
+          toast(`${coName} enriched — generating Aerpolice use cases…`, { icon: '⚡' })
           const t1 = Date.now()
           return fetch('/api/ai/use-cases', {
             method: 'POST',
@@ -116,7 +116,7 @@ export default function Web2AgentCompaniesPage() {
               const ucDur = Date.now() - t1
               if (ucRes.success) {
                 actFinish(a3, 'success', `${ucRes.use_cases?.length ?? 0} use cases saved`, ucDur)
-                toast.success(`✓ ${coName} — deep research + Aergap use cases ready`)
+                toast.success(`✓ ${coName} — deep research + Aerpolice use cases ready`)
               } else {
                 actFinish(a3, 'error', 'Use case gen failed', ucDur)
                 toast.success(`✓ ${coName} enriched (use cases failed — retry from lead page)`)
@@ -151,13 +151,13 @@ export default function Web2AgentCompaniesPage() {
         website:                 a.site,
         description:             a.desc,
         industry_category:       a.industry,
-        customer_category:       ['Web2 Agent Company', 'Aergap Governance Customer'],
-        product_to_sell:         'Aergap Agent Governance (Identity + Policy + Execution Gate + Audit Trail)',
+        customer_category:       ['Web2 Agent Company', 'Aerpolice Governance Customer'],
+        product_to_sell:         'Aerpolice Agent Governance (Identity + Policy + Execution Gate + Audit Trail)',
         pain_point:              a.govReason,
         pain_point_severity:     a.govRisk === 'High' ? 'critical' : a.govRisk === 'Medium-High' ? 'high' : 'medium',
-        pain_point_evidence:     a.whyAergap,
+        pain_point_evidence:     a.whyAerpolice,
         pain_point_evidence_type:'agent_analysis',
-        kima_fit:                a.whyAergap,
+        kima_fit:                a.whyAerpolice,
         trigger_reason:          `${a.co} — ${a.cat} — Tier ${a.tier} — ${a.priority}`,
         integration_feasibility: a.stage === 'Startup' ? 'high' : a.stage === 'Growth' ? 'medium' : 'low',
         lead_score:              a.fitScore * 10,
@@ -182,10 +182,10 @@ export default function Web2AgentCompaniesPage() {
   }
 
   const exportCSV = () => {
-    const headers = ['Tier', 'Priority', 'Category', 'Company', 'Website', 'Industry', 'Fit Score', 'Gov Risk', 'What Agent Does', 'High-Stake Actions', 'Gov Reason', 'Why Aergap', 'Decision Maker', 'Outreach Angle', 'Trigger Signals']
+    const headers = ['Tier', 'Priority', 'Category', 'Company', 'Website', 'Industry', 'Fit Score', 'Gov Risk', 'What Agent Does', 'High-Stake Actions', 'Gov Reason', 'Why Aerpolice', 'Decision Maker', 'Outreach Angle', 'Trigger Signals']
     const rows = filtered.map(a => [
       a.tier, a.priority, a.cat, a.co, a.site, a.industry, a.fitScore, a.govRisk,
-      a.agentDoes, a.highStakeActions.join('; '), a.govReason, a.whyAergap, a.decisionMaker, a.outreachAngle, a.triggerSignals.join('; '),
+      a.agentDoes, a.highStakeActions.join('; '), a.govReason, a.whyAerpolice, a.decisionMaker, a.outreachAngle, a.triggerSignals.join('; '),
     ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
     const csv = [headers.join(','), ...rows].join('\n')
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
@@ -216,7 +216,7 @@ export default function Web2AgentCompaniesPage() {
                 Web2 AI Agent Companies
               </h1>
               <p style={{ fontSize: 12, color: 'rgb(100,106,135)', marginTop: 2 }}>
-                {WEB2_COMPANIES.length} Web2 companies deploying autonomous AI agents — Aergap governance prospects
+                {WEB2_COMPANIES.length} Web2 companies deploying autonomous AI agents — Aerpolice governance prospects
               </p>
             </div>
           </div>
@@ -462,12 +462,12 @@ export default function Web2AgentCompaniesPage() {
                                   </div>
                                 </div>
 
-                                {/* Governance reason + Aergap fit */}
+                                {/* Governance reason + Aerpolice fit */}
                                 <div>
                                   <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Governance Risk</div>
                                   <p style={{ fontSize: 11, color: 'rgb(160,165,195)', lineHeight: 1.55, marginBottom: 12 }}>{a.govReason}</p>
-                                  <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Why Aergap Fits</div>
-                                  <p style={{ fontSize: 11, color: 'rgb(160,165,195)', lineHeight: 1.55 }}>{a.whyAergap}</p>
+                                  <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Why Aerpolice Fits</div>
+                                  <p style={{ fontSize: 11, color: 'rgb(160,165,195)', lineHeight: 1.55 }}>{a.whyAerpolice}</p>
                                 </div>
 
                                 {/* Trigger signals + outreach */}

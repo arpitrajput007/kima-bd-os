@@ -29,7 +29,7 @@ interface CardLabels {
 
 const LABEL_PRESETS: Record<string, CardLabels> = {
   security:    { badge: 'SECURITY INCIDENT',   panel1: 'WHAT HAPPENED',         panel2: 'THE GOVERNANCE GAP',      accentColor: '#7c3aed' },
-  agentic:     { badge: 'AGENTIC AI',          panel1: 'THE DEVELOPMENT',        panel2: 'AERGAP\'S ROLE',          accentColor: '#3b82f6' },
+  agentic:     { badge: 'AGENTIC AI',          panel1: 'THE DEVELOPMENT',        panel2: 'AERPOLICE\'S ROLE',          accentColor: '#3b82f6' },
   insight:     { badge: 'MARKET INSIGHT',      panel1: 'WHAT\'S HAPPENING',      panel2: 'THE MISSING LAYER',       accentColor: '#f59e0b' },
   product:     { badge: 'PRODUCT LAUNCH',      panel1: 'WHAT WAS BUILT',         panel2: 'THE GOVERNANCE QUESTION', accentColor: '#10b981' },
   regulation:  { badge: 'REGULATORY UPDATE',   panel1: 'THE CHANGE',             panel2: 'WHAT THIS MEANS',         accentColor: '#f59e0b' },
@@ -102,7 +102,7 @@ function buildCard(opts: {
         }, e('span', { style: { fontSize: 14 } }, '⚡')),
         e('span', {
           style: { color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em' },
-        }, 'AERGAP'),
+        }, 'AERPOLICE'),
       ),
       e('div', {
         style: {
@@ -161,11 +161,11 @@ function buildCard(opts: {
     e('div', {
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 20 },
     },
-      e('span', { style: { color: 'rgba(255,255,255,0.15)', fontSize: 11 } }, 'aergap.io'),
+      e('span', { style: { color: 'rgba(255,255,255,0.15)', fontSize: 11 } }, 'aerpolice.io'),
       e('div', {
         style: { background: 'linear-gradient(135deg, #7c3aed, #3b82f6)', borderRadius: 6, padding: '5px 13px' },
       },
-        e('span', { style: { color: 'white', fontSize: 11, fontWeight: 700 } }, 'Aergap'),
+        e('span', { style: { color: 'white', fontSize: 11, fontWeight: 700 } }, 'Aerpolice'),
       ),
     ),
   )

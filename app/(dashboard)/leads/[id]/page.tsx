@@ -27,7 +27,7 @@ import type { Lead, Contact, ContactTouch, OutreachMessage, UseCase, BDBrief, Us
 import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL, REGIONS } from '@/lib/types'
 import { actStart, actFinish, ACTION_TOOL, ACTION_LABEL } from '@/lib/agent-activity'
 
-type AIAction = 'research' | 'pain_points' | 'kima_fit' | 'aeredium_fit' | 'aergap_fit' | 'classify' | 'score' | 'contacts' | null
+type AIAction = 'research' | 'pain_points' | 'kima_fit' | 'aeredium_fit' | 'aerpolice_fit' | 'classify' | 'score' | 'contacts' | null
 
 /* ── Design tokens (matching reference exactly) ──────────────── */
 const C = {
@@ -1040,7 +1040,7 @@ function UCPoints({ value, color }: { value: string | string[] | unknown; color:
 const PRODUCT_COLORS: Record<string, { text: string; bg: string; border: string }> = {
   Kima:     { text: 'rgb(167,139,250)', bg: 'rgba(124,58,237,0.08)', border: 'rgba(124,58,237,0.25)' },
   Aeredium: { text: 'rgb(103,232,249)', bg: 'rgba(34,211,238,0.07)', border: 'rgba(34,211,238,0.25)' },
-  Aergap:   { text: 'rgb(110,231,183)', bg: 'rgba(52,211,153,0.07)', border: 'rgba(52,211,153,0.25)' },
+  Aerpolice:   { text: 'rgb(110,231,183)', bg: 'rgba(52,211,153,0.07)', border: 'rgba(52,211,153,0.25)' },
 }
 
 function FlowStep({ label, color, children }: { label: string; color: string; children: React.ReactNode }) {
@@ -1479,7 +1479,7 @@ function UseCasesSection({ lead, onGenerated }: { lead: Lead; onGenerated: (case
           <Puzzle size={36} color="rgba(167,139,250,0.3)" style={{ margin: '0 auto 14px' }} />
           <p style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 8 }}>No use cases yet</p>
           <p style={{ fontSize: 13, color: 'rgb(100,107,140)', lineHeight: 1.65, maxWidth: 420, margin: '0 auto 20px' }}>
-            The agent researches {lead.company_name}&apos;s workflows and pain points, then builds concrete scenarios showing exactly how Kima, Aeredium, and Aergap each fit.
+            The agent researches {lead.company_name}&apos;s workflows and pain points, then builds concrete scenarios showing exactly how Kima, Aeredium, and Aerpolice each fit.
           </p>
           <button onClick={generate} disabled={generating}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 22px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: 'white', border: 'none', boxShadow: '0 2px 14px rgba(124,58,237,0.3)' }}>
@@ -1641,11 +1641,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     if (!window.__bda) window.__bda = { events: [], v: 0 }
     const toolMap: Record<string, string> = {
       research: 'Claude', classify: 'Claude', kima_fit: 'Claude',
-      aeredium_fit: 'Claude', aergap_fit: 'Claude', score: 'Claude', contacts: 'ContactFinder', pain_points: 'Claude',
+      aeredium_fit: 'Claude', aerpolice_fit: 'Claude', score: 'Claude', contacts: 'ContactFinder', pain_points: 'Claude',
     }
     const labelMap: Record<string, string> = {
       research: 'Research Company', classify: 'Classify Lead', kima_fit: 'Kima Fit Analysis',
-      aeredium_fit: 'Aeredium Fit Analysis', aergap_fit: 'Aergap Fit Analysis', score: 'Score Lead',
+      aeredium_fit: 'Aeredium Fit Analysis', aerpolice_fit: 'Aerpolice Fit Analysis', score: 'Score Lead',
       contacts: 'Find Contacts', pain_points: 'Identify Pain Points',
     }
     if (aiAction) {
@@ -1697,7 +1697,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [contactedModalOpen, setContactedModalOpen] = useState(false)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     overview: true, research: true, pain: true, kima: true,
-    aeredium: true, aergap: true, contacts: true, outreach: true, feedback: false
+    aeredium: true, aerpolice: true, contacts: true, outreach: true, feedback: false
   })
 
   const toggle = (k: string) => setExpanded(s => ({ ...s, [k]: !s[k] }))
@@ -1815,9 +1815,9 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           aeredium_fit: json.data.aeredium_fit, security_angle: json.data.security_angle,
           risk_angle: json.data.risk_angle, updated_at: new Date().toISOString()
         }).eq('id', id); loadLead()
-      } else if (action === 'aergap_fit') {
+      } else if (action === 'aerpolice_fit') {
         await supabase.from('leads').update({
-          aergap_fit: json.data.aergap_fit, agent_control_angle: json.data.agent_control_angle,
+          aerpolice_fit: json.data.aerpolice_fit, agent_control_angle: json.data.agent_control_angle,
           updated_at: new Date().toISOString()
         }).eq('id', id); loadLead()
       } else if (action === 'score') {
@@ -2011,7 +2011,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               { action: 'pain_points' as AIAction, label: 'Identify Pain Points' },
               { action: 'kima_fit' as AIAction,    label: 'Kima Fit'             },
               { action: 'aeredium_fit' as AIAction,label: 'Aeredium Fit'         },
-              { action: 'aergap_fit' as AIAction,  label: 'Aergap Fit'           },
+              { action: 'aerpolice_fit' as AIAction,  label: 'Aerpolice Fit'           },
               { action: 'classify' as AIAction,    label: 'Classify'             },
               { action: 'score' as AIAction,       label: 'Score Lead'           },
               { action: 'contacts' as AIAction,    label: 'Find Contacts'        },
@@ -2308,13 +2308,13 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               )}
             </FindingCard>
 
-            {/* Aergap Fit — AI-agent governance */}
+            {/* Aerpolice Fit — AI-agent governance */}
             <FindingCard
-              icon={BadgeCheck} title="Aergap Fit" pillVariant="cyan"
-              body={lead.aergap_fit ? lead.aergap_fit.split('\n')[0] : 'Aergap fit not analyzed yet.'}
-              expanded={expanded.aergap} onToggle={() => toggle('aergap')}
+              icon={BadgeCheck} title="Aerpolice Fit" pillVariant="cyan"
+              body={lead.aerpolice_fit ? lead.aerpolice_fit.split('\n')[0] : 'Aerpolice fit not analyzed yet.'}
+              expanded={expanded.aerpolice} onToggle={() => toggle('aerpolice')}
             >
-              {lead.aergap_fit ? (
+              {lead.aerpolice_fit ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   {/* Main pitch */}
                   <div style={{ borderRadius: 12, border: '1px solid rgba(34,211,238,0.2)', background: 'rgba(34,211,238,0.06)', padding: '14px 16px' }}>
@@ -2322,7 +2322,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                       <BadgeCheck size={14} color="#22d3ee" />
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#67e8f9', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Agent Governance</span>
                     </div>
-                    <ProseBullets text={lead.aergap_fit!} color="rgb(220,225,240)" dotColor="rgba(34,211,238,0.7)" />
+                    <ProseBullets text={lead.aerpolice_fit!} color="rgb(220,225,240)" dotColor="rgba(34,211,238,0.7)" />
                   </div>
                   {/* Control / governance angle */}
                   {lead.agent_control_angle && (
@@ -2336,9 +2336,9 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   )}
                 </div>
               ) : (
-                <button onClick={() => runAI('aergap_fit')} disabled={aiAction !== null}
+                <button onClick={() => runAI('aerpolice_fit')} disabled={aiAction !== null}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 9, border: '1px solid rgba(34,211,238,0.28)', background: 'rgba(34,211,238,0.09)', padding: '8px 14px', fontSize: 13, color: 'rgb(103,232,249)', cursor: 'pointer', fontFamily: 'inherit' }}>
-                  <Sparkles size={12} />Analyze Aergap Fit
+                  <Sparkles size={12} />Analyze Aerpolice Fit
                 </button>
               )}
             </FindingCard>
@@ -2636,8 +2636,8 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
   }
 
   const starters = [
-    'How does their tech work and where do Kima, Aeredium & Aergap each fit?',
-    'Do they have AI agents taking real consequential actions — are they an Aergap customer?',
+    'How does their tech work and where do Kima, Aeredium & Aerpolice each fit?',
+    'Do they have AI agents taking real consequential actions — are they an Aerpolice customer?',
     'What\'s the strongest angle to pitch the full suite here?',
     'What objections will they raise, and how do I counter them?',
   ]
@@ -2693,7 +2693,7 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
           {messages.length === 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <p style={{ fontSize: 13, color: 'rgb(150,157,180)', lineHeight: 1.65, margin: 0 }}>
-                Ask anything about <span style={{ color: 'rgb(103,232,249)' }}>{lead.company_name}</span> — how their tech works, whether they have AI agents taking real actions, and where <strong style={{ color: 'white' }}>Kima / Aeredium / Aergap</strong> each plug in. I research them live and remember what we figure out.
+                Ask anything about <span style={{ color: 'rgb(103,232,249)' }}>{lead.company_name}</span> — how their tech works, whether they have AI agents taking real actions, and where <strong style={{ color: 'white' }}>Kima / Aeredium / Aerpolice</strong> each plug in. I research them live and remember what we figure out.
               </p>
               <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgb(100,107,140)', marginTop: 2 }}>Try asking</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

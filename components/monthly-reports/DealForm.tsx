@@ -535,8 +535,8 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
           </Field>
           )}
           {fld('best_product_fit') && (
-          <Field label="Which Kima / Aergap product fits best?">
-            <Textarea rows={2} value={form.best_product_fit} onChange={e => set('best_product_fit', e.target.value)} placeholder="e.g. Aergap cross-chain settlement" />
+          <Field label="Which Kima / Aerpolice product fits best?">
+            <Textarea rows={2} value={form.best_product_fit} onChange={e => set('best_product_fit', e.target.value)} placeholder="e.g. Aerpolice cross-chain settlement" />
           </Field>
           )}
           {fld('long_term_value') && (

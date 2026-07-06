@@ -1,6 +1,6 @@
 // ============================================================
-// /api/ai/aergap-copilot
-// Dedicated BD Co-Pilot for Aergap — separate persona,
+// /api/ai/aerpolice-copilot
+// Dedicated BD Co-Pilot for Aerpolice — separate persona,
 // same infrastructure (memory, pipeline context, URL reading,
 // sessions, GPT-4o).
 // ============================================================
@@ -15,10 +15,10 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// ── Aergap persona ────────────────────────────────────────────────────────────
-const AERGAP_PERSONA = `You are the dedicated Business Development Co-Pilot for Aergap.
+// ── Aerpolice persona ────────────────────────────────────────────────────────────
+const AERPOLICE_PERSONA = `You are the dedicated Business Development Co-Pilot for Aerpolice.
 
-Your role is to help the user become the highest-performing BD representative and help Aergap discover where agent governance pain exists, generate qualified opportunities, secure discovery interviews, and convert the strongest prospects into design partners.
+Your role is to help the user become the highest-performing BD representative and help Aerpolice discover where agent governance pain exists, generate qualified opportunities, secure discovery interviews, and convert the strongest prospects into design partners.
 
 You think like:
 - Elite Enterprise SDR
@@ -28,9 +28,9 @@ You think like:
 - Security Software Sales Leader
 - AI Infrastructure Expert
 
-## About Aergap
+## About Aerpolice
 
-Aergap is the trust layer for AI agents that take high-stakes actions.
+Aerpolice is the trust layer for AI agents that take high-stakes actions.
 It sits underneath AI agents and determines what they are allowed to do before they act.
 
 Core capabilities:
@@ -41,7 +41,7 @@ Core capabilities:
 
 Primary wedge: AI agents that can move money or perform irreversible actions.
 
-Core message: "When an AI agent can move money, one wrong call cannot be undone. Aergap is the gate that determines what the agent is allowed to do before it acts."
+Core message: "When an AI agent can move money, one wrong call cannot be undone. Aerpolice is the gate that determines what the agent is allowed to do before it acts."
 
 ## Current Objective
 
@@ -54,9 +54,9 @@ NOT maximising revenue. The objective is:
 
 ## Competitive Differentiation
 
-vs. Fireblocks / custody layers: those sit on top of chains; Aergap sits underneath the agent itself — the gate fires before the action, not after.
-vs. RBAC / permissions systems: RBAC is static, role-based, and human-managed. Aergap is dynamic, agent-specific, and enforced at execution time.
-vs. Audit logs: logs are post-hoc — they record what happened. Aergap's gate blocks it before it happens.
+vs. Fireblocks / custody layers: those sit on top of chains; Aerpolice sits underneath the agent itself — the gate fires before the action, not after.
+vs. RBAC / permissions systems: RBAC is static, role-based, and human-managed. Aerpolice is dynamic, agent-specific, and enforced at execution time.
+vs. Audit logs: logs are post-hoc — they record what happened. Aerpolice's gate blocks it before it happens.
 vs. "We'll build this ourselves": how long until your first agent incident? What's the cost of one unauthorized transaction at scale?
 
 ## ICP (Ideal Customer Profile)
@@ -80,7 +80,7 @@ If enterprise customers are already asking this → confirmed live buying signal
 
 ## Highest-Resonance Demo Scenarios
 
-1. Payment drain: agent pays for data hiding a malicious instruction; Aergap's gate holds and logs it before execution.
+1. Payment drain: agent pays for data hiding a malicious instruction; Aerpolice's gate holds and logs it before execution.
 2. HFT gate: human approval fatigue on fast agents; gate catches the bad call that slipped through.
 
 ## ANUM Qualification Framework
@@ -105,7 +105,7 @@ Recommend: Drop / Nurture / Discovery Interview / Design Partner.
 ## Responsibilities
 
 ### Company Research
-Summary · Product · Business model · Funding · Enterprise customers · Security concerns · Governance challenges · Why Aergap matters to them.
+Summary · Product · Business model · Funding · Enterprise customers · Security concerns · Governance challenges · Why Aerpolice matters to them.
 
 ### ICP Fit Score (1–10 each)
 - Agentic AI usage
@@ -119,7 +119,7 @@ Explain reasoning. Give an overall score and recommendation.
 Who to contact first and why. Specific roles: Founder/CEO, CTO, Head of Product, VP Eng, Head of AI, Head of Trust, Security leads.
 
 ### Signal Detection
-Recent funding · Enterprise launches · Security incidents · Compliance hires · AI/agent product launches · Procurement friction. Explain why each signal matters for Aergap timing.
+Recent funding · Enterprise launches · Security incidents · Compliance hires · AI/agent product launches · Procurement friction. Explain why each signal matters for Aerpolice timing.
 
 ### Outreach Creation
 Cold emails · LinkedIn messages (≤300 chars for connection notes) · Follow-ups · Founder-specific · CTO-specific.
@@ -249,8 +249,8 @@ function extractUrl(text: string): string | null {
   return match ? match[0] : null
 }
 
-// ── Agent memory (Aergap-scoped only) ────────────────────────────────────────
-// Only pull knowledge tagged 'aergap' — never load Kima rules or knowledge.
+// ── Agent memory (Aerpolice-scoped only) ────────────────────────────────────────
+// Only pull knowledge tagged 'aerpolice' — never load Kima rules or knowledge.
 
 async function loadMemoryBlock(): Promise<string> {
   try {
@@ -258,7 +258,7 @@ async function loadMemoryBlock(): Promise<string> {
       .from('agent_knowledge')
       .select('title, content, knowledge_type')
       .eq('status', 'active')
-      .contains('tags', ['aergap'])
+      .contains('tags', ['aerpolice'])
       .order('created_at', { ascending: false })
       .limit(30)
 
@@ -268,7 +268,7 @@ async function loadMemoryBlock(): Promise<string> {
       .map(k => `[${k.knowledge_type.toUpperCase()}] ${k.title}\n${k.content.slice(0, 500)}`)
       .join('\n\n---\n\n')
 
-    return `\n\n══ AERGAP LEARNED INTELLIGENCE (${data.length} entries) ══\n\n${entries}`
+    return `\n\n══ AERPOLICE LEARNED INTELLIGENCE (${data.length} entries) ══\n\n${entries}`
   } catch { return '' }
 }
 
@@ -335,7 +335,7 @@ async function buildBDContext(): Promise<string> {
 
     if (memoryBlock) parts.push(memoryBlock)
   } catch (e) {
-    console.error('[aergap-copilot buildBDContext]', e)
+    console.error('[aerpolice-copilot buildBDContext]', e)
   }
   return parts.length ? `\n\n=== LIVE BD CONTEXT ===\n${parts.join('\n\n')}` : ''
 }
@@ -347,7 +347,7 @@ async function getOrCreateSession(sessionId?: string): Promise<string> {
     const { data } = await supabase.from('voice_sessions').select('id').eq('id', sessionId).single()
     if (data) return sessionId
   }
-  const { data } = await supabase.from('voice_sessions').insert({ title: '[Aergap] BD chat', message_count: 0 }).select('id').single()
+  const { data } = await supabase.from('voice_sessions').insert({ title: '[Aerpolice] BD chat', message_count: 0 }).select('id').single()
   return data?.id || crypto.randomUUID()
 }
 
@@ -356,12 +356,12 @@ async function autoTitle(sessionId: string, firstMsg: string, firstReply = '') {
     const snippet = `User: ${firstMsg.slice(0, 200)}${firstReply ? `\nAssistant: ${firstReply.slice(0, 200)}` : ''}`
     const c = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: `Generate a specific 4-7 word title for this BD conversation. Focus on the company name, person, product, or concrete goal — NOT generic phrases like "BD chat" or "Strategy Session". Examples of good titles: "Outreach to Skyfire's CEO", "Aergap Fit for Stripe Agents", "Pitch Angle for Ramp Treasury".\n\nConversation:\n${snippet}\n\nReturn ONLY the title, no quotes, no punctuation at the end.` }],
+      messages: [{ role: 'user', content: `Generate a specific 4-7 word title for this BD conversation. Focus on the company name, person, product, or concrete goal — NOT generic phrases like "BD chat" or "Strategy Session". Examples of good titles: "Outreach to Skyfire's CEO", "Aerpolice Fit for Stripe Agents", "Pitch Angle for Ramp Treasury".\n\nConversation:\n${snippet}\n\nReturn ONLY the title, no quotes, no punctuation at the end.` }],
       max_tokens: 25, temperature: 0.4,
     })
     const raw = c.choices[0].message.content?.trim() || ''
     if (!raw || raw.toLowerCase().includes('bd chat')) return // skip generic fallback
-    const title = `[Aergap] ${raw}`
+    const title = `[Aerpolice] ${raw}`
     await supabase.from('voice_sessions').update({ title }).eq('id', sessionId)
   } catch { /* non-critical */ }
 }
@@ -390,7 +390,7 @@ export async function POST(req: NextRequest) {
         const { error } = await supabase.from('agent_knowledge').insert({
           title, content,
           knowledge_type: 'general',
-          tags: ['aergap', 'copilot'],
+          tags: ['aerpolice', 'copilot'],
           status: 'active',
         })
         if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -433,7 +433,7 @@ export async function POST(req: NextRequest) {
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: AERGAP_PERSONA + bdContext + urlNote },
+        { role: 'system', content: AERPOLICE_PERSONA + bdContext + urlNote },
         ...history.slice(-16),
         { role: 'user', content: userMessage },
       ],
@@ -474,8 +474,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ reply, memory, session_id: sessionId })
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Aergap Co-Pilot failed'
-    console.error('[aergap-copilot route]', err)
+    const message = err instanceof Error ? err.message : 'Aerpolice Co-Pilot failed'
+    console.error('[aerpolice-copilot route]', err)
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

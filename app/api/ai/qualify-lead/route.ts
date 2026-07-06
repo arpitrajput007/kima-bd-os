@@ -18,7 +18,7 @@
 
 import { claudeJSON, CLAUDE_RESEARCH } from '@/lib/claude'
 import { NextRequest, NextResponse } from 'next/server'
-import { PRODUCT_BRAIN, AERGAP_KNOWLEDGE, PRODUCTS_CATALOG } from '@/lib/kima-knowledge'
+import { PRODUCT_BRAIN, AERPOLICE_KNOWLEDGE, PRODUCTS_CATALOG } from '@/lib/kima-knowledge'
 import { scoringMemory } from '@/lib/agent-memory'
 
 // ── Infer company name from a URL ─────────────────────────────
@@ -98,18 +98,18 @@ export async function POST(req: NextRequest) {
     scoringMemory(),
   ])
 
-  const systemPrompt = `You are a senior BD researcher for Kima, Aeredium, and Aergap — three complementary financial and AI infrastructure products.
+  const systemPrompt = `You are a senior BD researcher for Kima, Aeredium, and Aerpolice — three complementary financial and AI infrastructure products.
 
 ${PRODUCT_BRAIN}
 
---- AERGAP ---
-${AERGAP_KNOWLEDGE}
+--- AERPOLICE ---
+${AERPOLICE_KNOWLEDGE}
 
 --- FULL PRODUCT CATALOG ---
 ${PRODUCTS_CATALOG}
 
 Your job is to:
-1. Qualify a company as a potential lead for ANY or ALL of our three products (Kima, Aeredium, Aergap)
+1. Qualify a company as a potential lead for ANY or ALL of our three products (Kima, Aeredium, Aerpolice)
 2. Fill EVERY field in the BD database — including risk_angle, settlement_angle, security_angle, revenue_potential, integration_feasibility, competitive positioning, social links, verified facts vs assumptions
 3. Evaluate every product in the catalog against this company and produce a product_matches array
 
@@ -249,22 +249,22 @@ Return a single JSON object with ALL of these fields:
       "use_case": ""
     },
     {
-      "product": "Aergap Agent Identity",
-      "company": "Aergap",
+      "product": "Aerpolice Agent Identity",
+      "company": "Aerpolice",
       "match": "strong | partial | none",
       "why": "...",
       "use_case": ""
     },
     {
-      "product": "Aergap Execution Gate",
-      "company": "Aergap",
+      "product": "Aerpolice Execution Gate",
+      "company": "Aerpolice",
       "match": "strong | partial | none",
       "why": "...",
       "use_case": ""
     },
     {
-      "product": "Aergap Audit Trail",
-      "company": "Aergap",
+      "product": "Aerpolice Audit Trail",
+      "company": "Aerpolice",
       "match": "strong | partial | none",
       "why": "...",
       "use_case": ""

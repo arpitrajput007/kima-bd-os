@@ -57,7 +57,7 @@ export const ACTIVITY_TYPES = [
 export const KIMA_PRODUCTS = [
   'Kima Protocol',
   'Aeredium',
-  'Aergap',
+  'Aerpolice',
   'Cross-chain settlement',
   'Stablecoin settlement',
   'Fiat on/off-ramp',

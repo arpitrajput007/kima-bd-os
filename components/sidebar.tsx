@@ -56,8 +56,8 @@ const navGroups: {
     label: 'Intelligence',
     items: [
       { href: '/copilot',         label: 'AI Co-Pilot',        icon: Bot, glow: true },
-      { href: '/aergap-copilot',     label: 'Aergap Co-Pilot',      icon: ShieldCheck, cyan: true },
-      { href: '/aergap-web2-copilot', label: 'Web2 Co-Pilot',       icon: Globe,       orange: true },
+      { href: '/aerpolice-copilot',     label: 'Aerpolice Co-Pilot',      icon: ShieldCheck, cyan: true },
+      { href: '/aerpolice-web2-copilot', label: 'Web2 Co-Pilot',       icon: Globe,       orange: true },
       { href: '/today',           label: "Today's Plan",        icon: Sun },
       { href: '/dashboard',       label: 'BD Command Center',   icon: LayoutDashboard },
       { href: '/leads',           label: 'Lead Inbox',          icon: Inbox },

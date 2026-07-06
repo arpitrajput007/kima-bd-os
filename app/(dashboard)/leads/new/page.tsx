@@ -26,7 +26,7 @@ interface FactItem { label: string; value: string }
 
 interface ProductMatch {
   product: string
-  company: 'Kima' | 'Aeredium' | 'Aergap'
+  company: 'Kima' | 'Aeredium' | 'Aerpolice'
   match: 'strong' | 'partial' | 'none'
   why: string
   use_case?: string
@@ -204,12 +204,12 @@ function RichText({ text }: { text: string }) {
 
 // ── Discuss panel ─────────────────────────────────────────────
 const DISCUSS_STARTERS = [
-  'How does their tech work and where do Kima, Aeredium & Aergap each fit?',
-  'Do they have AI agents taking real consequential actions — are they an Aergap customer?',
+  'How does their tech work and where do Kima, Aeredium & Aerpolice each fit?',
+  'Do they have AI agents taking real consequential actions — are they an Aerpolice customer?',
   'What would make this a strong lead for our full suite?',
   'Who should I reach out to first and what should I say?',
   'What objections will they raise and how do I counter them?',
-  'Write a cold outreach message focused on Aergap',
+  'Write a cold outreach message focused on Aerpolice',
 ]
 
 function DiscussPanel({ leadData }: { leadData: QualifyResult }) {
@@ -332,7 +332,7 @@ function DiscussPanel({ leadData }: { leadData: QualifyResult }) {
             {msgs.length === 0 ? (
               <div>
                 <p style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.3)', marginBottom: 10, lineHeight: 1.5 }}>
-                  Ask anything about <strong style={{ color: 'rgba(255,255,255,0.5)' }}>{leadData.company_name}</strong> — how their tech works, whether AI agents are in their product, and where <strong style={{ color: 'rgba(255,255,255,0.5)' }}>Kima / Aeredium / Aergap</strong> each fit.
+                  Ask anything about <strong style={{ color: 'rgba(255,255,255,0.5)' }}>{leadData.company_name}</strong> — how their tech works, whether AI agents are in their product, and where <strong style={{ color: 'rgba(255,255,255,0.5)' }}>Kima / Aeredium / Aerpolice</strong> each fit.
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {DISCUSS_STARTERS.map(s => (
@@ -1041,7 +1041,7 @@ export default function NewLeadPage() {
                   const companyMeta: Record<string, { color: string; bg: string; border: string; dot: string }> = {
                     Kima:     { color: 'rgb(96,165,250)',   bg: 'rgba(96,165,250,0.08)',   border: 'rgba(96,165,250,0.22)',   dot: 'rgba(96,165,250,0.9)' },
                     Aeredium: { color: 'rgb(167,139,250)',  bg: 'rgba(167,139,250,0.08)',  border: 'rgba(167,139,250,0.22)',  dot: 'rgba(167,139,250,0.9)' },
-                    Aergap:   { color: 'rgb(251,191,36)',   bg: 'rgba(251,191,36,0.07)',   border: 'rgba(251,191,36,0.22)',   dot: 'rgba(251,191,36,0.9)' },
+                    Aerpolice:   { color: 'rgb(251,191,36)',   bg: 'rgba(251,191,36,0.07)',   border: 'rgba(251,191,36,0.22)',   dot: 'rgba(251,191,36,0.9)' },
                   }
                   const matchStyle = (m: string) => ({
                     strong:  { icon: '✓', color: 'rgb(52,211,153)',  bg: 'rgba(52,211,153,0.1)',  border: 'rgba(52,211,153,0.22)',  label: 'Strong Match' },
@@ -1074,7 +1074,7 @@ export default function NewLeadPage() {
                       </div>
 
                       {/* per-company groups */}
-                      {(['Kima', 'Aeredium', 'Aergap'] as const).map(co => {
+                      {(['Kima', 'Aeredium', 'Aerpolice'] as const).map(co => {
                         const items = groups[co]
                         if (!items?.length) return null
                         const cm = companyMeta[co]

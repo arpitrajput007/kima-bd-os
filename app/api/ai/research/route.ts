@@ -113,17 +113,17 @@ Return JSON:
   "why_aeredium_matters": "Why Aeredium makes the Kima pitch stronger for this company"
 }`
 
-    } else if (action === 'aergap_fit') {
-      userPrompt = `Identify how Aergap (governance & control layer for AI agents that move money) can specifically help this company:
+    } else if (action === 'aerpolice_fit') {
+      userPrompt = `Identify how Aerpolice (governance & control layer for AI agents that move money) can specifically help this company:
 Company: ${company_name}
 Website: ${website || 'unknown'}
 Description: ${description || 'unknown'}
 
-Aergap only fits if this company has autonomous AI agents that take consequential financial actions (payments, procurement, treasury, trading). "Uses AI" is NOT sufficient — the agents must have real economic authority. If they don't, say so honestly in aergap_fit.
+Aerpolice only fits if this company has autonomous AI agents that take consequential financial actions (payments, procurement, treasury, trading). "Uses AI" is NOT sufficient — the agents must have real economic authority. If they don't, say so honestly in aerpolice_fit.
 
 Return JSON:
 {
-  "aergap_fit": "Specific way Aergap helps this company — what governance gap exists, or an honest explanation of why it's not a fit",
+  "aerpolice_fit": "Specific way Aerpolice helps this company — what governance gap exists, or an honest explanation of why it's not a fit",
   "agent_control_angle": "The specific control/governance angle (execution gate, audit trail, spend limits, identity) for their situation, or null"
 }`
 

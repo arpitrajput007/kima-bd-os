@@ -89,7 +89,7 @@ STEP 3 — EVALUATE OUR PRODUCTS HONESTLY
 Only after understanding the company and their pains, evaluate each product:
 - Does Kima solve a REAL settlement or interoperability problem they have?
 - Does Aeredium solve a REAL institutional infrastructure problem they have?
-- Does Aergap solve a REAL AI agent governance problem they have?
+- Does Aerpolice solve a REAL AI agent governance problem they have?
 
 CRITICAL: "No fit" is a perfectly valid — and valuable — conclusion for any or all products.
 - If you force a recommendation where none exists, you waste the BD team's time and destroy trust in the agent's judgment.
@@ -101,7 +101,7 @@ TEST: If you replaced the company name with a different company and the analysis
 STEP 4 — HYPOTHESIZE STRATEGICALLY
 For products that aren't an immediate fit, ask: "Under what future conditions would this become relevant?"
 - "If they expand into X corridor, Kima becomes relevant because..."
-- "When they start giving agents financial authority, Aergap becomes critical because..."
+- "When they start giving agents financial authority, Aerpolice becomes critical because..."
 - "If they partner with institutional players, Aeredium's TEE infrastructure would matter because..."
 Label these clearly as forward-looking hypotheses, not current opportunities.
 ════════════════════════════════════════════════════════`
@@ -127,10 +127,10 @@ THE PROBLEM — THREE GAPS every agentic payment company hits:
 3. No verifiable audit trail — there is no cryptographic proof that a transaction was authorized, within policy, and untampered. Enterprises and regulators demand this. No current agent payment stack provides it.
 
 OUR ANSWER — THREE PRODUCTS, THREE GAPS:
-- Aergap solves Gaps 2 & 3: Agent Identity proves who the agent is. Agent Policy + Execution Gate blocks unauthorized actions before they execute — not after. Audit Trail gives enterprises the cryptographic proof they demand. All hardware-enforced, not software-level.
+- Aerpolice solves Gaps 2 & 3: Agent Identity proves who the agent is. Agent Policy + Execution Gate blocks unauthorized actions before they execute — not after. Audit Trail gives enterprises the cryptographic proof they demand. All hardware-enforced, not software-level.
 - Kima solves Gap 1: single API settlement across 9+ chains, stablecoins, fiat, CBDCs — no bridges, no custodian handoff. Agents can move real value across any rail via one integration.
 - Aeredium adds institutional-grade infrastructure: TEE-attested validators + AERKey threshold ECDSA enforce spend policy at the hardware/key level. Banks and enterprises can build on top with Bitcoin-anchored finality and ~250k TPS.
-Together: "Aergap proves who the agent is and gates what it can do. Kima ensures the payment settles safely across any rail. Aeredium provides the institutional-grade execution layer underneath it all."
+Together: "Aerpolice proves who the agent is and gates what it can do. Kima ensures the payment settles safely across any rail. Aeredium provides the institutional-grade execution layer underneath it all."
 ALWAYS position as additive/complementary — sell the full suite where applicable.
 
 ICP — WHO TO TARGET:
@@ -154,8 +154,8 @@ RESONANCE SCENARIOS (reference these in outreach — buyers respond strongly):
 2. HFT gate: human approval fatigue on fast agents; policy gate catches the bad call that slipped through.
 
 KEY COMPETITORS IN THIS SPACE:
-- Skyfire: KYA Token (agent identity) + Agentic Wallet (USDC on EVM + tokenized cards) + Buy for Me (autonomous checkout). Settlement is EVM-only USDC + card networks — no cross-chain, no fiat off-ramp. Policy is software-level, not key-level. No verifiable audit trail. Position our full suite (Aergap + Kima + Aeredium) as additive to or replacing Skyfire.
-- Software-only governance tools (MCP gates, RBAC, KYA tokens): verify who the agent is but a compromised runtime or prompt injection can still pass those checks and execute unauthorized transactions — policy enforcement is logical, not cryptographic. Aergap's Execution Gate is hardware-enforced, not software-level.
+- Skyfire: KYA Token (agent identity) + Agentic Wallet (USDC on EVM + tokenized cards) + Buy for Me (autonomous checkout). Settlement is EVM-only USDC + card networks — no cross-chain, no fiat off-ramp. Policy is software-level, not key-level. No verifiable audit trail. Position our full suite (Aerpolice + Kima + Aeredium) as additive to or replacing Skyfire.
+- Software-only governance tools (MCP gates, RBAC, KYA tokens): verify who the agent is but a compromised runtime or prompt injection can still pass those checks and execute unauthorized transactions — policy enforcement is logical, not cryptographic. Aerpolice's Execution Gate is hardware-enforced, not software-level.
 - Bridge/messaging layers (LayerZero, Wormhole): smart contracts, oracles, relayers, wrapped assets — every one is an attack surface. Kima has no bridges, no smart contracts, no wrapped assets.`
 
 // ── Target customer categories ───────────────────────────────────────────────
@@ -179,34 +179,34 @@ export const ICP_BLOCK = `IDEAL CUSTOMER PROFILES (ICP):
 - Banks & institutions needing native settlement infra (Aeredium) without custody handoff
 - Web2 companies with SWIFT/wire friction (exporters, neobanks)`
 
-// ── AERGAP ───────────────────────────────────────────────────────────────────
-export const AERGAP_KNOWLEDGE = `AERGAP — Governance and control layer for AI agents that move money.
+// ── AERPOLICE ───────────────────────────────────────────────────────────────────
+export const AERPOLICE_KNOWLEDGE = `AERPOLICE — Governance and control layer for AI agents that move money.
 
-What Aergap actually is:
-As autonomous AI agents begin paying invoices, trading assets, moving treasury funds, signing blockchain transactions, and handling financial operations, organizations face a critical challenge: how do you give an agent enough authority to do its job without giving it unlimited power? Aergap solves this by sitting BETWEEN the AI agent and the underlying financial infrastructure. The agent can decide what it wants to do — but it cannot execute financial actions unless those actions comply with policies defined by its owner or operator.
+What Aerpolice actually is:
+As autonomous AI agents begin paying invoices, trading assets, moving treasury funds, signing blockchain transactions, and handling financial operations, organizations face a critical challenge: how do you give an agent enough authority to do its job without giving it unlimited power? Aerpolice solves this by sitting BETWEEN the AI agent and the underlying financial infrastructure. The agent can decide what it wants to do — but it cannot execute financial actions unless those actions comply with policies defined by its owner or operator.
 
-What Aergap provides:
+What Aerpolice provides:
 - Agent Identity: verifiable, cross-ecosystem identity for every agent — enterprises and regulators can prove who (or what) acted
 - Agent Policy + Execution Gate: declarative rules enforced BEFORE execution — unauthorized agent calls are stopped before they happen, not detected after
 - Audit Trail: immutable cryptographic log of every agent action and gate decision — the proof enterprises and regulators demand
 - Controls: automated approval thresholds, human-in-the-loop for large/unusual transactions, spending limits, approved recipient lists, prompt injection protection, instant freeze/revoke
 
-What Aergap is NOT:
-Aergap does not replace wallets, custody providers, banks, or payment infrastructure. It governs what autonomous agents are ALLOWED to do with those systems.
+What Aerpolice is NOT:
+Aerpolice does not replace wallets, custody providers, banks, or payment infrastructure. It governs what autonomous agents are ALLOWED to do with those systems.
 
-The right framing: "Stripe governs payments for businesses. Okta governs access for employees. Aergap governs economic authority for AI agents."
+The right framing: "Stripe governs payments for businesses. Okta governs access for employees. Aerpolice governs economic authority for AI agents."
 
-WHO AERGAP IS FOR:
+WHO AERPOLICE IS FOR:
 - Companies building AI agents that take consequential financial actions (payments, procurement, expense approvals, treasury management, trading)
 - AI-native companies selling agent products to enterprises where the enterprise asks: "Can you prove your agent won't go rogue? Can you audit every action? Can we set spending limits?"
 - Primary urgency signal: enterprise deals stalling in security review because the company cannot demonstrate agent identity, policy enforcement, and audit trail
 - Also relevant: agentic commerce startups, autonomous checkout, MCP-based financial tooling, AI wallet builders
 
-WHEN AERGAP IS NOT THE RIGHT ANSWER:
+WHEN AERPOLICE IS NOT THE RIGHT ANSWER:
 - A company using AI for recommendations, analysis, or content — but not for executing financial transactions. "Uses AI" is not the same as "has autonomous agents with financial authority."
-- A company where a human always approves every financial action before it executes. If every payment has a human in the loop already, Aergap adds friction, not value.
+- A company where a human always approves every financial action before it executes. If every payment has a human in the loop already, Aerpolice adds friction, not value.
 - A company with no near-term plans to give agents financial autonomy.
-- Do NOT force Aergap into a pitch where it doesn't naturally fit. It will read as desperation.
+- Do NOT force Aerpolice into a pitch where it doesn't naturally fit. It will read as desperation.
 
 Key contacts: Founder/CEO (small companies); Head of Product, VP Engineering, Head of AI, Head of Trust, Security leads (larger).
 Trigger events: enterprise customer announcement, funding round, compliance/security hire, AI agent product launch.`
@@ -217,11 +217,11 @@ export const SINGLE_API_LINE =
 
 // ── Per-lead product focus (deterministic routing) ───────────────────────────
 // Decides which product LEADS the pitch for a given lead. An AI-agent company
-// must get an Aergap governance pitch — NOT the default Kima cross-chain /
+// must get an Aerpolice governance pitch — NOT the default Kima cross-chain /
 // settlement framing. This is deterministic and does NOT depend on the
 // learn/approval rule loop (which only applies after manual approval).
 
-export type ProductFocus = 'aergap' | 'settlement'
+export type ProductFocus = 'aerpolice' | 'settlement'
 
 export interface LeadFocusInput {
   company_name?: string | null
@@ -233,7 +233,7 @@ export interface LeadFocusInput {
   product_to_sell?: string | null
 }
 
-// Strong signals only — we do NOT want to mistakenly pitch Aergap to a pure
+// Strong signals only — we do NOT want to mistakenly pitch Aerpolice to a pure
 // payments/settlement company just because it mentions "agent" once.
 const AI_AGENT_KEYWORDS = [
   'ai agent', 'ai agents', 'agentic', 'autonomous agent', 'autonomous agents',
@@ -256,13 +256,13 @@ export function isAiAgentLead(lead: LeadFocusInput): boolean {
   return AI_AGENT_KEYWORDS.some(k => hay.includes(k))
 }
 
-// The Aergap-first directive. Injected LATE in the prompt (after the generic
+// The Aerpolice-first directive. Injected LATE in the prompt (after the generic
 // rules) so it overrides any earlier Kima/settlement framing.
-export const AERGAP_FOCUS_DIRECTIVE = `══ PRODUCT FOCUS FOR THIS LEAD — AERGAP (AI-agent governance), NOT settlement ══
+export const AERPOLICE_FOCUS_DIRECTIVE = `══ PRODUCT FOCUS FOR THIS LEAD — AERPOLICE (AI-agent governance), NOT settlement ══
 
-This is an AI-agent company. The scope of work you pitch MUST center on Aergap. Any earlier mention of Kima, cross-chain, settlement, the "single API" line, or bridges does NOT apply to this lead — override it.
+This is an AI-agent company. The scope of work you pitch MUST center on Aerpolice. Any earlier mention of Kima, cross-chain, settlement, the "single API" line, or bridges does NOT apply to this lead — override it.
 
-LEAD WITH AERGAP:
+LEAD WITH AERPOLICE:
 - Agent Identity — verifiable proof of who (or what) acted
 - Agent Policy + Execution Gate — unauthorized agent actions are blocked BEFORE they execute, not detected after, and it's hardware-enforced, not software-level
 - Audit Trail — immutable cryptographic log of every agent action and gate decision
@@ -270,26 +270,26 @@ LEAD WITH AERGAP:
 
 THE HOOK (use when it fits their situation): enterprise deals stalling in security review because they can't prove agent identity, policy enforcement, and audit trail. That is the live buying signal.
 
-FRAMING LINE you may use: "Stripe governs payments for businesses. Okta governs access for employees. Aergap governs economic authority for AI agents."
+FRAMING LINE you may use: "Stripe governs payments for businesses. Okta governs access for employees. Aerpolice governs economic authority for AI agents."
 
 HARD BANS for this lead — do NOT lead with, pitch, or headline any of these:
 - Cross-chain settlement, interoperability, bridges, "no bridges", wrapped/synthetic assets
 - Kima UPR, single-API settlement, liquidity, on/off-ramp as the primary offer
 - The "single API integration, completely free, instant, and hassle-free" Kima line
-Only mention Kima/Aeredium if it is genuinely additive AND only after Aergap is established — one sentence maximum, framed as "and later, once agents are moving real value across rails…". Never make settlement the headline for this lead.`
+Only mention Kima/Aeredium if it is genuinely additive AND only after Aerpolice is established — one sentence maximum, framed as "and later, once agents are moving real value across rails…". Never make settlement the headline for this lead.`
 
 // The default settlement directive — keeps the Kima single-API line for
 // non-AI-agent leads.
 export const SETTLEMENT_FOCUS_DIRECTIVE = `══ PRODUCT FOCUS FOR THIS LEAD — Kima / Aeredium settlement ══
 
 Lead with the Kima/Aeredium angle that fits their situation (cross-chain settlement, on/off-ramp, liquidity, institutional infra). Weave in the single-API idea naturally where it fits: "${SINGLE_API_LINE}"
-Only bring in Aergap if they genuinely build AI agents that take consequential financial actions — otherwise leave it out.`
+Only bring in Aerpolice if they genuinely build AI agents that take consequential financial actions — otherwise leave it out.`
 
 // Resolve the right focus + directive for a lead. Use this in every outreach /
 // drafting path so the product choice is consistent and deterministic.
 export function productFocusDirective(lead: LeadFocusInput): { focus: ProductFocus; directive: string } {
   return isAiAgentLead(lead)
-    ? { focus: 'aergap', directive: AERGAP_FOCUS_DIRECTIVE }
+    ? { focus: 'aerpolice', directive: AERPOLICE_FOCUS_DIRECTIVE }
     : { focus: 'settlement', directive: SETTLEMENT_FOCUS_DIRECTIVE }
 }
 
@@ -307,7 +307,7 @@ ${KIMA_KNOWLEDGE}
 
 ${AEREDIUM_KNOWLEDGE}
 
-${AERGAP_KNOWLEDGE}
+${AERPOLICE_KNOWLEDGE}
 
 ${AGENTIC_PAYMENTS}
 
@@ -349,15 +349,15 @@ export const PRODUCTS_CATALOG = `COMPLETE PRODUCT CATALOG — evaluate every lea
    TEE-attested threshold ECDSA across three cloud providers — signing keys are never assembled in any single place. Cryptographic policy enforcement at key level.
    Best fit: custodians; MPC wallet providers; companies needing hardware-grade signing accountability and key governance.
 
-━━ AERGAP ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-7. Aergap Agent Identity
+━━ AERPOLICE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. Aerpolice Agent Identity
    Verifiable, cross-ecosystem readable identity for every AI agent — proves who acted for enterprise and regulatory compliance.
    Best fit: AI-native companies selling agents to enterprises; companies where regulators ask "which agent did what?"; MCP-based tooling where agent identity matters.
 
-8. Aergap Agent Policy + Execution Gate
+8. Aerpolice Agent Policy + Execution Gate
    Declarative spend/action policies enforced at the gate before execution — stops unauthorized agent calls before they happen, not after.
    Best fit: companies whose AI agents take consequential actions (payments, procurement, data access); companies with enterprise customers demanding policy enforcement proof; AI wallet builders; agentic commerce startups.
 
-9. Aergap Audit Trail
+9. Aerpolice Audit Trail
    Immutable cryptographic log of every agent action and gate decision — satisfies enterprise security review and regulatory audit requirements.
    Best fit: any AI-native company facing enterprise security review; companies where agents make financial or compliance-sensitive decisions; highly regulated verticals (finance, healthcare, legal).`

@@ -62,7 +62,7 @@ export const DEAL_FORM_FIELDS: FieldMeta[] = [
 
   { key: 'business_impact',         label: 'What business can this opportunity bring?',section: 'impact' },
   { key: 'why_valuable',            label: 'Why is this customer valuable?',           section: 'impact' },
-  { key: 'best_product_fit',        label: 'Which Kima / Aergap product fits best?',   section: 'impact' },
+  { key: 'best_product_fit',        label: 'Which Kima / Aerpolice product fits best?',   section: 'impact' },
   { key: 'long_term_value',         label: 'Long-term strategic value',                section: 'impact' },
 
   { key: 'feature_requested',       label: 'Feature Requested',                        section: 'feedback' },

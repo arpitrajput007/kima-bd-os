@@ -1,5 +1,5 @@
-// ── Web2 Agent Companies — Aergap BD Intelligence Data ──────────
-// 50 Web2 companies deploying autonomous AI agents where Aergap
+// ── Web2 Agent Companies — Aerpolice BD Intelligence Data ──────────
+// 50 Web2 companies deploying autonomous AI agents where Aerpolice
 // (identity, policy, execution gate, audit trail) is a strong fit.
 
 export type Web2Category =
@@ -31,7 +31,7 @@ export interface Web2Company {
   highStakeActions: string[]
   govRisk: GovernanceRisk
   govReason: string
-  whyAergap: string
+  whyAerpolice: string
   triggerSignals: string[]
   decisionMaker: string
   outreachAngle: string
@@ -86,10 +86,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Autonomous payroll disbursement', 'Cash sweep execution across bank accounts', 'Contractor payment initiation', 'FX conversion without human confirmation', 'AP payment runs against live ERPs'],
     govRisk: 'High',
     govReason: 'Money moves autonomously once a workflow is signed off. "Who authorized this payment run?" is a daily enterprise question. Audit trail is self-built, not independently enforced pre-action. A rogue payment, misdirected sweep, or contractor overpayment is immediately irreversible.',
-    whyAergap: 'Execution Gate is the missing layer between "workflow approved once" and "every individual payment execution enforced." Aergap lets Round sell policy-enforced autonomy to enterprise customers — turning a liability into a trust feature.',
+    whyAerpolice: 'Execution Gate is the missing layer between "workflow approved once" and "every individual payment execution enforced." Aerpolice lets Round sell policy-enforced autonomy to enterprise customers — turning a liability into a trust feature.',
     triggerSignals: ['$6M seed Apr 2026 to scale autonomous payment agents', 'ISO 27001 certified — already selling trust', '"We built our first agent that could move money" (public quote)', 'Actively pitching toward enterprise from SMB base'],
     decisionMaker: 'Pac O\'Shea, Co-Founder & CEO — linkedin.com/in/pac-o-shea. Founder-led, sets product and risk posture personally. Under 20 employees.',
-    outreachAngle: 'Frame Aergap as the layer that turns your autonomous payment agents into an enterprise-grade product. You already have the logs — Aergap gives you pre-action policy enforcement that your enterprise buyers will ask for before signing.',
+    outreachAngle: 'Frame Aerpolice as the layer that turns your autonomous payment agents into an enterprise-grade product. You already have the logs — Aerpolice gives you pre-action policy enforcement that your enterprise buyers will ask for before signing.',
   },
 
   {
@@ -101,10 +101,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Autonomous vendor onboarding and approval', 'PO generation and submission into live ERPs', 'Supplier negotiation with spend-commit authority', 'Contract execution across multiple systems', 'Invoice matching and payment triggering'],
     govRisk: 'High',
     govReason: 'Agents act inside Fortune 500 ERPs with negotiation and spend-commit authority. A rogue PO, unauthorized vendor onboarding, or unchecked negotiation is a procurement-fraud nightmare. CEO publicly distinguishes "assists" vs "executes" — that framing reveals where enterprise security teams get nervous.',
-    whyAergap: 'Procurement is Aergap\'s named Tier-1 vertical. Lio sells into exact enterprises that will demand an execution gate and audit trail before letting an agent commit spend. Aergap is the trust layer Lio bundles to win security/procurement sign-off faster.',
+    whyAerpolice: 'Procurement is Aerpolice\'s named Tier-1 vertical. Lio sells into exact enterprises that will demand an execution gate and audit trail before letting an agent commit spend. Aerpolice is the trust layer Lio bundles to win security/procurement sign-off faster.',
     triggerSignals: ['$30M Series A led by a16z (Mar 2026)', 'Expanding US enterprise footprint', 'Explicitly selling autonomous execution as differentiator', 'CEO narrating "copilot vs. agent" distinction publicly — warm door for governance framing'],
     decisionMaker: 'Vladimir Keil, Co-Founder & CEO — linkedin.com/in/vladimir-keil. Under 30 employees, founder is right contact for partnership/design-partner conversation.',
-    outreachAngle: 'You\'ve staked your brand on execution, not assistance. Enterprise security teams will ask who controls the agent before they sign. Aergap gives you a policy + audit answer before they ask, turning security review from a blocker into a closer.',
+    outreachAngle: 'You\'ve staked your brand on execution, not assistance. Enterprise security teams will ask who controls the agent before they sign. Aerpolice gives you a policy + audit answer before they ask, turning security review from a blocker into a closer.',
   },
 
   {
@@ -116,10 +116,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Autonomous customer-facing collection actions', 'Payment matching and reconciliation execution', 'Invoice generation and dispute triggering', 'Communication on behalf of finance team to clients', 'Writing off or escalating aged receivables'],
     govRisk: 'High',
     govReason: 'Touches customer billing and payment data at scale. CEO explicitly states humans will move to "agent management, strategic work, and governance" — they already know governance is the open problem. A wrong collection action or reconciliation error against a Fortune 500 client creates significant financial and reputational exposure.',
-    whyAergap: 'Fazeshift\'s own roadmap names "governance" as the next frontier. Aergap is the productized enforcement layer they\'re gesturing at. Policy enforcement on which AR actions the agent can take + audit trail for every collection action = design-partner story that writes itself.',
+    whyAerpolice: 'Fazeshift\'s own roadmap names "governance" as the next frontier. Aerpolice is the productized enforcement layer they\'re gesturing at. Policy enforcement on which AR actions the agent can take + audit trail for every collection action = design-partner story that writes itself.',
     triggerSignals: ['$17M Series A (F-Prime Capital, Google Gradient Ventures, YC)', 'Serving Fortune 500 clients — enterprise compliance questions incoming', 'CEO publicly naming governance as next frontier', 'Under 30 employees — fast decision cycle'],
     decisionMaker: 'Caitlin Leksana, CEO & Co-Founder. San Francisco-based, early-stage team.',
-    outreachAngle: 'You\'re already talking about governance as your next layer. Aergap is the enforcement engine you don\'t have to build — pre-action policy blocking + immutable audit trail for every AR action your agent takes. Worth 20 minutes?',
+    outreachAngle: 'You\'re already talking about governance as your next layer. Aerpolice is the enforcement engine you don\'t have to build — pre-action policy blocking + immutable audit trail for every AR action your agent takes. Worth 20 minutes?',
   },
 
   {
@@ -131,10 +131,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Payment approval without human sign-off', 'GL coding and ERP write-back', 'Vendor communication on financial matters', 'Fraud detection acting as first and last line of defense', 'Autonomous duplicate detection and exception handling'],
     govRisk: 'High',
     govReason: '"No manual steps required" is the governance gap stated as a selling point. Approvals happen inside the agent, not by a human, before money moves. At enterprise scale across 16+ ERPs this is a textbook SOX control failure waiting to happen.',
-    whyAergap: 'A vendor literally marketing the absence of human approval gates. Aergap\'s Policy Enforcement + Execution Gate is the missing control plane that turns "no manual steps" into "controlled autonomy." Design-partner pitch: help Mod AI sell to enterprises that otherwise won\'t buy.',
+    whyAerpolice: 'A vendor literally marketing the absence of human approval gates. Aerpolice\'s Policy Enforcement + Execution Gate is the missing control plane that turns "no manual steps" into "controlled autonomy." Design-partner pitch: help Mod AI sell to enterprises that otherwise won\'t buy.',
     triggerSignals: ['YC-backed, actively selling to enterprise', 'Integration with 16+ ERPs — surface area for governance failures', '"No manual steps required" as headline — creates security review friction', 'Actively growing Fortune 500 pipeline'],
     decisionMaker: 'Founders not confirmed via public search — recommend LinkedIn Sales Navigator search on "Mod AI usemod.ai founder" or YC directory for W24/S24 batch.',
-    outreachAngle: '"No manual steps" is a great headline for SMBs. Enterprise procurement teams will push back in security review — not because they don\'t want automation, but because they need to prove controls exist. Aergap is what you tell them when they ask.',
+    outreachAngle: '"No manual steps" is a great headline for SMBs. Enterprise procurement teams will push back in security review — not because they don\'t want automation, but because they need to prove controls exist. Aerpolice is what you tell them when they ask.',
   },
 
   {
@@ -146,10 +146,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Autonomous government tax filings', 'State tax account registration on behalf of employer', 'IRS/state notice responses with binding legal effect', 'Payroll disbursement to employee bank accounts', 'Multi-state compliance actions across 50 jurisdictions'],
     govRisk: 'High',
     govReason: 'Autonomous filings with government agencies are legally binding and irreversible. A filing error, incorrect tax ID, or unauthorized notice response creates compliance violations across multiple jurisdictions. Enterprise payroll errors also expose companies to labor law liability.',
-    whyAergap: 'Government filings require auditability and identity verification by definition. Aergap\'s audit trail and execution gate directly answer: who authorized this filing, under what policy, and can you prove it? Required for any enterprise payroll buyer subject to SOX or multi-state compliance scrutiny.',
+    whyAerpolice: 'Government filings require auditability and identity verification by definition. Aerpolice\'s audit trail and execution gate directly answer: who authorized this filing, under what policy, and can you prove it? Required for any enterprise payroll buyer subject to SOX or multi-state compliance scrutiny.',
     triggerSignals: ['$25M raised (Sound Ventures, Dropbox founders)', 'Autonomous government filings as core product — high-stakes by design', 'Moving upmarket toward enterprise — compliance questions will increase', 'Founder Ayush Sharma actively growing team'],
     decisionMaker: 'Ayush Sharma, Co-Founder & CEO. Early-stage, founder-led.',
-    outreachAngle: 'Autonomous government filings are your moat — but they\'re also your enterprise sales blocker. When a 500-person company asks "what happens if the agent files the wrong form?" — Aergap gives you a pre-action policy answer, not just a retroactive log.',
+    outreachAngle: 'Autonomous government filings are your moat — but they\'re also your enterprise sales blocker. When a 500-person company asks "what happens if the agent files the wrong form?" — Aerpolice gives you a pre-action policy answer, not just a retroactive log.',
   },
 
   {
@@ -161,10 +161,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Claims coverage determination (approve/deny)', 'Payout amount calculation and triggering', 'Fraud flag and escalation', 'Regulatory claims reporting', 'Reserve setting for open claims'],
     govRisk: 'High',
     govReason: 'Already live at major P&C carriers. Wrong automated decision = regulatory exposure under state insurance regulations + litigation risk from claimants denied coverage. Insurance regulators explicitly require human review of AI claim decisions in multiple states.',
-    whyAergap: 'Insurance is a named Aergap vertical. Claims decisions require documented audit trail, agent identity logging, and policy enforcement on what claims the AI can approve autonomously vs. escalate. Aergap is the compliance layer between "AI recommends" and "AI decides."',
+    whyAerpolice: 'Insurance is a named Aerpolice vertical. Claims decisions require documented audit trail, agent identity logging, and policy enforcement on what claims the AI can approve autonomously vs. escalate. Aerpolice is the compliance layer between "AI recommends" and "AI decides."',
     triggerSignals: ['YC-backed, already deployed at major P&C carriers', '75% of premium dollar at stake in claims — highest financial exposure in insurance', 'State AI-in-claims regulation increasing', 'Active YC network for intro'],
     decisionMaker: 'Founders via YC directory — recommend YC batch lookup for direct contact.',
-    outreachAngle: 'You\'re already inside major carriers. When state regulators ask for the audit trail on an AI claims decision, Aergap is what you show them — immutable log of every decision, the policy that governed it, and the identity of the agent that made it.',
+    outreachAngle: 'You\'re already inside major carriers. When state regulators ask for the audit trail on an AI claims decision, Aerpolice is what you show them — immutable log of every decision, the policy that governed it, and the identity of the agent that made it.',
   },
 
   {
@@ -176,10 +176,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Autonomous device isolation', 'Credential revocation without human approval', 'Security containment actions in production', 'Threat hunting across enterprise systems', 'Incident determination affecting IR workflows'],
     govRisk: 'High',
     govReason: 'A wrong autonomous containment action (isolating the wrong device, revoking the wrong credential) can take down production systems. Enterprise security-mature buyers like UiPath will ask: "what stops the agent from doing something destructive before a human reviews it?"',
-    whyAergap: 'Security/IT Ops is Aergap\'s named Tier-2 vertical. Dropzone sells to CISOs — exactly the buyer Aergap\'s Execution Gate and Audit Trail are built for. Natural co-sell: Dropzone investigates, Aergap gates the remediation action. Prevents the "oops" in autonomous SOC.',
+    whyAerpolice: 'Security/IT Ops is Aerpolice\'s named Tier-2 vertical. Dropzone sells to CISOs — exactly the buyer Aerpolice\'s Execution Gate and Audit Trail are built for. Natural co-sell: Dropzone investigates, Aerpolice gates the remediation action. Prevents the "oops" in autonomous SOC.',
     triggerSignals: ['$16.85M Series A', 'UiPath as enterprise customer — security-mature buyer who will ask governance questions', 'Q2 2026 AI Threat Hunter and remediation launch — moving from investigate to execute', 'Expanding into autonomous response'],
     decisionMaker: 'Edward Wu, Founder & CEO — linkedin.com/in/edwardxwu. Seattle-based, founder-led.',
-    outreachAngle: 'Investigation without governance is fine. Autonomous remediation without governance is a liability. As you launch Threat Hunter and remediation, Aergap is the gate that answers "who authorized this containment action, under what policy, and is it on record?" — before CISO customers ask.',
+    outreachAngle: 'Investigation without governance is fine. Autonomous remediation without governance is a liability. As you launch Threat Hunter and remediation, Aerpolice is the gate that answers "who authorized this containment action, under what policy, and is it on record?" — before CISO customers ask.',
   },
 
   {
@@ -191,10 +191,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Prior auth approval and denial determinations', 'Pharmacy routing decisions affecting patient care', 'Payer portal submissions and appeals', 'Benefits verification and eligibility decisions', 'Medical necessity documentation generation'],
     govRisk: 'High',
     govReason: 'Decisions affect patient access to medication. CMS-0057-F regulation and Jan 2027 FHIR mandate require documented, individualized decision-making. Federal guidance explicitly prohibits MA orgs from making medical necessity decisions using algorithms that don\'t consider individual circumstances. TPAs have been sued for automated bulk denials.',
-    whyAergap: 'Healthcare PA is a named Aergap Tier-2 vertical. High accountability, hard compliance deadlines, and regulatory pressure. Aergap\'s audit trail and policy enforcement answer the CMS question directly: which agent made this PA decision, under what policy, with what individualized factors considered?',
+    whyAerpolice: 'Healthcare PA is a named Aerpolice Tier-2 vertical. High accountability, hard compliance deadlines, and regulatory pressure. Aerpolice\'s audit trail and policy enforcement answer the CMS question directly: which agent made this PA decision, under what policy, with what individualized factors considered?',
     triggerSignals: ['$100M at $1B valuation (Accel/Thrive/General Catalyst, Jan 2026)', 'CMS-0057-F deadline pressure — forcing function for governance investment', 'Highest valuation of any AI PA startup — enterprise sales cycle beginning', 'State AI-in-claims regulation expanding'],
     decisionMaker: 'Sahir Jaggi, Founder & CEO (ex-Oscar Health product leader). Well-funded, longer sales cycle — approach compliance/trust angle.',
-    outreachAngle: 'CMS-0057-F requires documented individualized review for every PA decision. Aergap is the audit trail layer that proves your agents considered individual circumstances — turning a regulatory requirement into a product feature your enterprise health system customers can show regulators.',
+    outreachAngle: 'CMS-0057-F requires documented individualized review for every PA decision. Aerpolice is the audit trail layer that proves your agents considered individual circumstances — turning a regulatory requirement into a product feature your enterprise health system customers can show regulators.',
   },
 
   {
@@ -206,10 +206,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Outbound calls to claimants on behalf of insurer', 'Claim status updates in CMS systems', 'Employer and provider contact on insurance matters', 'Repair shop authorization and scheduling', 'Billing inquiry resolution with financial implications'],
     govRisk: 'High',
     govReason: 'Autonomous agent speaks to claimants and providers as the insurer\'s representative, updating case records with legal and financial implications. Misrepresentation, incorrect status updates, or unauthorized commitments create direct regulatory and litigation exposure.',
-    whyAergap: 'Voice agents taking binding actions in claims workflows need identity verification (which agent said what) and policy enforcement (what can the agent commit to). Aergap\'s audit trail and execution gate are directly applicable to autonomous voice agent operations.',
+    whyAerpolice: 'Voice agents taking binding actions in claims workflows need identity verification (which agent said what) and policy enforcement (what can the agent commit to). Aerpolice\'s audit trail and execution gate are directly applicable to autonomous voice agent operations.',
     triggerSignals: ['$4.6M seed round', 'Integrates with major CMS and IVR platforms — enterprise claims footprint', 'Autonomous outbound calls = highest-stakes voice agent use case', 'Active expansion across P&C carriers'],
     decisionMaker: 'Founders via Businesswire/Crunchbase — recommend direct site outreach.',
-    outreachAngle: 'When a claimant disputes what your agent said or committed to on a call, you need an immutable record of the agent\'s identity, the conversation, and the policy it was operating under. Aergap is that record — built before the dispute, not assembled after.',
+    outreachAngle: 'When a claimant disputes what your agent said or committed to on a call, you need an immutable record of the agent\'s identity, the conversation, and the policy it was operating under. Aerpolice is that record — built before the dispute, not assembled after.',
   },
 
   {
@@ -221,10 +221,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['System access grants and revocations (identity)', 'Employee onboarding access setup', 'Offboarding access removal (compliance-critical)', 'Hardware procurement execution', 'Security configuration changes'],
     govRisk: 'High',
     govReason: 'Agent grants and revokes system access autonomously — the most sensitive action in IT operations. Incorrect access grant = privilege escalation. Incomplete offboarding = SOC 2 and audit finding. Access provisioning without governance is the #1 IT audit failure mode.',
-    whyAergap: 'Access provisioning and identity management are Aergap\'s most direct IT Ops use case. Agent Identity + Policy Enforcement + Execution Gate perfectly maps to: which agent granted access, under what policy, was it authorized before it happened? SOC 2 and ISO 27001 customers will require this.',
-    triggerSignals: ['YC-backed — fast decision cycle', 'Access provisioning as core product — exact Aergap use case', 'Selling to enterprise IT teams who live in SOC 2 audits', 'Active YC network for intro'],
+    whyAerpolice: 'Access provisioning and identity management are Aerpolice\'s most direct IT Ops use case. Agent Identity + Policy Enforcement + Execution Gate perfectly maps to: which agent granted access, under what policy, was it authorized before it happened? SOC 2 and ISO 27001 customers will require this.',
+    triggerSignals: ['YC-backed — fast decision cycle', 'Access provisioning as core product — exact Aerpolice use case', 'Selling to enterprise IT teams who live in SOC 2 audits', 'Active YC network for intro'],
     decisionMaker: 'Founders via YC directory — W24/S24 batch lookup.',
-    outreachAngle: 'SOC 2 auditors will ask: who authorized this access grant, was it approved before it happened, and can you prove it? Aergap is the pre-action gate and audit trail for access provisioning agents — turning your biggest enterprise sales risk into a differentiator.',
+    outreachAngle: 'SOC 2 auditors will ask: who authorized this access grant, was it approved before it happened, and can you prove it? Aerpolice is the pre-action gate and audit trail for access provisioning agents — turning your biggest enterprise sales risk into a differentiator.',
   },
 
   {
@@ -236,10 +236,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Cloud infrastructure provisioning (spend and config)', 'Deprovisioning and deletion of production resources', 'Security remediation actions in production', 'Incident response automation with real system impact', 'CI/CD pipeline execution with deployment authority'],
     govRisk: 'High',
     govReason: 'Agent provisions cloud infra and executes security actions across 140+ integrations with direct production access. A misconfigured provisioning or incorrect deprovisioning can cause outages, data loss, or cloud cost spikes immediately. "Deterministic" in the name doesn\'t mean "governed."',
-    whyAergap: 'Platform engineering agents with production access are exactly where Aergap\'s pre-action execution gate applies. Policy enforcement on what infra the agent can create/delete + audit trail for every action = the governance story that turns Kestrel from a dev tool into an enterprise platform product.',
+    whyAerpolice: 'Platform engineering agents with production access are exactly where Aerpolice\'s pre-action execution gate applies. Policy enforcement on what infra the agent can create/delete + audit trail for every action = the governance story that turns Kestrel from a dev tool into an enterprise platform product.',
     triggerSignals: ['YC-backed — fast decision cycle', '140+ integrations — broad blast radius for governance failures', 'Developer-first with production access — security teams will eventually ask questions', 'Active YC network for intro'],
     decisionMaker: 'Founders via YC directory — recommend direct outreach.',
-    outreachAngle: 'When your agent provisions $50K of cloud infra in response to a prompt, who authorized that? Aergap is the policy gate that runs before Kestrel executes — so you have an answer for enterprise platform teams who need to show their board what controls exist.',
+    outreachAngle: 'When your agent provisions $50K of cloud infra in response to a prompt, who authorized that? Aerpolice is the policy gate that runs before Kestrel executes — so you have an answer for enterprise platform teams who need to show their board what controls exist.',
   },
 
   {
@@ -251,10 +251,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Commercial claims coverage determination', 'Payout calculation on complex multi-line claims', 'TPA workflow execution with carrier implications', 'Exception routing and escalation decisions', 'Claims reserve setting'],
     govRisk: 'High',
     govReason: 'Multimodal agent orchestration making high-value commercial claims decisions at a TPA. Wrong decisions create regulatory exposure, litigation risk, and carrier relationship damage. Commercial claims have higher individual values — a single bad AI decision can mean $1M+ error.',
-    whyAergap: 'Commercial claims at a TPA is a perfect Aergap story — high individual decision value, regulated industry, carrier clients who will demand audit trails. Agent identity + policy enforcement + audit trail for every claims decision answers both carrier and regulatory requirements.',
+    whyAerpolice: 'Commercial claims at a TPA is a perfect Aerpolice story — high individual decision value, regulated industry, carrier clients who will demand audit trails. Agent identity + policy enforcement + audit trail for every claims decision answers both carrier and regulatory requirements.',
     triggerSignals: ['$6M seed (Portage, TenOneTen, American Family Ventures)', 'TPA-focused — selling to enterprise carriers who have existing compliance requirements', 'Commercial claims complexity = highest governance risk in insurance', 'Founder Grace Hanson actively building'],
     decisionMaker: 'Grace Hanson, Founder & CEO.',
-    outreachAngle: 'Carrier clients will ask: which AI made this commercial claims decision, under what policy, and where\'s the audit trail? Aergap answers all three before the claim hits litigation. Worth a conversation about building that into your TPA offering?',
+    outreachAngle: 'Carrier clients will ask: which AI made this commercial claims decision, under what policy, and where\'s the audit trail? Aerpolice answers all three before the claim hits litigation. Worth a conversation about building that into your TPA offering?',
   },
 
   // ── TIER 2: Strong Prospects ──────────────────────────────────────────────
@@ -268,10 +268,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Autonomous expense approval and rejection', 'Invoice fraud detection with blocking authority', 'GL coding and ERP write-back at scale', 'T&E policy enforcement without human review', 'Audit report generation for regulators'],
     govRisk: 'High',
     govReason: 'Amazon and Salesforce are customers — the most security-mature enterprise buyers in the world. When they run autonomous finance workflows, internal audit teams require documented controls. Explicitly calling it "autonomous operations" puts governance at the top of every enterprise security review.',
-    whyAergap: 'AppZen is the governance problem at enterprise scale. Their customers (Amazon, Salesforce) will already be asking about pre-action controls and audit trails. Aergap is the layer between "autonomous" and "audited" — directly applicable to their T&E and AP agent product.',
+    whyAerpolice: 'AppZen is the governance problem at enterprise scale. Their customers (Amazon, Salesforce) will already be asking about pre-action controls and audit trails. Aerpolice is the layer between "autonomous" and "audited" — directly applicable to their T&E and AP agent product.',
     triggerSignals: ['$180M raised', 'Amazon + Salesforce as reference customers — both have mature InfoSec', 'Explicitly calling product "autonomous operations"', 'Moving upmarket with CFO office positioning'],
     decisionMaker: 'Anant Kale, CEO & Co-Founder.',
-    outreachAngle: 'When Amazon\'s internal audit team asks AppZen "what policy governed that expense approval?" — what do you show them? Aergap is the pre-action policy layer that makes autonomous finance operations auditable before the fact.',
+    outreachAngle: 'When Amazon\'s internal audit team asks AppZen "what policy governed that expense approval?" — what do you show them? Aerpolice is the pre-action policy layer that makes autonomous finance operations auditable before the fact.',
   },
 
   {
@@ -282,11 +282,11 @@ export const WEB2_COMPANIES: Web2Company[] = [
     agentDoes: 'Platform connects other companies\' AI agents to payment rails with programmable permissions and spend limits, enabling autonomous B2B transactions with built-in traceability.',
     highStakeActions: ['Connecting agent to live payment rails', 'Setting and enforcing spend limits per agent', 'Enabling autonomous B2B transaction execution', 'Reconciliation and audit of agent payments'],
     govRisk: 'Medium-High',
-    govReason: 'Adjacent infrastructure rather than direct prospect. Locus solves the payment-rail half of agent governance; Aergap solves the broader policy/identity/audit half. Their customers are exactly Aergap\'s downstream ICP.',
-    whyAergap: 'Partnership track: Aergap as the policy and identity layer on top of Locus\'s payment rail creates a complete governance stack. Locus customers who deploy spend-capable agents need Aergap\'s pre-action execution gate. Co-sell or embed conversation.',
-    triggerSignals: ['YC-backed, building specifically for "the machine economy"', 'Payments rail for AI agents = Aergap\'s downstream ICP', 'Early stage — partnership conversation easier than at scale'],
+    govReason: 'Adjacent infrastructure rather than direct prospect. Locus solves the payment-rail half of agent governance; Aerpolice solves the broader policy/identity/audit half. Their customers are exactly Aerpolice\'s downstream ICP.',
+    whyAerpolice: 'Partnership track: Aerpolice as the policy and identity layer on top of Locus\'s payment rail creates a complete governance stack. Locus customers who deploy spend-capable agents need Aerpolice\'s pre-action execution gate. Co-sell or embed conversation.',
+    triggerSignals: ['YC-backed, building specifically for "the machine economy"', 'Payments rail for AI agents = Aerpolice\'s downstream ICP', 'Early stage — partnership conversation easier than at scale'],
     decisionMaker: 'Founders via YC directory — recommend direct outreach.',
-    outreachAngle: 'You solve the payment rail. Aergap solves the policy and identity layer above it. Your customers need both — let\'s talk about whether a co-sell or embed makes sense before someone else takes that conversation to them.',
+    outreachAngle: 'You solve the payment rail. Aerpolice solves the policy and identity layer above it. Your customers need both — let\'s talk about whether a co-sell or embed makes sense before someone else takes that conversation to them.',
   },
 
   {
@@ -298,10 +298,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Instant claim payment triggering', 'Autonomous damage verification and valuation', 'Coverage determination without human adjuster', 'Satellite data processing for binding claims decisions'],
     govRisk: 'High',
     govReason: 'Autonomous claim verification and immediate payment trigger. Insurance regulators require documented decision rationale. An incorrect payment or wrongful denial based on satellite data misinterpretation is an immediate regulatory event.',
-    whyAergap: 'Instant AI claims payment is the clearest insurance case for Aergap\'s execution gate. The gate fires between "agent determines claim is valid" and "payment triggers" — allowing policy enforcement (amount limits, exception escalation) before money moves.',
+    whyAerpolice: 'Instant AI claims payment is the clearest insurance case for Aerpolice\'s execution gate. The gate fires between "agent determines claim is valid" and "payment triggers" — allowing policy enforcement (amount limits, exception escalation) before money moves.',
     triggerSignals: ['YC-backed', 'Autonomous claims payment = highest-stakes insurance action', 'Active YC network for intro'],
     decisionMaker: 'Founders via YC directory.',
-    outreachAngle: 'Satellite-verified instant claims payment is a breakthrough product. Aergap is the gate between verification and payout — ensures every payment is within policy limits before it fires, and gives you an immutable record when a claimant disputes the valuation.',
+    outreachAngle: 'Satellite-verified instant claims payment is a breakthrough product. Aerpolice is the gate between verification and payout — ensures every payment is within policy limits before it fires, and gives you an immutable record when a claimant disputes the valuation.',
   },
 
   {
@@ -312,11 +312,11 @@ export const WEB2_COMPANIES: Web2Company[] = [
     agentDoes: 'AI agent processes loan applications, runs underwriting analysis, monitors loan covenants, drafts credit memos, and triggers approve/escalate decisions on commercial loan packets.',
     highStakeActions: ['Loan approval and rejection recommendations', 'Covenant violation detection and escalation', 'Credit memo drafting with regulatory implications', 'Commercial real estate underwriting decisions', 'Risk classification affecting lending rates'],
     govRisk: 'High',
-    govReason: 'Agent enforces credit policy and triggers approve/escalate on commercial loans. Wrong underwriting decisions create ECOA and fair lending exposure. Covenant monitoring errors can trigger defaults. "Versioned policy engine" shows they know policy control matters — Aergap formalizes it.',
-    whyAergap: '"Versioned policy engine" is the signal — they already understand policy enforcement. Aergap is the independent enforcement layer that satisfies bank examiners: agent identity, policy version at decision time, and immutable audit trail for every credit decision.',
+    govReason: 'Agent enforces credit policy and triggers approve/escalate on commercial loans. Wrong underwriting decisions create ECOA and fair lending exposure. Covenant monitoring errors can trigger defaults. "Versioned policy engine" shows they know policy control matters — Aerpolice formalizes it.',
+    whyAerpolice: '"Versioned policy engine" is the signal — they already understand policy enforcement. Aerpolice is the independent enforcement layer that satisfies bank examiners: agent identity, policy version at decision time, and immutable audit trail for every credit decision.',
     triggerSignals: ['Active enterprise lending deployments', '99%+ accuracy claims — means they\'re selling accuracy, but regulators want auditability', 'Versioned policy engine in product already — governance awareness confirmed'],
     decisionMaker: 'Founders via company site/LinkedIn.',
-    outreachAngle: 'You have a versioned policy engine. Aergap is the independent enforcement and audit layer that satisfies bank examiners — proving which policy governed which credit decision, which agent made it, and that it was enforced before the decision was made.',
+    outreachAngle: 'You have a versioned policy engine. Aerpolice is the independent enforcement and audit layer that satisfies bank examiners — proving which policy governed which credit decision, which agent made it, and that it was enforced before the decision was made.',
   },
 
   {
@@ -328,10 +328,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Autonomous loan approval/denial', 'Credit data processing and decisioning', 'Loan rate and term determination', 'Member-facing denial notices with regulatory requirements', 'Adverse action compliance documentation'],
     govRisk: 'High',
     govReason: 'Fully automated loan decisions at regulated credit unions. ECOA, FCRA, and NCUA regulation require documented decisioning rationale, adverse action notices, and non-discriminatory decision-making. NCUA examiners will ask about AI governance when they visit.',
-    whyAergap: 'Regulated credit union lending decisions are a clear Aergap case. Audit trail for every AI decision, policy enforcement on which loans the AI can approve autonomously, and agent identity for NCUA examination directly address the regulatory exposure.',
+    whyAerpolice: 'Regulated credit union lending decisions are a clear Aerpolice case. Audit trail for every AI decision, policy enforcement on which loans the AI can approve autonomously, and agent identity for NCUA examination directly address the regulatory exposure.',
     triggerSignals: ['Live at Vibrant Credit Union and Canopy Credit Union', 'NCUA-regulated clients = governance requirements by default', 'Autonomous loan decisions = ECOA/FCRA compliance exposure'],
     decisionMaker: 'Founders via company site.',
-    outreachAngle: 'When the NCUA examiner asks "who approved this loan and under what policy?" — what does your credit union customer show them? Aergap is the audit trail and policy enforcement layer that answers that question before the examination.',
+    outreachAngle: 'When the NCUA examiner asks "who approved this loan and under what policy?" — what does your credit union customer show them? Aerpolice is the audit trail and policy enforcement layer that answers that question before the examination.',
   },
 
   {
@@ -343,10 +343,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Employee record updates in HRIS systems', 'Benefits modification and enrollment changes', 'Leave approval and processing with pay implications', 'Policy change implementation across HR systems', 'Sensitive employee data access and modification'],
     govRisk: 'High',
     govReason: 'Agent executes HR system changes — not just answers questions. Incorrect benefits modification, unauthorized record update, or improper leave processing creates ERISA, labor law, and PII exposure. 1,000+ integrations means broad blast radius for any governance failure.',
-    whyAergap: 'HR agents with write access to employee records are a direct Aergap use case. Identity (which agent touched which record), policy enforcement (what HR changes can the agent execute without approval), and audit trail (ERISA and labor law documentation) are all required.',
+    whyAerpolice: 'HR agents with write access to employee records are a direct Aerpolice use case. Identity (which agent touched which record), policy enforcement (what HR changes can the agent execute without approval), and audit trail (ERISA and labor law documentation) are all required.',
     triggerSignals: ['Enterprise-scale deployment, $1,000+ app integrations', 'WorkLM positioned as action-taking agent — governance questions incoming', 'Selling to enterprise HR teams subject to labor law compliance'],
     decisionMaker: 'Adit Jain, CEO & Co-Founder.',
-    outreachAngle: 'Executing HR system changes at enterprise scale means any incorrect action is an ERISA or labor law event. Aergap is the policy gate that runs before WorkLM acts — so your enterprise customers can prove what the agent was authorized to change, and what it wasn\'t.',
+    outreachAngle: 'Executing HR system changes at enterprise scale means any incorrect action is an ERISA or labor law event. Aerpolice is the policy gate that runs before WorkLM acts — so your enterprise customers can prove what the agent was authorized to change, and what it wasn\'t.',
   },
 
   {
@@ -358,10 +358,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Autonomous contract redlining with legal effect', 'Playbook application to binding agreements', 'Non-standard term flagging and rejection', 'Multi-document review and modification', 'Contract approval routing'],
     govRisk: 'Medium-High',
     govReason: 'Agent executes multi-step legal review/redline across simultaneous deals. An incorrect redline or missed clause on a binding agreement creates direct legal exposure. Enterprise legal teams need to prove the agent applied the correct version of the playbook.',
-    whyAergap: 'Contract review agents require policy enforcement (which playbook version applied), audit trail (every redline and the policy basis), and identity (which agent reviewed which document). SOC 2 Type II certification shows governance awareness — Aergap deepens it.',
-    triggerSignals: ['Active enterprise legal adoption', 'SOC 2 Type II certified — governance-aware customer base', 'Playbook enforcement is their core value prop — Aergap reinforces it'],
+    whyAerpolice: 'Contract review agents require policy enforcement (which playbook version applied), audit trail (every redline and the policy basis), and identity (which agent reviewed which document). SOC 2 Type II certification shows governance awareness — Aerpolice deepens it.',
+    triggerSignals: ['Active enterprise legal adoption', 'SOC 2 Type II certified — governance-aware customer base', 'Playbook enforcement is their core value prop — Aerpolice reinforces it'],
     decisionMaker: 'Scott Stevenson, Co-Founder & CEO.',
-    outreachAngle: 'You enforce the playbook — Aergap proves it. When a client asks "which version of the playbook did your agent apply to this contract, and can you show the audit trail?" — Aergap gives you that answer before anyone asks.',
+    outreachAngle: 'You enforce the playbook — Aerpolice proves it. When a client asks "which version of the playbook did your agent apply to this contract, and can you show the audit trail?" — Aerpolice gives you that answer before anyone asks.',
   },
 
   {
@@ -373,10 +373,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Contract negotiation with binding implications', 'Multi-party redlining and position management', 'Standard clause substitution on agreements', 'Legal risk flagging with autonomous routing', 'Approval workflow execution for legal sign-off'],
     govRisk: 'Medium-High',
     govReason: 'Negotiation authority on binding contract terms. An unauthorized concession or missed protective clause on a major agreement creates immediate legal exposure. Enterprise legal buyers need documented controls on what the AI can agree to unilaterally.',
-    whyAergap: 'Legal negotiation agents need policy enforcement on what terms they can accept/reject autonomously, agent identity for which AI touched which contract, and audit trail for regulatory disclosure requirements. Aergap maps directly to all three.',
+    whyAerpolice: 'Legal negotiation agents need policy enforcement on what terms they can accept/reject autonomously, agent identity for which AI touched which contract, and audit trail for regulatory disclosure requirements. Aerpolice maps directly to all three.',
     triggerSignals: ['Well-funded, enterprise legal customer base', 'Negotiation authority = highest governance risk in legal tech', 'Moving upmarket to global enterprise accounts'],
     decisionMaker: 'James Clough, Co-Founder & CEO.',
-    outreachAngle: 'When a client asks "what was your AI authorized to concede in that negotiation, and where\'s the record?" — Aergap is the answer. Policy enforcement on negotiation limits + audit trail for every position taken = the enterprise governance story that closes the deals your legal team can\'t.',
+    outreachAngle: 'When a client asks "what was your AI authorized to concede in that negotiation, and where\'s the record?" — Aerpolice is the answer. Policy enforcement on negotiation limits + audit trail for every position taken = the enterprise governance story that closes the deals your legal team can\'t.',
   },
 
   {
@@ -388,10 +388,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Automated credit approve/deny decisions', 'Risk score calculation affecting lending rates', 'Application fraud detection with rejection authority', 'Adverse action notice generation (regulatory)', 'Portfolio-level credit policy enforcement'],
     govRisk: 'High',
     govReason: 'Regulated lending decisions made autonomously at banks. FCRA, ECOA, and CFPB fair lending requirements demand explainability, documented policy, and human override capability for every adverse decision. CFPB has signaled increased scrutiny on AI lending models.',
-    whyAergap: 'Mature, well-funded enterprise deployment makes this a strong Aergap conversation at the compliance/security layer. Audit trail for every AI credit decision, policy enforcement on automated decisioning limits, and agent identity for regulatory examination are direct fit.',
+    whyAerpolice: 'Mature, well-funded enterprise deployment makes this a strong Aerpolice conversation at the compliance/security layer. Audit trail for every AI credit decision, policy enforcement on automated decisioning limits, and agent identity for regulatory examination are direct fit.',
     triggerSignals: ['$300M+ raised — mature enterprise relationships', 'CFPB and state regulator scrutiny on AI lending increasing', 'Adverse action and ECOA compliance requirements are automatic', 'Well-established bank and credit union customer base'],
     decisionMaker: 'Mike de Vere, CEO.',
-    outreachAngle: 'CFPB examiners are increasingly asking about AI credit model governance. Aergap is the independent audit and policy layer that proves your decisioning engine is operating within approved parameters — before the examination, not after.',
+    outreachAngle: 'CFPB examiners are increasingly asking about AI credit model governance. Aerpolice is the independent audit and policy layer that proves your decisioning engine is operating within approved parameters — before the examination, not after.',
   },
 
   {
@@ -403,10 +403,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Identity management changes in production', 'Automated incident response triggering', 'Security policy enforcement automation', 'Access revocation and provisioning workflows', 'Threat containment actions'],
     govRisk: 'High',
     govReason: 'Automates identity management and incident response — two of the highest-consequence action categories in IT security. No-code means security teams without development review creating and deploying production-impacting automations.',
-    whyAergap: 'Security automation without governance is a liability. Aergap\'s execution gate on identity management and incident response actions, combined with audit trail for every automated security action, directly addresses what S32 and Microsoft M12 investors would expect at enterprise scale.',
-    triggerSignals: ['$35M Series A (S32, Microsoft\'s M12)', 'Identity management automation = direct Aergap use case', 'Microsoft-backed — selling to Microsoft enterprise ecosystem', 'No-code = broad access to create production-impacting workflows'],
+    whyAerpolice: 'Security automation without governance is a liability. Aerpolice\'s execution gate on identity management and incident response actions, combined with audit trail for every automated security action, directly addresses what S32 and Microsoft M12 investors would expect at enterprise scale.',
+    triggerSignals: ['$35M Series A (S32, Microsoft\'s M12)', 'Identity management automation = direct Aerpolice use case', 'Microsoft-backed — selling to Microsoft enterprise ecosystem', 'No-code = broad access to create production-impacting workflows'],
     decisionMaker: 'Founders via Crescendo/Crunchbase.',
-    outreachAngle: 'When a no-code security workflow triggers an identity change in production, who authorized it and under what policy? Aergap answers that question before your enterprise customers\' audit teams ask — turning your no-code freedom into enterprise governance.',
+    outreachAngle: 'When a no-code security workflow triggers an identity change in production, who authorized it and under what policy? Aerpolice answers that question before your enterprise customers\' audit teams ask — turning your no-code freedom into enterprise governance.',
   },
 
   {
@@ -418,10 +418,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Autonomous alert triage affecting response priority', 'Threat hunting across sensitive enterprise systems', 'Detection tuning recommendations with production impact', 'Incident escalation and containment decisions'],
     govRisk: 'High',
     govReason: 'Early-stage with no Fortune 500 logos yet — auditability is explicitly flagged as a compliance blocker in regulated industries. Every enterprise SOC deal will require demonstrating AI action governance before contract sign.',
-    whyAergap: 'Auditability is the stated sales blocker. Aergap is the direct solution: agent identity + audit trail for every SOC action + execution gate for remediation. Position as the governance layer that removes the compliance objection from every enterprise deal.',
+    whyAerpolice: 'Auditability is the stated sales blocker. Aerpolice is the direct solution: agent identity + audit trail for every SOC action + execution gate for remediation. Position as the governance layer that removes the compliance objection from every enterprise deal.',
     triggerSignals: ['Recent Series B', 'Auditability flagged as explicit compliance blocker', 'Expanding toward autonomous remediation — execution gate becomes critical', 'Actively seeking enterprise SOC customers'],
     decisionMaker: 'Founders via company site.',
-    outreachAngle: 'Your enterprise prospects are blocking on auditability. Aergap is the audit trail and identity layer that removes that objection — letting you close SOC deals where compliance teams currently say no.',
+    outreachAngle: 'Your enterprise prospects are blocking on auditability. Aerpolice is the audit trail and identity layer that removes that objection — letting you close SOC deals where compliance teams currently say no.',
   },
 
   {
@@ -433,10 +433,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Multi-agent threat hunting across production systems', 'Coordinated alert investigation with escalation authority', 'Cross-system correlation accessing sensitive telemetry', 'Incident determination affecting IR workflows'],
     govRisk: 'High',
     govReason: '"Long-term viability unproven" per industry analysts — needs trust signals to win deals. Multi-agent coordination without governance means unclear accountability when an investigation leads to a wrong conclusion or missed threat.',
-    whyAergap: 'Multi-agent systems need agent identity (which agent concluded what), policy enforcement (what systems can each agent access), and audit trail (full decision chain for the threat investigation). Aergap is the governance layer that makes multi-agent SOC trustworthy to enterprise buyers.',
+    whyAerpolice: 'Multi-agent systems need agent identity (which agent concluded what), policy enforcement (what systems can each agent access), and audit trail (full decision chain for the threat investigation). Aerpolice is the governance layer that makes multi-agent SOC trustworthy to enterprise buyers.',
     triggerSignals: ['Series A, July 2025', 'Multi-agent architecture — governance accountability gap between agents', 'Mid-market focus — buyers are less sophisticated but still ask security governance questions'],
     decisionMaker: 'Founders via Crunchbase.',
-    outreachAngle: 'Multi-agent threat hunting is powerful — but when a SOC manager asks "which agent made that determination and why?" you need an answer. Aergap gives you agent identity and audit trail across the full multi-agent chain.',
+    outreachAngle: 'Multi-agent threat hunting is powerful — but when a SOC manager asks "which agent made that determination and why?" you need an answer. Aerpolice gives you agent identity and audit trail across the full multi-agent chain.',
   },
 
   // ── TIER 3: Monitor / Longer Cycle ───────────────────────────────────────
@@ -450,10 +450,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Autonomous invoice approval and payment', 'Corporate card spend enforcement', 'Fraud blocking with irreversible transaction impact', 'Approval routing and escalation'],
     govRisk: 'High',
     govReason: 'Well-resourced — likely to build governance in-house before buying. Enterprise clients already asking governance questions but Ramp has internal compliance capability.',
-    whyAergap: 'Longer-cycle enterprise/platform-partnership motion. If Aergap can be embedded in the Ramp platform as a governance layer for enterprise customers, it\'s a distribution win. Not immediate design-partner outreach.',
+    whyAerpolice: 'Longer-cycle enterprise/platform-partnership motion. If Aerpolice can be embedded in the Ramp platform as a governance layer for enterprise customers, it\'s a distribution win. Not immediate design-partner outreach.',
     triggerSignals: ['Mature enterprise product', '$32B valuation — internal compliance investment likely', 'Platform partnership conversation more realistic than customer sale'],
     decisionMaker: 'Eric Glyman, Co-Founder & CEO.',
-    outreachAngle: 'Enterprise customers are asking Ramp about governance for autonomous AP. Aergap embedded in the Ramp platform answers that question across your entire customer base — let\'s talk platform partnership.',
+    outreachAngle: 'Enterprise customers are asking Ramp about governance for autonomous AP. Aerpolice embedded in the Ramp platform answers that question across your entire customer base — let\'s talk platform partnership.',
   },
 
   {
@@ -465,10 +465,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Parallel agent execution in procurement systems', 'Supplier approval and onboarding', 'PO and spend commitment execution', 'Compliance workflow automation'],
     govRisk: 'High',
     govReason: 'Fortune 500 clients + ISO/IEC 42001 certification shows they\'re already governance-aware. May have internal governance tooling, but the no-code + parallel agent architecture creates governance gaps they may not have solved.',
-    whyAergap: 'ISO/IEC 42001 certification means they know AI governance matters — Aergap operationalizes it. Execution gate on parallel agent actions is exactly where governance gaps appear. Worth an OEM/embed conversation given Fortune 500 distribution.',
+    whyAerpolice: 'ISO/IEC 42001 certification means they know AI governance matters — Aerpolice operationalizes it. Execution gate on parallel agent actions is exactly where governance gaps appear. Worth an OEM/embed conversation given Fortune 500 distribution.',
     triggerSignals: ['ISO/IEC 42001 certified — governance-aware', 'Fortune 500 clients — enterprise compliance requirements incoming', 'No-code + parallel agents = governance complexity'],
     decisionMaker: 'Founders via company site.',
-    outreachAngle: 'You\'ve got the ISO 42001 cert — Aergap makes it operational. Pre-action execution gate for parallel agent procurement workflows + immutable audit trail = turning your certification into a product feature your Fortune 500 customers can audit.',
+    outreachAngle: 'You\'ve got the ISO 42001 cert — Aerpolice makes it operational. Pre-action execution gate for parallel agent procurement workflows + immutable audit trail = turning your certification into a product feature your Fortune 500 customers can audit.',
   },
 
   {
@@ -480,10 +480,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Policy-based approval routing', 'Vendor onboarding and evaluation', 'Spend commitment coordination', 'Intake-to-pay workflow execution'],
     govRisk: 'Medium',
     govReason: 'Mostly intake/routing rather than full autonomous execution — governance risk is present but lower than execution-first platforms. Well-resourced team likely handles compliance internally.',
-    whyAergap: 'Monitor for when they add autonomous execution capabilities. Policy-based routing is adjacent to Aergap\'s policy enforcement — a natural conversation if they expand into autonomous action execution.',
-    triggerSignals: ['Well-funded, fast enterprise adoption', 'Policy routing is adjacent to Aergap\'s policy enforcement', 'Watch for autonomous execution feature announcements'],
+    whyAerpolice: 'Monitor for when they add autonomous execution capabilities. Policy-based routing is adjacent to Aerpolice\'s policy enforcement — a natural conversation if they expand into autonomous action execution.',
+    triggerSignals: ['Well-funded, fast enterprise adoption', 'Policy routing is adjacent to Aerpolice\'s policy enforcement', 'Watch for autonomous execution feature announcements'],
     decisionMaker: 'Rujul Zaparde, Co-Founder & CEO.',
-    outreachAngle: 'When Zip moves from routing approvals to executing them autonomously, Aergap is the pre-action gate you\'ll want. Let\'s get ahead of that conversation.',
+    outreachAngle: 'When Zip moves from routing approvals to executing them autonomously, Aerpolice is the pre-action gate you\'ll want. Let\'s get ahead of that conversation.',
   },
 
   {
@@ -495,10 +495,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Autonomous supplier qualification and selection', 'RFP management and vendor scoring', 'Sourcing decision execution with spend implications', 'Contract initiation for selected vendors'],
     govRisk: 'Medium-High',
     govReason: 'AI-native architecture means autonomous sourcing decisions with procurement implications. Enterprise buyers will ask about governance of supplier selection decisions, especially for high-value categories.',
-    whyAergap: 'AI-native procurement with autonomous sourcing decisions is a governance conversation. Aergap\'s execution gate on supplier selection + audit trail for procurement decisions maps well to enterprise compliance requirements.',
+    whyAerpolice: 'AI-native procurement with autonomous sourcing decisions is a governance conversation. Aerpolice\'s execution gate on supplier selection + audit trail for procurement decisions maps well to enterprise compliance requirements.',
     triggerSignals: ['Enterprise-focused, AI-native architecture', 'Autonomous RFP execution = procurement governance questions', 'Growing enterprise customer base'],
     decisionMaker: 'CEO per company site — verify current leadership.',
-    outreachAngle: 'When a sourcing agent autonomously selects a $2M supplier, enterprise procurement teams need to show the decision trail. Aergap is the governance record before the contract signs.',
+    outreachAngle: 'When a sourcing agent autonomously selects a $2M supplier, enterprise procurement teams need to show the decision trail. Aerpolice is the governance record before the contract signs.',
   },
 
   {
@@ -510,10 +510,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Prior auth submission with medical access implications', 'Patient intake with insurance verification', 'Payer communication on behalf of provider', 'Fax processing for medically critical documents', 'Care authorization status updates'],
     govRisk: 'High',
     govReason: 'Automates documents that gate patient access to medical equipment and treatment. A missed authorization or incorrect processing creates patient harm, CMS compliance exposure, and provider billing risk.',
-    whyAergap: 'Healthcare prior auth agents need audit trail for every submission, policy enforcement on what the agent can approve, and identity logging for CMS compliance. Coral\'s growth trajectory will surface compliance questions quickly.',
+    whyAerpolice: 'Healthcare prior auth agents need audit trail for every submission, policy enforcement on what the agent can approve, and identity logging for CMS compliance. Coral\'s growth trajectory will surface compliance questions quickly.',
     triggerSignals: ['Targeting 4x growth — enterprise expansion incoming', 'DME/infusion/radiology = highly regulated settings', 'Fax-to-digital workflows = compliance documentation requirements'],
     decisionMaker: 'Founders via Fierce Healthcare.',
-    outreachAngle: 'CMS and state regulators are watching prior auth automation closely. Aergap gives you the audit trail that proves every automated authorization followed documented policy — before a payer audit triggers the question.',
+    outreachAngle: 'CMS and state regulators are watching prior auth automation closely. Aerpolice gives you the audit trail that proves every automated authorization followed documented policy — before a payer audit triggers the question.',
   },
 
   {
@@ -525,10 +525,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Autonomous payer calls with appeals authority', 'Claims status negotiation with binding implications', 'Denial appeal submissions via phone', 'Payment timeline negotiation on provider\'s behalf'],
     govRisk: 'Medium-High',
     govReason: 'Agent represents the provider in real payer negotiations — commitments made on calls have legal and financial implications. Incorrect appeal or unauthorized commitment creates provider revenue cycle exposure.',
-    whyAergap: 'Voice agents making real commitments in payer negotiations need identity logging (which agent called, what was said), policy enforcement (what can the agent commit to), and audit trail for revenue cycle compliance.',
+    whyAerpolice: 'Voice agents making real commitments in payer negotiations need identity logging (which agent called, what was said), policy enforcement (what can the agent commit to), and audit trail for revenue cycle compliance.',
     triggerSignals: ['$15M Series A (SignalFire)', 'Omega Healthcare distribution = major healthcare enterprise access', 'Voice AI in regulated payer negotiations = governance gap'],
     decisionMaker: 'Sam Schwager, Co-Founder & CEO.',
-    outreachAngle: 'When a payer disputes a commitment your voice agent made in a call, what\'s your record? Aergap is the identity and audit layer that proves what your agent said, under what policy, in every payer call.',
+    outreachAngle: 'When a payer disputes a commitment your voice agent made in a call, what\'s your record? Aerpolice is the identity and audit layer that proves what your agent said, under what policy, in every payer call.',
   },
 
   {
@@ -540,10 +540,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Benefits verification with patient financial implications', 'Prior auth submission for medical procedures', 'Payer portal navigation and data submission', 'Appeal initiation for denied authorizations'],
     govRisk: 'High',
     govReason: 'Mature enterprise health system relationships mean complex compliance requirements already exist. Well-funded with established compliance function, but governance gap between "agent called" and "audit trail documented" remains.',
-    whyAergap: 'Enterprise health systems buying Infinitus need SOC 2, HIPAA, and CMS audit compliance on AI agent actions. Aergap is the independent audit layer that their existing compliance function doesn\'t cover on the AI action side.',
+    whyAerpolice: 'Enterprise health systems buying Infinitus need SOC 2, HIPAA, and CMS audit compliance on AI agent actions. Aerpolice is the independent audit layer that their existing compliance function doesn\'t cover on the AI action side.',
     triggerSignals: ['$102.9M raised, mature enterprise health system relationships', 'HIPAA and CMS compliance requirements automatic', 'Watch for enterprise expansion and compliance hire signals'],
     decisionMaker: 'Ankit Jain, Founder & CEO.',
-    outreachAngle: 'Your health system customers\' compliance teams will eventually ask for agent-level audit trails for HIPAA and CMS documentation. Aergap gives you that layer before they ask.',
+    outreachAngle: 'Your health system customers\' compliance teams will eventually ask for agent-level audit trails for HIPAA and CMS documentation. Aerpolice gives you that layer before they ask.',
   },
 
   {
@@ -555,10 +555,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Care authorization with clinical implications', 'Insurance eligibility verification and billing', 'Referral management affecting care continuity', 'Clinical coding with revenue cycle implications', 'Patient scheduling with care delay risk'],
     govRisk: 'Medium-High',
     govReason: 'Authorization touches insurance and financial workflows with patient care implications. Enterprise health system traction means compliance questions are already in every deal.',
-    whyAergap: 'Health system enterprise deals require HIPAA compliance documentation on AI agent actions. Aergap\'s audit trail for care authorization and scheduling agents is a natural add-on to their enterprise compliance posture.',
+    whyAerpolice: 'Health system enterprise deals require HIPAA compliance documentation on AI agent actions. Aerpolice\'s audit trail for care authorization and scheduling agents is a natural add-on to their enterprise compliance posture.',
     triggerSignals: ['Strong enterprise health system traction', 'North Kansas City Hospital case study published', 'Care authorization workflows = compliance documentation required'],
     decisionMaker: 'Pranay Kapadia, Founder & CEO.',
-    outreachAngle: 'Enterprise health systems require HIPAA-compliant audit trails for AI-driven care authorization. Aergap is the documentation layer that proves every agent action was within policy before it affected a patient.',
+    outreachAngle: 'Enterprise health systems require HIPAA-compliant audit trails for AI-driven care authorization. Aerpolice is the documentation layer that proves every agent action was within policy before it affected a patient.',
   },
 
   {
@@ -570,10 +570,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Cross-system healthcare workflow execution', 'Prior auth and billing coordination', 'Clinical scheduling automation', 'Back-office system orchestration with patient care implications'],
     govRisk: 'Medium-High',
     govReason: 'Multi-system healthcare coordination with patient care implications. $6.5M raise suggests early growth — governance questions will arrive as enterprise customers scale.',
-    whyAergap: 'Agentic OS coordinating multiple healthcare systems needs identity tracking across systems and audit trail for cross-system actions. Aergap is the governance layer above the individual system integrations.',
+    whyAerpolice: 'Agentic OS coordinating multiple healthcare systems needs identity tracking across systems and audit trail for cross-system actions. Aerpolice is the governance layer above the individual system integrations.',
     triggerSignals: ['Recently raised $6.5M', 'Multi-system healthcare coordination = complex governance footprint', 'Active growth phase — governance questions incoming'],
     decisionMaker: 'Prakash Khot, Co-Founder & CEO.',
-    outreachAngle: 'When an agent touches five different healthcare systems to process one prior auth, which action in which system needs to be audited? Aergap tracks the full chain across all five — one audit trail for the whole workflow.',
+    outreachAngle: 'When an agent touches five different healthcare systems to process one prior auth, which action in which system needs to be audited? Aerpolice tracks the full chain across all five — one audit trail for the whole workflow.',
   },
 
   {
@@ -585,10 +585,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Benefits verification for specialty pharmacy', 'Prior auth submission for high-cost biopharma', 'Patient support communication with medical implications', 'Affordability program eligibility determination'],
     govRisk: 'Medium-High',
     govReason: 'Biopharma patient access involves high-cost specialty medications and complex payer rules. Incorrect determination or missed authorization step has significant patient access and financial implications.',
-    whyAergap: 'Biopharma market access workflows for specialty medications need audit trails for payer documentation and patient safety compliance. Aergap is the governance layer for agents operating in FDA-regulated biopharma access programs.',
+    whyAerpolice: 'Biopharma market access workflows for specialty medications need audit trails for payer documentation and patient safety compliance. Aerpolice is the governance layer for agents operating in FDA-regulated biopharma access programs.',
     triggerSignals: ['Scaling agentic AI capabilities', 'Hiring across the board', 'Biopharma clients = FDA and payer compliance requirements'],
     decisionMaker: 'Danny Sigurdson, Founder & CEO.',
-    outreachAngle: 'Specialty medication access agents need documented audit trails for payer audits and FDA compliance. Aergap is the record that proves every step in the patient access workflow was authorized and compliant.',
+    outreachAngle: 'Specialty medication access agents need documented audit trails for payer audits and FDA compliance. Aerpolice is the record that proves every step in the patient access workflow was authorized and compliant.',
   },
 
   {
@@ -600,10 +600,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Autonomous contract redlining at scale', 'Archive classification affecting legal discoverability', 'Contract intake with metadata and risk tagging', 'Workflow routing for legal sign-off'],
     govRisk: 'Medium',
     govReason: 'Large incumbent with 1,000+ enterprise customers and existing in-house compliance capabilities. Likely to build governance internally. Agentic suite just launched — governance questions will arrive as autonomous features deepen.',
-    whyAergap: 'Enterprise CLM with autonomous capabilities will face governance questions from legal teams and risk officers. Monitor for when internal governance builds stall or compliance requirements exceed internal capacity. OEM/embed conversation is more realistic than design-partner.',
+    whyAerpolice: 'Enterprise CLM with autonomous capabilities will face governance questions from legal teams and risk officers. Monitor for when internal governance builds stall or compliance requirements exceed internal capacity. OEM/embed conversation is more realistic than design-partner.',
     triggerSignals: ['Launched agentic suite March 2026', 'Enterprise legal customer base — compliance-aware buyers', '1,000+ customers means scale brings governance questions quickly'],
     decisionMaker: 'Jason Boehmig, Co-Founder & CEO.',
-    outreachAngle: 'As your agentic suite scales across 1,000 enterprise legal teams, which CLM actions require documented governance? Aergap is the audit and policy layer for when the answer is "all of them."',
+    outreachAngle: 'As your agentic suite scales across 1,000 enterprise legal teams, which CLM actions require documented governance? Aerpolice is the audit and policy layer for when the answer is "all of them."',
   },
 
   {
@@ -615,10 +615,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Litigation document drafting with filing implications', 'Case law research used for binding legal arguments', 'Court filing preparation', 'Discovery workflow coordination'],
     govRisk: 'Medium-High',
     govReason: 'Part of well-funded legal AI cluster. Litigation documents and filings have direct court implications — wrong or unauthorized agent action on a filing deadline creates legal malpractice exposure.',
-    whyAergap: 'Litigation agents touching court filings need identity and audit trail. Which agent drafted which document, under what attorney supervision, for which case — required for malpractice defense and attorney-client privilege documentation.',
+    whyAerpolice: 'Litigation agents touching court filings need identity and audit trail. Which agent drafted which document, under what attorney supervision, for which case — required for malpractice defense and attorney-client privilege documentation.',
     triggerSignals: ['Part of well-funded legal AI cluster', 'Litigation automation = bar compliance questions', 'Growing enterprise law firm customer base'],
     decisionMaker: 'Founders via Crunchbase.',
-    outreachAngle: 'Bar associations are watching AI in litigation closely. Aergap gives you the attorney supervision documentation trail — which agent acted on which matter, under what attorney authorization, for malpractice and ethical compliance.',
+    outreachAngle: 'Bar associations are watching AI in litigation closely. Aerpolice gives you the attorney supervision documentation trail — which agent acted on which matter, under what attorney authorization, for malpractice and ethical compliance.',
   },
 
   {
@@ -630,10 +630,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Case research used in client advice', 'Precedent identification for legal strategy', 'Research memo generation with billing implications', 'Workflow execution across matter management systems'],
     govRisk: 'Medium-High',
     govReason: 'Law firm clients (Gunderson Dettmer, CMS Legal) are governance-sophisticated. Legal AI agents executing research and memos need documented attorney review and supervision for malpractice protection.',
-    whyAergap: 'Law firm clients require attorney supervision documentation for AI-generated legal work. Aergap\'s agent identity and audit trail for every research output and workflow action directly addresses professional responsibility requirements.',
+    whyAerpolice: 'Law firm clients require attorney supervision documentation for AI-generated legal work. Aerpolice\'s agent identity and audit trail for every research output and workflow action directly addresses professional responsibility requirements.',
     triggerSignals: ['Customer base growing (Gunderson Dettmer, CMS Legal)', 'Launched AI Agents Suite', 'Law firm customers = bar compliance and malpractice requirements automatic'],
     decisionMaker: 'Paulina Grnarova, Co-Founder & CEO.',
-    outreachAngle: 'When a client disputes advice that referenced an AI research memo, you need a documented chain from agent to attorney review. Aergap is that chain — identity, policy, and audit trail for every legal AI action.',
+    outreachAngle: 'When a client disputes advice that referenced an AI research memo, you need a documented chain from agent to attorney review. Aerpolice is that chain — identity, policy, and audit trail for every legal AI action.',
   },
 
   {
@@ -645,10 +645,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Mortgage approval and denial decisions', 'Income and collateral verification', 'Rate and term determination', 'Loan file completeness determination'],
     govRisk: 'High',
     govReason: 'Mortgage underwriting AI at a major lender. CFPB, HMDA, and fair lending law require documented, explainable, and non-discriminatory underwriting decisions. Backed by Newrez (large incumbent) — longer sales cycle, likely building compliance in-house.',
-    whyAergap: 'Longer-cycle engagement. Newrez is a large incumbent with existing compliance infrastructure. Monitor for when internal AI governance builds reach their limits or when regulatory pressure from CFPB accelerates. OEM conversation more realistic.',
+    whyAerpolice: 'Longer-cycle engagement. Newrez is a large incumbent with existing compliance infrastructure. Monitor for when internal AI governance builds reach their limits or when regulatory pressure from CFPB accelerates. OEM conversation more realistic.',
     triggerSignals: ['Rolling out 2026', 'CFPB fair lending scrutiny on AI mortgages increasing', 'Watch for regulatory actions against AI mortgage underwriting'],
     decisionMaker: 'Backed by Newrez — check for independent product leadership.',
-    outreachAngle: 'CFPB fair lending examiners are increasingly focused on AI mortgage underwriting. Aergap\'s independent audit trail proves your decisioning engine is operating within approved policy parameters — before the examination.',
+    outreachAngle: 'CFPB fair lending examiners are increasingly focused on AI mortgage underwriting. Aerpolice\'s independent audit trail proves your decisioning engine is operating within approved policy parameters — before the examination.',
   },
 
   {
@@ -660,10 +660,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Automated loan origination decisions', 'BaaS partner lending policy enforcement', 'Regulatory reporting automation'],
     govRisk: 'Medium',
     govReason: 'Large regulated bank with mature compliance function — likely builds governance in-house. Deprioritize for design-partner motion.',
-    whyAergap: 'Monitor. Banks at this scale have internal compliance and legal infrastructure that Aergap would compete with, not complement. Focus on their BaaS fintech partners instead — those startups deploying AI on Cross River rails are better prospects.',
+    whyAerpolice: 'Monitor. Banks at this scale have internal compliance and legal infrastructure that Aerpolice would compete with, not complement. Focus on their BaaS fintech partners instead — those startups deploying AI on Cross River rails are better prospects.',
     triggerSignals: ['Established player — watch for AI product launches that exceed internal compliance capacity'],
     decisionMaker: 'N/A — bank, not startup. Deprioritize for design-partner motion.',
-    outreachAngle: 'Cross River\'s fintech partners deploying AI lending on their rails are better Aergap prospects — route outreach to their BaaS ecosystem.',
+    outreachAngle: 'Cross River\'s fintech partners deploying AI lending on their rails are better Aerpolice prospects — route outreach to their BaaS ecosystem.',
   },
 
   {
@@ -675,10 +675,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['No-code deployment of underwriting agents', 'Financial workflow automation with regulatory implications', 'Agent orchestration across financial systems'],
     govRisk: 'Medium-High',
     govReason: 'Infrastructure/platform play — governance applies to every agent built on Lyzr. No-code means non-technical users deploying production-impacting financial agents without developer review.',
-    whyAergap: 'Platform partner track: Aergap as the governance runtime for every agent built on Lyzr. No-code financial agent builder + Aergap governance layer = enterprise-grade platform for regulated industries.',
+    whyAerpolice: 'Platform partner track: Aerpolice as the governance runtime for every agent built on Lyzr. No-code financial agent builder + Aerpolice governance layer = enterprise-grade platform for regulated industries.',
     triggerSignals: ['Active enterprise sales motion', 'Financial services focus — regulated industries', 'No-code + financial agents = governance responsibility gap'],
     decisionMaker: 'Siddhartha Jain, Founder & CEO.',
-    outreachAngle: 'Every loan underwriting agent built on Lyzr needs governance documentation. Aergap embedded in your platform gives every financial services customer audit trail and policy enforcement out of the box — turning governance into your enterprise moat.',
+    outreachAngle: 'Every loan underwriting agent built on Lyzr needs governance documentation. Aerpolice embedded in your platform gives every financial services customer audit trail and policy enforcement out of the box — turning governance into your enterprise moat.',
   },
 
   // ── TIER 4: Monitor / Competitive Intel ─────────────────────────────────
@@ -691,9 +691,9 @@ export const WEB2_COMPANIES: Web2Company[] = [
     agentDoes: 'Platform discovers, manages, and governs non-human identities including AI agents, service accounts, and API keys across enterprise environments.',
     highStakeActions: ['NHI discovery and inventory', 'Machine identity policy enforcement', 'Agent credential management', 'Privileged access governance for non-human accounts'],
     govRisk: 'High',
-    govReason: 'Adjacent/competitive — they secure non-human identities which overlaps with Aergap\'s Agent Identity capability. Potential partner rather than prospect.',
-    whyAergap: 'COMPETITIVE INTEL: Oasis solves NHI governance at the identity layer. Aergap\'s agent identity + execution gate + audit trail is broader (includes policy enforcement and pre-action blocking). Monitor for partnership or differentiation opportunities.',
-    triggerSignals: ['Growing NHI governance market', 'Enterprise security teams asking about agent identity', 'Potential partnership if Aergap focuses on execution gate differentiation'],
+    govReason: 'Adjacent/competitive — they secure non-human identities which overlaps with Aerpolice\'s Agent Identity capability. Potential partner rather than prospect.',
+    whyAerpolice: 'COMPETITIVE INTEL: Oasis solves NHI governance at the identity layer. Aerpolice\'s agent identity + execution gate + audit trail is broader (includes policy enforcement and pre-action blocking). Monitor for partnership or differentiation opportunities.',
+    triggerSignals: ['Growing NHI governance market', 'Enterprise security teams asking about agent identity', 'Potential partnership if Aerpolice focuses on execution gate differentiation'],
     decisionMaker: 'N/A — competitor/adjacent. Do not pitch as customer.',
     outreachAngle: 'Competitive awareness only. Understand their positioning before enterprise deals where both appear in the evaluation.',
   },
@@ -702,12 +702,12 @@ export const WEB2_COMPANIES: Web2Company[] = [
     co: 'Alter (YC)', site: 'https://alter.security', tier: 4,
     cat: 'Security & IT Ops', industry: 'Identity – Agent Access Governance',
     stage: 'Startup', fitScore: 4, priority: 'Competitive Intel',
-    desc: 'YC-backed zero-trust identity and policy enforcement for AI agent tool calls. Direct competitor to Aergap\'s identity and policy capabilities.',
+    desc: 'YC-backed zero-trust identity and policy enforcement for AI agent tool calls. Direct competitor to Aerpolice\'s identity and policy capabilities.',
     agentDoes: 'Enforces zero-trust identity and policy on AI agent tool calls — preventing unauthorized tool access and logging agent actions.',
     highStakeActions: ['Agent tool call policy enforcement', 'Zero-trust identity for AI agents', 'Agent action logging'],
     govRisk: 'High',
-    govReason: 'DIRECT COMPETITOR — zero-trust identity + policy enforcement for agent tool calls is a direct overlap with Aergap\'s Agent Identity and Policy Enforcement capabilities.',
-    whyAergap: 'COMPETITIVE INTEL ONLY: Alter is a YC-backed direct competitor. Track their positioning, funding, and customer wins. Differentiate Aergap on: execution gate (pre-action blocking, not just policy), financial workflows focus, and audit trail depth.',
+    govReason: 'DIRECT COMPETITOR — zero-trust identity + policy enforcement for agent tool calls is a direct overlap with Aerpolice\'s Agent Identity and Policy Enforcement capabilities.',
+    whyAerpolice: 'COMPETITIVE INTEL ONLY: Alter is a YC-backed direct competitor. Track their positioning, funding, and customer wins. Differentiate Aerpolice on: execution gate (pre-action blocking, not just policy), financial workflows focus, and audit trail depth.',
     triggerSignals: ['YC batch — track their investor and customer network', 'Direct competitive overlap on identity and policy', 'Monitor for funding rounds and customer announcements'],
     decisionMaker: 'N/A — direct competitor. Do not pitch.',
     outreachAngle: 'Competitive tracking only. Know their pitch before enterprise evaluations.',
@@ -722,8 +722,8 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Enterprise identity governance at scale', 'Non-human identity management', 'Access certification and review for AI agents'],
     govRisk: 'High',
     govReason: 'Large incumbent with established enterprise relationships. Adding AI agent governance to existing IGA platform. More likely to compete than cooperate at enterprise accounts.',
-    whyAergap: 'COMPETITIVE INTEL: SailPoint is the incumbent Aergap will compete against in large enterprise IGA deals. Differentiate on: execution gate (SailPoint logs, Aergap blocks), financial workflow depth, and startup agility. Watch their agent identity product roadmap closely.',
-    triggerSignals: ['Large enterprise IGA relationships — will appear in same deals as Aergap', 'Expanding into NHI and agent identity security', 'Monitor product roadmap for execution-gate capability development'],
+    whyAerpolice: 'COMPETITIVE INTEL: SailPoint is the incumbent Aerpolice will compete against in large enterprise IGA deals. Differentiate on: execution gate (SailPoint logs, Aerpolice blocks), financial workflow depth, and startup agility. Watch their agent identity product roadmap closely.',
+    triggerSignals: ['Large enterprise IGA relationships — will appear in same deals as Aerpolice', 'Expanding into NHI and agent identity security', 'Monitor product roadmap for execution-gate capability development'],
     decisionMaker: 'N/A — incumbent competitor. Do not pitch.',
     outreachAngle: 'Enterprise competitive positioning only. Know their agent security pitch before large identity governance evaluations.',
   },
@@ -737,10 +737,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Automated defect detection reporting', 'Code quality gate decisions', 'Test coverage analysis'],
     govRisk: 'Medium',
     govReason: 'Execution risk is lower — read-heavy analysis rather than write/execute actions. Earlier stage, governance questions less immediate. Good for later-stage outreach when they move toward automated remediation or deployment gating.',
-    whyAergap: 'Monitor. If Holmes moves toward automated code remediation or deployment gating (agents writing code or blocking deployments), governance becomes critical. Reach out when that roadmap emerges.',
+    whyAerpolice: 'Monitor. If Holmes moves toward automated code remediation or deployment gating (agents writing code or blocking deployments), governance becomes critical. Reach out when that roadmap emerges.',
     triggerSignals: ['Pre-seed €1.1M', 'Watch for automated remediation or deployment-gate features', 'Later-stage outreach when execution authority increases'],
     decisionMaker: 'Founders via company site.',
-    outreachAngle: 'When your defect detection agents move to automated remediation — writing fixes or blocking deployments — Aergap is the governance gate that proves what the agent changed and why.',
+    outreachAngle: 'When your defect detection agents move to automated remediation — writing fixes or blocking deployments — Aerpolice is the governance gate that proves what the agent changed and why.',
   },
 
   {
@@ -752,10 +752,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Client intake with legal matter implications', 'Case document processing', 'Matter creation and assignment'],
     govRisk: 'Medium',
     govReason: 'Intake and admin operations have lower immediate financial risk than litigation or contract execution. But as scope expands toward client-facing advice or billing, governance requirements increase.',
-    whyAergap: 'Monitor. Law firm admin agents replacing staff will face bar association scrutiny on client intake and advice. Aergap becomes relevant as scope expands beyond pure admin into client-facing actions.',
+    whyAerpolice: 'Monitor. Law firm admin agents replacing staff will face bar association scrutiny on client intake and advice. Aerpolice becomes relevant as scope expands beyond pure admin into client-facing actions.',
     triggerSignals: ['YC-backed', 'Watch for scope expansion into client advice or billing', 'Bar association AI guidance evolving'],
     decisionMaker: 'Founders via YC directory.',
-    outreachAngle: 'As intake agents move toward client advice or billing, bar compliance requirements kick in. Aergap is the governance layer for when admin automation becomes professional services automation.',
+    outreachAngle: 'As intake agents move toward client advice or billing, bar compliance requirements kick in. Aerpolice is the governance layer for when admin automation becomes professional services automation.',
   },
 
   {
@@ -766,11 +766,11 @@ export const WEB2_COMPANIES: Web2Company[] = [
     agentDoes: 'Agents automate internal audit workflows — SOX controls testing, evidence collection, findings documentation, and audit program management.',
     highStakeActions: ['SOX controls testing with regulatory implications', 'Audit evidence collection across systems', 'Findings documentation and escalation', 'Remediation tracking and sign-off'],
     govRisk: 'Medium-High',
-    govReason: 'SOX audit automation with full audit trace already claimed. Interesting edge case — they need Aergap-style governance for their own audit agents, or they could be a partner/acqui-hire target. Full audit trace means they understand the value.',
-    whyAergap: 'Interesting positioning: Denki already has "full audit trace" as a stated feature — they understand the value of what Aergap offers. Two angles: (1) they could be a customer for Aergap governance on their own AI agents, or (2) they\'re a distribution partner for Aergap in SOX-regulated customers.',
-    triggerSignals: ['YC-backed, early stage', '"Full audit trace" as stated feature — governance-aware', 'SOX customer base = same compliance profile as Aergap ICP'],
+    govReason: 'SOX audit automation with full audit trace already claimed. Interesting edge case — they need Aerpolice-style governance for their own audit agents, or they could be a partner/acqui-hire target. Full audit trace means they understand the value.',
+    whyAerpolice: 'Interesting positioning: Denki already has "full audit trace" as a stated feature — they understand the value of what Aerpolice offers. Two angles: (1) they could be a customer for Aerpolice governance on their own AI agents, or (2) they\'re a distribution partner for Aerpolice in SOX-regulated customers.',
+    triggerSignals: ['YC-backed, early stage', '"Full audit trace" as stated feature — governance-aware', 'SOX customer base = same compliance profile as Aerpolice ICP'],
     decisionMaker: 'Founders via YC directory.',
-    outreachAngle: 'You\'re selling audit trace to SOX teams. Aergap sells pre-action policy enforcement + audit trace for AI agents doing the auditing. Your SOX customers are our ICP — let\'s talk about whether that\'s a partner conversation.',
+    outreachAngle: 'You\'re selling audit trace to SOX teams. Aerpolice sells pre-action policy enforcement + audit trace for AI agents doing the auditing. Your SOX customers are our ICP — let\'s talk about whether that\'s a partner conversation.',
   },
 
   {
@@ -781,11 +781,11 @@ export const WEB2_COMPANIES: Web2Company[] = [
     agentDoes: 'Provides insurance coverage for operational losses resulting from AI agent mistakes — complementary to governance infrastructure, not a replacement.',
     highStakeActions: ['Insurance policy binding for AI agent risk', 'Claims assessment for agent-caused losses'],
     govRisk: 'Medium',
-    govReason: 'Adjacent infrastructure — Klaimee is downstream of Aergap. Companies using Aergap\'s governance layer would have lower premiums on Klaimee policies (fewer governance incidents). Natural distribution partnership.',
-    whyAergap: 'Partnership track: Aergap reduces the governance risk that Klaimee insures. Customers with Aergap governance have better loss ratios — a co-marketing angle where Aergap is the risk mitigation layer and Klaimee is the residual risk transfer.',
+    govReason: 'Adjacent infrastructure — Klaimee is downstream of Aerpolice. Companies using Aerpolice\'s governance layer would have lower premiums on Klaimee policies (fewer governance incidents). Natural distribution partnership.',
+    whyAerpolice: 'Partnership track: Aerpolice reduces the governance risk that Klaimee insures. Customers with Aerpolice governance have better loss ratios — a co-marketing angle where Aerpolice is the risk mitigation layer and Klaimee is the residual risk transfer.',
     triggerSignals: ['YC-backed', 'Complementary product — lower premiums for governed agents', 'Partnership conversation more valuable than customer sale'],
     decisionMaker: 'Founders via YC directory.',
-    outreachAngle: 'Companies with Aergap governance have fewer agent incidents — better loss ratios for your policies. Let\'s talk about a co-marketing arrangement: Aergap as the risk mitigation layer, Klaimee as the residual risk transfer.',
+    outreachAngle: 'Companies with Aerpolice governance have fewer agent incidents — better loss ratios for your policies. Let\'s talk about a co-marketing arrangement: Aerpolice as the risk mitigation layer, Klaimee as the residual risk transfer.',
   },
 
   {
@@ -797,10 +797,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['AI agent risk assessment and underwriting', 'Claims processing for agent-caused losses'],
     govRisk: 'Medium',
     govReason: 'Downstream infrastructure — same positioning as Klaimee. Partnership track is more valuable than customer sale.',
-    whyAergap: 'Same logic as Klaimee — partnership track. Aergap governance reduces the residual risk Mount insures. Co-marketing: pass through Aergap-governed deployments as lower-risk policies.',
-    triggerSignals: ['YC-backed', 'Red-team focus + Aergap governance = lower underwriting risk', 'Partnership conversation'],
+    whyAerpolice: 'Same logic as Klaimee — partnership track. Aerpolice governance reduces the residual risk Mount insures. Co-marketing: pass through Aerpolice-governed deployments as lower-risk policies.',
+    triggerSignals: ['YC-backed', 'Red-team focus + Aerpolice governance = lower underwriting risk', 'Partnership conversation'],
     decisionMaker: 'Founders via YC directory.',
-    outreachAngle: 'Aergap-governed deployments have pre-action policy enforcement — lower residual risk for your underwriting. Let\'s talk about recognizing that in your underwriting model.',
+    outreachAngle: 'Aerpolice-governed deployments have pre-action policy enforcement — lower residual risk for your underwriting. Let\'s talk about recognizing that in your underwriting model.',
   },
 
   {
@@ -812,10 +812,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Autonomous policy binding with legal effect', 'Coverage negotiation on behalf of commercial client', 'Risk assessment driving binding coverage decisions', 'Premium payment initiation'],
     govRisk: 'High',
     govReason: 'Autonomous commercial insurance binding has direct legal and financial implications. State insurance regulation requires licensed broker oversight. An incorrect autonomous binding or coverage gap is a professional liability event.',
-    whyAergap: 'Autonomous insurance binding agents need identity (which agent bound this policy), policy enforcement (within what parameters can the agent bind), and audit trail (regulatory documentation for state DOI). High Aergap fit — just early stage.',
+    whyAerpolice: 'Autonomous insurance binding agents need identity (which agent bound this policy), policy enforcement (within what parameters can the agent bind), and audit trail (regulatory documentation for state DOI). High Aerpolice fit — just early stage.',
     triggerSignals: ['YC-backed', 'Autonomous binding = highest-stakes insurance action', 'State DOI compliance requirements automatic', 'Watch for enterprise commercial clients'],
     decisionMaker: 'Founders via YC directory.',
-    outreachAngle: 'When state regulators ask which agent bound this commercial policy and under what licensed broker authority, Aergap is your audit trail. Worth a conversation as you scale autonomous binding.',
+    outreachAngle: 'When state regulators ask which agent bound this commercial policy and under what licensed broker authority, Aerpolice is your audit trail. Worth a conversation as you scale autonomous binding.',
   },
 
   {
@@ -827,13 +827,13 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Autonomous insurance policy binding', 'Risk evaluation driving binding decisions', 'Coverage negotiation with carriers', 'Policy documentation and delivery'],
     govRisk: 'High',
     govReason: '9 policies already bound autonomously — the most concrete evidence of autonomous insurance execution in this batch. State DOI requires licensed broker oversight of binding decisions. Regulatory exposure is immediate and real.',
-    whyAergap: 'Kinro is the textbook Aergap insurance case: autonomous agents binding contracts with financial and legal effect. Agent identity + execution gate on binding authority + audit trail for DOI compliance = directly applicable product. Best early outreach candidate in the insurance tier-4 batch.',
+    whyAerpolice: 'Kinro is the textbook Aerpolice insurance case: autonomous agents binding contracts with financial and legal effect. Agent identity + execution gate on binding authority + audit trail for DOI compliance = directly applicable product. Best early outreach candidate in the insurance tier-4 batch.',
     triggerSignals: ['9 policies autonomously bound (public claim) — most advanced autonomous insurance agent in YC batch', 'State DOI compliance requirements automatic', 'YC-backed — fast decision cycle', 'Active YC network for intro'],
     decisionMaker: 'Founders via YC directory.',
-    outreachAngle: '9 autonomous policy bindings means you\'ve proven the product. The next 9,000 will require DOI audit documentation. Aergap is the identity and audit layer that proves each autonomous binding was within licensed broker parameters — before the state examiner asks.',
+    outreachAngle: '9 autonomous policy bindings means you\'ve proven the product. The next 9,000 will require DOI audit documentation. Aerpolice is the identity and audit layer that proves each autonomous binding was within licensed broker parameters — before the state examiner asks.',
   },
 
-  // ── AERGAP BD TARGET LIST (imported) ─────────────────────────────────────
+  // ── AERPOLICE BD TARGET LIST (imported) ─────────────────────────────────────
 
   {
     co: 'Nava', site: 'https://navalabs.ai', tier: 4,
@@ -843,11 +843,11 @@ export const WEB2_COMPANIES: Web2Company[] = [
     agentDoes: 'Sits between AI financial agents and payment rails: when an agent proposes a transaction, funds are held in escrow until a verification framework confirms the outcome matches the user\'s stated intent — pass and it executes, fail and funds stay locked. Decision rationale is posted on-chain.',
     highStakeActions: ['Escrow custody of agent transaction funds', 'Intent-verification gating before payment execution', 'On-chain logging of accept/reject decisions', 'Underwriting agent actions via native stablecoin'],
     govRisk: 'High',
-    govReason: 'Near-identical thesis to Aergap\'s Pact / Triple-Gate model — pre-action verification before money moves. Approach as partnership / competitive intel, not a straightforward customer.',
-    whyAergap: 'COMPETITIVE INTEL / COOPETITION: Nava builds the escrow-and-verify half of agent payment trust on an on-chain (L3 Arbitrum) stack. Overlaps Aergap\'s execution gate. Track positioning; differentiate Aergap on off-chain enterprise policy enforcement, identity, and audit depth across Web2 finance workflows.',
-    triggerSignals: ['$8.3M seed (Apr 2026) co-led by Polychain and Archetype', 'Founders ex-EigenLayer (CEO Vyas Krishnan, first EigenLayer employee)', 'On-chain escrow + verification = direct thesis overlap with Aergap', 'Native stablecoin planned to underwrite agent actions'],
+    govReason: 'Near-identical thesis to Aerpolice\'s Pact / Triple-Gate model — pre-action verification before money moves. Approach as partnership / competitive intel, not a straightforward customer.',
+    whyAerpolice: 'COMPETITIVE INTEL / COOPETITION: Nava builds the escrow-and-verify half of agent payment trust on an on-chain (L3 Arbitrum) stack. Overlaps Aerpolice\'s execution gate. Track positioning; differentiate Aerpolice on off-chain enterprise policy enforcement, identity, and audit depth across Web2 finance workflows.',
+    triggerSignals: ['$8.3M seed (Apr 2026) co-led by Polychain and Archetype', 'Founders ex-EigenLayer (CEO Vyas Krishnan, first EigenLayer employee)', 'On-chain escrow + verification = direct thesis overlap with Aerpolice', 'Native stablecoin planned to underwrite agent actions'],
     decisionMaker: 'Vyas Krishnan, Co-Founder & CEO (ex-EigenLayer Product Lead); co-founder Brianna Montgomery. Consider partnership / coopetition framing rather than a pure sales pitch.',
-    outreachAngle: 'You\'re building the trust layer for agent payments on-chain; Aergap builds it for enterprise Web2 finance workflows. Worth comparing notes on where the lines are before we both show up in the same evaluations — partner or coopetition, not pitch.',
+    outreachAngle: 'You\'re building the trust layer for agent payments on-chain; Aerpolice builds it for enterprise Web2 finance workflows. Worth comparing notes on where the lines are before we both show up in the same evaluations — partner or coopetition, not pitch.',
   },
 
   {
@@ -858,11 +858,11 @@ export const WEB2_COMPANIES: Web2Company[] = [
     agentDoes: 'Sits between AI agents and payment rails (bank transfers, cards, stablecoins, Ralio Wallet), enforcing spend limits and rules, verifying identity, and writing full audit trails so money only moves when it should.',
     highStakeActions: ['Spend-limit and rule enforcement on agent payments', 'Identity verification for paying agents', 'Audit-trail capture across payment rails', 'Wallet custody and payment execution'],
     govRisk: 'High',
-    govReason: 'Pitch is almost word-for-word Aergap\'s own positioning applied to a narrower payments wedge — guardrails + identity + audit for agent money movement. Coopetition rather than a clean customer.',
-    whyAergap: 'COMPETITIVE INTEL / COOPETITION: Ralio is the closest agentic-payments analogue to Aergap in Europe. Fast-moving, lean team with urgent felt need. Track their guardrails/identity/audit positioning closely; differentiate Aergap on broader execution-gate scope beyond payments (any high-stakes agent action) and verticalized governance.',
-    triggerSignals: ['$2.5M pre-seed, 3x oversubscribed — largest agentic-payments pre-seed in Europe to date', 'Led by Sure Valley Ventures (Seed X, Love Ventures, Plug and Play, Antler)', 'Guardrails + identity + audit = near-identical positioning to Aergap', 'Founders ex-Alan / ex-Form3 — strong payments pedigree'],
+    govReason: 'Pitch is almost word-for-word Aerpolice\'s own positioning applied to a narrower payments wedge — guardrails + identity + audit for agent money movement. Coopetition rather than a clean customer.',
+    whyAerpolice: 'COMPETITIVE INTEL / COOPETITION: Ralio is the closest agentic-payments analogue to Aerpolice in Europe. Fast-moving, lean team with urgent felt need. Track their guardrails/identity/audit positioning closely; differentiate Aerpolice on broader execution-gate scope beyond payments (any high-stakes agent action) and verticalized governance.',
+    triggerSignals: ['$2.5M pre-seed, 3x oversubscribed — largest agentic-payments pre-seed in Europe to date', 'Led by Sure Valley Ventures (Seed X, Love Ventures, Plug and Play, Antler)', 'Guardrails + identity + audit = near-identical positioning to Aerpolice', 'Founders ex-Alan / ex-Form3 — strong payments pedigree'],
     decisionMaker: 'Ghali Bennani Laafiret & Leonardo Rosales, Co-Founders (London, UK). Good first-touch candidate, but frame as coopetition/intel given thesis overlap.',
-    outreachAngle: 'We\'re solving the same trust problem from different ends — you at the payment rail, Aergap across the full agent-action surface. Before the market frames us as competitors, worth a candid conversation about where collaboration beats collision.',
+    outreachAngle: 'We\'re solving the same trust problem from different ends — you at the payment rail, Aerpolice across the full agent-action surface. Before the market frames us as competitors, worth a candid conversation about where collaboration beats collision.',
   },
 
   {
@@ -874,10 +874,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Autonomous agent-initiated B2B payments', 'Authorization and approval-chain enforcement', 'Settlement across multiple verticals', 'Agent identity issuance for payment actions'],
     govRisk: 'High',
     govReason: 'Money moves autonomously across multiple high-stakes verticals (healthcare, construction, logistics). Approval chains exist but pre-action policy enforcement and independent audit are the open governance question as design partners scale.',
-    whyAergap: 'Natural is building the payment rail; Aergap is the policy + execution-gate + audit layer on top. Small lean team (5–10) already running a design-partner-led GTM motion — founders will recognize and respect the same approach. Strong co-sell / embed candidate where Aergap governs what each agent is allowed to pay, for how much, under what policy.',
+    whyAerpolice: 'Natural is building the payment rail; Aerpolice is the policy + execution-gate + audit layer on top. Small lean team (5–10) already running a design-partner-led GTM motion — founders will recognize and respect the same approach. Strong co-sell / embed candidate where Aerpolice governs what each agent is allowed to pay, for how much, under what policy.',
     triggerSignals: ['$9.8M seed co-led by Abstract and Human Capital (Forerunner, Terrain, Restive)', 'Already recruiting design partners across logistics, property, procurement, healthcare, construction', 'Lean team — fast decision cycle', 'Identity + authorization already core to the product (governance-aware)'],
     decisionMaker: 'Kahlil Lalji, Co-Founder & CEO (with Eric Wang, Walt Leung). Explicitly recruiting design partners across verticals — a warm door for a governance partnership.',
-    outreachAngle: 'You\'re recruiting design partners to build the financial backbone for agents — Aergap is the policy and execution-gate layer that lets those agents pay autonomously without your enterprise customers losing sleep. Same design-partner playbook; worth 20 minutes?',
+    outreachAngle: 'You\'re recruiting design partners to build the financial backbone for agents — Aerpolice is the policy and execution-gate layer that lets those agents pay autonomously without your enterprise customers losing sleep. Same design-partner playbook; worth 20 minutes?',
   },
 
   {
@@ -889,10 +889,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Agent-initiated payments from business accounts', 'Card issuance on demand', 'Invoice generation with financial effect', 'Treasury and account-setting changes'],
     govRisk: 'High',
     govReason: 'A live AI agent moving money and issuing cards across real business accounts. Slash routes money-moving actions through existing approval workflows, but pre-action policy enforcement and independent audit of agent decisions remain the enterprise governance gap as it scales upmarket.',
-    whyAergap: 'Funded, live product with a real payment surface needing containment. Aergap\'s execution gate and audit trail map directly onto Twin\'s money-moving actions — the layer enterprise buyers will ask for before letting an agent issue cards or send payments. Verify exact funding/product details before outreach.',
+    whyAerpolice: 'Funded, live product with a real payment surface needing containment. Aerpolice\'s execution gate and audit trail map directly onto Twin\'s money-moving actions — the layer enterprise buyers will ask for before letting an agent issue cards or send payments. Verify exact funding/product details before outreach.',
     triggerSignals: ['$100M Series C — reached unicorn status (Apr 2026)', 'Twin agent live, executing payments / invoices / card issuance', 'Money-moving actions already gated by approval workflows (governance-aware)', 'Scaling business-banking footprint'],
     decisionMaker: 'Founders via company site — verify product/funding details directly before outreach.',
-    outreachAngle: 'Twin moves money and issues cards on a customer\'s say-so. As you move upmarket, security teams will ask what policy gates each agent action before it executes. Aergap is that pre-action gate and the immutable record behind it.',
+    outreachAngle: 'Twin moves money and issues cards on a customer\'s say-so. As you move upmarket, security teams will ask what policy gates each agent action before it executes. Aerpolice is that pre-action gate and the immutable record behind it.',
   },
 
   {
@@ -903,11 +903,11 @@ export const WEB2_COMPANIES: Web2Company[] = [
     agentDoes: 'Agents read every invoice, validate charges against published rates, flag billing errors, run 3-way match, and close the fiscal cycle — automating AP and procurement so finance teams govern rather than do the work.',
     highStakeActions: ['Invoice-to-payment processing without manual steps', 'Tariff / rate validation and billing-error flagging', '3-way match and ERP write-back', 'Procurement workflow execution'],
     govRisk: 'High',
-    govReason: 'Exactly the "agent moves money, needs policy and audit" surface Aergap targets. AP automation into live ERPs with autonomous matching and payment is a textbook control surface for SOX-style scrutiny.',
-    whyAergap: 'CFO-office buyer is a strong Aergap ICP. Cedalio automates the procurement-to-payment cycle that most needs pre-action policy enforcement and an independent audit trail. YC-backed and early — a clean design-partner conversation where Aergap gates which invoices/payments the agent can clear autonomously.',
-    triggerSignals: ['YC-backed', 'Live with enterprise customers (Ambev, Galicia, Falabella) cutting AP time ~80%', 'CFO-office ICP — direct fit for Aergap policy + audit', 'Invoice-to-3-way-match-to-payment = high-stakes money movement'],
+    govReason: 'Exactly the "agent moves money, needs policy and audit" surface Aerpolice targets. AP automation into live ERPs with autonomous matching and payment is a textbook control surface for SOX-style scrutiny.',
+    whyAerpolice: 'CFO-office buyer is a strong Aerpolice ICP. Cedalio automates the procurement-to-payment cycle that most needs pre-action policy enforcement and an independent audit trail. YC-backed and early — a clean design-partner conversation where Aerpolice gates which invoices/payments the agent can clear autonomously.',
+    triggerSignals: ['YC-backed', 'Live with enterprise customers (Ambev, Galicia, Falabella) cutting AP time ~80%', 'CFO-office ICP — direct fit for Aerpolice policy + audit', 'Invoice-to-3-way-match-to-payment = high-stakes money movement'],
     decisionMaker: 'Founders via YC directory / company site. Early stage — founder is the right contact for a design-partner conversation.',
-    outreachAngle: 'You\'re moving finance teams from doing AP to governing it — Aergap is the governance layer that makes that real: pre-action policy on which invoices and payments your agents clear autonomously, plus an audit trail your customers\' controllers can show an auditor.',
+    outreachAngle: 'You\'re moving finance teams from doing AP to governing it — Aerpolice is the governance layer that makes that real: pre-action policy on which invoices and payments your agents clear autonomously, plus an audit trail your customers\' controllers can show an auditor.',
   },
 
   {
@@ -919,10 +919,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Automated financial spreading and cash-flow modeling', 'Credit-memo generation feeding underwriting decisions', 'Document intake and validation', 'Portfolio-monitoring outputs'],
     govRisk: 'Medium-High',
     govReason: 'Not agent-payments exactly, but adjacent: AI decisions feeding commercial credit underwriting at regulated banks and fintechs, where audit-ready and explainable decisioning matters. Human-in-the-loop today lowers immediate risk.',
-    whyAergap: 'Adjacent / expansion conversation. Accend already serves real fintech customers (Brex, Rippling, Rho, Column, Settle) who care about audit-ready AI decisions — a strong reference-customer footprint. Aergap fits as the independent audit and policy layer if/when underwriting moves toward more autonomous decisioning.',
+    whyAerpolice: 'Adjacent / expansion conversation. Accend already serves real fintech customers (Brex, Rippling, Rho, Column, Settle) who care about audit-ready AI decisions — a strong reference-customer footprint. Aerpolice fits as the independent audit and policy layer if/when underwriting moves toward more autonomous decisioning.',
     triggerSignals: ['$3.2M seed (Y Combinator, Adverb Ventures, General Catalyst, 645 Ventures)', 'Serves Brex, Rippling, Rho, Column, Settle — strong fintech reference base', '"Audit-ready AI" positioning — governance-aware', 'Founders ex-Brex Risk / Deutsche Bank / Credit Suisse'],
     decisionMaker: 'Founders via YC directory / withaccend.com (HQ New York). Approach as an adjacent / expansion conversation.',
-    outreachAngle: 'Your "audit-ready AI" pitch is exactly the muscle Aergap strengthens. As your underwriting agents take on more decisioning, Aergap is the independent policy + audit layer your bank and fintech customers\' examiners will ask for.',
+    outreachAngle: 'Your "audit-ready AI" pitch is exactly the muscle Aerpolice strengthens. As your underwriting agents take on more decisioning, Aerpolice is the independent policy + audit layer your bank and fintech customers\' examiners will ask for.',
   },
 
   {
@@ -933,11 +933,11 @@ export const WEB2_COMPANIES: Web2Company[] = [
     agentDoes: 'Agent-native security platform that automatically discovers agents running inside an enterprise, continuously analyzes their capabilities and behavior, and enforces a unified risk-assessment and policy-control framework for agent visibility, behavioral monitoring, permission management, and risk governance.',
     highStakeActions: ['Enterprise-wide agent discovery and inventory', 'Behavioral monitoring and posture assessment', 'Permission management and risk control for agents', 'Policy enforcement across the agentic footprint'],
     govRisk: 'Medium',
-    govReason: 'Closest direct category neighbor — an agent-governance platform overlapping Aergap\'s core. Well-funded and well-positioned; a partnership/integration conversation makes more sense than a straightforward sale.',
-    whyAergap: 'COMPETITIVE INTEL / PARTNERSHIP: Geordie governs agent visibility, behavior, and permissions at enterprise scale. Overlaps Aergap on policy control but appears observation/posture-led rather than pre-action execution-gate-led. Explore partnership angle first; differentiate Aergap on pre-action blocking and financial-workflow depth. Watch their roadmap closely.',
-    triggerSignals: ['$30M Series A led by Balderton (total ~$36.5M); RSAC 2026 Innovation Sandbox winner', '1,300% ARR growth in first five months of 2026', 'Direct category overlap with Aergap agent governance', 'Enterprise discovery + behavioral monitoring = adjacent, not identical, to execution gate'],
+    govReason: 'Closest direct category neighbor — an agent-governance platform overlapping Aerpolice\'s core. Well-funded and well-positioned; a partnership/integration conversation makes more sense than a straightforward sale.',
+    whyAerpolice: 'COMPETITIVE INTEL / PARTNERSHIP: Geordie governs agent visibility, behavior, and permissions at enterprise scale. Overlaps Aerpolice on policy control but appears observation/posture-led rather than pre-action execution-gate-led. Explore partnership angle first; differentiate Aerpolice on pre-action blocking and financial-workflow depth. Watch their roadmap closely.',
+    triggerSignals: ['$30M Series A led by Balderton (total ~$36.5M); RSAC 2026 Innovation Sandbox winner', '1,300% ARR growth in first five months of 2026', 'Direct category overlap with Aerpolice agent governance', 'Enterprise discovery + behavioral monitoring = adjacent, not identical, to execution gate'],
     decisionMaker: 'N/A for a sales pitch — closest direct category neighbor. Explore partnership / integration first.',
-    outreachAngle: 'Competitive and partnership awareness. Geordie governs the agent footprint at the posture layer; Aergap gates the action before it happens. Understand their positioning before enterprise deals where both appear — and scope where integration beats overlap.',
+    outreachAngle: 'Competitive and partnership awareness. Geordie governs the agent footprint at the posture layer; Aerpolice gates the action before it happens. Understand their positioning before enterprise deals where both appear — and scope where integration beats overlap.',
   },
 
   {
@@ -949,10 +949,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Autonomous PO issuance against budgets', 'Vendor onboarding and contract routing', 'Invoice processing and payment workflows', 'Committed-spend tracking across the procurement lifecycle'],
     govRisk: 'High',
     govReason: 'Procurement agents handling vendor onboarding, PO issuance, and payments are a direct wedge match — a rogue PO, unauthorized vendor, or unchecked spend commitment is a procurement-fraud and control risk at enterprise scale ($3B invoices/year).',
-    whyAergap: 'Procurement is Aergap\'s named Tier-1 vertical and Pivot is funded enough to have real budget while still reachable at founder level. Aergap\'s execution gate on spend-committing agent actions plus an immutable audit trail is exactly what enterprise customers (DoorDash, Lemonade, Flix) will demand before letting agents commit spend.',
+    whyAerpolice: 'Procurement is Aerpolice\'s named Tier-1 vertical and Pivot is funded enough to have real budget while still reachable at founder level. Aerpolice\'s execution gate on spend-committing agent actions plus an immutable audit trail is exactly what enterprise customers (DoorDash, Lemonade, Flix) will demand before letting agents commit spend.',
     triggerSignals: ['$40M Series B (Forestay, Notion Capital); ~$70M total raised', 'Enterprise customers DoorDash, Lemonade, Flix across 25+ countries', 'Agentic workflows autonomously issue POs — direct spend-commit governance need', 'Deepening ERP / financial-system integrations'],
     decisionMaker: 'Founders via pivotapp.ai (Paris, France) — funded enough to have real budget, still reachable at founder level.',
-    outreachAngle: 'When your agents autonomously issue a PO or onboard a vendor, enterprise procurement teams need to prove the action was within policy. Aergap is the pre-action gate and audit trail that turns agentic spend from a security-review blocker into a closer.',
+    outreachAngle: 'When your agents autonomously issue a PO or onboard a vendor, enterprise procurement teams need to prove the action was within policy. Aerpolice is the pre-action gate and audit trail that turns agentic spend from a security-review blocker into a closer.',
   },
 
   {
@@ -963,11 +963,11 @@ export const WEB2_COMPANIES: Web2Company[] = [
     agentDoes: 'AMRs autonomously move material across factory and warehouse floors, coordinated by fleet-management software with real-time monitoring, analytics, and robot-management dashboards.',
     highStakeActions: ['Autonomous material movement in live facilities', 'Fleet-level task allocation and routing', 'Robot operation near humans and equipment', 'Fleet-wide stop / containment control'],
     govRisk: 'Medium',
-    govReason: 'Physical autonomy on factory and warehouse floors — a malfunctioning or misrouted robot creates operational and safety risk. Fleet-level kill switch and containment map to Aergap\'s Containment pillar, but the fintech-side proof point comes first.',
-    whyAergap: 'Actively expanding to US/Europe; fleet-level kill switch and containment fit Aergap\'s Containment pillar directly. Approach once one fintech-side case study exists — the containment story for physical agents needs a proof point before it lands.',
-    triggerSignals: ['$5.4M Series A led by IAN Alpha Fund (Info Edge)', 'Expanding globally (Bengaluru HQ + Texas sales/support office)', 'Fleet management + containment = direct fit for Aergap Containment pillar', 'Manufacturing scale of 1,000+ robots/year'],
+    govReason: 'Physical autonomy on factory and warehouse floors — a malfunctioning or misrouted robot creates operational and safety risk. Fleet-level kill switch and containment map to Aerpolice\'s Containment pillar, but the fintech-side proof point comes first.',
+    whyAerpolice: 'Actively expanding to US/Europe; fleet-level kill switch and containment fit Aerpolice\'s Containment pillar directly. Approach once one fintech-side case study exists — the containment story for physical agents needs a proof point before it lands.',
+    triggerSignals: ['$5.4M Series A led by IAN Alpha Fund (Info Edge)', 'Expanding globally (Bengaluru HQ + Texas sales/support office)', 'Fleet management + containment = direct fit for Aerpolice Containment pillar', 'Manufacturing scale of 1,000+ robots/year'],
     decisionMaker: 'Ribin Mathew, Ebin Sunny, Brijesh CA, Raj Mohan — Co-Founders (Bengaluru, India). Approach once a fintech-side case study exists.',
-    outreachAngle: 'A fleet-level kill switch is table stakes; proving every autonomous action stayed within policy is the next ask. When you\'re ready, Aergap is the containment + audit layer for physical agent fleets — best after a first reference proof point exists.',
+    outreachAngle: 'A fleet-level kill switch is table stakes; proving every autonomous action stayed within policy is the next ask. When you\'re ready, Aerpolice is the containment + audit layer for physical agent fleets — best after a first reference proof point exists.',
   },
 
   {
@@ -979,10 +979,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Autonomous ground operations in dangerous environments', 'Operator-intent-to-action translation', 'Multi-robot coordination and execution', 'Payload-equipped task execution under human oversight'],
     govRisk: 'Medium-High',
     govReason: 'Physical autonomy in defense and industrial settings where mistakes have safety and mission consequences. Early enough to want safety/containment designed in before scale; supervised-autonomy posture is a governance-aware starting point.',
-    whyAergap: 'MVP-to-early product stage — good timing for a containment-by-design conversation before scale locks in architecture. Aergap\'s containment and audit layer maps to "what is each robot authorized to do, under whose supervision, on record" for supervised multi-robot operations.',
+    whyAerpolice: 'MVP-to-early product stage — good timing for a containment-by-design conversation before scale locks in architecture. Aerpolice\'s containment and audit layer maps to "what is each robot authorized to do, under whose supervision, on record" for supervised multi-robot operations.',
     triggerSignals: ['$10.2M seed led by Ace Capital Partners (~$15M total)', 'Debuting product ecosystem at Eurosatory 2026', 'Supervised-autonomy + human-oversight posture = governance-aware', 'Expanding across US, Middle East, Europe'],
     decisionMaker: 'Founders via shiftersai.com (Washington, DC; R&D near Tel Aviv, Israel). Early stage — good timing for containment-by-design.',
-    outreachAngle: 'You\'ve built supervised autonomy in from the start — Aergap is the layer that records and enforces it: which robot was authorized to do what, under whose supervision, provable after the fact. Easiest to design in now, before scale.',
+    outreachAngle: 'You\'ve built supervised autonomy in from the start — Aerpolice is the layer that records and enforces it: which robot was authorized to do what, under whose supervision, provable after the fact. Easiest to design in now, before scale.',
   },
 
   {
@@ -994,10 +994,10 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Natural-language-to-robot-action execution', 'Skill learning and deployment to production robots', 'Cross-hardware perception/planning/control orchestration', 'Real-world physical task execution'],
     govRisk: 'Medium-High',
     govReason: 'Early-stage, real-world physical action surface with no visible governance layer yet. Translating language to robot action in industrial settings carries safety and operational risk as deployments scale.',
-    whyAergap: 'Very early stage — good for future pipeline; may be too early for a paid pilot now. Aergap becomes relevant as Mbodi\'s deployments scale (especially via the ABB partnership) and customers ask what each robot is authorized to do and how it\'s recorded. Monitor for production-deployment and enterprise-customer signals.',
+    whyAerpolice: 'Very early stage — good for future pipeline; may be too early for a paid pilot now. Aerpolice becomes relevant as Mbodi\'s deployments scale (especially via the ABB partnership) and customers ask what each robot is authorized to do and how it\'s recorded. Monitor for production-deployment and enterprise-customer signals.',
     triggerSignals: ['YC X25 batch', 'Commercialization partnership with ABB (leading robot manufacturer)', 'Language-to-action in industrial settings = physical risk surface', 'No visible governance layer yet'],
     decisionMaker: 'Sebastian Peralta & Xavier Chi, Co-Founders (ex-Google). Very early — future pipeline, monitor for scale signals.',
-    outreachAngle: 'As you roll out with ABB, customers will ask what each robot is allowed to do and how that\'s proven. Aergap is the policy + audit layer for embodied agents — worth keeping on your radar as deployments move into production.',
+    outreachAngle: 'As you roll out with ABB, customers will ask what each robot is allowed to do and how that\'s proven. Aerpolice is the policy + audit layer for embodied agents — worth keeping on your radar as deployments move into production.',
   },
 
   {
@@ -1009,9 +1009,9 @@ export const WEB2_COMPANIES: Web2Company[] = [
     highStakeActions: ['Physical intervention on live data-center hardware', 'Reboots and hardware swaps on production infrastructure', 'Autonomous navigation in critical facilities', 'Continuous security monitoring'],
     govRisk: 'Medium-High',
     govReason: 'Early-stage with real-world physical risk and no visible governance layer yet. A wrong reboot, cable action, or hardware swap on live data-center infrastructure can cause outages or data loss.',
-    whyAergap: 'Good for future pipeline once the core fintech wedge is proven. Aergap\'s containment and audit layer maps to "which robot performed which physical intervention on which rack, under what authorization" — relevant as Boost\'s deployments scale into production data centers.',
+    whyAerpolice: 'Good for future pipeline once the core fintech wedge is proven. Aerpolice\'s containment and audit layer maps to "which robot performed which physical intervention on which rack, under what authorization" — relevant as Boost\'s deployments scale into production data centers.',
     triggerSignals: ['YC X25 batch (San Francisco, founded 2025)', 'Physical intervention on live data-center infrastructure = high blast radius', 'No visible governance layer yet', 'Watch for enterprise / hyperscaler data-center deployments'],
     decisionMaker: 'Founders via boostrobotics.ai (founders@boostrobotics.ai). Future pipeline — revisit once the core fintech wedge is proven.',
-    outreachAngle: 'A robot rebooting the wrong rack is an outage. As Boost scales into production data centers, Aergap is the containment and audit layer that proves which robot was authorized to touch which hardware — worth a conversation when enterprise deployments ramp.',
+    outreachAngle: 'A robot rebooting the wrong rack is an outage. As Boost scales into production data centers, Aerpolice is the containment and audit layer that proves which robot was authorized to touch which hardware — worth a conversation when enterprise deployments ramp.',
   },
 ]
