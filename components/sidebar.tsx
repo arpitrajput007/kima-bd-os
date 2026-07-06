@@ -167,7 +167,7 @@ export function Sidebar() {
         <div className="px-4 py-2.5 flex items-center gap-2 flex-shrink-0"
           style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(52,211,153,0.04)' }}>
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 status-pulse flex-shrink-0" />
-          <span className="text-[11px] font-semibold" style={{ color: 'rgb(52,211,153)' }}>Agent Active · Discovering 24/7</span>
+          <span className="text-[11px] font-semibold" style={{ color: 'rgb(52,211,153)' }}>Agent Active · Manual discovery</span>
         </div>
       )}
 
@@ -270,7 +270,7 @@ export function Sidebar() {
             <div className="px-3 py-2.5 rounded-lg flex items-center gap-2"
               style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
               <Activity size={11} style={{ color: 'rgb(167,139,250)' }} />
-              <span className="text-[11px]" style={{ color: 'rgb(130,130,160)' }}>Running daily discovery cron</span>
+              <span className="text-[11px]" style={{ color: 'rgb(130,130,160)' }}>Discovery runs on manual click only</span>
             </div>
           </div>
         )}
