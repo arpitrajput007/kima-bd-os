@@ -150,6 +150,6 @@ Return this exact JSON structure:
     model: CLAUDE_RESEARCH,
     system,
     user,
-    maxTokens: 2500,
+    maxTokens: 4000,
   }) as Promise<BDBrief>
 }
