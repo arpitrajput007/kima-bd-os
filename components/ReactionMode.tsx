@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 import {
   RefreshCw, Loader2, Sparkles, Copy, CheckCheck,
   ArrowLeft, Bookmark, BookmarkCheck, Trash2, CheckCircle2,
   Clock, ChevronDown, ChevronUp, Zap, Rss, Hash, MessageSquare,
-  Lightbulb, Filter, CheckSquare, Square, X,
+  Lightbulb, Filter, CheckSquare, Square, X, BookOpen, ExternalLink,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -168,16 +169,43 @@ function CollapsibleSection({ title, icon, children, accent = '#a78bfa' }: {
 }
 
 // ── News item card ─────────────────────────────────────────────────────────────
-function NewsCard({ item, onReact, onDelete, selectMode, selected, onToggleSelect }: {
+function NewsCard({ item, onReact, onDelete, onOpenDetail, selectMode, selected, onToggleSelect }: {
   item: ReactionNewsItem
   onReact: (item: ReactionNewsItem) => void
   onDelete: (id: string) => void
+  onOpenDetail: (item: ReactionNewsItem) => void
   selectMode: boolean
   selected: boolean
   onToggleSelect: (id: string) => void
 }) {
   const c = topicColor(item.topic)
   const sourceName = item.source && item.source !== 'exa' ? item.source : item.topic
+  const [showExplain, setShowExplain] = useState(false)
+  const [explaining, setExplaining]   = useState(false)
+  const [explanation, setExplanation] = useState<string | null>(null)
+
+  const toggleExplain = async () => {
+    if (showExplain) { setShowExplain(false); return }
+    setShowExplain(true)
+    if (explanation || explaining) return
+    setExplaining(true)
+    try {
+      const res = await fetch('/api/reaction/explain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: item.title, summary: item.summary, topic: item.topic }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      setExplanation(json.explanation)
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Explanation failed')
+      setShowExplain(false)
+    } finally {
+      setExplaining(false)
+    }
+  }
+
   return (
     <div
       onClick={selectMode ? () => onToggleSelect(item.id) : undefined}
@@ -240,7 +268,101 @@ function NewsCard({ item, onReact, onDelete, selectMode, selected, onToggleSelec
           </div>
         )}
       </div>
+      {!selectMode && (
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => onOpenDetail(item)}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, fontSize: 10.5, fontWeight: 700, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)', cursor: 'pointer' }}
+          >
+            <BookOpen size={11} /> Read in detail
+          </button>
+          <button
+            onClick={toggleExplain}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, fontSize: 10.5, fontWeight: 700, background: showExplain ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.02)', border: showExplain ? '1px solid rgba(251,191,36,0.25)' : '1px solid rgba(255,255,255,0.06)', color: showExplain ? '#fbbf24' : 'rgba(255,255,255,0.4)', cursor: 'pointer' }}
+          >
+            {explaining ? <Loader2 size={11} className="animate-spin" /> : <Lightbulb size={11} />}
+            Explain simply
+          </button>
+        </div>
+      )}
+      {showExplain && (
+        <div style={{ borderRadius: 8, background: 'rgba(251,191,36,0.05)', border: '1px solid rgba(251,191,36,0.15)', padding: '10px 12px', fontSize: 11.5, color: 'rgb(210,200,170)', lineHeight: 1.65 }}>
+          {explaining ? 'Explaining in plain language…' : explanation}
+        </div>
+      )}
     </div>
+  )
+}
+
+// ── News detail modal ──────────────────────────────────────────────────────────
+function NewsDetailModal({ item, onClose, onReact }: {
+  item: ReactionNewsItem
+  onClose: () => void
+  onReact: (item: ReactionNewsItem) => void
+}) {
+  const c = topicColor(item.topic)
+  const sourceName = item.source && item.source !== 'exa' ? item.source : item.topic
+  return createPortal(
+    <div
+      onClick={onClose}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ width: '100%', maxWidth: 640, maxHeight: '85vh', overflowY: 'auto', borderRadius: 16, background: 'rgb(14,15,26)', border: `1px solid ${c.border}`, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <TopicBadge topic={item.topic} />
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', gap: 3 }}>
+              <Rss size={9} /> {sourceName}
+            </span>
+            {item.published_at && (
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                <Clock size={9} /> {timeAgo(item.published_at)}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
+          >
+            <X size={13} />
+          </button>
+        </div>
+
+        <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: 'rgb(232,236,255)', lineHeight: 1.5 }}>
+            {item.title}
+          </div>
+          {item.summary && (
+            <div style={{ fontSize: 13, color: 'rgb(180,187,215)', lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>
+              {item.summary}
+            </div>
+          )}
+          {item.url && (
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#60a5fa', textDecoration: 'none' }}
+            >
+              <ExternalLink size={12} /> Open original article
+            </a>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, padding: '14px 18px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <button
+            onClick={() => { onReact(item); onClose() }}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 14px', borderRadius: 9, fontSize: 12, fontWeight: 700, background: `${c.color}18`, border: `1px solid ${c.border}`, color: c.color, cursor: 'pointer' }}
+          >
+            <Sparkles size={13} /> React to this
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   )
 }
 
@@ -629,6 +751,7 @@ export default function ReactionMode() {
   const [refreshing, setRefreshing]   = useState(false)
   const [topicFilter, setTopicFilter] = useState('All')
   const [selectedItem, setSelectedItem] = useState<ReactionNewsItem | null>(null)
+  const [detailItem, setDetailItem]   = useState<ReactionNewsItem | null>(null)
   const [drafts, setDrafts]           = useState<ReactionDraft[]>([])
   const [draftsLoading, setDraftsLoading] = useState(false)
   const [filterStatus, setFilterStatus] = useState<'all' | 'saved' | 'posted'>('all')
@@ -894,6 +1017,7 @@ export default function ReactionMode() {
                         item={item}
                         onReact={handleReact}
                         onDelete={id => deleteNewsItems([id])}
+                        onOpenDetail={setDetailItem}
                         selectMode={selectMode}
                         selected={selectedIds.has(item.id)}
                         onToggleSelect={toggleSelect}
@@ -997,6 +1121,14 @@ export default function ReactionMode() {
             </div>
           )}
         </div>
+      )}
+
+      {detailItem && (
+        <NewsDetailModal
+          item={detailItem}
+          onClose={() => setDetailItem(null)}
+          onReact={handleReact}
+        />
       )}
     </div>
   )
