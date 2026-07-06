@@ -425,6 +425,29 @@ export async function POST(req: NextRequest) {
       })
     })
 
+    // 2b. Cheap early exit: if this source's own target category is already at
+    // cap, every company we'd find is going to get thrown away at the cap check
+    // anyway (see step 6) — but only AFTER paying for Perplexity/Exa-news/Hunter/
+    // Claude research on each one. Bail before any of that spend happens.
+    // Don't touch last_run_at — this source didn't actually run, so it should be
+    // retried as soon as the category drains, not wait out its full cadence.
+    if (
+      source.target_customer_category &&
+      CUSTOMER_CATEGORIES.includes(source.target_customer_category) &&
+      (categoryCounts[source.target_customer_category] || 0) >= CATEGORY_CAP
+    ) {
+      return NextResponse.json({
+        found: 0,
+        saved: 0,
+        skipped_duplicate: 0,
+        skipped_generic: 0,
+        skipped_cap: 1,
+        skipped_low_score: 0,
+        leads_saved: [],
+        note: `Skipped — "${source.target_customer_category}" already has ${categoryCounts[source.target_customer_category]} unworked leads (cap ${CATEGORY_CAP}). No research run, no tokens spent.`,
+      })
+    }
+
     // 3. Get existing company names/websites/domains to avoid duplicates.
     // We match on: exact lowercased name, lowercased domain (most reliable),
     // and a slug version (removes spaces/punctuation) to catch "Gnosis Safe" vs "GnosisSafe".
@@ -432,8 +455,16 @@ export async function POST(req: NextRequest) {
       .from('leads')
       .select('company_name, website')
 
+    // Strip qualifiers that make the same company look like two different names
+    // to a naive slug — "Lio (formerly askLio)" vs "askLio" vs "Lio Inc." should
+    // all collapse to the same key so we never re-run expensive research on a
+    // company already sitting in the lead box.
     function nameSlug(s: string) {
-      return s.toLowerCase().replace(/[^a-z0-9]/g, '')
+      return s
+        .toLowerCase()
+        .replace(/\([^)]*\)/g, '')                                   // drop "(formerly X)", "(YC S24)", etc.
+        .replace(/\b(inc|incorporated|ltd|llc|ltd\.|corp|corporation|co)\b\.?/g, '')
+        .replace(/[^a-z0-9]/g, '')
     }
 
     const existingNames = new Set(

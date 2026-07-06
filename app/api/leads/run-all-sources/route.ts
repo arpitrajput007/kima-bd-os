@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { isSourceDue } from '@/lib/source-scheduling'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,16 +14,24 @@ const supabase = createClient(
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
-    const { data: sources } = await supabase
+    const { force = false } = await req.json().catch(() => ({ force: false }))
+
+    const { data: allSources } = await supabase
       .from('sources')
-      .select('id, source_name')
+      .select('id, source_name, frequency, last_run_at')
       .eq('status', 'active')
       .not('source_url_or_query', 'is', null)
 
-    if (!sources?.length) {
+    if (!allSources?.length) {
       return NextResponse.json({ error: 'No active sources. Add some in Discovery Sources.' }, { status: 400 })
+    }
+
+    // Cadence gating (skippable via force=true — the explicit manual override).
+    const sources = force ? allSources : allSources.filter(s => isSourceDue(s, 'manual'))
+    if (!sources.length) {
+      return NextResponse.json({ error: 'No sources due right now — every active source already ran within its schedule. Use "Force run all" to override.', skipped_not_due: allSources.length }, { status: 400 })
     }
 
     // Create the job record so the UI can track progress.

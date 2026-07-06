@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { isSourceDue } from '@/lib/source-scheduling'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,9 +24,9 @@ export async function GET(req: NextRequest) {
   }
 
   // Fetch all active sources that have a URL configured
-  const { data: sources, error } = await supabase
+  const { data: allSources, error } = await supabase
     .from('sources')
-    .select('id, source_name, source_url_or_query')
+    .select('id, source_name, source_url_or_query, frequency, last_run_at')
     .eq('status', 'active')
     .not('source_url_or_query', 'is', null)
 
@@ -33,8 +34,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  if (!sources || sources.length === 0) {
+  if (!allSources || allSources.length === 0) {
     return NextResponse.json({ message: 'No active sources to process', processed: 0 })
+  }
+
+  // Cadence gating: a source tagged 'weekly' running in a 'daily' cron would
+  // otherwise fire every single night — 7x its intended spend. 'manual' sources
+  // must never auto-fire here at all; they only run from the button.
+  const sources = allSources.filter(s => isSourceDue(s, 'cron'))
+  const skipped = allSources.length - sources.length
+
+  if (sources.length === 0) {
+    return NextResponse.json({ message: 'No sources due today', processed: 0, skipped_not_due: skipped })
   }
 
   const appUrl =
@@ -67,6 +78,7 @@ export async function GET(req: NextRequest) {
     success: true,
     run_at: new Date().toISOString(),
     sources_processed: sources.length,
+    skipped_not_due: skipped,
     total_leads_saved: totalSaved,
     results,
   })

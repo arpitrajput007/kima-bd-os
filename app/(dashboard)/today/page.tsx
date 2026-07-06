@@ -16,6 +16,7 @@ import {
   buildTarget, channelDeepLink, logTouch, followUpDue,
   MAX_FOLLOWUPS, FOLLOWUP_GAP_DAYS, type OutreachMeta,
 } from '@/lib/outreach'
+import { isSourceDue } from '@/lib/source-scheduling'
 
 type LeadActivity = { id: string; type: string; channel?: string }
 type LeadWithContacts = Lead & { contacts?: Contact[]; lead_activities?: LeadActivity[] }
@@ -320,6 +321,7 @@ export default function TodayPage() {
   const [loading, setLoading]   = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [fetching, setFetching] = useState(false)
+  const [forceRunAll, setForceRunAll] = useState(false)
   const [hackFetching, setHackFetching] = useState(false)
   const [bgJob, setBgJob] = useState<{ status: string; sources_done: number; sources_total: number; leads_saved: number; current_source?: string } | null>(null)
   const [contactingLead, setContactingLead] = useState<LeadWithContacts | null>(null)
@@ -347,16 +349,28 @@ export default function TodayPage() {
   // Chain discover calls source-by-source from the frontend.
   // Each /api/ai/discover call = 1 source = fits within Vercel's 60s limit.
   // Total run time scales with number of sources but quality is never sacrificed.
+  //
+  // Cadence gating: a source's own `frequency` (daily/weekly/manual) decides
+  // whether it's due. A 'weekly' source that ran yesterday should NOT run again
+  // just because you clicked the button — that's how credits used to get eaten
+  // for near-duplicate results. "Force run all" is the explicit manual override
+  // for when you want a full run regardless of schedule.
   const fetchFreshLeads = async () => {
     setFetching(true)
     try {
-      const { data: sources, error } = await supabase
+      const { data: allSources, error } = await supabase
         .from('sources')
-        .select('id, source_name')
+        .select('id, source_name, frequency, last_run_at')
         .eq('status', 'active')
         .not('source_url_or_query', 'is', null)
-      if (error || !sources?.length) {
+      if (error || !allSources?.length) {
         toast.error('No active sources. Add some in Discovery Sources.')
+        return
+      }
+      const sources = forceRunAll ? allSources : allSources.filter(s => isSourceDue(s, 'manual'))
+      const skippedNotDue = allSources.length - sources.length
+      if (!sources.length) {
+        toast(`All ${allSources.length} sources already ran within their schedule. Check "Force run all" to run them anyway.`)
         return
       }
       const researchAI = (typeof window !== 'undefined' ? localStorage.getItem('bd_research_ai') : null) || 'claude'
@@ -377,11 +391,12 @@ export default function TodayPage() {
         setBgJob({ status: 'running', sources_done: i + 1, sources_total: sources.length, leads_saved: totalSaved, current_source: src.source_name })
       }
       setBgJob(null)
+      const skippedNote = skippedNotDue > 0 ? ` (${skippedNotDue} source${skippedNotDue !== 1 ? 's' : ''} skipped — not due yet)` : ''
       if (totalSaved > 0) {
-        toast.success(`Discovery complete — ${totalSaved} new lead${totalSaved !== 1 ? 's' : ''} added`)
+        toast.success(`Discovery complete — ${totalSaved} new lead${totalSaved !== 1 ? 's' : ''} added${skippedNote}`)
         loadData()
       } else {
-        toast('Discovery complete — no new leads found (all already in pipeline or below quality threshold)')
+        toast(`Discovery complete — no new leads found (all already in pipeline or below quality threshold)${skippedNote}`)
       }
     } catch {
       toast.error('Discovery failed')
@@ -593,6 +608,18 @@ export default function TodayPage() {
               ? <><Loader2 size={13} className="animate-spin" /> Starting…</>
               : <><Download size={13} /> Fetch fresh leads</>}
           </button>
+          <label
+            title="Off (default): only run sources that are actually due per their daily/weekly schedule. On: ignore schedule and run every active source now — costs more, use sparingly."
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, fontSize: '11px', fontWeight: 600,
+              color: forceRunAll ? '#fbbf24' : 'rgb(120,125,155)', cursor: 'pointer', userSelect: 'none',
+              padding: '6px 10px', borderRadius: 8, border: `1px solid ${forceRunAll ? 'rgba(251,191,36,0.35)' : 'rgba(255,255,255,0.08)'}`,
+              background: forceRunAll ? 'rgba(251,191,36,0.08)' : 'transparent',
+            }}>
+            <input type="checkbox" checked={forceRunAll} onChange={e => setForceRunAll(e.target.checked)}
+              style={{ accentColor: '#fbbf24', width: 13, height: 13 }} />
+            Force run all
+          </label>
           <button onClick={fetchHackedLeads} disabled={hackFetching}
             className="btn btn-secondary" style={{ padding: '7px 14px', fontSize: '12px', borderColor: 'rgba(251,113,133,0.35)', color: '#fb7185' }}
             title="Scan rekt.news + Exa for bridge/protocol hacks in the last 120 days and add them as leads">
