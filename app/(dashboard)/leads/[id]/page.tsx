@@ -2448,7 +2448,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 }
 
 /* ── Discuss Lead: research-grounded chat that teaches the agent ──────────── */
-interface ChatMsg { role: 'user' | 'assistant'; content: string }
+interface ChatMsg { role: 'user' | 'assistant'; content: string; followUps?: string[] }
 
 // Lightweight renderer: **bold**, "- " bullets, and paragraph spacing.
 function RichText({ text }: { text: string }) {
@@ -2619,7 +2619,8 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
       if (json.dossier) setDossier(json.dossier)
-      setMessages([...next, { role: 'assistant', content: json.reply }])
+      const followUps: string[] = Array.isArray(json.followUps) ? json.followUps : []
+      setMessages([...next, { role: 'assistant', content: json.reply, followUps }])
       if (sessionId) {
         const ts = new Date().toISOString()
         const count = next.length + 1
@@ -2718,13 +2719,28 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
                 </div>
               </div>
             ) : (
-              <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
-                  <Brain size={13} color="rgb(103,232,249)" />
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                    <Brain size={13} color="rgb(103,232,249)" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0, borderRadius: '4px 14px 14px 14px', padding: '11px 14px', fontSize: 13, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgb(208,213,230)' }}>
+                    <RichText text={m.content} />
+                  </div>
                 </div>
-                <div style={{ flex: 1, minWidth: 0, borderRadius: '4px 14px 14px 14px', padding: '11px 14px', fontSize: 13, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgb(208,213,230)' }}>
-                  <RichText text={m.content} />
-                </div>
+                {i === messages.length - 1 && !thinking && (m.followUps || []).length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingLeft: 38 }}>
+                    {m.followUps!.map((f, fi) => (
+                      <button key={fi} onClick={() => ask(f)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textAlign: 'left', borderRadius: 999, border: '1px solid rgba(34,211,238,0.22)', background: 'rgba(34,211,238,0.06)', padding: '6px 12px', fontSize: 11.5, color: 'rgb(190,225,235)', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1.4, transition: 'background 0.15s' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(34,211,238,0.13)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'rgba(34,211,238,0.06)')}>
+                        <Sparkles size={11} color="rgb(103,232,249)" style={{ flexShrink: 0 }} />
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )
           ))}

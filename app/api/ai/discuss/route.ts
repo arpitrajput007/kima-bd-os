@@ -1,4 +1,4 @@
-import { claudeJSON, claudeText, CLAUDE_RESEARCH } from "@/lib/claude"
+import { claudeJSON, claudeText, CLAUDE_RESEARCH, CLAUDE_MINI } from "@/lib/claude"
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { FULL_BRAIN } from '@/lib/kima-knowledge'
@@ -207,6 +207,32 @@ Set worth_saving=false if nothing durable came up.`,
   return { saved: true, title: parsed.title, rules_created: rulesCreated }
 }
 
+// ── Follow-up suggestions: concrete next actions grounded in named contacts ──
+async function suggestFollowUps(params: {
+  company: string
+  contacts: { name?: string | null; role?: string | null }[]
+  question: string
+  reply: string
+}): Promise<string[]> {
+  const contactList = (params.contacts || [])
+    .filter(c => c.name)
+    .map(c => `${c.name}${c.role ? ` (${c.role})` : ''}`)
+    .join(', ') || 'none on file'
+
+  try {
+    const parsed = await claudeJSON<{ follow_ups?: string[] }>({
+      model: CLAUDE_MINI,
+      maxTokens: 400,
+      temperature: 0.6,
+      system: `You suggest what a BD person would want to ask next in a chat with a sales-intelligence agent, right after reading the agent's answer. Suggest concrete, actionable next steps — not vague "tell me more" prompts. Favor requests for deliverables tied to a SPECIFIC named contact when one is known: an outreach note/message for that person, with the right channel and its real character limit (LinkedIn connection note ≈300 characters, LinkedIn InMail ≈2000, cold email — no hard limit but say "concise"). Also consider: objection handling, a comparison angle, or a next-step recommendation. Ground every suggestion in names/roles actually mentioned — never invent a person. Each suggestion must be phrased as something the BD person would type, first person implied (e.g. "Reachout note for Patricia within 300 characters" not "Should I write a note?").`,
+      user: `Company: ${params.company}\nKnown contacts: ${contactList}\nBD's question: ${params.question}\nAgent's answer:\n${params.reply.slice(0, 2500)}\n\nReturn JSON: {"follow_ups": ["...", "...", "..."]} — exactly 3 suggestions, each under 90 characters.`,
+    })
+    return (parsed.follow_ups || []).filter(s => typeof s === 'string' && s.trim()).slice(0, 3)
+  } catch {
+    return []
+  }
+}
+
 export async function POST(req: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: 'Anthropic API key not configured.' }, { status: 400 })
@@ -282,7 +308,15 @@ ${agentContext}`
         `BD: ${message}`,
       ].join('\n\n'),
     }) || 'I had trouble with that — try rephrasing?'
-    return NextResponse.json({ reply, dossier })
+
+    const followUps = await suggestFollowUps({
+      company: lead.company_name,
+      contacts: (lead as LeadRow).contacts || [],
+      question: message,
+      reply,
+    })
+
+    return NextResponse.json({ reply, dossier, followUps })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Discussion failed'
     console.error('[discuss route]', err)
