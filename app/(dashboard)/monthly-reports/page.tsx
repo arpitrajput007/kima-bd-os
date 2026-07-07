@@ -25,6 +25,7 @@ import { getOutreachStats, EMPTY_OUTREACH_STATS } from '@/lib/monthly-outreach-s
 import type { OutreachStats } from '@/lib/monthly-outreach-stats'
 import { KpiCard, MiniBar, SectionHeader, InlineEditableNumber, AiFixButton } from '@/components/monthly-reports/ui'
 import { TimeAllocationSection, timeByResponsibility, TIME_PIE_COLORS } from '@/components/monthly-reports/time-allocation-section'
+import { exportDealPDF, exportDealDoc } from '@/lib/deal-export'
 
 // PostgREST reports a missing table as code PGRST205 ("Could not find the
 // table ... in the schema cache"), not a "does not exist" message.
@@ -461,7 +462,9 @@ export default function MonthlyReportsPage() {
   const [savedPriorityNotes, setSavedPriorityNotes] = useState('')
   const [savingPriorityNotes, setSavingPriorityNotes] = useState(false)
   const [prioritiesSetupNeeded, setPrioritiesSetupNeeded] = useState(false)
+  const [openRowExport, setOpenRowExport] = useState<string | null>(null)
   const exportRef = useRef<HTMLDivElement>(null)
+  const rowExportRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { setMounted(true) }, [])
 
@@ -498,7 +501,7 @@ export default function MonthlyReportsPage() {
 
     const [actsRes, stats] = await Promise.all([
       dealList.length
-        ? supabase.from('deal_activities').select('id,deal_id,activity_type,created_at').in('deal_id', dealList.map(d => d.id))
+        ? supabase.from('deal_activities').select('id,deal_id,activity_type,content,created_at').in('deal_id', dealList.map(d => d.id))
         : Promise.resolve({ data: [] as DealActivity[] }),
       getOutreachStats(supabase, month),
     ])
@@ -513,6 +516,7 @@ export default function MonthlyReportsPage() {
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false)
+      if (rowExportRef.current && !rowExportRef.current.contains(e.target as Node)) setOpenRowExport(null)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -1108,6 +1112,38 @@ export default function MonthlyReportsPage() {
                           ) : null}
                         </div>
                         <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                          <div className="relative" ref={openRowExport === deal.id ? rowExportRef : undefined}>
+                            <button
+                              onClick={e => { e.preventDefault(); e.stopPropagation(); setOpenRowExport(openRowExport === deal.id ? null : deal.id) }}
+                              className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                              style={{ color: 'rgb(120,120,150)' }}
+                              title="Export this deal"
+                            >
+                              <Download size={13} />
+                            </button>
+                            {openRowExport === deal.id && (
+                              <div
+                                onClick={e => { e.preventDefault(); e.stopPropagation() }}
+                                className="absolute right-0 top-full mt-1 w-48 rounded-xl overflow-hidden z-50 shadow-xl"
+                                style={{ background: 'rgb(22,22,34)', border: '1px solid rgba(255,255,255,0.1)' }}
+                              >
+                                <button
+                                  onClick={e => { e.preventDefault(); e.stopPropagation(); exportDealPDF(deal, activities.filter(a => a.deal_id === deal.id)); setOpenRowExport(null) }}
+                                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs hover:bg-white/5 text-left transition-colors"
+                                  style={{ color: 'rgb(180,180,210)' }}
+                                >
+                                  <FileText size={12} style={{ color: '#a78bfa' }} />Export as PDF
+                                </button>
+                                <button
+                                  onClick={e => { e.preventDefault(); e.stopPropagation(); exportDealDoc(deal, activities.filter(a => a.deal_id === deal.id)); setOpenRowExport(null) }}
+                                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs hover:bg-white/5 text-left transition-colors"
+                                  style={{ color: 'rgb(180,180,210)' }}
+                                >
+                                  <FileText size={12} style={{ color: '#60a5fa' }} />Export as Word (.doc)
+                                </button>
+                              </div>
+                            )}
+                          </div>
                           {deal.expected_close_date && (
                             <div className="flex items-center gap-1 text-[10px]" style={{ color: 'rgb(110,110,140)' }}>
                               <Calendar size={10} />

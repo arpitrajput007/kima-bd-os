@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -8,6 +8,7 @@ import Link from 'next/link'
 import {
   ArrowLeft, Loader2, Pencil, Trash2, Building2, Target,
   DollarSign, TrendingUp, AlertTriangle, Lightbulb, Activity, StickyNote,
+  Download, ChevronDown, FileText,
 } from 'lucide-react'
 import DealForm from '@/components/monthly-reports/DealForm'
 import type { DealFormData } from '@/components/monthly-reports/DealForm'
@@ -16,6 +17,7 @@ import type { NewActivityInput } from '@/components/monthly-reports/ActivityTime
 import { dealStatusMeta, fmtMonthYear, blockerLabel } from '@/lib/monthly-reports-types'
 import type { MonthlyDeal, DealActivity } from '@/lib/monthly-reports-types'
 import { SectionHeader } from '@/components/monthly-reports/ui'
+import { exportDealPDF, exportDealDoc } from '@/lib/deal-export'
 
 function InfoRow({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null
@@ -39,6 +41,16 @@ export default function DealDetailPage() {
   const [saving, setSaving] = useState(false)
   const [addingActivity, setAddingActivity] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
+  const exportRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -152,6 +164,30 @@ export default function DealDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <div className="relative" ref={exportRef}>
+            <button
+              onClick={() => setExportOpen(!exportOpen)}
+              className="btn btn-secondary flex items-center gap-1.5"
+              style={{ padding: '7px 14px', fontSize: '12px' }}
+            >
+              <Download size={12} />Export<ChevronDown size={10} />
+            </button>
+            {exportOpen && (
+              <div className="absolute left-0 top-full mt-1 w-48 rounded-xl overflow-hidden z-50 shadow-xl"
+                style={{ background: 'rgb(22,22,34)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <button onClick={() => { exportDealPDF(deal, activities); setExportOpen(false) }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs hover:bg-white/5 text-left transition-colors"
+                  style={{ color: 'rgb(180,180,210)' }}>
+                  <FileText size={12} style={{ color: '#a78bfa' }} />Export as PDF
+                </button>
+                <button onClick={() => { exportDealDoc(deal, activities); setExportOpen(false) }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs hover:bg-white/5 text-left transition-colors"
+                  style={{ color: 'rgb(180,180,210)' }}>
+                  <FileText size={12} style={{ color: '#60a5fa' }} />Export as Word (.doc)
+                </button>
+              </div>
+            )}
+          </div>
           <button onClick={() => setEditing(true)} className="btn btn-secondary" style={{ padding: '7px 14px', fontSize: '12px' }}>
             <Pencil size={12} />Edit
           </button>
