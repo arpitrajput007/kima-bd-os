@@ -6,8 +6,9 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Mail, Check, X, Loader2 } from 'lucide-react'
+import { Mail, Check, X, Loader2, Maximize2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface PendingDraft {
@@ -91,6 +92,17 @@ function DraftCard({
               to {draft.contacts?.email || '—'}
             </div>
           </div>
+          <Link
+            href={`/email-reachout?id=${draft.id}`}
+            title="View full email & edit"
+            style={{
+              flexShrink: 0, width: 26, height: 26, borderRadius: 7, display: 'flex',
+              alignItems: 'center', justifyContent: 'center', color: 'rgb(140,145,180)',
+              border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)',
+            }}
+          >
+            <Maximize2 size={12} />
+          </Link>
         </div>
 
         <div style={{ fontSize: 12, fontWeight: 600, color: 'rgb(210,215,240)', marginBottom: 4 }}>
@@ -185,13 +197,15 @@ export default function PendingOutreachApprovals() {
       overflowX: 'visible',
       paddingBottom: 4,
     }}>
-      <div style={{
-        width: 340, padding: '5px 11px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+      <Link href="/email-reachout" style={{
+        width: 340, boxSizing: 'border-box', padding: '5px 11px', borderRadius: 8, fontSize: 11, fontWeight: 600,
         background: 'rgba(20,21,35,0.95)', border: '1px solid rgba(255,255,255,0.1)',
-        color: 'rgb(160,165,200)', backdropFilter: 'blur(20px)',
+        color: 'rgb(160,165,200)', backdropFilter: 'blur(20px)', textDecoration: 'none',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       }}>
-        {drafts.length} draft{drafts.length === 1 ? '' : 's'} awaiting approval
-      </div>
+        <span>{drafts.length} draft{drafts.length === 1 ? '' : 's'} awaiting approval</span>
+        <span style={{ color: '#60a5fa' }}>Open →</span>
+      </Link>
       {drafts.slice(0, 5).map(draft => (
         <DraftCard key={draft.id} draft={draft} onDone={handleDone} />
       ))}

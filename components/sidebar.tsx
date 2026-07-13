@@ -25,6 +25,7 @@ import {
   PenLine,
   ShieldCheck,
   Send,
+  Mail,
   Globe,
   FileDown,
   Clock,
@@ -86,6 +87,7 @@ const navGroups: {
     label: 'Automation',
     items: [
       { href: '/sources',            label: 'Discovery Sources',  icon: Database },
+      { href: '/email-reachout',     label: 'Email Reachout',     icon: Mail, glow: true },
       { href: '/outreach',           label: 'Outreach Studio',    icon: MessageSquare },
       { href: '/reachout-storage',   label: 'Reachout Storage',   icon: Send },
       { href: '/content',            label: 'Content Studio',     icon: PenLine, glow: true },

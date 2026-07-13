@@ -8,11 +8,20 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// One-click approve/discard for a queued email draft.
-// POST { id: outreach_messages.id, action: 'send' | 'discard' }
+interface ApproveDraftBody {
+  id?: string
+  action?: 'send' | 'discard' | 'save'
+  subject?: string
+  text?: string
+}
+
+// One-click approve/discard/edit for a queued email draft.
+// POST { id: outreach_messages.id, action: 'send' | 'discard' | 'save', subject?, text? }
+// 'save' persists edits without sending. 'send' accepts optional subject/text
+// overrides so an edited-but-unsaved draft can be sent in one click.
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => null) as { id?: string; action?: 'send' | 'discard' } | null
-  if (!body?.id || (body.action !== 'send' && body.action !== 'discard')) {
+  const body = await req.json().catch(() => null) as ApproveDraftBody | null
+  if (!body?.id || !['send', 'discard', 'save'].includes(body.action ?? '')) {
     return NextResponse.json({ error: 'Missing id or invalid action' }, { status: 400 })
   }
 
@@ -37,6 +46,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, action: 'discarded' })
   }
 
+  const storedSubjectMatch = (draftRow.message as string).match(/^Subject: (.+)$/m)
+  const storedSubject = storedSubjectMatch?.[1] || ''
+  const storedText = storedSubjectMatch
+    ? (draftRow.message as string).replace(/^Subject: .+\n\n/, '')
+    : (draftRow.message as string)
+
+  const subject = body.subject ?? storedSubject
+  const text = body.text ?? storedText
+
+  if (body.action === 'save') {
+    const { error } = await supabase
+      .from('outreach_messages')
+      .update({ message: `Subject: ${subject}\n\n${text}`, updated_at: new Date().toISOString() })
+      .eq('id', draftRow.id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true, action: 'saved' })
+  }
+
   // ── action === 'send' ──────────────────────────────────────────────────────
   if (!isEmailConfigured()) {
     return NextResponse.json({ error: 'Gmail not configured' }, { status: 500 })
@@ -55,12 +82,6 @@ export async function POST(req: NextRequest) {
   if (!contact?.email) {
     return NextResponse.json({ error: 'No contact email on this draft' }, { status: 400 })
   }
-
-  const subjectMatch = (draftRow.message as string).match(/^Subject: (.+)$/m)
-  const subject = subjectMatch?.[1] || `Re: ${lead.company_name}`
-  const text = subjectMatch
-    ? (draftRow.message as string).replace(/^Subject: .+\n\n/, '')
-    : (draftRow.message as string)
 
   // A lead already 'contacted' means this draft is a follow-up — thread it
   // into the same Gmail conversation as the prior message(s).
@@ -89,6 +110,7 @@ export async function POST(req: NextRequest) {
     gmailThreadId: threadId,
     gmailMessageId,
     gmailMessageIdHeader: messageIdHeader,
+    message: `Subject: ${subject}\n\n${text}`,
   })
 
   if (finalizeErr) {

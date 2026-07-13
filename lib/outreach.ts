@@ -299,6 +299,7 @@ export async function finalizeDraftSend(
     gmailThreadId?: string
     gmailMessageId?: string
     gmailMessageIdHeader?: string
+    message?: string
   },
 ): Promise<{ error: string | null }> {
   const { error: e1 } = await advanceLeadFollowUp(supabase, opts)
@@ -309,6 +310,7 @@ export async function finalizeDraftSend(
       gmail_thread_id: opts.gmailThreadId || null,
       gmail_message_id: opts.gmailMessageId || null,
       gmail_message_id_header: opts.gmailMessageIdHeader || null,
+      ...(opts.message ? { message: opts.message } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq('id', opts.messageId)
