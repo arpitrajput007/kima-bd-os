@@ -16,8 +16,8 @@ const supabase = createClient(
 // Can also be triggered manually: GET /api/cron/auto-outreach with the cron secret.
 //
 // Emails are NOT sent automatically — this only queues drafts (status='draft')
-// for review. Arpit approves/discards each one with one click from the
-// PendingOutreachApprovals widget, which actually sends via /api/leads/approve-draft.
+// for review. Arpit reviews/edits/sends each one from the Email Reachout page,
+// which actually sends via /api/leads/approve-draft.
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
 

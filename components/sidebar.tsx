@@ -32,9 +32,10 @@ import {
   CalendarClock,
   Lightbulb,
 } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { readTimeData } from '@/components/TimeTracker'
+import { createClient } from '@/lib/supabase/client'
 
 function fmtSecs(s: number): string {
   const h = Math.floor(s / 3600)
@@ -87,7 +88,7 @@ const navGroups: {
     label: 'Automation',
     items: [
       { href: '/sources',            label: 'Discovery Sources',  icon: Database },
-      { href: '/email-reachout',     label: 'Email Reachout',     icon: Mail, glow: true },
+      { href: '/email-reachout',     label: 'Email Reachout',     icon: Mail },
       { href: '/outreach',           label: 'Outreach Studio',    icon: MessageSquare },
       { href: '/reachout-storage',   label: 'Reachout Storage',   icon: Send },
       { href: '/content',            label: 'Content Studio',     icon: PenLine, glow: true },
@@ -110,6 +111,7 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const [apiIssues, setApiIssues] = useState<string[]>([])
   const [todayTime, setTodayTime] = useState(0)
+  const [pendingDrafts, setPendingDrafts] = useState(0)
 
   useEffect(() => {
     const load = () => {
@@ -133,6 +135,22 @@ export function Sidebar() {
     window.addEventListener('kima_time_update', load)
     return () => window.removeEventListener('kima_time_update', load)
   }, [])
+
+  const loadPendingDrafts = useCallback(async () => {
+    const supabase = createClient()
+    const { count } = await supabase
+      .from('outreach_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('channel', 'email')
+      .eq('status', 'draft')
+    setPendingDrafts(count ?? 0)
+  }, [])
+
+  useEffect(() => {
+    loadPendingDrafts()
+    const timer = setInterval(loadPendingDrafts, 60_000)
+    return () => clearInterval(timer)
+  }, [loadPendingDrafts])
 
   return (
     <aside
@@ -186,6 +204,7 @@ export function Sidebar() {
             {group.items.map(({ href, label, icon: Icon, glow, voice, cyan, orange }) => {
               const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
               const hasApiAlert = href === '/settings' && apiIssues.length > 0
+              const draftBadge = href === '/email-reachout' ? pendingDrafts : 0
               return (
                 <Link
                   key={href}
@@ -245,6 +264,16 @@ export function Sidebar() {
                   )}
                   {collapsed && hasApiAlert && (
                     <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: '#f87171' }} />
+                  )}
+                  {!collapsed && draftBadge > 0 && !isActive && (
+                    <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded"
+                      style={{ background: 'rgba(96,165,250,0.2)', color: '#60a5fa' }}
+                      title={`${draftBadge} draft${draftBadge === 1 ? '' : 's'} awaiting approval`}>
+                      {draftBadge}
+                    </span>
+                  )}
+                  {collapsed && draftBadge > 0 && (
+                    <span style={{ position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: '50%', background: '#60a5fa' }} />
                   )}
                 </Link>
               )
