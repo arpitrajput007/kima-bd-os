@@ -2441,7 +2441,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         />
       </div>
 
-      {discussOpen && <DiscussPanel lead={lead} onClose={() => setDiscussOpen(false)} />}
+      {discussOpen && <DiscussPanel lead={lead} contacts={contacts} onClose={() => setDiscussOpen(false)} />}
       {contactedModalOpen && <ContactedModal lead={lead} onClose={() => setContactedModalOpen(false)} onSaved={loadLead} />}
     </div>
   )
@@ -2480,6 +2480,209 @@ function RichText({ text }: { text: string }) {
 
 interface DiscussionSession { id: string; title: string; message_count: number; updated_at: string }
 
+// ── Detect per-recipient drafts inside a discuss reply ──────────────────────
+// The discuss AI writes drafts as "### Message for NAME (ROLE)" sections
+// followed by "---", the body, then another "---" and meta notes. We parse
+// those out so each one gets its own one-click Send control.
+interface DraftBlock { name: string; role?: string; body: string }
+
+function extractBlockBody(raw: string): string {
+  const lines = raw.split('\n')
+  let start = 0
+  while (start < lines.length && lines[start].trim() === '') start++
+  if (lines[start] && lines[start].trim() === '---') start++
+  const body: string[] = []
+  for (let i = start; i < lines.length; i++) {
+    const t = lines[i].trim()
+    if (t === '---' || /^\*\*Character count/i.test(t)) break
+    body.push(lines[i])
+  }
+  while (body.length && body[body.length - 1].trim() === '') body.pop()
+  while (body.length && body[0].trim() === '') body.shift()
+  return body.join('\n').trim()
+}
+
+function parseDraftBlocks(text: string): DraftBlock[] {
+  const headerRe = /^#{1,6}\s*Message for\s+([^\n(]+?)\s*(?:\(([^)]+)\))?\s*$/gim
+  const matches = [...text.matchAll(headerRe)]
+  if (matches.length === 0) return []
+  const blocks: DraftBlock[] = []
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i]
+    const start = (m.index ?? 0) + m[0].length
+    const end = i + 1 < matches.length ? (matches[i + 1].index ?? text.length) : text.length
+    const body = extractBlockBody(text.slice(start, end))
+    if (body) blocks.push({ name: m[1].trim(), role: m[2]?.trim(), body })
+  }
+  return blocks
+}
+
+function normalizeName(s: string): string {
+  return s.toLowerCase().replace(/[^a-z\s]/g, '').trim()
+}
+
+function matchContact(name: string, contacts: Contact[]): Contact | undefined {
+  const target = normalizeName(name)
+  if (!target) return undefined
+  return contacts.find(c => c.name && normalizeName(c.name) === target)
+    || contacts.find(c => c.name && (normalizeName(c.name).includes(target) || target.includes(normalizeName(c.name))))
+    || contacts.find(c => c.name && normalizeName(c.name).split(' ')[0] === target.split(' ')[0])
+}
+
+type SendChannel = 'email' | 'linkedin' | 'telegram' | 'twitter'
+const SEND_CHANNEL_CFG: Record<SendChannel, { label: string; icon: typeof Mail }> = {
+  email: { label: 'Email', icon: Mail },
+  linkedin: { label: 'LinkedIn', icon: MessageSquare },
+  telegram: { label: 'Telegram', icon: Send },
+  twitter: { label: 'Twitter', icon: AtSign },
+}
+
+// One-click send bar rendered under each detected draft block.
+function DraftSendBar({ lead, contacts, block }: { lead: Lead; contacts: Contact[]; block: DraftBlock }) {
+  const supabase = createClient()
+  const matched = matchContact(block.name, contacts)
+  const meta: OutreachMeta = {
+    telegram_url: lead.telegram_url || undefined,
+    twitter_url: lead.twitter_url || undefined,
+    website: lead.website || undefined,
+    contact: matched ? {
+      id: matched.id, name: matched.name, email: matched.email,
+      linkedin_url: matched.linkedin_url, twitter_url: matched.twitter_url, telegram: matched.telegram,
+    } : null,
+  }
+  const target = buildTarget(meta)
+  const available: SendChannel[] = (['email', 'linkedin', 'telegram', 'twitter'] as SendChannel[])
+    .filter(ch => ch === 'email' ? !!target.email : ch === 'linkedin' ? !!target.linkedin_url : ch === 'telegram' ? !!target.telegram_url : !!target.twitter_url)
+
+  const [channel, setChannel] = useState<SendChannel | null>(available[0] ?? null)
+  const [subject, setSubject] = useState(`Re: ${lead.company_name}`)
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const copy = () => {
+    navigator.clipboard.writeText(block.body)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  const send = async () => {
+    if (!channel) return
+    setSending(true)
+
+    if (channel === 'email') {
+      const { data: inserted, error: insErr } = await supabase
+        .from('outreach_messages')
+        .insert({
+          lead_id: lead.id,
+          contact_id: matched?.id || null,
+          channel: 'email',
+          message: `Subject: ${subject}\n\n${block.body}`,
+          status: 'draft',
+        })
+        .select('id')
+        .single()
+
+      if (insErr || !inserted) { toast.error('Could not save draft'); setSending(false); return }
+
+      const res = await fetch('/api/leads/approve-draft', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: inserted.id, action: 'send' }),
+      })
+      const json = await res.json()
+      setSending(false)
+      if (!res.ok) {
+        toast.error(`${json.error || 'Send failed'} — saved as a draft in Email Reachout instead`)
+        return
+      }
+      setSent(true)
+      toast.success(`Sent to ${matched?.name || block.name}`)
+      return
+    }
+
+    const url = channelDeepLink(channel, target, block.body)
+    const { error } = await logTouch(supabase, {
+      leadId: lead.id, channel, text: block.body, contactId: matched?.id, kind: 'initial',
+    })
+    setSending(false)
+    if (error) { toast.error('Could not log the touch'); return }
+    navigator.clipboard.writeText(block.body)
+    if (url) window.open(url, '_blank')
+    setSent(true)
+    toast.success('Logged · follow-up scheduled')
+  }
+
+  if (sent) {
+    return (
+      <div style={{ marginLeft: 38, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'rgb(110,231,183)' }}>
+        <CheckCircle2 size={12} /> Sent to {matched?.name || block.name}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      marginLeft: 38, display: 'flex', flexDirection: 'column', gap: 7, padding: '9px 11px',
+      borderRadius: 10, border: '1px solid rgba(34,211,238,0.15)', background: 'rgba(34,211,238,0.03)',
+    }}>
+      <div style={{ fontSize: 11, color: 'rgb(160,167,190)' }}>
+        Draft for <strong style={{ color: 'white' }}>{block.name}</strong>{block.role ? ` (${block.role})` : ''}
+        {!matched && <span style={{ color: 'rgb(251,191,36)' }}> · no contact match — verify before sending</span>}
+      </div>
+
+      {available.length > 0 ? (
+        <>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {available.map(ch => {
+              const cfg = SEND_CHANNEL_CFG[ch]
+              const active = channel === ch
+              return (
+                <button key={ch} onClick={() => setChannel(ch)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 9px', borderRadius: 999,
+                    fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                    border: `1px solid ${active ? 'rgba(34,211,238,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                    background: active ? 'rgba(34,211,238,0.14)' : 'rgba(255,255,255,0.03)',
+                    color: active ? 'rgb(103,232,249)' : 'rgb(160,167,190)',
+                  }}>
+                  <cfg.icon size={10} /> {cfg.label}
+                </button>
+              )
+            })}
+          </div>
+
+          {channel === 'email' && (
+            <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject"
+              style={{
+                padding: '6px 9px', borderRadius: 8, fontSize: 12, fontFamily: 'inherit',
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'white',
+              }} />
+          )}
+
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={copy}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: copied ? 'rgb(110,231,183)' : 'rgb(160,167,190)' }}>
+              {copied ? <CheckCircle2 size={10} /> : <Copy size={10} />} {copied ? 'Copied' : 'Copy'}
+            </button>
+            <button onClick={send} disabled={sending || !channel}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: sending ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid rgba(34,211,238,0.35)', background: 'rgba(34,211,238,0.14)', color: 'rgb(103,232,249)', opacity: sending ? 0.6 : 1 }}>
+              {sending ? <Loader2 size={10} className="animate-spin" /> : <Send size={10} />} Send
+            </button>
+          </div>
+        </>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, color: 'rgb(120,127,160)' }}>No contact info on file for this person.</span>
+          <button onClick={copy}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 9px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: copied ? 'rgb(110,231,183)' : 'rgb(160,167,190)' }}>
+            {copied ? <CheckCircle2 size={10} /> : <Copy size={10} />} {copied ? 'Copied' : 'Copy text'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function relTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
   const m = Math.floor(diff / 60000)
@@ -2492,7 +2695,7 @@ function relTime(iso: string): string {
   return new Date(iso).toLocaleDateString()
 }
 
-function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
+function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Contact[]; onClose: () => void }) {
   const supabase = createClient()
   const [sessions, setSessions] = useState<DiscussionSession[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -2728,6 +2931,9 @@ function DiscussPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
                     <RichText text={m.content} />
                   </div>
                 </div>
+                {parseDraftBlocks(m.content).map((block, bi) => (
+                  <DraftSendBar key={bi} lead={lead} contacts={contacts} block={block} />
+                ))}
                 {i === messages.length - 1 && !thinking && (m.followUps || []).length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingLeft: 38 }}>
                     {m.followUps!.map((f, fi) => (
