@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL } from '@/lib/types'
 import type { Lead } from '@/lib/types'
-import { buildTarget, channelDeepLink, logTouch, type OutreachMeta } from '@/lib/outreach'
+import { buildTarget, channelDeepLink, logTouch, isRealEmail, type OutreachMeta } from '@/lib/outreach'
 
 const CHANNELS = ['telegram', 'linkedin', 'twitter', 'email'] as const
 const TONES = ['casual', 'professional', 'founder_to_founder', 'concise', 'strong_bd'] as const
@@ -247,8 +247,11 @@ function DraftChannelCard({
           disabled={sendingId === draft.id}
           className="btn btn-ghost"
           style={{ padding: '3px 9px', fontSize: 11, gap: 4, color: cfg.color }}
+          title={channel === 'email' ? 'Sends immediately via Gmail — no mail client needed' : 'Opens the destination and logs the touch'}
         >
-          {sendingId === draft.id ? <Loader2 size={10} className="animate-spin" /> : <ExternalLink size={10} />}
+          {sendingId === draft.id
+            ? <Loader2 size={10} className="animate-spin" />
+            : channel === 'email' ? <Mail size={10} /> : <ExternalLink size={10} />}
           Send
         </button>
       </div>
@@ -498,9 +501,55 @@ function OutreachStudioContent() {
     toast.success('Copied!')
   }
 
+  // Email actually sends for real via Gmail — one click, no mail client hand-off.
+  const sendEmailDraft = async (draft: AgentDraft) => {
+    const email = autoMeta?.contact?.email
+    if (!isRealEmail(email)) {
+      toast.error('No real email on file for this contact')
+      setSendingId(null)
+      return
+    }
+    const { data: inserted, error: insErr } = await supabase
+      .from('outreach_messages')
+      .insert({
+        lead_id: selectedLeadId,
+        contact_id: autoMeta?.contact?.id || null,
+        channel: 'email',
+        message: draft.subject ? `Subject: ${draft.subject}\n\n${draft.text}` : draft.text,
+        status: 'draft',
+      })
+      .select('id')
+      .single()
+
+    if (insErr || !inserted) {
+      toast.error('Could not save the draft')
+      setSendingId(null)
+      return
+    }
+
+    const res = await fetch('/api/leads/approve-draft', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: inserted.id, action: 'send' }),
+    })
+    const json = await res.json()
+    setSendingId(null)
+    if (!res.ok) {
+      toast.error(`${json.error || 'Send failed'} — saved as a draft in Email Reachout instead`)
+      return
+    }
+    toast.success('Sent!')
+  }
+
   const sendDraft = async (draft: AgentDraft) => {
     if (!selectedLeadId) return
     setSendingId(draft.id)
+
+    if (draft.channel === 'email') {
+      await sendEmailDraft(draft)
+      return
+    }
+
     const target = buildTarget(autoMeta)
     const url = channelDeepLink(draft.channel, target, draft.text, draft.subject)
     const fullText = draft.subject ? `${draft.subject}\n\n${draft.text}` : draft.text
@@ -515,7 +564,7 @@ function OutreachStudioContent() {
     setSendingId(null)
     if (error) { toast.error('Could not log the touch'); return }
     if (url) {
-      if (draft.channel !== 'email') navigator.clipboard.writeText(fullText)
+      navigator.clipboard.writeText(fullText)
       window.open(url, '_blank')
       toast.success('Logged · follow-up scheduled in 5 days')
     } else {
