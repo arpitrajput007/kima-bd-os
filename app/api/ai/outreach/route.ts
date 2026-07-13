@@ -326,7 +326,7 @@ FOLLOW-UP RULES:
 - Do NOT repeat the same hook or pitch from the prior message(s). Lead with a DIFFERENT angle: a fresh proof point, a new trigger, a relevant comparison, or a genuinely useful nudge.
 - Lightly acknowledge you reached out before without guilt-tripping ("following up" is fine; no "just bumping this" or "circling back").
 - ${isFinal
-    ? 'This is the LAST follow-up — make it an easy, no-pressure close: a simple yes/no, or "should I close the loop?" so it is painless to reply even with a no.'
+    ? 'This is the LAST follow-up. Write the body only — do NOT write your own closing line or ask. A closing sentence ("If that\'s not interesting, no worries — just reply \'no\' and I\'ll stop following up.") is appended automatically after your text, so end on the last useful point instead.'
     : 'End with a tiny, low-friction question that is easy to answer.'}
 - Match the channel: ${channel}. ${channel === 'email' ? 'Include a short subject line.' : 'No subject line.'}
 - No signature block.

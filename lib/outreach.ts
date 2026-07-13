@@ -2,9 +2,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Lead } from './types'
 
 // How many follow-ups we owe before a lead is "done" being chased.
-export const MAX_FOLLOWUPS = 2
+export const MAX_FOLLOWUPS = 3
 // Days to wait between touches before the next follow-up is due.
-export const FOLLOWUP_GAP_DAYS = 5
+export const FOLLOWUP_GAP_DAYS = 3
 
 // Where to open / who to message for a given channel. Built from a lead's
 // company-level socials plus the best individual contact.
@@ -227,19 +227,11 @@ export async function getOutreachLearnings(supabase: SupabaseClient): Promise<Ou
   }
 }
 
-// Record an outreach touch: advance the lead's follow-up state and log the
-// sent message. `kind` is 'initial' for the first message, 'followup' after.
-export async function logTouch(
+// Advance a lead's follow-up state after a touch actually goes out — shared by
+// logTouch (fresh send) and finalizeDraftSend (approved draft).
+async function advanceLeadFollowUp(
   supabase: SupabaseClient,
-  opts: {
-    leadId: string
-    channel: string
-    text: string
-    subject?: string
-    contactId?: string
-    kind: 'initial' | 'followup'
-    currentStage?: number
-  },
+  opts: { leadId: string; channel: string; kind: 'initial' | 'followup'; currentStage?: number },
 ): Promise<{ error: string | null }> {
   const now = new Date()
   const newStage = opts.kind === 'initial'
@@ -258,13 +250,93 @@ export async function logTouch(
   }
   if (opts.kind === 'initial') update.contacted_at = now.toISOString()
 
-  const { error: e1 } = await supabase.from('leads').update(update).eq('id', opts.leadId)
+  const { error } = await supabase.from('leads').update(update).eq('id', opts.leadId)
+  return { error: error?.message || null }
+}
+
+// Record an outreach touch: advance the lead's follow-up state and log the
+// sent message. `kind` is 'initial' for the first message, 'followup' after.
+export async function logTouch(
+  supabase: SupabaseClient,
+  opts: {
+    leadId: string
+    channel: string
+    text: string
+    subject?: string
+    contactId?: string
+    kind: 'initial' | 'followup'
+    currentStage?: number
+    gmailThreadId?: string
+    gmailMessageId?: string
+    gmailMessageIdHeader?: string
+  },
+): Promise<{ error: string | null }> {
+  const { error: e1 } = await advanceLeadFollowUp(supabase, opts)
   const { error: e2 } = await supabase.from('outreach_messages').insert({
     lead_id: opts.leadId,
     contact_id: opts.contactId || null,
     channel: opts.channel,
     message: opts.subject ? `Subject: ${opts.subject}\n\n${opts.text}` : opts.text,
     status: 'sent',
+    gmail_thread_id: opts.gmailThreadId || null,
+    gmail_message_id: opts.gmailMessageId || null,
+    gmail_message_id_header: opts.gmailMessageIdHeader || null,
   })
-  return { error: e1?.message || e2?.message || null }
+  return { error: e1 || e2?.message || null }
+}
+
+// Approving a queued draft (see /api/leads/approve-draft): advance the lead's
+// follow-up state and flip the existing outreach_messages row from
+// 'draft' to 'sent' in place, rather than inserting a new row.
+export async function finalizeDraftSend(
+  supabase: SupabaseClient,
+  opts: {
+    messageId: string
+    leadId: string
+    channel: string
+    kind: 'initial' | 'followup'
+    currentStage?: number
+    gmailThreadId?: string
+    gmailMessageId?: string
+    gmailMessageIdHeader?: string
+  },
+): Promise<{ error: string | null }> {
+  const { error: e1 } = await advanceLeadFollowUp(supabase, opts)
+  const { error: e2 } = await supabase
+    .from('outreach_messages')
+    .update({
+      status: 'sent',
+      gmail_thread_id: opts.gmailThreadId || null,
+      gmail_message_id: opts.gmailMessageId || null,
+      gmail_message_id_header: opts.gmailMessageIdHeader || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', opts.messageId)
+  return { error: e1 || e2?.message || null }
+}
+
+// The most recent EMAIL touch we sent this lead, if any — used to thread the
+// next follow-up into the same Gmail conversation (In-Reply-To/References +
+// threadId) so replies keep landing in one place we can watch.
+export async function getLastEmailThread(
+  supabase: SupabaseClient,
+  leadId: string,
+): Promise<{ threadId?: string; messageIdHeader?: string; subject?: string } | null> {
+  const { data } = await supabase
+    .from('outreach_messages')
+    .select('gmail_thread_id, gmail_message_id_header, message')
+    .eq('lead_id', leadId)
+    .eq('channel', 'email')
+    .not('gmail_thread_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!data?.gmail_thread_id) return null
+  const subjectMatch = (data.message as string | null)?.match(/^Subject: (.+)$/m)
+  return {
+    threadId: data.gmail_thread_id,
+    messageIdHeader: data.gmail_message_id_header || undefined,
+    subject: subjectMatch?.[1],
+  }
 }

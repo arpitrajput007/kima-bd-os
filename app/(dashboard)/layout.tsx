@@ -1,6 +1,8 @@
 import { Sidebar } from '@/components/sidebar'
 import AgentActivityLog from '@/components/AgentActivityLog'
 import FollowUpNotifications from '@/components/FollowUpNotifications'
+import NewReplyNotifications from '@/components/NewReplyNotifications'
+import PendingOutreachApprovals from '@/components/PendingOutreachApprovals'
 import TimeTracker from '@/components/TimeTracker'
 
 export default function DashboardLayout({
@@ -30,6 +32,8 @@ export default function DashboardLayout({
       </div>
       <AgentActivityLog />
       <FollowUpNotifications />
+      <NewReplyNotifications />
+      <PendingOutreachApprovals />
     </div>
   )
 }

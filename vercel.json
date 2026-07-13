@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/auto-outreach",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/check-replies",
+      "schedule": "0 14 * * *"
     }
   ]
 }

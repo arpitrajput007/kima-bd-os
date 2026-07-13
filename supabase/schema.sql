@@ -93,6 +93,9 @@ create table if not exists outreach_messages (
   call_opening text,
   meeting_agenda text,
   status text default 'draft' check (status in ('draft', 'sent', 'delivered', 'replied', 'archived')),
+  gmail_thread_id text,
+  gmail_message_id text,
+  gmail_message_id_header text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
