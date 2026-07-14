@@ -31,6 +31,7 @@ import {
   Clock,
   CalendarClock,
   Lightbulb,
+  Boxes,
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
@@ -54,6 +55,12 @@ const navGroups: {
   items: { href: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; glow?: boolean; voice?: boolean; cyan?: boolean; orange?: boolean }[]
 }[] = [
 
+  {
+    label: 'Company',
+    items: [
+      { href: '/products', label: 'Products', icon: Boxes, glow: true },
+    ],
+  },
   {
     label: 'Intelligence',
     items: [
