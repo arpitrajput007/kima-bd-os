@@ -3,10 +3,11 @@
 import { useState } from 'react'
 import {
   Boxes, Check, X, ArrowRight, Sparkles, Package, Landmark, ShieldCheck,
+  type LucideIcon,
 } from 'lucide-react'
 import { PRODUCTS, COMPANY_ONE_LINER, TOGETHER_LINE, type Product } from '@/lib/products-showcase'
 
-const ACCENT: Record<Product['accent'], { color: string; bg: string; border: string; icon: React.ComponentType<{ size?: number; className?: string }> }> = {
+const ACCENT: Record<Product['accent'], { color: string; bg: string; border: string; icon: LucideIcon }> = {
   violet: { color: 'rgb(167,139,250)', bg: 'rgba(124,58,237,0.1)', border: 'rgba(124,58,237,0.25)', icon: Package },
   blue:   { color: 'rgb(96,165,250)',  bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.25)',  icon: Landmark },
   cyan:   { color: 'rgb(103,232,249)', bg: 'rgba(6,182,212,0.1)',   border: 'rgba(6,182,212,0.25)',   icon: ShieldCheck },
