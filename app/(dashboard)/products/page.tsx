@@ -263,11 +263,7 @@ function CustomProductDetail({ product, onDeleted }: { product: CustomProduct; o
           {an.icp?.description && (
             <p className="text-[13.5px] leading-relaxed mb-3" style={{ color: 'var(--text-1)' }}>{an.icp.description}</p>
           )}
-          <div className="flex flex-wrap gap-2">
-            {(an.icp?.segments ?? []).map((s, i) => (
-              <span key={i} className="badge" style={{ color: a.color, background: a.bg, borderColor: a.border }}>{s}</span>
-            ))}
-          </div>
+          <BulletList items={an.icp?.segments ?? []} color={a.color} />
         </div>
       </div>
 
