@@ -29,7 +29,7 @@ interface CardLabels {
 
 const LABEL_PRESETS: Record<string, CardLabels> = {
   security:    { badge: 'SECURITY INCIDENT',   panel1: 'WHAT HAPPENED',         panel2: 'THE GOVERNANCE GAP',      accentColor: '#7c3aed' },
-  agentic:     { badge: 'AGENTIC AI',          panel1: 'THE DEVELOPMENT',        panel2: 'AERPOLICE\'S ROLE',          accentColor: '#3b82f6' },
+  agentic:     { badge: 'AGENTIC AI',          panel1: 'THE DEVELOPMENT',        panel2: 'THE FIX',                 accentColor: '#3b82f6' },
   insight:     { badge: 'MARKET INSIGHT',      panel1: 'WHAT\'S HAPPENING',      panel2: 'THE MISSING LAYER',       accentColor: '#f59e0b' },
   product:     { badge: 'PRODUCT LAUNCH',      panel1: 'WHAT WAS BUILT',         panel2: 'THE GOVERNANCE QUESTION', accentColor: '#10b981' },
   regulation:  { badge: 'REGULATORY UPDATE',   panel1: 'THE CHANGE',             panel2: 'WHAT THIS MEANS',         accentColor: '#f59e0b' },
