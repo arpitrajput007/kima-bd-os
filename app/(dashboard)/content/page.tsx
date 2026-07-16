@@ -9,7 +9,7 @@ import {
   Zap, Hash, AlignLeft, AtSign, MessageCircle, X,
   Bookmark, BookmarkCheck, Trash2, ChevronDown, ChevronUp,
   Clock, CheckCircle2, Filter, History, RotateCcw, GalleryHorizontalEnd,
-  Brain, Send, Plus, MessageSquare, Lightbulb,
+  Brain, Send, Plus, MessageSquare, Lightbulb, Pencil, Check,
 } from 'lucide-react'
 import ReactionMode from '@/components/ReactionMode'
 
@@ -76,12 +76,33 @@ interface GraphicState {
   url: string | null
 }
 
+interface DiscussionThread {
+  id: string
+  session_id: string
+  title: string
+  message_count: number
+  created_at: string
+  updated_at: string
+}
+
 // A product angle is "present" unless the model explicitly found no genuine fit
 // (legacy sessions/drafts may still carry the old 'N/A' sentinel).
 function hasProductAngle(angle: string | null | undefined): angle is string {
   if (!angle) return false
   const lower = angle.toLowerCase()
   return angle !== 'N/A' && !lower.startsWith('none')
+}
+
+function relTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  const d = Math.floor(h / 24)
+  if (d < 7) return `${d}d ago`
+  return new Date(iso).toLocaleDateString()
 }
 
 // ── Copy hook ──────────────────────────────────────────────────────────────────
@@ -515,10 +536,11 @@ function DiscussRichText({ text }: { text: string }) {
   )
 }
 
-function ContentDiscussPanel({ result, newsContext, sourceUrl, onClose }: {
+function ContentDiscussPanel({ result, newsContext, sourceUrl, sessionId, onClose }: {
   result: ContentResult
   newsContext: string
   sourceUrl: string
+  sessionId: string | null
   onClose: () => void
 }) {
   const [messages, setMessages] = useState<DiscussChatMsg[]>([])
@@ -528,6 +550,13 @@ function ContentDiscussPanel({ result, newsContext, sourceUrl, onClose }: {
   const [mounted, setMounted]   = useState(false)
   const scrollRef  = useRef<HTMLDivElement>(null)
   const inputRef   = useRef<HTMLTextAreaElement>(null)
+
+  // Persisted conversation threads for this generated content (custom-named, saved to history).
+  const [threads, setThreads]       = useState<DiscussionThread[]>([])
+  const [activeId, setActiveId]     = useState<string | null>(null)
+  const [listOpen, setListOpen]     = useState(false)
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
 
   useEffect(() => {
     setMounted(true)
@@ -542,6 +571,66 @@ function ContentDiscussPanel({ result, newsContext, sourceUrl, onClose }: {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, thinking])
 
+  // Load this content's past conversations and open the most recent one.
+  useEffect(() => {
+    if (!sessionId) return
+    (async () => {
+      try {
+        const res  = await fetch(`/api/content-discussions?session_id=${sessionId}`)
+        const json = await res.json()
+        const list: DiscussionThread[] = json.discussions || []
+        setThreads(list)
+        if (list.length) loadThread(list[0].id)
+      } catch { /* stay on a fresh, unsaved conversation */ }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId])
+
+  const loadThread = async (id: string) => {
+    setActiveId(id)
+    setListOpen(false)
+    try {
+      const res  = await fetch(`/api/content-discussions/${id}`)
+      const json = await res.json()
+      setMessages((json.messages || []).map((m: { role: string; content: string }) => ({ role: m.role as 'user' | 'assistant', content: m.content })))
+    } catch { /* leave whatever was showing */ }
+  }
+
+  const newConversation = () => {
+    setActiveId(null)
+    setMessages([])
+    setListOpen(false)
+    setTimeout(() => inputRef.current?.focus(), 60)
+  }
+
+  const deleteThread = async (id: string) => {
+    setThreads(prev => prev.filter(t => t.id !== id))
+    try { await fetch(`/api/content-discussions/${id}`, { method: 'DELETE' }) } catch { /* already removed */ }
+    if (activeId === id) {
+      const remaining = threads.filter(t => t.id !== id)
+      if (remaining.length) loadThread(remaining[0].id)
+      else { setActiveId(null); setMessages([]) }
+    }
+  }
+
+  const startRename = (t: DiscussionThread) => {
+    setRenamingId(t.id)
+    setRenameValue(t.title)
+  }
+
+  const saveRename = async () => {
+    const id = renamingId
+    const title = renameValue.trim()
+    setRenamingId(null)
+    if (!id || !title) return
+    setThreads(prev => prev.map(t => t.id === id ? { ...t, title } : t))
+    try {
+      await fetch(`/api/content-discussions/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }),
+      })
+    } catch { /* local rename already applied */ }
+  }
+
   const close = () => {
     setShown(false)
     setTimeout(onClose, 200)
@@ -551,11 +640,33 @@ function ContentDiscussPanel({ result, newsContext, sourceUrl, onClose }: {
     const question = q.trim()
     if (!question || thinking) return
 
+    // Lazily create a named thread on the first message of a new conversation.
+    let threadId = activeId
+    if (!threadId && sessionId) {
+      try {
+        const res  = await fetch('/api/content-discussions', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId, title: question.slice(0, 70) }),
+        })
+        const json = await res.json()
+        if (json.discussion) {
+          threadId = json.discussion.id
+          setActiveId(threadId)
+          setThreads(prev => [json.discussion, ...prev])
+        }
+      } catch { /* continue unsaved if thread creation fails */ }
+    }
+
     const next: DiscussChatMsg[] = [...messages, { role: 'user', content: question }]
     setMessages(next)
     setInput('')
     if (inputRef.current) inputRef.current.style.height = 'auto'
     setThinking(true)
+    if (threadId) {
+      fetch(`/api/content-discussions/${threadId}/messages`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: 'user', content: question }),
+      }).catch(() => {})
+    }
 
     try {
       const res  = await fetch('/api/ai/content/discuss', {
@@ -582,6 +693,15 @@ function ContentDiscussPanel({ result, newsContext, sourceUrl, onClose }: {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
       setMessages([...next, { role: 'assistant', content: json.reply }])
+      if (threadId) {
+        const ts = new Date().toISOString()
+        const count = next.length + 1
+        fetch(`/api/content-discussions/${threadId}/messages`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: 'assistant', content: json.reply }),
+        }).catch(() => {})
+        setThreads(prev => prev.map(t => t.id === threadId ? { ...t, message_count: count, updated_at: ts } : t)
+          .sort((a, b) => b.updated_at.localeCompare(a.updated_at)))
+      }
     } catch (err: unknown) {
       setMessages([...next, { role: 'assistant', content: `⚠️ ${err instanceof Error ? err.message : 'Something went wrong'}` }])
     } finally {
@@ -615,6 +735,7 @@ function ContentDiscussPanel({ result, newsContext, sourceUrl, onClose }: {
           transform: shown ? 'translateX(0)' : 'translateX(100%)',
           transition: 'transform 0.28s cubic-bezier(0.22,1,0.36,1)',
           overflow: 'hidden',
+          position: 'relative',
         }}
       >
         {/* Header */}
@@ -624,18 +745,43 @@ function ContentDiscussPanel({ result, newsContext, sourceUrl, onClose }: {
               <Brain size={17} color="#a78bfa" />
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>Discuss Content</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {activeId ? (threads.find(t => t.id === activeId)?.title || 'Discuss Content') : 'Discuss Content'}
+              </div>
               <div style={{ fontSize: 11, color: 'rgba(167,139,250,0.7)', marginTop: 1 }}>
                 {totalPosts} posts loaded · ask anything before you post
               </div>
             </div>
           </div>
-          <button
-            onClick={close}
-            style={{ width: 32, height: 32, borderRadius: 9, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-          >
-            <X size={16} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            {sessionId && (
+              <button
+                onClick={() => setListOpen(v => !v)}
+                title="Conversation history"
+                style={{ width: 32, height: 32, borderRadius: 9, border: `1px solid ${listOpen ? 'rgba(167,139,250,0.4)' : 'rgba(255,255,255,0.1)'}`, background: listOpen ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.04)', color: listOpen ? '#a78bfa' : 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
+              >
+                <History size={15} />
+                {threads.length > 0 && (
+                  <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 15, height: 15, padding: '0 3px', borderRadius: 999, background: '#a78bfa', color: 'rgb(16,10,30)', fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>{threads.length}</span>
+                )}
+              </button>
+            )}
+            {sessionId && (
+              <button
+                onClick={newConversation}
+                title="New conversation"
+                style={{ width: 32, height: 32, borderRadius: 9, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Plus size={16} />
+              </button>
+            )}
+            <button
+              onClick={close}
+              style={{ width: 32, height: 32, borderRadius: 9, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Content context strip */}
@@ -747,6 +893,73 @@ function ContentDiscussPanel({ result, newsContext, sourceUrl, onClose }: {
             Enter to send · Shift+Enter for new line · close any time
           </div>
         </div>
+
+        {/* Conversations drawer (this content's chat history, custom-named) */}
+        {sessionId && (
+          <div onClick={() => setListOpen(false)}
+            style={{ position: 'absolute', inset: 0, zIndex: 5, background: listOpen ? 'rgba(4,4,10,0.45)' : 'rgba(4,4,10,0)', pointerEvents: listOpen ? 'auto' : 'none', transition: 'background 0.2s ease' }}>
+            <div onClick={e => e.stopPropagation()}
+              style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: 'min(300px, 82%)', background: 'linear-gradient(180deg, rgb(20,21,32), rgb(14,14,22))', borderRight: '1px solid rgba(167,139,250,0.25)', boxShadow: '24px 0 60px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', transform: listOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.26s cubic-bezier(0.22,1,0.36,1)' }}>
+              <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'rgb(220,210,245)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Conversations</div>
+                <button onClick={newConversation} title="New conversation"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, borderRadius: 8, border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.1)', color: '#a78bfa', fontSize: 11, fontWeight: 600, padding: '5px 9px', cursor: 'pointer' }}>
+                  <Plus size={12} /> New
+                </button>
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto', padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {threads.length === 0 && (
+                  <div style={{ fontSize: 12, color: 'rgb(110,117,145)', padding: '16px 10px', lineHeight: 1.6 }}>
+                    No conversations yet. Ask a question and it&apos;ll be saved here so you can read it again later.
+                  </div>
+                )}
+                {threads.map(t => (
+                  <div key={t.id} onClick={() => renamingId !== t.id && loadThread(t.id)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, borderRadius: 10, padding: '9px 10px', cursor: 'pointer', border: `1px solid ${activeId === t.id ? 'rgba(167,139,250,0.3)' : 'transparent'}`, background: activeId === t.id ? 'rgba(167,139,250,0.08)' : 'transparent' }}
+                    onMouseEnter={e => { if (activeId !== t.id) e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
+                    onMouseLeave={e => { if (activeId !== t.id) e.currentTarget.style.background = 'transparent' }}>
+                    <MessageSquare size={13} color={activeId === t.id ? '#a78bfa' : 'rgb(120,127,160)'} style={{ flexShrink: 0 }} />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      {renamingId === t.id ? (
+                        <input
+                          autoFocus
+                          value={renameValue}
+                          onChange={e => setRenameValue(e.target.value)}
+                          onClick={e => e.stopPropagation()}
+                          onKeyDown={e => { if (e.key === 'Enter') saveRename(); if (e.key === 'Escape') setRenamingId(null) }}
+                          onBlur={saveRename}
+                          style={{ width: '100%', fontSize: 12.5, color: 'white', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(167,139,250,0.4)', borderRadius: 5, padding: '2px 6px', outline: 'none', fontFamily: 'inherit' }}
+                        />
+                      ) : (
+                        <div style={{ fontSize: 12.5, color: activeId === t.id ? 'white' : 'rgb(200,205,222)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.title}</div>
+                      )}
+                      <div style={{ fontSize: 10, color: 'rgb(110,117,145)', marginTop: 1 }}>{relTime(t.updated_at)} · {t.message_count} msg</div>
+                    </div>
+                    {renamingId === t.id ? (
+                      <button onClick={e => { e.stopPropagation(); saveRename() }} title="Save name"
+                        style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 7, border: 'none', background: 'rgba(167,139,250,0.15)', color: '#a78bfa', cursor: 'pointer' }}>
+                        <Check size={12} />
+                      </button>
+                    ) : (
+                      <button onClick={e => { e.stopPropagation(); startRename(t) }} title="Rename conversation"
+                        style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 7, border: 'none', background: 'transparent', color: 'rgb(120,127,160)', cursor: 'pointer' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(167,139,250,0.12)'; e.currentTarget.style.color = '#a78bfa' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgb(120,127,160)' }}>
+                        <Pencil size={12} />
+                      </button>
+                    )}
+                    <button onClick={e => { e.stopPropagation(); deleteThread(t.id) }} title="Delete conversation"
+                      style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 7, border: 'none', background: 'transparent', color: 'rgb(120,127,160)', cursor: 'pointer' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248,113,113,0.12)'; e.currentTarget.style.color = 'rgb(248,113,113)' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgb(120,127,160)' }}>
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -761,6 +974,7 @@ export default function ContentStudioPage() {
   const [url, setUrl]           = useState('')
   const [loading, setLoading]   = useState(false)
   const [result, setResult]     = useState<ContentResult | null>(null)
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [tab, setTab]           = useState<TabKey>('tweets')
   const [discussOpen, setDiscussOpen] = useState(false)
   const { copied, copy }        = useCopy()
@@ -828,6 +1042,7 @@ export default function ContentStudioPage() {
       thread: session.thread,
       linkedin: session.linkedin,
     })
+    setCurrentSessionId(session.id)
     setSavedMap({})
     setGraphicStates({})
     setView('create')
@@ -852,6 +1067,7 @@ export default function ContentStudioPage() {
     if (!news.trim() && !url.trim()) { toast.error('Paste the news, a URL, or any context first'); return }
     setLoading(true)
     setResult(null)
+    setCurrentSessionId(null)
     setGraphicStates({})
     setSavedMap({})
     try {
@@ -860,7 +1076,7 @@ export default function ContentStudioPage() {
       if (!res.ok) throw new Error(json.error)
       setResult(json.data)
       toast.success('Content generated')
-      // Auto-save the full session silently
+      // Auto-save the full session silently, then link it up so Discuss can persist chat history against it
       fetch('/api/content-sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -875,7 +1091,10 @@ export default function ContentStudioPage() {
           linkedin: json.data.linkedin,
         }),
       }).then(r => r.json()).then(s => {
-        if (s.session) setSessions(prev => [s.session, ...prev])
+        if (s.session) {
+          setSessions(prev => [s.session, ...prev])
+          setCurrentSessionId(s.session.id)
+        }
       }).catch(() => { /* non-critical */ })
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : 'Generation failed') }
     finally { setLoading(false) }
@@ -963,6 +1182,7 @@ export default function ContentStudioPage() {
           result={result}
           newsContext={news}
           sourceUrl={url}
+          sessionId={currentSessionId}
           onClose={() => setDiscussOpen(false)}
         />
       )}

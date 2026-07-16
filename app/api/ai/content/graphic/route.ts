@@ -83,6 +83,7 @@ function buildCard(opts: {
     // Accent line at top
     e('div', {
       style: {
+        display: 'flex',
         position: 'absolute', top: 0, left: 0, right: 0, height: 3,
         background: 'linear-gradient(90deg, #7c3aed 0%, #3b82f6 60%, transparent 100%)',
       },
@@ -106,6 +107,7 @@ function buildCard(opts: {
       ),
       e('div', {
         style: {
+          display: 'flex',
           background: `${labels.accentColor}1e`, border: `1px solid ${labels.accentColor}4d`,
           borderRadius: 6, padding: '4px 11px',
         },
@@ -117,6 +119,7 @@ function buildCard(opts: {
     // Headline with left accent bar
     e('div', {
       style: {
+        display: 'flex',
         fontSize: hlSize, fontWeight: 800, color: 'white', lineHeight: 1.22,
         marginBottom: isLinkedIn ? 22 : 30,
         borderLeft: '3px solid #7c3aed', paddingLeft: 16,
@@ -134,10 +137,10 @@ function buildCard(opts: {
         },
       },
         e('div', {
-          style: { color: 'rgba(255,255,255,0.3)', fontSize: 9, fontWeight: 700, letterSpacing: '0.13em', marginBottom: 9 },
+          style: { display: 'flex', color: 'rgba(255,255,255,0.3)', fontSize: 9, fontWeight: 700, letterSpacing: '0.13em', marginBottom: 9 },
         }, labels.panel1),
         e('div', {
-          style: { color: 'rgba(255,255,255,0.82)', fontSize: bodySize, lineHeight: 1.62 },
+          style: { display: 'flex', color: 'rgba(255,255,255,0.82)', fontSize: bodySize, lineHeight: 1.62 },
         }, trunc(incident_summary, 170)),
       ),
       // Solution
@@ -149,10 +152,10 @@ function buildCard(opts: {
         },
       },
         e('div', {
-          style: { color: labels.accentColor, fontSize: 9, fontWeight: 700, letterSpacing: '0.13em', marginBottom: 9 },
+          style: { display: 'flex', color: labels.accentColor, fontSize: 9, fontWeight: 700, letterSpacing: '0.13em', marginBottom: 9 },
         }, labels.panel2),
         e('div', {
-          style: { color: 'rgba(167,139,250,0.88)', fontSize: bodySize, lineHeight: 1.62 },
+          style: { display: 'flex', color: 'rgba(167,139,250,0.88)', fontSize: bodySize, lineHeight: 1.62 },
         }, trunc(solution, 170)),
       ),
     ),
@@ -163,7 +166,7 @@ function buildCard(opts: {
     },
       e('span', { style: { color: 'rgba(255,255,255,0.15)', fontSize: 11 } }, 'aerpolice.io'),
       e('div', {
-        style: { background: 'linear-gradient(135deg, #7c3aed, #3b82f6)', borderRadius: 6, padding: '5px 13px' },
+        style: { display: 'flex', background: 'linear-gradient(135deg, #7c3aed, #3b82f6)', borderRadius: 6, padding: '5px 13px' },
       },
         e('span', { style: { color: 'white', fontSize: 11, fontWeight: 700 } }, 'Aerpolice'),
       ),
@@ -211,36 +214,41 @@ async function saveToGallery(opts: {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json()
-  const { incident_summary, root_cause, kima_angle, hook, post_type = 'tweet', content_id } = body
+  try {
+    const body = await req.json()
+    const { incident_summary, root_cause, kima_angle, hook, post_type = 'tweet', content_id } = body
 
-  if (!incident_summary || !hook) {
-    return NextResponse.json({ error: 'incident_summary and hook are required.' }, { status: 400 })
+    if (!incident_summary || !hook) {
+      return NextResponse.json({ error: 'incident_summary and hook are required.' }, { status: 400 })
+    }
+
+    const isLinkedIn = post_type === 'linkedin'
+    const width  = isLinkedIn ? 1200 : 1024
+    const height = isLinkedIn ? 628  : 1024
+    const size   = `${width}x${height}`
+    const solution = kima_angle || root_cause || ''
+
+    // Classify content type to pick the right card labels (fast Haiku call)
+    const labels = await classifyContent(incident_summary, solution)
+
+    const card = buildCard({ hook, incident_summary, solution, isLinkedIn, labels })
+
+    const imgResponse = new ImageResponse(card, { width, height })
+    const buffer = Buffer.from(await imgResponse.arrayBuffer())
+    const b64 = buffer.toString('base64')
+
+    const publicUrl = await saveToGallery({ b64, incident_summary, hook, post_type, content_id, size })
+    const imageUrl = publicUrl ?? `data:image/png;base64,${b64}`
+
+    return NextResponse.json({
+      success: true,
+      image_url: imageUrl,
+      saved_to_gallery: !!publicUrl,
+      size,
+      content_id,
+    })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Graphic generation failed'
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
-
-  const isLinkedIn = post_type === 'linkedin'
-  const width  = isLinkedIn ? 1200 : 1024
-  const height = isLinkedIn ? 628  : 1024
-  const size   = `${width}x${height}`
-  const solution = kima_angle || root_cause || ''
-
-  // Classify content type to pick the right card labels (fast Haiku call)
-  const labels = await classifyContent(incident_summary, solution)
-
-  const card = buildCard({ hook, incident_summary, solution, isLinkedIn, labels })
-
-  const imgResponse = new ImageResponse(card, { width, height })
-  const buffer = Buffer.from(await imgResponse.arrayBuffer())
-  const b64 = buffer.toString('base64')
-
-  const publicUrl = await saveToGallery({ b64, incident_summary, hook, post_type, content_id, size })
-  const imageUrl = publicUrl ?? `data:image/png;base64,${b64}`
-
-  return NextResponse.json({
-    success: true,
-    image_url: imageUrl,
-    saved_to_gallery: !!publicUrl,
-    size,
-    content_id,
-  })
 }
