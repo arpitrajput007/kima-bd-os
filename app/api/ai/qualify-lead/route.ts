@@ -145,8 +145,8 @@ Return a single JSON object with ALL of these fields:
 
   // ── Classification ─────────────────────────────────────────
   "industry_category": "Exactly one of: Cross-border payment company | PSP/payment gateway | On/off-ramp provider | Stablecoin payment company | Wallet | DEX | Perp DEX | Launchpad | RWA platform | iGaming/payment-heavy platform | Neobank | Fintech | Exchange | Chain ecosystem | AI commerce/payment agent | Treasury management platform | Custody/payment infrastructure company | Web2 company with payment/settlement friction | Other",
-  "customer_category": ["Array — pick all that apply: Agentic Payments Customer | LayerZero Customer | Hacked Protocol | Needs On/Off Ramp | Fireblocks Customer | Web2 Stablecoin Settlement Customer | Other"],
-  "product_to_sell": "Exactly one of: Agentic payment rails | Cross-chain settlement | Stablecoin settlement | Fiat on/off-ramp | Treasury movement | DvP settlement | iGaming payments | RWA settlement | PSP settlement | Wallet onboarding | Launchpad participation | Payment orchestration | Cross-border USDT/USDC settlement",
+  "customer_category": ["Array — pick all that apply: Agentic Payments Customer | Aerpolice Governance Customer | AERKey / Key Governance Customer | LayerZero Customer | Hacked Protocol | Needs On/Off Ramp | Fireblocks Customer | Web2 Stablecoin Settlement Customer | Other"],
+  "product_to_sell": "Exactly one of: Agentic payment rails | Aerpolice agent governance | AERKey threshold signing | Cross-chain settlement | Stablecoin settlement | Fiat on/off-ramp | Treasury movement | DvP settlement | iGaming payments | RWA settlement | PSP settlement | Wallet onboarding | Launchpad participation | Payment orchestration | Cross-border USDT/USDC settlement",
   "region": "Primary market — one of: Global | North America | Europe | Asia | Middle East | Africa | Southeast Asia | South Asia | Latin America | MENA | EU-India corridor | UAE-India corridor | US-India corridor",
 
   // ── Pain point ─────────────────────────────────────────────

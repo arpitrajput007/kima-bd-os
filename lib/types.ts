@@ -94,6 +94,8 @@ export const INDUSTRY_CATEGORIES = [
 
 export const CUSTOMER_CATEGORIES = [
   'Agentic Payments Customer',
+  'Aerpolice Governance Customer',
+  'AERKey / Key Governance Customer',
   'LayerZero Customer',
   'Hacked Protocol',
   'Needs On/Off Ramp',
@@ -104,6 +106,8 @@ export const CUSTOMER_CATEGORIES = [
 
 export const PRODUCTS_TO_SELL = [
   'Agentic payment rails',
+  'Aerpolice agent governance',
+  'AERKey threshold signing',
   'Cross-chain settlement',
   'Stablecoin settlement',
   'Fiat on/off-ramp',

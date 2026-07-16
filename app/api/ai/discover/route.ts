@@ -38,6 +38,8 @@ async function getHunterContacts(website: string): Promise<string> {
 
 const CUSTOMER_CATEGORIES = [
   'Agentic Payments Customer',
+  'Aerpolice Governance Customer',
+  'AERKey / Key Governance Customer',
   'LayerZero Customer',
   'Hacked Protocol',
   'Needs On/Off Ramp',
@@ -265,16 +267,20 @@ async function deepResearch(
     // where Opus earns its cost. Extended thinking reasons through company-specific
     // pain points and finds real contacts rather than generic ones.
     // For OpenAI: standard gpt-4o via routeJSON.
-    const deepResearchSystem = `You are a senior BD researcher for Kima and Aeredium.
+    const deepResearchSystem = `You are a senior BD researcher for Kima, Aeredium (including AERKey threshold signing), and Aerpolice.
 
 ${PRODUCT_BRAIN}
 
 FIRST, validate the input is a REAL, SPECIFIC company (a brand you can google to one company's site like "Bybit", "JPMorgan", "Circle") and NOT a generic category/segment ("Crypto Exchanges", "Banks", "Fintechs", "Infrastructure", "AI", "RWA Platforms"). If it is a category, set "is_specific_real_company": false and leave other fields minimal.
 
+Evaluate ALL THREE product lines for every company — do not default to Kima/Aeredium framing out of habit:
+- If this company builds or ships AI agents that take financial actions (payments, procurement, treasury, trading), Aerpolice governance is likely the lead pitch, not settlement.
+- If this company is a custodian, MPC wallet provider, exchange, or institution with key-signing/custody policy needs, evaluate AERKey specifically (see AERKEY section above) — don't collapse it into a generic "Aeredium" mention.
+
 SCORING (0-100):
 High score (70+): clear pain point, active product, matches a target category, decision maker findable
 Medium (40-69): possible fit but unclear pain point or no direct match
-Low (<40): no clear use case for Kima/Aeredium
+Low (<40): no clear use case for Kima/Aeredium/Aerpolice
 ${learnedIntelligence || ''}`
 
     const deepResearchUser = `Do a deep BD research on this company for Kima/Aeredium:
@@ -303,8 +309,8 @@ Return this exact JSON:
 {
   "is_specific_real_company": true,
   "industry_category": "one specific industry category",
-  "customer_category": ["array — pick from: Agentic Payments Customer, LayerZero Customer, Hacked Protocol, Needs On/Off Ramp, Fireblocks Customer, Web2 Stablecoin Settlement Customer, Other"],
-  "product_to_sell": "the single most relevant Kima/Aeredium product for this company and WHY",
+  "customer_category": ["array — pick from: Agentic Payments Customer, Aerpolice Governance Customer, AERKey / Key Governance Customer, LayerZero Customer, Hacked Protocol, Needs On/Off Ramp, Fireblocks Customer, Web2 Stablecoin Settlement Customer, Other"],
+  "product_to_sell": "the single most relevant Kima/Aeredium/Aerpolice product for this company and WHY — e.g. 'AERKey threshold signing — they run MPC custody today with no hardware-attested signing policy' or 'Aerpolice agent governance — their AI agent handles payouts with no execution gate'",
   "region": "their primary market region",
   "company_summary": "3-4 sentence summary: what they do, how big, what stack they use, what stage they're at",
   "business_model": "how they specifically make money",
@@ -317,7 +323,8 @@ Return this exact JSON:
   "pain_point_evidence_type": "verified_source|agent_analysis|inferred",
   "kima_fit": "exactly how Kima's specific product solves their specific pain — tied to their actual stack",
   "suggested_use_case": "the precise Kima integration to pitch",
-  "aeredium_fit": "how Aeredium's TEE validators / AERKey / AERLink addresses their trust or compliance gap",
+  "aeredium_fit": "how Aeredium's TEE validators / AERKey / AERLink addresses their trust or compliance gap — if AERKey (threshold signing / key governance) is the specific angle, say so explicitly",
+  "aerpolice_fit": "how Aerpolice's Agent Identity / Execution Gate / Audit Trail addresses their AI-agent governance gap, or null if this company has no AI agents taking financial actions — never force this",
   "trigger_reason": "why reach out NOW — a specific recent event (funding, product launch, hire, hack). Must be datable and real.",
   "source_url": "exact URL to the trigger event. NOT a homepage. null if none.",
   "settlement_angle": "the exact settlement improvement Kima delivers for their specific flow",
@@ -658,6 +665,7 @@ export async function POST(req: NextRequest) {
           pain_point_evidence_type: research.pain_point_evidence_type || 'agent_analysis',
           kima_fit: research.kima_fit,
           aeredium_fit: research.aeredium_fit,
+          aerpolice_fit: research.aerpolice_fit || null,
           suggested_use_case: research.suggested_use_case,
           trigger_reason: research.trigger_reason,
           settlement_angle: research.settlement_angle,

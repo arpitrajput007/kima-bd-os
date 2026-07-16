@@ -1,7 +1,7 @@
 import { claudeJSON, claudeText, CLAUDE_RESEARCH } from "@/lib/claude"
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { PRODUCT_BRAIN_COMPACT } from '@/lib/kima-knowledge'
+import { PRODUCT_BRAIN } from '@/lib/kima-knowledge'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -132,18 +132,22 @@ export async function POST() {
     // 4. Light live grounding (best-effort).
     const web = await searchWeb('best directories and communities to find new crypto payment, stablecoin, DeFi and AI agent projects 2026')
 
-    const systemPrompt = `You are a senior BD lead-generation strategist for Kima and Aeredium.
+    const systemPrompt = `You are a senior BD lead-generation strategist for Kima, Aeredium (including AERKey threshold signing), and Aerpolice.
 
-${PRODUCT_BRAIN_COMPACT}
+${PRODUCT_BRAIN}
 
 Your job: suggest NEW discovery sources the user should add to their lead-finding agent.
 A "source" is a place the agent can crawl/search to find target companies: an ecosystem directory,
 a Telegram/Discord community, a Twitter/X profile that posts deals, a Google search query, a news/funding
 feed, a DeFiLlama category, a Crunchbase list, a hackathon directory, etc.
 
-Good sources are: high-signal, regularly updated, full of companies that match Kima/Aeredium's ICP
-(payment/settlement/cross-chain/stablecoin/agentic-commerce/RWA/wallets/exchanges/fintech), and
-realistically crawlable from a public URL or a search query.
+Good sources are: high-signal, regularly updated, full of companies that match any of the three product
+lines' ICPs — Kima/Aeredium (payment/settlement/cross-chain/stablecoin/RWA/wallets/exchanges/fintech),
+AERKey (custodians, MPC/custody wallet providers, exchanges, institutions needing key-signing governance),
+and Aerpolice (AI-native companies whose agents take financial actions — payments, procurement, treasury,
+trading — especially ones facing enterprise security review). Actively look for gaps: if AERKey or
+Aerpolice have few or no dedicated sources yet, prioritize suggesting sources for whichever is thinnest.
+Sources must be realistically crawlable from a public URL or a search query.
 
 Return ONLY valid JSON. No markdown.`
 

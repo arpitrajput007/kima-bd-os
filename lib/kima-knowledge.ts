@@ -54,6 +54,34 @@ WHEN AEREDIUM IS NOT THE RIGHT ANSWER:
 - Companies that need a payment API, not a settlement network.
 - Companies with no need for institutional-grade compliance, throughput, or privacy.`
 
+// ── AERKEY (standalone deep-dive — do not treat as a minor Aeredium bullet) ──
+export const AERKEY_KNOWLEDGE = `AERKEY — TEE-attested threshold ECDSA signing. Cryptographic key governance, not just custody.
+
+What AERKey actually is:
+AERKey is Aeredium's threshold-signing product: private keys are split via threshold ECDSA and every signing operation runs inside hardware-attested TEEs (Trusted Execution Environments) across three independent cloud providers (AWS Nitro, Azure SEV-SNP, GCP Confidential Space). A signing key is never assembled, never reconstructed in one place, and never held by a single human, server, or cloud vendor. Policy — who can sign, how much, under what conditions — is enforced cryptographically at the key level, not as a software rule that a compromised process can route around.
+
+How it's different from standard MPC custody (Fireblocks, Coinbase Custody, Copper, Fordefi, etc.):
+- Those platforms shard key material across parties (MPC) but the signing computation itself typically runs in ordinary server processes — trust the operator's software and infra security.
+- AERKey performs the signing operation itself inside hardware-attested enclaves spread across three different cloud providers, so no single cloud, insider, or compromised host can produce a valid signature alone.
+- This is "key governance" (cryptographically enforced policy on WHO/HOW MUCH can be signed) layered on top of threshold custody — not just "where the key shards live."
+
+WHO AERKEY IS FOR:
+- Custodians and MPC/custody wallet providers who want a stronger signing guarantee than software-only MPC, or who want to white-label/resell a harder security story to institutional clients.
+- Exchanges, prime brokers, and OTC desks that need hardware-grade accountability for hot/warm wallet signing at scale.
+- Banks and institutions issuing their own wallets or tokenized asset custody (an Aeredium "Participant" or "Service offering" engagement model) that need provable, auditable signing policy — not just an internal spreadsheet of approvers.
+- Treasury and payment platforms (including AI-agent treasury/payroll tools) that need spend-limit or multi-party-approval enforcement built into the signature itself, so a compromised app layer cannot force an unauthorized transfer.
+- Any company currently doing multisig-via-hardware-wallets-and-spreadsheets that has outgrown that process as transaction volume or headcount grows.
+
+Key buying trigger: a security incident, insurance/compliance audit, or institutional client due-diligence questionnaire that asks "where do your keys live, who can sign, and can you prove it" — and the honest answer today involves a single MPC vendor, a single cloud, or manual multisig coordination.
+
+WHEN AERKEY IS NOT THE RIGHT ANSWER:
+- Early-stage teams with a single small hot wallet and no institutional counterparties — a standard multisig (Safe, etc.) is sufficient and AERKey is overkill.
+- Companies that only need custody (holding keys safely) and have no signing-policy or governance requirement — a plain custodian may suffice.
+- Companies with no near-term plans to handle institutional volume, funds, or regulated assets.
+
+Key contacts: Head of Security / CISO, Head of Custody or Treasury, VP Engineering, Founder/CTO (smaller companies), Compliance/Risk lead (institutions).
+Trigger events: security incident or near-miss, new institutional client requiring custody proof, compliance/security hire, expansion into custody/treasury products, funding round earmarked for infrastructure hardening.`
+
 // ── Consultant reasoning framework ───────────────────────────────────────────
 // Injected into enrichment and bd-brief prompts to force the right order of
 // reasoning. This is the single most important quality lever in the system.
@@ -306,6 +334,8 @@ export const PRODUCT_BRAIN = `${CONSULTANT_FRAMEWORK}
 ${KIMA_KNOWLEDGE}
 
 ${AEREDIUM_KNOWLEDGE}
+
+${AERKEY_KNOWLEDGE}
 
 ${AERPOLICE_KNOWLEDGE}
 
