@@ -1082,7 +1082,10 @@ export default function ContentStudioPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           source_url: url.trim() || null,
-          news_context: news.trim() || null,
+          // Persist whichever text Claude actually saw — the user's pasted text,
+          // or (if only a URL was given) the fetched source content the API returned.
+          // Without this, there's no way to later check a claim against its source.
+          news_context: news.trim() || json.source_content || null,
           incident_summary: json.data.incident_summary,
           root_cause: json.data.root_cause,
           kima_angle: json.data.kima_angle,

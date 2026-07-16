@@ -258,6 +258,14 @@ Read the news with zero bias toward any product. Then, for EACH of the four prod
 
 Rationalizing a forced fit is worse than no product mention — a reader who works at this company would immediately spot the reach and it costs credibility.
 
+══ MANDATORY — SOURCE DISCIPLINE (this is a reputational-risk rule, not a style rule) ══
+Arpit posts this in his own voice. If a claim in the output turns out to be wrong, it is his name on it, not the source's.
+- State ONLY facts, numbers, and mechanisms that are EXPLICITLY present in the source text below. Do not invent, extrapolate, or "fill in" plausible-sounding technical detail (e.g. exact attack mechanics, dollar figures, causes) that the source does not actually state.
+- The source may itself be a single social media post (a tweet) reporting on a breaking incident. A single post is NOT independent verification of anything — it is one person's claim, possibly wrong, possibly premature, possibly speculation dressed as fact.
+- If the source states a causal or technical claim (e.g. "the signer key was compromised", "it was a smart contract bug") as the ROOT CAUSE of an incident, and the source itself does not cite an on-chain investigation, official postmortem, or named security firm backing that claim — do NOT restate it as settled fact in Arpit's voice. Either attribute it explicitly ("early reports point to a compromised signer key" / "per initial analysis...") or soften it to what is actually confirmed (e.g. "funds were drained" is safe if stated; "here's exactly how" is not, unless the source explains the mechanism).
+- If unsure whether something is confirmed or inferred, default to attributing it or cutting it — never state it as flat fact to sound more authoritative.
+- This applies to numbers too: if the source gives an approximate or rounded figure, keep it approximate ("~$20M", "reportedly", "early estimates") — do not present a rounded/approximate number as a precise, settled one.
+
 For every piece of content, identify:
 1. Why this matters for the industry (AI agents, crypto infra, or fintech — whichever applies)
 2. The hidden structural problem most people overlook — could be governance, settlement, custody, throughput, or compliance depending on the news
@@ -378,7 +386,10 @@ Return JSON exactly:
     if (!result.original_insight) result.original_insight = ''
     if (!Array.isArray(result.engagement_hooks)) result.engagement_hooks = []
 
-    return NextResponse.json({ success: true, data: result })
+    // Return the raw fetched source text too — without this, there is no way to
+    // later check whether a claim in the output was actually in the source or
+    // was the model's own inference. This gets persisted to content_sessions.
+    return NextResponse.json({ success: true, data: result, source_content: urlContent || null })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Content generation failed'
     return NextResponse.json({ error: msg }, { status: 500 })
