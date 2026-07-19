@@ -32,6 +32,7 @@ import {
   CalendarClock,
   Lightbulb,
   Boxes,
+  KeyRound,
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
@@ -52,7 +53,7 @@ function todayISO(): string {
 
 const navGroups: {
   label: string
-  items: { href: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; glow?: boolean; voice?: boolean; cyan?: boolean; orange?: boolean }[]
+  items: { href: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; glow?: boolean; voice?: boolean; cyan?: boolean; orange?: boolean; blue?: boolean }[]
 }[] = [
 
   {
@@ -89,6 +90,7 @@ const navGroups: {
     items: [
       { href: '/web3-agent-companies', label: 'Web3 AI Agent Companies', icon: Shield,  glow: true },
       { href: '/web2-agent-companies', label: 'Web2 AI Agent Companies', icon: Globe,   orange: true },
+      { href: '/aerkey-customers',     label: 'AERKey Customers',        icon: KeyRound, blue: true },
     ],
   },
   {
@@ -208,7 +210,7 @@ export function Sidebar() {
             {collapsed && gi > 0 && (
               <div className="my-2 mx-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }} />
             )}
-            {group.items.map(({ href, label, icon: Icon, glow, voice, cyan, orange }) => {
+            {group.items.map(({ href, label, icon: Icon, glow, voice, cyan, orange, blue }) => {
               const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
               const hasApiAlert = href === '/settings' && apiIssues.length > 0
               const draftBadge = href === '/email-reachout' ? pendingDrafts : 0
@@ -226,6 +228,10 @@ export function Sidebar() {
                     background: 'rgba(6,182,212,0.07)',
                     borderColor: 'rgba(6,182,212,0.22)',
                     color: 'rgba(103,232,249,0.9)',
+                  } : blue && !isActive ? {
+                    background: 'rgba(96,165,250,0.07)',
+                    borderColor: 'rgba(96,165,250,0.22)',
+                    color: 'rgba(147,197,253,0.9)',
                   } : glow && !isActive ? {
                     background: 'rgba(124,58,237,0.08)',
                     borderColor: 'rgba(124,58,237,0.25)',
@@ -247,6 +253,12 @@ export function Sidebar() {
                   {!collapsed && cyan && !isActive && (
                     <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded"
                       style={{ background: 'rgba(6,182,212,0.15)', color: '#67e8f9' }}>
+                      NEW
+                    </span>
+                  )}
+                  {!collapsed && blue && !isActive && (
+                    <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded"
+                      style={{ background: 'rgba(96,165,250,0.15)', color: '#93c5fd' }}>
                       NEW
                     </span>
                   )}
