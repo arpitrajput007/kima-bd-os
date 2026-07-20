@@ -2918,8 +2918,9 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
   }
 
   const starters = [
-    'How does their tech work and where do Kima, Aeredium & Aerpolice each fit?',
+    'How does their tech work and where do Kima, Aeredium, AERKey & Aerpolice each fit?',
     'Do they have AI agents taking real consequential actions — are they an Aerpolice customer?',
+    'Do they run custody, a wallet, or a signing operation — are they an AERKey fit?',
     'What\'s the strongest angle to pitch the full suite here?',
     'What objections will they raise, and how do I counter them?',
   ]
@@ -2975,7 +2976,7 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
           {messages.length === 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <p style={{ fontSize: 13, color: 'rgb(150,157,180)', lineHeight: 1.65, margin: 0 }}>
-                Ask anything about <span style={{ color: 'rgb(103,232,249)' }}>{lead.company_name}</span> — how their tech works, whether they have AI agents taking real actions, and where <strong style={{ color: 'white' }}>Kima / Aeredium / Aerpolice</strong> each plug in. I research them live and remember what we figure out.
+                Ask anything about <span style={{ color: 'rgb(103,232,249)' }}>{lead.company_name}</span> — how their tech works, whether they have AI agents taking real actions or custody/signing exposure, and where <strong style={{ color: 'white' }}>Kima / Aeredium / AERKey / Aerpolice</strong> each plug in. I research them live and remember what we figure out.
               </p>
               <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgb(100,107,140)', marginTop: 2 }}>Try asking</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
