@@ -491,12 +491,15 @@ export default function LeadsPage() {
                               <div className="flex flex-wrap gap-1">
                                 {otherFits.length === 0
                                   ? <span className="text-xs" style={{ color: 'rgb(90,95,120)' }}>—</span>
-                                  : otherFits.map((f, i) => (
-                                    <span key={i} className="badge text-xs" title={f.subProduct}
-                                      style={{ background: COMPANY_ACCENT[f.companySlug].color + '15', color: COMPANY_ACCENT[f.companySlug].color, borderColor: COMPANY_ACCENT[f.companySlug].color + '35', fontSize: '10px', padding: '1px 6px' }}>
-                                      {f.companyName}
-                                    </span>
-                                  ))}
+                                  : otherFits.map((f, i) => {
+                                    const label = f.subProduct.startsWith('AERKey') ? 'AERKey' : f.companyName
+                                    return (
+                                      <span key={i} className="badge text-xs" title={f.subProduct}
+                                        style={{ background: COMPANY_ACCENT[f.companySlug].color + '15', color: COMPANY_ACCENT[f.companySlug].color, borderColor: COMPANY_ACCENT[f.companySlug].color + '35', fontSize: '10px', padding: '1px 6px' }}>
+                                        {label}
+                                      </span>
+                                    )
+                                  })}
                               </div>
                             </td>
                             <td><span className="text-xs" style={{ color: 'rgb(140,140,160)' }}>{lead.pain_point ? truncate(lead.pain_point, 50) : '—'}</span></td>
