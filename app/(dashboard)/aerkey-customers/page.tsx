@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
   KeyRound, Search, Plus, ChevronUp, ChevronDown, Filter,
-  Download, CheckCircle, Loader2,
+  Download, CheckCircle, Loader2, ExternalLink,
 } from 'lucide-react'
 import { AERKEY_CUSTOMERS, AERKEY_CATEGORIES, type AerkeyCustomer } from '@/lib/aerkey-customers'
 
@@ -83,7 +83,7 @@ export default function AerkeyCustomersPage() {
     try {
       const { error } = await getClient().from('leads').insert({
         company_name: c.company,
-        website: null,
+        website: c.website,
         twitter_url: null,
         description: c.stageSignal,
         industry_category: c.category,
@@ -131,8 +131,8 @@ export default function AerkeyCustomersPage() {
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={() => {
-              const csv = ['Company,Category,Stage/Size Signal,Why Good Fit,Source Confidence',
-                ...sorted.map(c => `"${c.company}","${c.category}","${c.stageSignal}","${c.whyFit}","${c.sourceConfidence}"`)
+              const csv = ['Company,Website,Category,Stage/Size Signal,Why Good Fit,Source Confidence',
+                ...sorted.map(c => `"${c.company}","${c.website ?? ''}","${c.category}","${c.stageSignal}","${c.whyFit}","${c.sourceConfidence}"`)
               ].join('\n')
               const a = document.createElement('a'); a.href = 'data:text/csv,' + encodeURIComponent(csv); a.download = 'aerkey-customers.csv'; a.click()
             }}
@@ -203,7 +203,15 @@ export default function AerkeyCustomersPage() {
                   onClick={() => setExpanded(isExpanded ? null : c.company)}>
 
                   {/* Company */}
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'white', paddingRight: 12 }}>{c.company}</div>
+                  <div style={{ paddingRight: 12 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'white', marginBottom: 2 }}>{c.company}</div>
+                    {c.website && (
+                      <a href={c.website} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                        style={{ fontSize: 10, color: 'rgb(110,115,150)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <ExternalLink size={9} />{c.website.replace(/^https?:\/\//, '').replace(/\/$/, '').slice(0, 24)}
+                      </a>
+                    )}
+                  </div>
 
                   {/* Category */}
                   <div style={{ paddingRight: 12 }}>
