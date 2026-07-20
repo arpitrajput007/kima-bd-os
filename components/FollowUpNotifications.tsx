@@ -3,8 +3,17 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
-import { Bell, X, CheckCircle2, ArrowRight, ChevronLeft } from 'lucide-react'
+import { Bell, X, CheckCircle2, ArrowRight, ChevronLeft, Clock } from 'lucide-react'
 import { toast } from 'sonner'
+
+// ── Snooze persistence (survives page loads/navigation) ────────────────────
+const SNOOZE_KEY = 'kima_followup_snooze_until'
+
+function isSnoozed(): boolean {
+  if (typeof window === 'undefined') return false
+  const until = localStorage.getItem(SNOOZE_KEY)
+  return !!until && new Date(until).getTime() > Date.now()
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface OverdueLead {
@@ -218,9 +227,10 @@ export default function FollowUpNotifications() {
   const [mounted,  setMounted]  = useState(false)
   const [leads,    setLeads]    = useState<OverdueLead[]>([])
   const [dismissed,setDismissed]= useState<Set<string>>(new Set())
+  const [snoozed,  setSnoozed]  = useState(false)
   const timerRef   = useRef<NodeJS.Timeout | null>(null)
 
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => { setMounted(true); setSnoozed(isSnoozed()) }, [])
 
   const fetchOverdue = useCallback(async () => {
     const now = new Date().toISOString()
@@ -237,10 +247,11 @@ export default function FollowUpNotifications() {
   }, [])
 
   useEffect(() => {
+    if (snoozed) return
     fetchOverdue()
     timerRef.current = setInterval(fetchOverdue, 60_000)
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [fetchOverdue])
+  }, [fetchOverdue, snoozed])
 
   const dismiss = (id: string) => {
     setDismissed(prev => new Set([...prev, id]))
@@ -248,6 +259,14 @@ export default function FollowUpNotifications() {
 
   const dismissAll = () => {
     setDismissed(prev => new Set([...prev, ...leads.map(l => l.id)]))
+  }
+
+  const snooze24h = () => {
+    const until = new Date(Date.now() + 24 * 3_600_000).toISOString()
+    try { localStorage.setItem(SNOOZE_KEY, until) } catch { /* ignore storage errors */ }
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+    setSnoozed(true)
+    toast.success('Follow-up reminders snoozed for 24 hours')
   }
 
   const reschedule = async (id: string, days: number) => {
@@ -299,7 +318,7 @@ export default function FollowUpNotifications() {
 
   const visible = leads.filter(l => !dismissed.has(l.id))
 
-  if (!mounted || visible.length === 0) return null
+  if (!mounted || snoozed || visible.length === 0) return null
 
   return createPortal(
     <div style={{
@@ -317,8 +336,21 @@ export default function FollowUpNotifications() {
       // hide scrollbar but keep scrollability
       msOverflowStyle: 'none',
     } as React.CSSProperties}>
-      {/* ── header: hide all ── */}
-      <div style={{ width: 330, display: 'flex', justifyContent: 'flex-end' }}>
+      {/* ── header: snooze / hide all ── */}
+      <div style={{ width: 330, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <button
+          onClick={snooze24h}
+          title="Don't show follow-up reminders for the next 24 hours"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '5px 11px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+            background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.28)',
+            color: '#a78bfa', cursor: 'pointer', fontFamily: 'inherit',
+            backdropFilter: 'blur(20px)',
+          }}
+        >
+          <Clock size={12} /> Snooze 24h
+        </button>
         <button
           onClick={dismissAll}
           title="Hide all overdue follow-ups until next page load"
