@@ -60,7 +60,7 @@ const RESEARCH_STEPS = [
   { icon: Globe,     label: 'Fetching web intelligence',       detail: 'News, press releases, funding & social links' },
   { icon: Search,    label: 'Analysing company',               detail: 'Business model, product, tech stack & competitors' },
   { icon: Target,    label: 'Identifying pain points',         detail: 'Payment, settlement & bridge friction' },
-  { icon: Zap,       label: 'Evaluating Kima / Aeredium fit', detail: 'Use case, risk angle, settlement & security angles' },
+  { icon: Zap,       label: 'Evaluating Kima / Aeredium / AERKey / Aerpolice fit', detail: 'Full 9-product match matrix — use case, risk angle, settlement & security angles' },
   { icon: BarChart2, label: 'Scoring & rendering verdict',     detail: 'Lead score, priority, strengths & flags' },
 ]
 
