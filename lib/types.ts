@@ -207,6 +207,19 @@ export interface UseCase {
   why_now?: string
 }
 
+// ── Per-product fit matrix ────────────────────────────────────────
+// One entry per product in the full 9-product catalog (Kima UPR/LaaS/DvP,
+// Aeredium L1/AERLink/AERKey, Aerpolice Identity/Gate/Audit). Lets a lead
+// point at the specific best-fit product (e.g. AERKey) rather than only a
+// company-level fit (kima_fit / aeredium_fit / aerpolice_fit).
+export interface ProductMatch {
+  product: string
+  company: 'Kima' | 'Aeredium' | 'Aerpolice'
+  match: 'strong' | 'partial' | 'none'
+  why: string
+  use_case?: string
+}
+
 export interface Lead {
   id: string
   company_name: string
@@ -231,6 +244,7 @@ export interface Lead {
   aeredium_fit?: string
   aerpolice_fit?: string
   agent_control_angle?: string
+  product_matches?: ProductMatch[]
   suggested_use_case?: string
   trigger_reason?: string
   risk_angle?: string

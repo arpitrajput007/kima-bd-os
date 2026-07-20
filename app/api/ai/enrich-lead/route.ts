@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { PRODUCT_BRAIN } from '@/lib/kima-knowledge'
 import { scoringMemory } from '@/lib/agent-memory'
+import type { ProductMatch } from '@/lib/types'
 
 export const maxDuration = 300 // Vercel Pro / Enterprise
 
@@ -196,7 +197,25 @@ Return JSON:
     "When they add agent-based automation, Aerpolice will matter because..."
   ],
   "honest_assessment": "One paragraph. Plain English. Is this a real opportunity? Which product and why? If weak or no fit across the board, say that clearly. The BD team needs honest signal, not manufactured confidence.",
-  "competitor_context": "Are any of our products in competition with something they already have? Be explicit."
+  "competitor_context": "Are any of our products in competition with something they already have? Be explicit.",
+
+  // ── Product & use-case match matrix ────────────────────────
+  // The verdicts above are company-level (Kima/Aeredium/Aerpolice as a whole).
+  // Now break Aeredium and Aerpolice down into their SPECIFIC sub-products —
+  // e.g. a company can be a no_fit for Aeredium's L1 but a strong fit for
+  // AERKey specifically. Return exactly 9 entries, one per product below.
+  // match values: "strong" | "partial" | "none"
+  "product_matches": [
+    { "product": "Kima UPR", "company": "Kima", "match": "strong | partial | none", "why": "...", "use_case": "" },
+    { "product": "Kima LaaS", "company": "Kima", "match": "strong | partial | none", "why": "...", "use_case": "" },
+    { "product": "Kima DvP", "company": "Kima", "match": "strong | partial | none", "why": "...", "use_case": "" },
+    { "product": "Aeredium Institutional L1", "company": "Aeredium", "match": "strong | partial | none", "why": "...", "use_case": "" },
+    { "product": "Aeredium AERLink", "company": "Aeredium", "match": "strong | partial | none", "why": "...", "use_case": "" },
+    { "product": "Aeredium AERKey", "company": "Aeredium", "match": "strong | partial | none", "why": "...", "use_case": "" },
+    { "product": "Aerpolice Agent Identity", "company": "Aerpolice", "match": "strong | partial | none", "why": "...", "use_case": "" },
+    { "product": "Aerpolice Execution Gate", "company": "Aerpolice", "match": "strong | partial | none", "why": "...", "use_case": "" },
+    { "product": "Aerpolice Audit Trail", "company": "Aerpolice", "match": "strong | partial | none", "why": "...", "use_case": "" }
+  ]
 }`
 }
 
@@ -406,10 +425,11 @@ export async function POST(req: NextRequest) {
       kima?: FitSection; aeredium?: FitSection; aerpolice?: FitSection
       combined_opportunity?: string; strategic_hypotheses?: string[]
       honest_assessment?: string; competitor_context?: string
+      product_matches?: ProductMatch[]
     }
     const fitData = await claudeJSON<FitResult>({
       model: CLAUDE_RESEARCH, system: SYS,
-      user: pFit(name, resSum, painSum), maxTokens: 2000,
+      user: pFit(name, resSum, painSum), maxTokens: 3200,
     }).catch(() => null)
 
     const fitSum = fitData ? JSON.stringify({
@@ -437,6 +457,10 @@ export async function POST(req: NextRequest) {
       const ag = fitData.aerpolice ?? {}
       if (ag.aerpolice_fit)          patch3.aerpolice_fit          = ag.aerpolice_fit
       if (ag.agent_control_angle) patch3.agent_control_angle = ag.agent_control_angle
+
+      // Full 9-product match matrix (which specific product — e.g. AERKey —
+      // is the best fit), not just the 3 company-level verdicts above.
+      if (fitData.product_matches?.length) patch3.product_matches = fitData.product_matches
 
       // Store honest_assessment in competitor_context field (re-purposed for
       // a richer summary that includes the full honest evaluation)

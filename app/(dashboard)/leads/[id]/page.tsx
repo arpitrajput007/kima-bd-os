@@ -13,7 +13,7 @@ import {
   ChevronDown, ChevronUp, RefreshCw, Building2, Brain,
   FileSearch, Puzzle, Calendar, Mail, Wand2,
   MapPin, AtSign, MessageCircle, Plus, Trash2, History,
-  BadgeCheck, AlertCircle, Lightbulb
+  BadgeCheck, AlertCircle, Lightbulb, Layers
 } from 'lucide-react'
 import {
   cn, getScoreBg, getStatusColor, getStatusLabel, getSeverityColor,
@@ -23,7 +23,7 @@ import {
   buildTarget, channelDeepLink, logTouch, recordOutcome,
   type OutreachMeta, type OutreachOutcome,
 } from '@/lib/outreach'
-import type { Lead, Contact, ContactTouch, OutreachMessage, UseCase, BDBrief, UseCaseProduct } from '@/lib/types'
+import type { Lead, Contact, ContactTouch, OutreachMessage, UseCase, BDBrief, UseCaseProduct, ProductMatch } from '@/lib/types'
 import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL, REGIONS } from '@/lib/types'
 import { actStart, actFinish, ACTION_TOOL, ACTION_LABEL } from '@/lib/agent-activity'
 
@@ -252,6 +252,67 @@ function StatStrip({ score, confidence, addedAt }: { score?: number | null; conf
           <span style={{ fontSize: 18, fontWeight: 600, color: 'rgb(203,213,225)' }}>{formatDate(addedAt)}</span>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Best single product to lead with — first "strong" match, else first "partial", else null.
+function bestFitProduct(matches?: ProductMatch[] | null): ProductMatch | null {
+  if (!matches?.length) return null
+  return matches.find(m => m.match === 'strong') ?? matches.find(m => m.match === 'partial') ?? null
+}
+
+// Full product fit breakdown — grouped by company, sorted strong-first.
+function ProductMatchMatrix({ matches }: { matches: ProductMatch[] }) {
+  const companyMeta: Record<string, { color: string; bg: string; border: string; dot: string }> = {
+    Kima:      { color: 'rgb(96,165,250)',  bg: 'rgba(96,165,250,0.08)',  border: 'rgba(96,165,250,0.22)',  dot: 'rgba(96,165,250,0.9)' },
+    Aeredium:  { color: 'rgb(167,139,250)', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.22)', dot: 'rgba(167,139,250,0.9)' },
+    Aerpolice: { color: 'rgb(251,191,36)',  bg: 'rgba(251,191,36,0.07)',  border: 'rgba(251,191,36,0.22)',  dot: 'rgba(251,191,36,0.9)' },
+  }
+  const matchStyle = (m: string) => ({
+    strong:  { icon: '✓', color: 'rgb(52,211,153)',  bg: 'rgba(52,211,153,0.1)',   border: 'rgba(52,211,153,0.22)' },
+    partial: { icon: '~', color: 'rgb(251,191,36)',  bg: 'rgba(251,191,36,0.08)',  border: 'rgba(251,191,36,0.22)' },
+    none:    { icon: '✕', color: 'rgb(156,163,175)', bg: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.07)' },
+  }[m] ?? { icon: '?', color: 'rgb(156,163,175)', bg: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.07)' })
+
+  const groups: Record<string, ProductMatch[]> = {}
+  matches.forEach(pm => { (groups[pm.company] ??= []).push(pm) })
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {(['Kima', 'Aeredium', 'Aerpolice'] as const).map(co => {
+        const items = groups[co]
+        if (!items?.length) return null
+        const cm = companyMeta[co]
+        return (
+          <div key={co}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: cm.dot, flexShrink: 0 }} />
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: cm.color }}>{co}</span>
+              <div style={{ flex: 1, height: 1, background: cm.border }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {items.map((pm, idx) => {
+                const ms = matchStyle(pm.match)
+                return (
+                  <div key={idx} style={{ borderRadius: 10, border: `1px solid ${ms.border}`, background: ms.bg, padding: '10px 14px', opacity: pm.match === 'none' ? 0.6 : 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{ width: 18, height: 18, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0, background: `${ms.color}18`, color: ms.color }}>{ms.icon}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: pm.match === 'none' ? 'rgb(120,125,155)' : 'rgb(220,225,245)' }}>{pm.product}</span>
+                    </div>
+                    <p style={{ fontSize: 12, lineHeight: 1.55, color: pm.match === 'none' ? 'rgb(90,95,125)' : 'rgb(170,175,205)', margin: '0 0 0 26px' }}>{pm.why}</p>
+                    {pm.use_case && pm.match !== 'none' && (
+                      <p style={{ margin: '6px 0 0 26px', fontSize: 11, color: cm.color, lineHeight: 1.5 }}>
+                        <span style={{ fontWeight: 700, letterSpacing: '0.05em' }}>USE CASE — </span>{pm.use_case}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -1907,6 +1968,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const ic = 'input-dark'; const is = { fontSize: '13px', padding: '8px 11px' }
 
   const isContacted = CONTACTED_STATUSES_SET.has(lead.status)
+  const bestFit = bestFitProduct(lead.product_matches)
 
   /* status badge color */
   const statusBadgeStyle: React.CSSProperties = lead.status === 'approved'
@@ -1953,6 +2015,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   <span style={{ borderRadius: 999, padding: '4px 14px', fontSize: 13, ...statusBadgeStyle }}>
                     {getStatusLabel(lead.status)}
                   </span>
+                  {bestFit && (
+                    <span title={bestFit.why} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 999, border: '1px solid rgba(34,211,238,0.35)', background: 'rgba(34,211,238,0.1)', padding: '4px 14px', fontSize: 13, color: 'rgb(103,232,249)' }}>
+                      <Layers size={12} />Best fit: {bestFit.product}
+                    </span>
+                  )}
                 </div>
                 {lead.website && (
                   <a href={lead.website} target="_blank" rel="noopener noreferrer"
@@ -2342,6 +2409,17 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 </button>
               )}
             </FindingCard>
+
+            {/* Product Fit Matrix — which specific product (e.g. AERKey) is the best fit */}
+            {lead.product_matches?.length ? (
+              <FindingCard
+                icon={Layers} title="Product Fit Matrix" pillVariant="cyan"
+                body={bestFit ? `Best fit: ${bestFit.product}` : 'No product in the catalog is a fit.'}
+                expanded={expanded.products ?? true} onToggle={() => toggle('products')}
+              >
+                <ProductMatchMatrix matches={lead.product_matches} />
+              </FindingCard>
+            ) : null}
 
           </div>
 

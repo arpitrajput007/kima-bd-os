@@ -13,7 +13,7 @@ import {
   MessageSquare, Send, Brain,
 } from 'lucide-react'
 import Link from 'next/link'
-import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL, REGIONS } from '@/lib/types'
+import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL, REGIONS, type ProductMatch } from '@/lib/types'
 
 // ── Design tokens ─────────────────────────────────────────────
 const C = {
@@ -23,14 +23,6 @@ const C = {
 
 // ── Types ─────────────────────────────────────────────────────
 interface FactItem { label: string; value: string }
-
-interface ProductMatch {
-  product: string
-  company: 'Kima' | 'Aeredium' | 'Aerpolice'
-  match: 'strong' | 'partial' | 'none'
-  why: string
-  use_case?: string
-}
 
 interface QualifyResult {
   company_name: string; description: string; business_model: string
@@ -568,6 +560,7 @@ export default function NewLeadPage() {
       assumptions: form.assumptions?.length ? form.assumptions : null,
       lead_score: score, confidence_score: Number(form.confidence_score) || null,
       priority, source_url: s(form.source_url), source_summary: s(form.source_summary),
+      product_matches: result?.product_matches?.length ? result.product_matches : null,
       status: 'new',
     }).select().single()
 
