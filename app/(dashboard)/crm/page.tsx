@@ -75,6 +75,14 @@ function getActivityMeta(a: Activity) {
   return TYPE_META[a.type] || TYPE_META.note
 }
 
+function lastTouched(lead: LeadWithActivity): number {
+  const acts = lead.activities || []
+  const latestActivity = acts.reduce((max, a) => Math.max(max, new Date(a.created_at).getTime()), 0)
+  const updated = lead.updated_at ? new Date(lead.updated_at).getTime() : 0
+  const created = lead.created_at ? new Date(lead.created_at).getTime() : 0
+  return Math.max(latestActivity, updated, created)
+}
+
 function relTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
   const m = Math.floor(diff / 60000)
@@ -959,11 +967,16 @@ function LeadFlyout({ lead, onClose, onActivityAdded, onStatusChange }: {
 }
 
 // ── Pipeline Card (improved) ────────────────────────────────────
-function PipelineCard({ lead, stage, onClick, onDelete }: {
+function PipelineCard({ lead, stage, onClick, onDelete, onDragStart, onDragEnd, onDragOverCard, isDragging, isDropTarget }: {
   lead: LeadWithActivity
   stage: typeof PIPELINE_STAGES[number]
   onClick: () => void
   onDelete: (id: string) => void
+  onDragStart: (id: string) => void
+  onDragEnd: () => void
+  onDragOverCard: (id: string) => void
+  isDragging: boolean
+  isDropTarget: boolean
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -989,22 +1002,28 @@ function PipelineCard({ lead, stage, onClick, onDelete }: {
 
   return (
     <div onClick={onClick}
+      draggable
+      onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', lead.id); onDragStart(lead.id) }}
+      onDragEnd={onDragEnd}
+      onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; onDragOverCard(lead.id) }}
       style={{
         background: isWon
           ? 'linear-gradient(145deg, rgba(74,222,128,0.07), rgba(34,211,238,0.03))'
           : isLost ? 'rgba(244,63,94,0.04)' : 'rgb(var(--bg-surface-2))',
-        border: isWon
+        border: isDropTarget
+          ? '1px dashed rgba(167,139,250,0.7)'
+          : isWon
           ? '1px solid rgba(74,222,128,0.22)'
           : isLost ? '1px solid rgba(244,63,94,0.14)'
           : confirmDelete ? '1px solid rgba(244,63,94,0.55)'
           : '1px solid var(--border)',
         borderRadius: 14,
-        cursor: 'pointer',
-        opacity: isLost ? 0.6 : 1,
+        cursor: 'grab',
+        opacity: isDragging ? 0.35 : isLost ? 0.6 : 1,
         overflow: 'hidden',
         position: 'relative',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.28)',
-        transition: 'box-shadow 0.15s, border-color 0.15s, transform 0.1s',
+        boxShadow: isDropTarget ? '0 0 0 2px rgba(167,139,250,0.25)' : '0 2px 10px rgba(0,0,0,0.28)',
+        transition: 'box-shadow 0.15s, border-color 0.15s, transform 0.1s, opacity 0.15s',
       }}
       onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-1px)')}
       onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
@@ -1163,6 +1182,24 @@ export default function CRMPage() {
   const [showAddLead, setShowAddLead] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
+  // Drag-and-drop ordering — `order` holds lead ids in display order (newest-touched first
+  // by default); dragging splices ids around so the user's manual arrangement sticks across reloads.
+  const [order, setOrder] = useState<string[]>([])
+  const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setOrder(prev => {
+      const stillExists = prev.filter(id => leads.some(l => l.id === id))
+      const known = new Set(stillExists)
+      const fresh = leads
+        .filter(l => !known.has(l.id))
+        .sort((a, b) => lastTouched(b) - lastTouched(a))
+        .map(l => l.id)
+      return [...fresh, ...stillExists]
+    })
+  }, [leads])
+
   const loadData = useCallback(async () => {
     setLoading(true)
     const [{ data: leadsData }, { data: activitiesData }, { data: contactsData }] = await Promise.all([
@@ -1210,6 +1247,31 @@ export default function CRMPage() {
     setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l))
     if (selectedLead?.id === id) setSelectedLead(prev => prev ? { ...prev, status } : prev)
     loadData()
+  }
+
+  const reorder = (draggedLeadId: string, targetStatus: LeadStatus, beforeId: string | null) => {
+    setOrder(prev => {
+      const next = prev.filter(id => id !== draggedLeadId)
+      const insertAt = beforeId ? next.indexOf(beforeId) : -1
+      if (insertAt === -1) {
+        // dropped on empty column area — place after the last card of that stage
+        let lastIdx = -1
+        next.forEach((id, i) => { if (leads.find(l => l.id === id)?.status === targetStatus) lastIdx = i })
+        next.splice(lastIdx + 1, 0, draggedLeadId)
+      } else {
+        next.splice(insertAt, 0, draggedLeadId)
+      }
+      return next
+    })
+  }
+
+  const handleDrop = (targetStatus: LeadStatus, beforeId: string | null) => {
+    if (!draggedId) return
+    const dragged = leads.find(l => l.id === draggedId)
+    reorder(draggedId, targetStatus, beforeId)
+    if (dragged && dragged.status !== targetStatus) moveStage(draggedId, targetStatus)
+    setDraggedId(null)
+    setDropTargetId(null)
   }
 
   const filteredLeads = searchQuery.trim()
@@ -1424,7 +1486,9 @@ export default function CRMPage() {
 
               {/* Active stages */}
               {activeStages.map(stage => {
-                const stageLeads = filteredLeads.filter(l => l.status === stage.status)
+                const stageLeads = order
+                  .map(id => filteredLeads.find(l => l.id === id))
+                  .filter((l): l is LeadWithActivity => !!l && l.status === stage.status)
                 return (
                   <div key={stage.status} style={{ width: 296, flexShrink: 0 }}>
                     {/* Column header */}
@@ -1454,22 +1518,31 @@ export default function CRMPage() {
                     </div>
 
                     {/* Cards */}
-                    <div style={{
-                      background: 'rgba(255,255,255,0.01)',
-                      border: '1px solid var(--border)',
-                      borderTop: 'none',
-                      borderRadius: '0 0 12px 12px',
-                      padding: 10,
-                      minHeight: 140,
-                      display: 'flex', flexDirection: 'column', gap: 8,
-                    }}>
+                    <div
+                      onDragOver={e => { e.preventDefault(); if (e.target === e.currentTarget) setDropTargetId(null) }}
+                      onDrop={e => { e.preventDefault(); handleDrop(stage.status, dropTargetId) }}
+                      style={{
+                        background: 'rgba(255,255,255,0.01)',
+                        border: '1px solid var(--border)',
+                        borderTop: 'none',
+                        borderRadius: '0 0 12px 12px',
+                        padding: 10,
+                        minHeight: 140,
+                        display: 'flex', flexDirection: 'column', gap: 8,
+                      }}>
                       {stageLeads.length === 0 ? (
                         <div style={{ textAlign: 'center', padding: '36px 8px', opacity: 0.35 }}>
                           <div style={{ fontSize: 24, marginBottom: 6 }}>—</div>
                           <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Empty</div>
                         </div>
                       ) : stageLeads.map(lead => (
-                        <PipelineCard key={lead.id} lead={lead} stage={stage} onClick={() => setSelectedLead(lead)} onDelete={deleteLead} />
+                        <PipelineCard key={lead.id} lead={lead} stage={stage} onClick={() => setSelectedLead(lead)} onDelete={deleteLead}
+                          isDragging={draggedId === lead.id}
+                          isDropTarget={dropTargetId === lead.id && draggedId !== lead.id}
+                          onDragStart={id => setDraggedId(id)}
+                          onDragEnd={() => { setDraggedId(null); setDropTargetId(null) }}
+                          onDragOverCard={id => setDropTargetId(id)}
+                        />
                       ))}
                     </div>
                   </div>
@@ -1479,7 +1552,9 @@ export default function CRMPage() {
               {/* Terminal stages (Won / Lost) — side by side, visually separated */}
               <div style={{ width: 2, flexShrink: 0, background: 'rgba(255,255,255,0.06)', borderRadius: 2, alignSelf: 'stretch', margin: '0 4px' }} />
               {terminalStages.map(stage => {
-                const stageLeads = filteredLeads.filter(l => l.status === stage.status)
+                const stageLeads = order
+                  .map(id => filteredLeads.find(l => l.id === id))
+                  .filter((l): l is LeadWithActivity => !!l && l.status === stage.status)
                 return (
                   <div key={stage.status} style={{ width: 248, flexShrink: 0 }}>
                     <div style={{
@@ -1503,18 +1578,27 @@ export default function CRMPage() {
                         </span>
                       </div>
                     </div>
-                    <div style={{
-                      background: stage.status === 'won' ? 'rgba(74,222,128,0.02)' : 'rgba(244,63,94,0.015)',
-                      border: `1px solid ${stage.status === 'won' ? 'rgba(74,222,128,0.12)' : 'rgba(244,63,94,0.08)'}`,
-                      borderTop: 'none',
-                      borderRadius: '0 0 10px 10px',
-                      padding: 8, minHeight: 80,
-                      display: 'flex', flexDirection: 'column', gap: 6,
-                    }}>
+                    <div
+                      onDragOver={e => { e.preventDefault(); if (e.target === e.currentTarget) setDropTargetId(null) }}
+                      onDrop={e => { e.preventDefault(); handleDrop(stage.status, dropTargetId) }}
+                      style={{
+                        background: stage.status === 'won' ? 'rgba(74,222,128,0.02)' : 'rgba(244,63,94,0.015)',
+                        border: `1px solid ${stage.status === 'won' ? 'rgba(74,222,128,0.12)' : 'rgba(244,63,94,0.08)'}`,
+                        borderTop: 'none',
+                        borderRadius: '0 0 10px 10px',
+                        padding: 8, minHeight: 80,
+                        display: 'flex', flexDirection: 'column', gap: 6,
+                      }}>
                       {stageLeads.length === 0 ? (
                         <div className="text-center text-[11px] text-muted" style={{ padding: '20px 8px', opacity: 0.4 }}>Empty</div>
                       ) : stageLeads.map(lead => (
-                        <PipelineCard key={lead.id} lead={lead} stage={stage} onClick={() => setSelectedLead(lead)} onDelete={deleteLead} />
+                        <PipelineCard key={lead.id} lead={lead} stage={stage} onClick={() => setSelectedLead(lead)} onDelete={deleteLead}
+                          isDragging={draggedId === lead.id}
+                          isDropTarget={dropTargetId === lead.id && draggedId !== lead.id}
+                          onDragStart={id => setDraggedId(id)}
+                          onDragEnd={() => { setDraggedId(null); setDropTargetId(null) }}
+                          onDragOverCard={id => setDropTargetId(id)}
+                        />
                       ))}
                     </div>
                   </div>
@@ -1635,7 +1719,10 @@ export default function CRMPage() {
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 16 }}>
-                {filteredLeads.filter(l => l.status === 'won').map((lead, idx) => (
+                {order
+                  .map(id => filteredLeads.find(l => l.id === id))
+                  .filter((l): l is LeadWithActivity => !!l && l.status === 'won')
+                  .map((lead, idx) => (
                   <div key={lead.id} onClick={() => setSelectedLead(lead)} className="section-card card-hover"
                     style={{ padding: '20px 22px', cursor: 'pointer', borderColor: 'rgba(74,222,128,0.18)', background: 'linear-gradient(135deg, rgba(74,222,128,0.04), rgba(34,211,238,0.02))', position: 'relative', overflow: 'hidden' }}>
                     {/* Top accent */}
