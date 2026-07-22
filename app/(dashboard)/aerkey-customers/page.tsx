@@ -8,6 +8,7 @@ import {
   Download, CheckCircle, Loader2, ExternalLink,
 } from 'lucide-react'
 import { AERKEY_CUSTOMERS, AERKEY_CATEGORIES, type AerkeyCustomer } from '@/lib/aerkey-customers'
+import { AssignToPlutoButton } from '@/components/AssignToPlutoButton'
 
 type SortKey = 'company' | 'category' | 'confidence'
 
@@ -39,17 +40,19 @@ export default function AerkeyCustomersPage() {
   const [sortAsc, setSortAsc] = useState(true)
   const [adding, setAdding] = useState<string | null>(null)
   const [added, setAdded] = useState<Set<string>>(new Set())
+  const [plutoAssigned, setPlutoAssigned] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState<string | null>(null)
 
   useEffect(() => {
     const names = AERKEY_CUSTOMERS.map(c => c.company)
     getClient()
       .from('leads')
-      .select('company_name')
+      .select('company_name, assigned_to')
       .in('company_name', names)
       .then(({ data }) => {
         if (data?.length) {
           setAdded(new Set(data.map((r: { company_name: string }) => r.company_name)))
+          setPlutoAssigned(new Set(data.filter((r: { assigned_to: string | null }) => r.assigned_to === 'pluto').map((r: { company_name: string }) => r.company_name)))
         }
       })
   }, [])
@@ -78,30 +81,36 @@ export default function AerkeyCustomersPage() {
     ? (sortAsc ? <ChevronUp size={11} /> : <ChevronDown size={11} />)
     : <ChevronDown size={11} style={{ opacity: 0.3 }} />
 
+  // Shared insert payload (minus company_name/status/updated_at, which the
+  // caller — either addToPipeline or the Assign-to-Pluto button — supplies).
+  const leadFieldsFor = (c: AerkeyCustomer) => ({
+    website: c.website,
+    twitter_url: null,
+    description: c.stageSignal,
+    industry_category: c.category,
+    customer_category: ['AERKey Customer'],
+    product_to_sell: 'AERKey (TEE Threshold Signing)',
+    pain_point: 'Custody / key-signing infrastructure need typical of a lean, fast-moving crypto business',
+    pain_point_severity: isDirect(c.sourceConfidence) ? 'high' : 'medium',
+    pain_point_evidence: c.whyFit,
+    pain_point_evidence_type: 'agent_analysis',
+    kima_fit: `AERKey provides TEE-attested threshold ECDSA signing that fits ${c.company}: ${c.whyFit}`,
+    trigger_reason: `${c.company} (${c.category}) is a fast-close AERKey target: ${c.stageSignal}`,
+    settlement_angle: c.whyFit,
+    integration_feasibility: 'high',
+    lead_score: isDirect(c.sourceConfidence) ? 75 : 60,
+    priority: isDirect(c.sourceConfidence) ? 'qualified' : 'needs_research',
+    source_url: null,
+  })
+
   const addToPipeline = async (c: AerkeyCustomer) => {
     setAdding(c.company)
     try {
       const { error } = await getClient().from('leads').insert({
         company_name: c.company,
-        website: c.website,
-        twitter_url: null,
-        description: c.stageSignal,
-        industry_category: c.category,
-        customer_category: ['AERKey Customer'],
-        product_to_sell: 'AERKey (TEE Threshold Signing)',
-        pain_point: 'Custody / key-signing infrastructure need typical of a lean, fast-moving crypto business',
-        pain_point_severity: isDirect(c.sourceConfidence) ? 'high' : 'medium',
-        pain_point_evidence: c.whyFit,
-        pain_point_evidence_type: 'agent_analysis',
-        kima_fit: `AERKey provides TEE-attested threshold ECDSA signing that fits ${c.company}: ${c.whyFit}`,
-        trigger_reason: `${c.company} (${c.category}) is a fast-close AERKey target: ${c.stageSignal}`,
-        settlement_angle: c.whyFit,
-        integration_feasibility: 'high',
-        lead_score: isDirect(c.sourceConfidence) ? 75 : 60,
-        priority: isDirect(c.sourceConfidence) ? 'qualified' : 'needs_research',
         status: 'new',
-        source_url: null,
         updated_at: new Date().toISOString(),
+        ...leadFieldsFor(c),
       })
       if (error) {
         if (error.code === '23505') { toast(`${c.company} is already in your pipeline`); setAdded(s => new Set([...s, c.company])) }
@@ -229,7 +238,7 @@ export default function AerkeyCustomersPage() {
                   <div><ConfidencePill sourceConfidence={c.sourceConfidence} /></div>
 
                   {/* Action */}
-                  <div onClick={e => e.stopPropagation()}>
+                  <div onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-start' }}>
                     {isAdded ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: '#34d399' }}>
                         <CheckCircle size={13} /> Added
@@ -241,6 +250,13 @@ export default function AerkeyCustomersPage() {
                         Add to BD
                       </button>
                     )}
+                    <AssignToPlutoButton
+                      companyName={c.company}
+                      createFields={{ ...leadFieldsFor(c) }}
+                      initialAssigned={plutoAssigned.has(c.company)}
+                      compact
+                      onAssigned={() => setAdded(s => new Set([...s, c.company]))}
+                    />
                   </div>
                 </div>
 

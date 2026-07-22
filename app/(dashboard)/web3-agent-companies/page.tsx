@@ -8,6 +8,7 @@ import {
   Filter, Download, CheckCircle, Loader2,
 } from 'lucide-react'
 import { WEB3_AGENTS, CATEGORIES, type Web3Agent } from '@/lib/web3-agent-companies'
+import { AssignToPlutoButton } from '@/components/AssignToPlutoButton'
 
 type SortKey = 'company' | 'urgencyScore' | 'accessibilityScore' | 'strategicValueScore' | 'total'
 
@@ -38,18 +39,20 @@ export default function Web3AgentCompaniesPage() {
   const [sortAsc, setSortAsc] = useState(false)
   const [adding, setAdding] = useState<string | null>(null)
   const [added, setAdded] = useState<Set<string>>(new Set())
+  const [plutoAssigned, setPlutoAssigned] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  // On mount: check which companies are already in the CRM
+  // On mount: check which companies are already in the CRM, and which are already with Pluto
   useEffect(() => {
     const names = WEB3_AGENTS.map(t => t.company)
     getClient()
       .from('leads')
-      .select('company_name')
+      .select('company_name, assigned_to')
       .in('company_name', names)
       .then(({ data }) => {
         if (data?.length) {
           setAdded(new Set(data.map((r: { company_name: string }) => r.company_name)))
+          setPlutoAssigned(new Set(data.filter((r: { assigned_to: string | null }) => r.assigned_to === 'pluto').map((r: { company_name: string }) => r.company_name)))
         }
       })
   }, [])
@@ -84,30 +87,36 @@ export default function Web3AgentCompaniesPage() {
     ? (sortAsc ? <ChevronUp size={11} /> : <ChevronDown size={11} />)
     : <ChevronDown size={11} style={{ opacity: 0.3 }} />
 
+  // Shared insert payload (minus company_name/status/updated_at, which the
+  // caller — either addToPipeline or the Assign-to-Pluto button — supplies).
+  const leadFieldsFor = (t: Web3Agent) => ({
+    website: t.website,
+    twitter_url: null,
+    description: t.description,
+    industry_category: t.category,
+    customer_category: ['Agentic Payments Customer'],
+    product_to_sell: 'Aeredium governance layer',
+    pain_point: t.governanceGap,
+    pain_point_severity: t.urgencyScore >= 9 ? 'critical' : t.urgencyScore >= 7 ? 'high' : 'medium',
+    pain_point_evidence: t.description,
+    pain_point_evidence_type: 'agent_analysis',
+    kima_fit: `Aeredium provides the cryptographic governance layer that ${t.company} needs: ${t.governanceGap}`,
+    trigger_reason: `${t.company} is building agent infrastructure in the ${t.category} space with a clear governance gap: ${t.governanceGap}`,
+    settlement_angle: t.currentSolution,
+    integration_feasibility: t.accessibilityScore >= 8 ? 'high' : t.accessibilityScore >= 5 ? 'medium' : 'low',
+    lead_score: Math.round((t.urgencyScore + t.accessibilityScore + t.strategicValueScore) / 30 * 100),
+    priority: t.urgencyScore >= 9 ? 'excellent' : t.urgencyScore >= 7 ? 'qualified' : 'needs_research',
+    source_url: t.sourceLink,
+  })
+
   const addToPipeline = async (t: Web3Agent) => {
     setAdding(t.company)
     try {
       const { error } = await getClient().from('leads').insert({
         company_name: t.company,
-        website: t.website,
-        twitter_url: null,
-        description: t.description,
-        industry_category: t.category,
-        customer_category: ['Agentic Payments Customer'],
-        product_to_sell: 'Aeredium governance layer',
-        pain_point: t.governanceGap,
-        pain_point_severity: t.urgencyScore >= 9 ? 'critical' : t.urgencyScore >= 7 ? 'high' : 'medium',
-        pain_point_evidence: t.description,
-        pain_point_evidence_type: 'agent_analysis',
-        kima_fit: `Aeredium provides the cryptographic governance layer that ${t.company} needs: ${t.governanceGap}`,
-        trigger_reason: `${t.company} is building agent infrastructure in the ${t.category} space with a clear governance gap: ${t.governanceGap}`,
-        settlement_angle: t.currentSolution,
-        integration_feasibility: t.accessibilityScore >= 8 ? 'high' : t.accessibilityScore >= 5 ? 'medium' : 'low',
-        lead_score: Math.round((t.urgencyScore + t.accessibilityScore + t.strategicValueScore) / 30 * 100),
-        priority: t.urgencyScore >= 9 ? 'excellent' : t.urgencyScore >= 7 ? 'qualified' : 'needs_research',
         status: 'new',
-        source_url: t.sourceLink,
         updated_at: new Date().toISOString(),
+        ...leadFieldsFor(t),
       })
       if (error) {
         if (error.code === '23505') { toast(`${t.company} is already in your pipeline`); setAdded(s => new Set([...s, t.company])) }
@@ -268,7 +277,7 @@ export default function Web3AgentCompaniesPage() {
                   </div>
 
                   {/* Action */}
-                  <div onClick={e => e.stopPropagation()}>
+                  <div onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-start' }}>
                     {isAdded ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: '#34d399' }}>
                         <CheckCircle size={13} /> Added
@@ -280,6 +289,13 @@ export default function Web3AgentCompaniesPage() {
                         Add to BD
                       </button>
                     )}
+                    <AssignToPlutoButton
+                      companyName={t.company}
+                      createFields={{ ...leadFieldsFor(t) }}
+                      initialAssigned={plutoAssigned.has(t.company)}
+                      compact
+                      onAssigned={() => setAdded(s => new Set([...s, t.company]))}
+                    />
                   </div>
                 </div>
 

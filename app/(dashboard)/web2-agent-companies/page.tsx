@@ -12,6 +12,7 @@ import {
   WEB2_COMPANIES, WEB2_CATEGORIES, WEB2_CAT_COLORS,
   type Web2Company, type Web2Category, type GovernanceRisk,
 } from '@/lib/web2-agent-companies'
+import { AssignToPlutoButton } from '@/components/AssignToPlutoButton'
 
 // ── Priority / risk styling ───────────────────────────────────
 const priorityStyle = (p: Web2Company['priority']) => {
@@ -46,6 +47,7 @@ export default function Web2AgentCompaniesPage() {
   const [tierFilter, setTierFilter] = useState<number | 'All'>('All')
   const [adding, setAdding]       = useState<string | null>(null)
   const [added, setAdded]         = useState<Set<string>>(new Set())
+  const [plutoAssigned, setPlutoAssigned] = useState<Set<string>>(new Set())
   const [enriching, setEnriching] = useState<Set<string>>(new Set())
   const [expandedDetail, setExpandedDetail] = useState<Set<string>>(new Set())
 
@@ -53,10 +55,13 @@ export default function Web2AgentCompaniesPage() {
     const names = WEB2_COMPANIES.map(a => a.co)
     supabase
       .from('leads')
-      .select('company_name')
+      .select('company_name, assigned_to')
       .in('company_name', names)
       .then(({ data }) => {
-        if (data?.length) setAdded(new Set(data.map((r: { company_name: string }) => r.company_name)))
+        if (data?.length) {
+          setAdded(new Set(data.map((r: { company_name: string }) => r.company_name)))
+          setPlutoAssigned(new Set(data.filter((r: { assigned_to: string | null }) => r.assigned_to === 'pluto').map((r: { company_name: string }) => r.company_name)))
+        }
       })
   }, []) // eslint-disable-line
 
@@ -142,29 +147,35 @@ export default function Web2AgentCompaniesPage() {
       .finally(() => setEnriching(s => { const n = new Set(s); n.delete(coName); return n }))
   }
 
+  // Shared insert payload (minus company_name/status/updated_at, which the
+  // caller — either addOne or the Assign-to-Pluto button — supplies).
+  const leadFieldsFor = (a: Web2Company) => ({
+    website:                 a.site,
+    description:             a.desc,
+    industry_category:       a.industry,
+    customer_category:       ['Web2 Agent Company', 'Aerpolice Governance Customer'],
+    product_to_sell:         'Aerpolice Agent Governance (Identity + Policy + Execution Gate + Audit Trail)',
+    pain_point:              a.govReason,
+    pain_point_severity:     a.govRisk === 'High' ? 'critical' : a.govRisk === 'Medium-High' ? 'high' : 'medium',
+    pain_point_evidence:     a.whyAerpolice,
+    pain_point_evidence_type:'agent_analysis',
+    kima_fit:                a.whyAerpolice,
+    trigger_reason:          `${a.co} — ${a.cat} — Tier ${a.tier} — ${a.priority}`,
+    integration_feasibility: a.stage === 'Startup' ? 'high' : a.stage === 'Growth' ? 'medium' : 'low',
+    lead_score:              a.fitScore * 10,
+    priority:                a.tier === 1 ? 'excellent' : a.tier === 2 ? 'qualified' : 'needs_research',
+    source_url:              a.site,
+  })
+
   const addOne = async (a: Web2Company) => {
     if (adding || added.has(a.co)) return
     setAdding(a.co)
     try {
       const { data: newLead, error } = await supabase.from('leads').insert({
         company_name:            a.co,
-        website:                 a.site,
-        description:             a.desc,
-        industry_category:       a.industry,
-        customer_category:       ['Web2 Agent Company', 'Aerpolice Governance Customer'],
-        product_to_sell:         'Aerpolice Agent Governance (Identity + Policy + Execution Gate + Audit Trail)',
-        pain_point:              a.govReason,
-        pain_point_severity:     a.govRisk === 'High' ? 'critical' : a.govRisk === 'Medium-High' ? 'high' : 'medium',
-        pain_point_evidence:     a.whyAerpolice,
-        pain_point_evidence_type:'agent_analysis',
-        kima_fit:                a.whyAerpolice,
-        trigger_reason:          `${a.co} — ${a.cat} — Tier ${a.tier} — ${a.priority}`,
-        integration_feasibility: a.stage === 'Startup' ? 'high' : a.stage === 'Growth' ? 'medium' : 'low',
-        lead_score:              a.fitScore * 10,
-        priority:                a.tier === 1 ? 'excellent' : a.tier === 2 ? 'qualified' : 'needs_research',
         status:                  'approved',
-        source_url:              a.site,
         updated_at:              new Date().toISOString(),
+        ...leadFieldsFor(a),
       }).select('id').single()
 
       if (error) {
@@ -422,23 +433,32 @@ export default function Web2AgentCompaniesPage() {
 
                         {/* Action */}
                         <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                          {isAdded && !isEnrich ? (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'rgb(52,211,153)' }}>
-                              <CheckCircle size={13} /> Added
-                            </span>
-                          ) : isAdded && isEnrich ? (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'rgb(251,191,36)' }}>
-                              <Loader2 size={13} className="animate-spin" /> Enriching…
-                            </span>
-                          ) : isAdding ? (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'rgb(251,146,60)' }}>
-                              <Loader2 size={13} className="animate-spin" /> Adding…
-                            </span>
-                          ) : (
-                            <button className="btn btn-ai" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => addOne(a)}>
-                              <Plus size={12} /> Add to BD
-                            </button>
-                          )}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center' }}>
+                            {isAdded && !isEnrich ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'rgb(52,211,153)' }}>
+                                <CheckCircle size={13} /> Added
+                              </span>
+                            ) : isAdded && isEnrich ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'rgb(251,191,36)' }}>
+                                <Loader2 size={13} className="animate-spin" /> Enriching…
+                              </span>
+                            ) : isAdding ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'rgb(251,146,60)' }}>
+                                <Loader2 size={13} className="animate-spin" /> Adding…
+                              </span>
+                            ) : (
+                              <button className="btn btn-ai" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => addOne(a)}>
+                                <Plus size={12} /> Add to BD
+                              </button>
+                            )}
+                            <AssignToPlutoButton
+                              companyName={a.co}
+                              createFields={{ ...leadFieldsFor(a), status: 'approved' }}
+                              initialAssigned={plutoAssigned.has(a.co)}
+                              compact
+                              onAssigned={() => setAdded(s => new Set([...s, a.co]))}
+                            />
+                          </div>
                         </td>
                       </tr>
 

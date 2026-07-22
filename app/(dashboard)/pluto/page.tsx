@@ -3,8 +3,9 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import {
-  Eye, RefreshCw, Send, CheckCircle2, Clock, Bell, Users, TrendingUp, Shield, Globe, Layers,
+  Eye, RefreshCw, Send, CheckCircle2, Clock, Bell, Users, TrendingUp, Shield, Globe, Layers, Trash2,
 } from 'lucide-react'
 import { cn, getStatusColor, getStatusLabel, formatDate } from '@/lib/utils'
 import type { Lead } from '@/lib/types'
@@ -44,12 +45,13 @@ function StatCard({ icon: Icon, label, value, color }: {
   )
 }
 
-function LeadGroupTable({ title, icon: Icon, color, leads, now }: {
+function LeadGroupTable({ title, icon: Icon, color, leads, now, onDelete }: {
   title: string
   icon: React.ComponentType<{ size?: number; color?: string }>
   color: string
   leads: Lead[]
   now: number
+  onDelete: (id: string) => void
 }) {
   if (leads.length === 0) return null
   return (
@@ -103,6 +105,14 @@ function LeadGroupTable({ title, icon: Icon, color, leads, now }: {
                         {CONTACTED_STATUSES.has(lead.status) && (
                           <CheckCircle2 size={13} style={{ color: '#34d399' }} />
                         )}
+                        <button
+                          onClick={() => onDelete(lead.id)}
+                          className="btn btn-ghost p-1.5"
+                          title="Delete lead"
+                          style={{ padding: 5, color: '#f87171' }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -135,6 +145,14 @@ export default function PlutoPage() {
   }, [supabase])
 
   useEffect(() => { loadLeads() }, [loadLeads])
+
+  const deleteLead = useCallback(async (id: string) => {
+    const lead = leads.find(l => l.id === id)
+    if (!confirm(`Delete ${lead?.company_name ?? 'this lead'}? This cannot be undone.`)) return
+    await supabase.from('leads').delete().eq('id', id)
+    setLeads(prev => prev.filter(l => l.id !== id))
+    toast(`${lead?.company_name ?? 'Lead'} deleted`)
+  }, [leads, supabase])
 
   const now = Date.now()
   const stats = useMemo(() => {
@@ -231,9 +249,9 @@ export default function PlutoPage() {
           </div>
         ) : (
           <>
-            <LeadGroupTable title="Web3 AI Agent Companies" icon={Shield} color="#a78bfa" leads={groups.web3} now={now} />
-            <LeadGroupTable title="Web2 AI Agent Companies" icon={Globe} color="#38bdf8" leads={groups.web2} now={now} />
-            <LeadGroupTable title="Other Assigned Leads" icon={Layers} color="#fbbf24" leads={groups.other} now={now} />
+            <LeadGroupTable title="Web3 AI Agent Companies" icon={Shield} color="#a78bfa" leads={groups.web3} now={now} onDelete={deleteLead} />
+            <LeadGroupTable title="Web2 AI Agent Companies" icon={Globe} color="#38bdf8" leads={groups.web2} now={now} onDelete={deleteLead} />
+            <LeadGroupTable title="Other Assigned Leads" icon={Layers} color="#fbbf24" leads={groups.other} now={now} onDelete={deleteLead} />
           </>
         )}
       </div>

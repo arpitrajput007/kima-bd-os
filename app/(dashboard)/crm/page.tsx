@@ -16,6 +16,7 @@ import {
 import { cn, getScoreBg, truncate } from '@/lib/utils'
 import type { Lead, Contact } from '@/lib/types'
 import type { LeadStatus } from '@/lib/types'
+import { AssignToPlutoButton } from '@/components/AssignToPlutoButton'
 
 type ActivityType = 'note' | 'call' | 'email' | 'meeting' | 'follow_up' | 'status_change'
 
@@ -903,6 +904,7 @@ function LeadFlyout({ lead, onClose, onActivityAdded, onStatusChange }: {
           <Link href={`/outreach?lead=${lead.id}`} className="btn btn-secondary" style={{ flex: 1, justifyContent: 'center', fontSize: 12, textDecoration: 'none' }}>
             <MessageSquare size={13} /> Draft message
           </Link>
+          <AssignToPlutoButton companyName={lead.company_name} initialAssigned={lead.assigned_to === 'pluto'} />
           <Link href={`/leads/${lead.id}`} className="btn btn-ghost" style={{ padding: '9px 11px', textDecoration: 'none' }}>
             <ChevronRight size={14} />
           </Link>

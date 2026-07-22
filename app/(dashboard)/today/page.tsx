@@ -17,6 +17,7 @@ import {
   MAX_FOLLOWUPS, FOLLOWUP_GAP_DAYS, type OutreachMeta,
 } from '@/lib/outreach'
 import { isSourceDue } from '@/lib/source-scheduling'
+import { AssignToPlutoButton } from '@/components/AssignToPlutoButton'
 
 type LeadActivity = { id: string; type: string; channel?: string }
 type LeadWithContacts = Lead & { contacts?: Contact[]; lead_activities?: LeadActivity[] }
@@ -293,6 +294,7 @@ function PlanLeadCard({ lead, rank, actionLoading, onContacted, onReserved, onDe
             className="btn btn-ghost justify-center" style={{ fontSize: '11px', padding: '5px 12px', color: 'rgb(130,135,165)' }}>
             <Eye size={12} /> View details
           </Link>
+          <AssignToPlutoButton companyName={lead.company_name} initialAssigned={lead.assigned_to === 'pluto'} compact />
           {onDelete && (
             <button
               onClick={handleDelete}
