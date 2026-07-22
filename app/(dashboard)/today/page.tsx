@@ -18,6 +18,7 @@ import {
 } from '@/lib/outreach'
 import { isSourceDue } from '@/lib/source-scheduling'
 import { AssignToPlutoButton } from '@/components/AssignToPlutoButton'
+import { getActor } from '@/lib/actor'
 
 type LeadActivity = { id: string; type: string; channel?: string }
 type LeadWithContacts = Lead & { contacts?: Contact[]; lead_activities?: LeadActivity[] }
@@ -472,6 +473,7 @@ export default function TodayPage() {
         lead_id: id, type: 'email', channel,
         content: note || `Reached out via ${channel}`,
         follow_up_at: followUpAt.toISOString(),
+        performed_by: getActor(),
       })
       toast.success(`Logged — follow-up in ${followUpDays} days`); loadData()
     } else { toast.error('Update failed') }

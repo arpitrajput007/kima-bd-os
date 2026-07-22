@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
 import { Bell, X, CheckCircle2, ArrowRight, ChevronLeft, Clock } from 'lucide-react'
 import { toast } from 'sonner'
+import { getActor } from '@/lib/actor'
 
 // ── Snooze persistence (survives page loads/navigation) ────────────────────
 const SNOOZE_KEY = 'kima_followup_snooze_until'
@@ -288,6 +289,7 @@ export default function FollowUpNotifications() {
         type: 'email',
         channel: lead.last_channel || 'follow_up',
         content: 'Follow-up done — no further reminder set',
+        performed_by: getActor(),
       })
 
       toast.success(`${lead.company_name} — follow-up cleared`)
@@ -307,6 +309,7 @@ export default function FollowUpNotifications() {
         channel: lead.last_channel || 'follow_up',
         content: `Follow-up done — next reminder in ${days} day${days === 1 ? '' : 's'}`,
         follow_up_at: nextAtTs,
+        performed_by: getActor(),
       })
 
       toast.success(`✓ Next follow-up for ${lead.company_name} in ${days}d`)

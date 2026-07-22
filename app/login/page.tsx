@@ -12,9 +12,11 @@ export default function LoginPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (passcode === 'Jarvis007') {
+    const actor = passcode === 'Jarvis007' ? 'me' : passcode === 'Ember7110@' ? 'pluto' : null
+    if (actor) {
       setLoading(true)
       document.cookie = 'kima_bd_passcode=Jarvis007; path=/; max-age=31536000'
+      document.cookie = `kima_bd_actor=${actor}; path=/; max-age=31536000`
       router.push('/dashboard')
     } else {
       setError(true)

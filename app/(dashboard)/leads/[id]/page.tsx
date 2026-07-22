@@ -26,6 +26,7 @@ import {
 import type { Lead, Contact, ContactTouch, OutreachMessage, UseCase, BDBrief, UseCaseProduct, ProductMatch } from '@/lib/types'
 import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL, REGIONS } from '@/lib/types'
 import { actStart, actFinish, ACTION_TOOL, ACTION_LABEL } from '@/lib/agent-activity'
+import { getActor, ACTOR_LABEL } from '@/lib/actor'
 
 type AIAction = 'research' | 'pain_points' | 'kima_fit' | 'aeredium_fit' | 'aerpolice_fit' | 'classify' | 'score' | 'contacts' | null
 
@@ -960,6 +961,7 @@ function ContactedModal({ lead, onClose, onSaved }: {
       content: note.trim() || `Reached out via ${CHANNELS.find(c => c.id === channel)?.label}`,
       scheduled_at: null,
       follow_up_at: followUpAt.toISOString(),
+      performed_by: getActor(),
     })
 
     setSaving(false)

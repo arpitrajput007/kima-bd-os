@@ -17,6 +17,7 @@ import { cn, getScoreBg, truncate } from '@/lib/utils'
 import type { Lead, Contact } from '@/lib/types'
 import type { LeadStatus } from '@/lib/types'
 import { AssignToPlutoButton } from '@/components/AssignToPlutoButton'
+import { getActor, ACTOR_LABEL } from '@/lib/actor'
 
 type ActivityType = 'note' | 'call' | 'email' | 'meeting' | 'follow_up' | 'status_change'
 
@@ -29,6 +30,7 @@ interface Activity {
   scheduled_at?: string | null
   follow_up_at?: string | null
   completed_at?: string | null
+  performed_by?: string | null
   created_at: string
 }
 
@@ -125,6 +127,7 @@ function AddActivityModal({ lead, onClose, onSaved, onOutreachLogged }: {
       channel: isOutreach && channel ? channel : null,
       content: content.trim() || 'Follow-up scheduled',
       scheduled_at: type === 'follow_up' && scheduledAt ? new Date(scheduledAt).toISOString() : null,
+      performed_by: getActor(),
     })
     // Auto-increment contacts_reached when logging outreach
     if (isOutreach && onOutreachLogged) {
@@ -277,6 +280,7 @@ function AddLeadModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     if (note.trim()) {
       await supabase.from('lead_activities').insert({
         lead_id: lead.id, type: 'note', content: note.trim(),
+        performed_by: getActor(),
       })
     }
 
@@ -939,6 +943,11 @@ function LeadFlyout({ lead, onClose, onActivityAdded, onStatusChange }: {
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="text-[11px] font-bold" style={{ color: meta.color }}>{meta.label}</span>
                           <span className="text-[10px] text-muted">{relTime(a.created_at)}</span>
+                          {a.performed_by && (
+                            <span className="text-[10px] font-semibold" style={{ color: a.performed_by === 'pluto' ? '#fbbf24' : '#a78bfa' }}>
+                              · {ACTOR_LABEL[a.performed_by as 'me' | 'pluto'] ?? a.performed_by}
+                            </span>
+                          )}
                           {a.completed_at && <span className="text-[10px] font-semibold" style={{ color: '#34d399' }}>✓ Done</span>}
                         </div>
                         <div className="text-[13px] text-secondary" style={{ lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{a.content}</div>
@@ -1244,6 +1253,7 @@ export default function CRMPage() {
     await supabase.from('lead_activities').insert({
       lead_id: id, type: 'status_change',
       content: `Moved to ${PIPELINE_STAGES.find(s => s.status === status)?.label || status}`,
+      performed_by: getActor(),
     })
     toast.success('Stage updated')
     setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l))

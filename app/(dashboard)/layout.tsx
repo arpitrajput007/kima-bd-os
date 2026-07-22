@@ -1,14 +1,19 @@
+import { cookies } from 'next/headers'
 import { Sidebar } from '@/components/sidebar'
 import AgentActivityLog from '@/components/AgentActivityLog'
 import FollowUpNotifications from '@/components/FollowUpNotifications'
 import NewReplyNotifications from '@/components/NewReplyNotifications'
 import TimeTracker from '@/components/TimeTracker'
+import { ACTOR_LABEL, type Actor } from '@/lib/actor'
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const cookieStore = await cookies()
+  const actor: Actor = cookieStore.get('kima_bd_actor')?.value === 'pluto' ? 'pluto' : 'me'
+
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'rgb(10, 11, 16)' }}>
       <TimeTracker />
@@ -24,6 +29,10 @@ export default function DashboardLayout({
           <span>{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
           <span className="mx-2 opacity-30">·</span>
           <span>Powered by GPT-4o + Tavily + Hunter.io</span>
+          <span className="mx-2 opacity-30">·</span>
+          <span style={{ color: actor === 'pluto' ? '#fbbf24' : 'rgb(160,165,200)', fontWeight: 600 }}>
+            Logged in as: {ACTOR_LABEL[actor]}
+          </span>
         </div>
         <main className="flex-1 overflow-auto min-w-0">
           {children}
