@@ -33,6 +33,7 @@ import {
   Lightbulb,
   Boxes,
   KeyRound,
+  Users,
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
@@ -103,6 +104,12 @@ const navGroups: {
       { href: '/content',            label: 'Content Studio',     icon: PenLine, glow: true },
       { href: '/agent-rules',        label: 'Agent Rules',        icon: Settings2 },
       { href: '/feedback',           label: 'Feedback Memory',    icon: Brain },
+    ],
+  },
+  {
+    label: 'Team',
+    items: [
+      { href: '/pluto', label: "Pluto's Section", icon: Users, orange: true },
     ],
   },
   {

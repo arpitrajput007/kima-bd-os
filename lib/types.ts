@@ -270,6 +270,7 @@ export interface Lead {
   follow_up_stage?: number
   next_follow_up_at?: string
   last_channel?: string
+  assigned_to?: string | null
   created_at: string
   updated_at: string
   contacts?: Contact[]

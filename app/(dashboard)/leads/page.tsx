@@ -8,7 +8,7 @@ import {
   Plus, Search, Filter, Star, ExternalLink, ChevronDown, ChevronRight,
   CheckCircle, XCircle, Eye, MessageSquare, Loader2, RefreshCw,
   AtSign, Send, MessageCircle, Sparkles, LayoutList, Layers, Clock,
-  Boxes, Package, Landmark, ShieldCheck, LayoutGrid,
+  Boxes, Package, Landmark, ShieldCheck, LayoutGrid, UserPlus, UserMinus,
 } from 'lucide-react'
 import {
   cn, getScoreBg, getStatusColor, getStatusLabel, formatDate, truncate
@@ -175,6 +175,21 @@ export default function LeadsPage() {
     if (error) toast.error('Update failed')
     else {
       toast.success(`Lead ${status.replace('_', ' ')}`)
+      loadLeads()
+    }
+    setActionLoading(null)
+  }
+
+  const assignLead = async (id: string, assignedTo: string | null) => {
+    setActionLoading(id + 'assign')
+    const { error } = await supabase
+      .from('leads')
+      .update({ assigned_to: assignedTo, updated_at: new Date().toISOString() })
+      .eq('id', id)
+
+    if (error) toast.error('Assignment failed')
+    else {
+      toast.success(assignedTo ? `Assigned to ${assignedTo}` : 'Unassigned')
       loadLeads()
     }
     setActionLoading(null)
@@ -478,6 +493,12 @@ export default function LeadsPage() {
                                 {lead.priority === 'excellent' && <span title="Excellent priority — score 85+, top BD target" style={{ display: 'inline-flex', flexShrink: 0 }}><Star size={11} style={{ color: '#a78bfa' }} /></span>}
                                 <div>
                                   <Link href={`/leads/${lead.id}`} className="text-sm font-medium text-white hover:text-violet-300 transition-colors">{lead.company_name}</Link>
+                                  {lead.assigned_to && (
+                                    <span className="badge text-xs ml-1.5" title={`Assigned to ${lead.assigned_to}`}
+                                      style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', borderColor: 'rgba(251,191,36,0.25)', fontSize: '10px', padding: '1px 6px' }}>
+                                      → {lead.assigned_to}
+                                    </span>
+                                  )}
                                   {lead.website && <a href={lead.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs mt-0.5" style={{ color: 'rgb(100,100,120)' }} onClick={e => e.stopPropagation()}>{lead.website.replace(/^https?:\/\//, '').slice(0, 25)}<ExternalLink size={9} /></a>}
                                   <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
                                     {lead.twitter_url && <a href={lead.twitter_url} target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8' }}><AtSign size={11} /></a>}
@@ -512,6 +533,15 @@ export default function LeadsPage() {
                                 {lead.status !== 'rejected' && <button onClick={() => updateLeadStatus(lead.id, 'rejected')} disabled={actionLoading === lead.id + 'rejected'} className="btn btn-ghost p-1.5" title="Reject" style={{ padding: 5, color: '#f87171' }}>{actionLoading === lead.id + 'rejected' ? <Loader2 size={13} className="animate-spin" /> : <XCircle size={13} />}</button>}
                                 {lead.status !== 'reserved' && <button onClick={() => updateLeadStatus(lead.id, 'reserved')} disabled={actionLoading === lead.id + 'reserved'} className="btn btn-ghost p-1.5" title="Reserve for later — too big right now" style={{ padding: 5, color: '#818cf8' }}>{actionLoading === lead.id + 'reserved' ? <Loader2 size={13} className="animate-spin" /> : <Clock size={13} />}</button>}
                                 <Link href={`/outreach?lead=${lead.id}`} className="btn btn-ghost p-1.5" title="Outreach" style={{ padding: 5, color: '#a78bfa' }}><MessageSquare size={13} /></Link>
+                                {lead.assigned_to === 'pluto' ? (
+                                  <button onClick={() => assignLead(lead.id, null)} disabled={actionLoading === lead.id + 'assign'} className="btn btn-ghost p-1.5" title="Unassign from Pluto" style={{ padding: 5, color: '#fbbf24' }}>
+                                    {actionLoading === lead.id + 'assign' ? <Loader2 size={13} className="animate-spin" /> : <UserMinus size={13} />}
+                                  </button>
+                                ) : (
+                                  <button onClick={() => assignLead(lead.id, 'pluto')} disabled={actionLoading === lead.id + 'assign'} className="btn btn-ghost p-1.5" title="Assign to Pluto" style={{ padding: 5, color: 'rgb(140,140,160)' }}>
+                                    {actionLoading === lead.id + 'assign' ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />}
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -575,6 +605,12 @@ export default function LeadsPage() {
                             >
                               {lead.company_name}
                             </Link>
+                            {lead.assigned_to && (
+                              <span className="badge text-xs ml-1.5" title={`Assigned to ${lead.assigned_to}`}
+                                style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', borderColor: 'rgba(251,191,36,0.25)', fontSize: '10px', padding: '1px 6px' }}>
+                                → {lead.assigned_to}
+                              </span>
+                            )}
                             {lead.website && (
                               <a href={lead.website} target="_blank" rel="noopener noreferrer"
                                 className="flex items-center gap-1 text-xs mt-0.5"
@@ -688,6 +724,27 @@ export default function LeadsPage() {
                             style={{ padding: '5px', color: '#a78bfa' }}>
                             <MessageSquare size={13} />
                           </Link>
+                          {lead.assigned_to === 'pluto' ? (
+                            <button
+                              onClick={() => assignLead(lead.id, null)}
+                              disabled={actionLoading === lead.id + 'assign'}
+                              className="btn btn-ghost p-1.5" title="Unassign from Pluto"
+                              style={{ padding: '5px', color: '#fbbf24' }}>
+                              {actionLoading === lead.id + 'assign'
+                                ? <Loader2 size={13} className="animate-spin" />
+                                : <UserMinus size={13} />}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => assignLead(lead.id, 'pluto')}
+                              disabled={actionLoading === lead.id + 'assign'}
+                              className="btn btn-ghost p-1.5" title="Assign to Pluto"
+                              style={{ padding: '5px', color: 'rgb(140,140,160)' }}>
+                              {actionLoading === lead.id + 'assign'
+                                ? <Loader2 size={13} className="animate-spin" />
+                                : <UserPlus size={13} />}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -13,7 +13,7 @@ import {
   ChevronDown, ChevronUp, RefreshCw, Building2, Brain,
   FileSearch, Puzzle, Calendar, Mail, Wand2,
   MapPin, AtSign, MessageCircle, Plus, Trash2, History,
-  BadgeCheck, AlertCircle, Lightbulb, Layers
+  BadgeCheck, AlertCircle, Lightbulb, Layers, UserPlus, UserMinus
 } from 'lucide-react'
 import {
   cn, getScoreBg, getStatusColor, getStatusLabel, getSeverityColor,
@@ -1824,6 +1824,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     else { toast.success(`Status: ${getStatusLabel(status as Lead['status'])}`); loadLead() }
   }
 
+  const assignTo = async (assignedTo: string | null) => {
+    const { error } = await supabase.from('leads').update({ assigned_to: assignedTo, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) toast.error('Assignment failed')
+    else { toast.success(assignedTo ? `Assigned to ${assignedTo}` : 'Unassigned'); loadLead() }
+  }
+
   const runAI = async (action: AIAction) => {
     if (!lead || !action) return
     setAiAction(action)
@@ -2064,6 +2070,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               />
               <ActionBtn icon={Brain} label="Discuss Lead" variant="cyan" onClick={() => setDiscussOpen(true)} />
               <ActionBtn icon={MessageSquare} label="Outreach Studio" variant="purple" href={`/outreach?lead=${lead.id}`} />
+              {lead.assigned_to === 'pluto' ? (
+                <ActionBtn icon={UserMinus} label="Unassign from Pluto" onClick={() => assignTo(null)} />
+              ) : (
+                <ActionBtn icon={UserPlus} label="Assign to Pluto" onClick={() => assignTo('pluto')} />
+              )}
             </div>
           </div>
 
