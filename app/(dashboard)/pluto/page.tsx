@@ -4,15 +4,29 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import {
-  Eye, RefreshCw, Send, CheckCircle2, Clock, Bell, Users, TrendingUp,
+  Eye, RefreshCw, Send, CheckCircle2, Clock, Bell, Users, TrendingUp, Shield, Globe, Layers,
 } from 'lucide-react'
 import { cn, getStatusColor, getStatusLabel, formatDate } from '@/lib/utils'
 import type { Lead } from '@/lib/types'
+import { WEB3_AGENTS } from '@/lib/web3-agent-companies'
+import { WEB2_COMPANIES } from '@/lib/web2-agent-companies'
 
 const CONTACTED_STATUSES = new Set(['contacted', 'replied', 'meeting_booked', 'proposal_sent', 'negotiating', 'integration', 'won'])
 const CLOSED_STATUSES = new Set(['rejected', 'archived'])
 
+const norm = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+const WEB3_NAMES = new Set(WEB3_AGENTS.map(a => norm(a.company)))
+const WEB2_NAMES = new Set(WEB2_COMPANIES.map(c => norm(c.co)))
+
 type Tab = 'all' | 'to_reach_out' | 'awaiting_reply' | 'overdue'
+type Group = 'web3' | 'web2' | 'other'
+
+function groupOf(companyName: string): Group {
+  const n = norm(companyName)
+  if (WEB3_NAMES.has(n)) return 'web3'
+  if (WEB2_NAMES.has(n)) return 'web2'
+  return 'other'
+}
 
 function StatCard({ icon: Icon, label, value, color }: {
   icon: React.ComponentType<{ size?: number; color?: string }>; label: string; value: number; color: string
@@ -25,6 +39,78 @@ function StatCard({ icon: Icon, label, value, color }: {
       <div>
         <div style={{ fontSize: 19, fontWeight: 700, color: 'white', lineHeight: 1 }}>{value}</div>
         <div style={{ fontSize: 11, color: 'rgb(140,140,160)', marginTop: 3 }}>{label}</div>
+      </div>
+    </div>
+  )
+}
+
+function LeadGroupTable({ title, icon: Icon, color, leads, now }: {
+  title: string
+  icon: React.ComponentType<{ size?: number; color?: string }>
+  color: string
+  leads: Lead[]
+  now: number
+}) {
+  if (leads.length === 0) return null
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div className="flex items-center gap-2 mb-2">
+        <Icon size={14} color={color} />
+        <span style={{ fontSize: 13, fontWeight: 700, color: 'white' }}>{title}</span>
+        <span className="badge text-xs" style={{ background: `${color}15`, color, borderColor: `${color}35`, fontSize: '10px', padding: '1px 6px' }}>
+          {leads.length}
+        </span>
+      </div>
+      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(22,22,34,0.8)' }}>
+        <div className="overflow-x-auto">
+          <table className="w-full data-table" style={{ marginBottom: 0 }}>
+            <thead>
+              <tr style={{ background: 'rgba(255,255,255,0.015)' }}>
+                <th className="text-left">Company</th>
+                <th className="text-left">Status</th>
+                <th className="text-left">Last Channel</th>
+                <th className="text-left">Next Follow-up</th>
+                <th className="text-left">Assigned</th>
+                <th className="text-left">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leads.map(lead => {
+                const overdue = !!lead.next_follow_up_at && new Date(lead.next_follow_up_at).getTime() <= now
+                return (
+                  <tr key={lead.id}>
+                    <td>
+                      <Link href={`/leads/${lead.id}`} className="text-sm font-medium text-white hover:text-violet-300 transition-colors">
+                        {lead.company_name}
+                      </Link>
+                    </td>
+                    <td><span className={cn('badge', getStatusColor(lead.status))}>{getStatusLabel(lead.status)}</span></td>
+                    <td><span className="text-xs" style={{ color: 'rgb(140,140,160)' }}>{lead.last_channel || '—'}</span></td>
+                    <td>
+                      {lead.next_follow_up_at ? (
+                        <span className="text-xs" style={{ color: overdue ? '#f87171' : 'rgb(140,140,160)', fontWeight: overdue ? 700 : 400 }}>
+                          {overdue && <Clock size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: -1 }} />}
+                          {formatDate(lead.next_follow_up_at)}
+                        </span>
+                      ) : <span className="text-xs" style={{ color: 'rgb(90,95,120)' }}>—</span>}
+                    </td>
+                    <td><span className="text-xs" style={{ color: 'rgb(100,100,120)' }}>{formatDate(lead.created_at)}</span></td>
+                    <td>
+                      <div className="flex items-center gap-1">
+                        <Link href={`/leads/${lead.id}`} className="btn btn-ghost p-1.5" title="Open — Discuss Lead &amp; Mark Contacted" style={{ padding: 5 }}>
+                          <Eye size={13} />
+                        </Link>
+                        {CONTACTED_STATUSES.has(lead.status) && (
+                          <CheckCircle2 size={13} style={{ color: '#34d399' }} />
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )
@@ -78,6 +164,17 @@ export default function PlutoPage() {
         return active
     }
   }, [leads, tab, now])
+
+  const groups = useMemo(() => {
+    const web3: Lead[] = [], web2: Lead[] = [], other: Lead[] = []
+    for (const l of filtered) {
+      const g = groupOf(l.company_name)
+      if (g === 'web3') web3.push(l)
+      else if (g === 'web2') web2.push(l)
+      else other.push(l)
+    }
+    return { web3, web2, other }
+  }, [filtered])
 
   return (
     <div className="fade-in">
@@ -133,57 +230,11 @@ export default function PlutoPage() {
             </div>
           </div>
         ) : (
-          <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(22,22,34,0.8)' }}>
-            <div className="overflow-x-auto">
-              <table className="w-full data-table" style={{ marginBottom: 0 }}>
-                <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.015)' }}>
-                    <th className="text-left">Company</th>
-                    <th className="text-left">Status</th>
-                    <th className="text-left">Last Channel</th>
-                    <th className="text-left">Next Follow-up</th>
-                    <th className="text-left">Assigned</th>
-                    <th className="text-left">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(lead => {
-                    const overdue = !!lead.next_follow_up_at && new Date(lead.next_follow_up_at).getTime() <= now
-                    return (
-                      <tr key={lead.id}>
-                        <td>
-                          <Link href={`/leads/${lead.id}`} className="text-sm font-medium text-white hover:text-violet-300 transition-colors">
-                            {lead.company_name}
-                          </Link>
-                        </td>
-                        <td><span className={cn('badge', getStatusColor(lead.status))}>{getStatusLabel(lead.status)}</span></td>
-                        <td><span className="text-xs" style={{ color: 'rgb(140,140,160)' }}>{lead.last_channel || '—'}</span></td>
-                        <td>
-                          {lead.next_follow_up_at ? (
-                            <span className="text-xs" style={{ color: overdue ? '#f87171' : 'rgb(140,140,160)', fontWeight: overdue ? 700 : 400 }}>
-                              {overdue && <Clock size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: -1 }} />}
-                              {formatDate(lead.next_follow_up_at)}
-                            </span>
-                          ) : <span className="text-xs" style={{ color: 'rgb(90,95,120)' }}>—</span>}
-                        </td>
-                        <td><span className="text-xs" style={{ color: 'rgb(100,100,120)' }}>{formatDate(lead.created_at)}</span></td>
-                        <td>
-                          <div className="flex items-center gap-1">
-                            <Link href={`/leads/${lead.id}`} className="btn btn-ghost p-1.5" title="Open — Discuss Lead &amp; Mark Contacted" style={{ padding: 5 }}>
-                              <Eye size={13} />
-                            </Link>
-                            {CONTACTED_STATUSES.has(lead.status) && (
-                              <CheckCircle2 size={13} style={{ color: '#34d399' }} />
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <>
+            <LeadGroupTable title="Web3 AI Agent Companies" icon={Shield} color="#a78bfa" leads={groups.web3} now={now} />
+            <LeadGroupTable title="Web2 AI Agent Companies" icon={Globe} color="#38bdf8" leads={groups.web2} now={now} />
+            <LeadGroupTable title="Other Assigned Leads" icon={Layers} color="#fbbf24" leads={groups.other} now={now} />
+          </>
         )}
       </div>
     </div>
