@@ -11,6 +11,7 @@ import { cn, getStatusColor, getStatusLabel, formatDate } from '@/lib/utils'
 import type { Lead } from '@/lib/types'
 import { WEB3_AGENTS } from '@/lib/web3-agent-companies'
 import { WEB2_COMPANIES } from '@/lib/web2-agent-companies'
+import { FollowUpDraftCard } from '@/components/FollowUpDraftCard'
 
 const CONTACTED_STATUSES = new Set(['contacted', 'replied', 'meeting_booked', 'proposal_sent', 'negotiating', 'integration', 'won'])
 const CLOSED_STATUSES = new Set(['rejected', 'archived'])
@@ -261,7 +262,7 @@ export default function PlutoPage() {
             ['all', 'All'],
             ['to_reach_out', 'To Reach Out'],
             ['awaiting_reply', 'Awaiting Reply'],
-            ['overdue', 'Follow-up Overdue'],
+            ['overdue', 'Follow-Ups Due'],
           ] as [Tab, string][]).map(([id, label]) => (
             <button
               key={id}
@@ -279,8 +280,14 @@ export default function PlutoPage() {
         {filtered.length === 0 ? (
           <div className="rounded-xl p-10 text-center" style={{ background: 'rgba(22,22,34,0.8)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div className="text-sm" style={{ color: 'rgb(140,140,160)' }}>
-              {leads.length === 0 ? 'No leads assigned to Pluto yet.' : 'Nothing in this view.'}
+              {leads.length === 0 ? 'No leads assigned to Pluto yet.' : tab === 'overdue' ? 'No follow-ups due — you\'re all caught up.' : 'Nothing in this view.'}
             </div>
+          </div>
+        ) : tab === 'overdue' ? (
+          <div className="flex flex-col gap-3">
+            {filtered.map((lead, i) => (
+              <FollowUpDraftCard key={lead.id} lead={lead} onSent={loadLeads} delayMs={i * 1500} />
+            ))}
           </div>
         ) : (
           <>
