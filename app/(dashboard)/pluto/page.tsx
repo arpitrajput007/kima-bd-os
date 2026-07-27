@@ -209,19 +209,29 @@ export default function PlutoPage() {
     setLoading(false)
 
     if (loaded.length > 0) {
-      const { data: activities } = await supabase
-        .from('lead_activities')
-        .select('lead_id, channel, performed_by, created_at')
-        .in('lead_id', loaded.map(l => l.id))
-        .not('channel', 'is', null)
-        .order('created_at', { ascending: true })
+      const leadIds = loaded.map(l => l.id)
+      // Channel history lives in two places that don't always overlap —
+      // lead_activities (Mark Contacted, follow-ups) and outreach_messages
+      // (Outreach Studio sends) — so both are merged into one timeline.
+      const [{ data: activities }, { data: messages }] = await Promise.all([
+        supabase.from('lead_activities')
+          .select('lead_id, channel, performed_by, created_at')
+          .in('lead_id', leadIds)
+          .not('channel', 'is', null),
+        supabase.from('outreach_messages')
+          .select('lead_id, channel, performed_by, created_at')
+          .in('lead_id', leadIds)
+          .not('status', 'eq', 'draft'),
+      ])
+      const touches = [...(activities || []), ...(messages || [])]
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
       const byLead: Record<string, ContactInfo> = {}
-      for (const a of activities || []) {
-        const entry = byLead[a.lead_id] || { channels: [], lastAt: a.created_at, lastBy: null }
-        if (a.channel && !entry.channels.includes(a.channel)) entry.channels.push(a.channel)
-        entry.lastAt = a.created_at
-        entry.lastBy = a.performed_by
-        byLead[a.lead_id] = entry
+      for (const t of touches) {
+        const entry = byLead[t.lead_id] || { channels: [], lastAt: t.created_at, lastBy: null }
+        if (t.channel && !entry.channels.includes(t.channel)) entry.channels.push(t.channel)
+        entry.lastAt = t.created_at
+        entry.lastBy = t.performed_by
+        byLead[t.lead_id] = entry
       }
       setContactInfo(byLead)
     } else {
