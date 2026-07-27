@@ -321,7 +321,12 @@ ${agentContext}`
     const historyMessages: { role: 'user' | 'assistant'; content: string }[] = Array.isArray(history) ? history : []
 
     const imageNote = image
-      ? '\n\nThe BD person has attached a screenshot with this message (e.g. a chat/DM thread with the lead, a screenshot of their product, or a document). Read it closely and ground your answer in what it actually shows.'
+      ? `\n\nThe BD person has attached a screenshot with this message (e.g. a chat/DM thread with the lead, a screenshot of their product, or a document). Read it closely and ground your answer in what it actually shows.
+
+If the screenshot is a conversation between multiple people, attribution matters — do not guess who said what:
+- Work out each speaker's identity from name labels, avatars/initials, bubble side (left vs right), bubble color, and platform conventions (e.g. the app's own user is usually right-aligned).
+- Quote or paraphrase a line ONLY once you're confident whose message it is. If two people could plausibly be the speaker, say so explicitly ("unclear if this is X or Y") instead of asserting a guess as fact.
+- If names are visible anywhere in the thread (headers, @mentions, signatures), use them — don't default to generic labels like "someone on their side" when a real name is legible.`
       : ''
 
     const { claudeText: ct } = await import('@/lib/claude')
