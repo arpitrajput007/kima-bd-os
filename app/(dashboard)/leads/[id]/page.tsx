@@ -13,7 +13,8 @@ import {
   ChevronDown, ChevronUp, RefreshCw, Building2, Brain,
   FileSearch, Puzzle, Calendar, Mail, Wand2,
   MapPin, AtSign, MessageCircle, Plus, Trash2, History,
-  BadgeCheck, AlertCircle, Lightbulb, Layers, UserPlus, UserMinus
+  BadgeCheck, AlertCircle, Lightbulb, Layers, UserPlus, UserMinus,
+  Image as ImageIcon
 } from 'lucide-react'
 import {
   cn, getScoreBg, getStatusColor, getStatusLabel, getSeverityColor,
@@ -2295,7 +2296,42 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 }
 
 /* ── Discuss Lead: research-grounded chat that teaches the agent ──────────── */
-interface ChatMsg { role: 'user' | 'assistant'; content: string; followUps?: string[] }
+interface ChatMsg { role: 'user' | 'assistant'; content: string; followUps?: string[]; image?: string }
+
+// Screenshot pasted into the composer, held client-side until sent.
+interface PendingImage { dataUrl: string; mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'; data: string }
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // Anthropic's per-image limit
+
+// Pull an image out of a clipboard/drop event, if there is one.
+async function extractImage(items: DataTransferItemList | FileList): Promise<PendingImage | null> {
+  const files: File[] = []
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i] as DataTransferItem | File
+    const file = 'getAsFile' in item ? item.getAsFile() : item
+    if (file && file.type.startsWith('image/')) files.push(file)
+  }
+  const file = files[0]
+  if (!file) return null
+  if (file.size > MAX_IMAGE_BYTES) {
+    toast.error('Screenshot is too large (max 5MB)')
+    return null
+  }
+  const dataUrl: string = await new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+  const comma = dataUrl.indexOf(',')
+  const mediaType = dataUrl.slice(5, dataUrl.indexOf(';'))
+  const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+  if (!allowed.includes(mediaType)) {
+    toast.error('Unsupported image type — use PNG, JPEG, GIF, or WebP')
+    return null
+  }
+  return { dataUrl, mediaType: mediaType as PendingImage['mediaType'], data: dataUrl.slice(comma + 1) }
+}
 
 // Lightweight renderer: **bold**, "- " bullets, and paragraph spacing.
 function RichText({ text }: { text: string }) {
@@ -2548,6 +2584,8 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
   const [activeId, setActiveId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
+  const [pendingImage, setPendingImage] = useState<PendingImage | null>(null)
+  const [dragOver, setDragOver] = useState(false)
   const [thinking, setThinking] = useState(false)
   const [dossier, setDossier] = useState<string>('')
   const [shown, setShown] = useState(false)
@@ -2555,6 +2593,7 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
   const [listOpen, setListOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const researched = dossier.length > 0
 
   // Portal availability + slide-in + body scroll lock + autofocus.
@@ -2636,8 +2675,10 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
   }
 
   const ask = async (q: string) => {
-    const question = q.trim()
-    if (!question || thinking) return
+    const typed = q.trim()
+    const image = pendingImage
+    if ((!typed && !image) || thinking) return
+    const question = typed || 'What do you make of this screenshot?'
 
     // Lazily create a thread on the first message of a new conversation.
     let sessionId = activeId
@@ -2654,17 +2695,22 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
       }
     }
 
-    const next = [...messages, { role: 'user' as const, content: question }]
+    const next = [...messages, { role: 'user' as const, content: question, ...(image ? { image: image.dataUrl } : {}) }]
     setMessages(next)
     setInput('')
+    setPendingImage(null)
     if (inputRef.current) inputRef.current.style.height = 'auto'
     setThinking(true)
+    // Screenshots are session-only context for the model — not persisted (no image column).
     if (sessionId) supabase.from('lead_discussion_messages').insert({ discussion_id: sessionId, lead_id: lead.id, role: 'user', content: question }).then(() => {})
 
     try {
       const res = await fetch('/api/ai/discuss', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead_id: lead.id, message: question, messages, dossier: dossier || undefined }),
+        body: JSON.stringify({
+          lead_id: lead.id, message: question, messages, dossier: dossier || undefined,
+          image: image ? { mediaType: image.mediaType, data: image.data } : undefined,
+        }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
@@ -2765,8 +2811,13 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
           {messages.map((m, i) => (
             m.role === 'user' ? (
               <div key={i} style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <div style={{ maxWidth: '85%', borderRadius: '14px 14px 4px 14px', padding: '10px 14px', fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', background: 'rgba(168,85,247,0.18)', border: '1px solid rgba(168,85,247,0.32)', color: 'rgb(228,218,252)' }}>
-                  {m.content}
+                <div style={{ maxWidth: '85%', display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
+                  {m.image && (
+                    <img src={m.image} alt="Pasted screenshot" style={{ maxWidth: '100%', maxHeight: 220, borderRadius: 10, border: '1px solid rgba(168,85,247,0.32)', display: 'block' }} />
+                  )}
+                  <div style={{ borderRadius: '14px 14px 4px 14px', padding: '10px 14px', fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', background: 'rgba(168,85,247,0.18)', border: '1px solid rgba(168,85,247,0.32)', color: 'rgb(228,218,252)' }}>
+                    {m.content}
+                  </div>
                 </div>
               </div>
             ) : (
@@ -2813,7 +2864,43 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
 
         {/* Composer */}
         <div style={{ padding: '12px 16px 16px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', borderRadius: 13, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', padding: 6 }}>
+          {pendingImage && (
+            <div style={{ position: 'relative', display: 'inline-block', marginBottom: 8 }}>
+              <img src={pendingImage.dataUrl} alt="Screenshot to attach" style={{ maxHeight: 90, borderRadius: 9, border: '1px solid rgba(34,211,238,0.3)', display: 'block' }} />
+              <button onClick={() => setPendingImage(null)} title="Remove screenshot"
+                style={{ position: 'absolute', top: -7, right: -7, width: 20, height: 20, borderRadius: 999, border: '1px solid rgba(255,255,255,0.15)', background: 'rgb(20,21,32)', color: 'rgb(200,205,220)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <X size={12} />
+              </button>
+            </div>
+          )}
+          <div
+            onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={async e => {
+              e.preventDefault()
+              setDragOver(false)
+              const img = await extractImage(e.dataTransfer.files)
+              if (img) setPendingImage(img)
+            }}
+            style={{ display: 'flex', gap: 8, alignItems: 'flex-end', borderRadius: 13, border: `1px solid ${dragOver ? 'rgba(34,211,238,0.5)' : 'rgba(255,255,255,0.12)'}`, background: dragOver ? 'rgba(34,211,238,0.06)' : 'rgba(255,255,255,0.04)', padding: 6, transition: 'background 0.15s, border-color 0.15s' }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              style={{ display: 'none' }}
+              onChange={async e => {
+                const files = e.target.files
+                if (files && files.length) {
+                  const img = await extractImage(files)
+                  if (img) setPendingImage(img)
+                }
+                e.target.value = ''
+              }}
+            />
+            <button onClick={() => fileInputRef.current?.click()} title="Attach a screenshot"
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, flexShrink: 0, marginBottom: 3, borderRadius: 9, border: 'none', background: 'transparent', color: 'rgb(140,147,175)', cursor: 'pointer' }}>
+              <ImageIcon size={16} />
+            </button>
             <textarea
               ref={inputRef}
               value={input}
@@ -2823,12 +2910,16 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
                 e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px'
               }}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(input) } }}
-              placeholder={`Ask about ${lead.company_name}…`}
+              onPaste={async e => {
+                const img = await extractImage(e.clipboardData.items)
+                if (img) { e.preventDefault(); setPendingImage(img) }
+              }}
+              placeholder={pendingImage ? 'Add a note (optional)…' : `Ask about ${lead.company_name}, or paste a screenshot…`}
               rows={1}
               style={{ flex: 1, resize: 'none', maxHeight: 140, border: 'none', background: 'transparent', padding: '8px 10px', fontSize: 13, color: 'white', fontFamily: 'inherit', lineHeight: 1.5, outline: 'none' }}
             />
-            <button onClick={() => ask(input)} disabled={thinking || !input.trim()}
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, flexShrink: 0, borderRadius: 10, border: 'none', background: thinking || !input.trim() ? 'rgba(34,211,238,0.12)' : 'rgb(34,211,238)', color: thinking || !input.trim() ? 'rgb(103,232,249)' : 'rgb(8,12,16)', cursor: thinking || !input.trim() ? 'not-allowed' : 'pointer', transition: 'all 0.15s' }}>
+            <button onClick={() => ask(input)} disabled={thinking || (!input.trim() && !pendingImage)}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, flexShrink: 0, borderRadius: 10, border: 'none', background: thinking || (!input.trim() && !pendingImage) ? 'rgba(34,211,238,0.12)' : 'rgb(34,211,238)', color: thinking || (!input.trim() && !pendingImage) ? 'rgb(103,232,249)' : 'rgb(8,12,16)', cursor: thinking || (!input.trim() && !pendingImage) ? 'not-allowed' : 'pointer', transition: 'all 0.15s' }}>
               {thinking ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
             </button>
           </div>

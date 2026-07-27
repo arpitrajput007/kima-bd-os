@@ -103,6 +103,9 @@ export async function claudeText(params: {
   maxTokens?: number
   thinking?: boolean
   temperature?: number
+  // Optional screenshot/image attached to the user turn (e.g. a pasted chat
+  // screenshot in Discuss Lead). `data` is base64 with no `data:` prefix.
+  image?: { mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'; data: string }
 }): Promise<string> {
   const client = _client()
 
@@ -112,13 +115,20 @@ export async function claudeText(params: {
     cache_control: { type: 'ephemeral' },
   }
 
+  const content: Anthropic.MessageParam['content'] = params.image
+    ? [
+        { type: 'image', source: { type: 'base64', media_type: params.image.mediaType, data: params.image.data } },
+        { type: 'text', text: params.user },
+      ]
+    : params.user
+
   const response = await client.messages.create({
     model: params.model ?? CLAUDE_RESEARCH,
     max_tokens: params.maxTokens ?? 4000,
     ...(params.thinking ? { thinking: { type: 'adaptive' } } : {}),
     ...(params.temperature != null && !params.thinking ? { temperature: params.temperature } : {}),
     system: [systemBlock],
-    messages: [{ role: 'user', content: params.user }],
+    messages: [{ role: 'user', content }],
   })
 
   // When thinking is enabled, content[0] may be a thinking block — find text explicitly.

@@ -271,6 +271,12 @@ export async function POST(req: NextRequest) {
     if (!lead_id) return NextResponse.json({ error: 'lead_id is required' }, { status: 400 })
     if (!message || !message.trim()) return NextResponse.json({ error: 'Empty message' }, { status: 400 })
 
+    // Pasted-in screenshot (e.g. a chat with the lead), if any — { mediaType, data }.
+    const image: { mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'; data: string } | undefined =
+      body.image && typeof body.image.data === 'string' && typeof body.image.mediaType === 'string'
+        ? body.image
+        : undefined
+
     const { data: lead, error } = await supabase
       .from('leads')
       .select('*, contacts(name, role)')
@@ -314,16 +320,21 @@ ${agentContext}`
 
     const historyMessages: { role: 'user' | 'assistant'; content: string }[] = Array.isArray(history) ? history : []
 
+    const imageNote = image
+      ? '\n\nThe BD person has attached a screenshot with this message (e.g. a chat/DM thread with the lead, a screenshot of their product, or a document). Read it closely and ground your answer in what it actually shows.'
+      : ''
+
     const { claudeText: ct } = await import('@/lib/claude')
     const reply = await ct({
       model: CLAUDE_RESEARCH,
       maxTokens: 1100,
       temperature: 0.7,
-      system: systemPrompt,
+      system: systemPrompt + imageNote,
       user: [
         ...historyMessages.slice(-16).map(m => `${m.role === 'user' ? 'BD' : 'Agent'}: ${m.content}`),
         `BD: ${message}`,
       ].join('\n\n'),
+      image,
     }) || 'I had trouble with that — try rephrasing?'
 
     const followUps = await suggestFollowUps({
