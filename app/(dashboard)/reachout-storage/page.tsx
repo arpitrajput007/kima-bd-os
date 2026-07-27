@@ -18,6 +18,7 @@ interface ReachoutRecord {
   channel: string
   message: string | null
   status: 'draft' | 'sent' | 'delivered' | 'replied' | 'archived'
+  performed_by: string | null
   created_at: string
   updated_at: string
   leads: { id: string; company_name: string; website: string | null; industry_category: string | null } | null
@@ -37,6 +38,12 @@ const CHANNEL_CFG: Record<string, { label: string; color: string; bg: string; bo
   telegram: { label: 'Telegram', color: '#22d3ee', bg: 'rgba(34,211,238,0.1)',  border: 'rgba(34,211,238,0.3)' },
   twitter:  { label: 'X / Twitter', color: '#38bdf8', bg: 'rgba(56,189,248,0.1)', border: 'rgba(56,189,248,0.3)' },
   email:    { label: 'Email', color: '#a78bfa', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.3)' },
+}
+
+const ACTOR_CFG: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  me:    { label: 'You',   color: '#a78bfa', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.3)' },
+  pluto: { label: 'Pluto', color: '#fbbf24', bg: 'rgba(251,191,36,0.1)',  border: 'rgba(251,191,36,0.3)' },
+  agent: { label: 'AI Agent', color: '#22d3ee', bg: 'rgba(34,211,238,0.1)', border: 'rgba(34,211,238,0.3)' },
 }
 
 const OUTCOME_CFG: Record<string, { label: string; color: string; bg: string; border: string; icon: typeof CheckCircle2 }> = {
@@ -66,6 +73,7 @@ function RecordCard({ record, onOutcomeChange }: { record: ReachoutRecord; onOut
   const [copied, setCopied] = useState(false)
 
   const ch = CHANNEL_CFG[record.channel] || { label: record.channel, color: '#a78bfa', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.3)' }
+  const actor = record.performed_by ? ACTOR_CFG[record.performed_by] : null
   const outcome = OUTCOME_CFG[record.status] || OUTCOME_CFG.sent
   const OutcomeIcon = outcome.icon
 
@@ -129,11 +137,18 @@ function RecordCard({ record, onOutcomeChange }: { record: ReachoutRecord; onOut
           </div>
         </div>
 
-        {/* Channel + date */}
+        {/* Channel + actor + date */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
-          <span style={{ padding: '4px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, background: ch.bg, border: `1px solid ${ch.border}`, color: ch.color }}>
-            {ch.label}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {actor && (
+              <span style={{ padding: '4px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, background: actor.bg, border: `1px solid ${actor.border}`, color: actor.color }}>
+                {actor.label}
+              </span>
+            )}
+            <span style={{ padding: '4px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, background: ch.bg, border: `1px solid ${ch.border}`, color: ch.color }}>
+              {ch.label}
+            </span>
+          </div>
           <span style={{ fontSize: 11, color: 'rgb(100,107,140)', display: 'flex', alignItems: 'center', gap: 4 }}>
             <Calendar size={10} />{dateStr}
           </span>
@@ -210,6 +225,7 @@ export default function ReachoutStoragePage() {
   const [loading, setLoading] = useState(true)
   const [filterChannel, setFilterChannel] = useState<string>('all')
   const [filterOutcome, setFilterOutcome] = useState<string>('all')
+  const [filterActor, setFilterActor] = useState<string>('all')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -248,6 +264,7 @@ export default function ReachoutStoragePage() {
   const filtered = records.filter(r => {
     if (filterChannel !== 'all' && r.channel !== filterChannel) return false
     if (filterOutcome !== 'all' && r.status !== filterOutcome) return false
+    if (filterActor !== 'all' && (r.performed_by || 'unknown') !== filterActor) return false
     return true
   })
 
@@ -332,6 +349,25 @@ export default function ReachoutStoragePage() {
           return (
             <button key={key} onClick={() => setFilterOutcome(key)}
               style={{ padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s', border: active ? '1px solid rgba(167,139,250,0.4)' : '1px solid rgba(255,255,255,0.08)', background: active ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.02)', color: active ? '#a78bfa' : 'rgb(120,127,160)' }}>
+              {label}
+            </button>
+          )
+        })}
+
+        <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.08)', margin: '0 4px' }} />
+
+        {/* Team member filter */}
+        {[
+          { key: 'all', label: 'All team' },
+          { key: 'me', label: 'You' },
+          { key: 'pluto', label: 'Pluto' },
+          { key: 'agent', label: 'AI Agent' },
+        ].map(({ key, label }) => {
+          const cfg = key === 'all' ? null : ACTOR_CFG[key]
+          const active = filterActor === key
+          return (
+            <button key={key} onClick={() => setFilterActor(key)}
+              style={{ padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s', border: active ? `1px solid ${cfg?.border ?? 'rgba(167,139,250,0.4)'}` : '1px solid rgba(255,255,255,0.08)', background: active ? (cfg?.bg ?? 'rgba(167,139,250,0.12)') : 'rgba(255,255,255,0.02)', color: active ? (cfg?.color ?? '#a78bfa') : 'rgb(120,127,160)' }}>
               {label}
             </button>
           )

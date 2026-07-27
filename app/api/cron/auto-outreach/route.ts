@@ -172,6 +172,7 @@ export async function GET(req: NextRequest) {
       channel: 'email',
       message: `Subject: ${subject}\n\n${emailDraft.text}`,
       status: 'draft',
+      performed_by: 'agent',
     })
     if (error) {
       errors.push(`${lead.company_name}: ${error.message}`)
@@ -193,6 +194,7 @@ export async function GET(req: NextRequest) {
       channel: top.channel,
       message: top.text,
       status: 'draft',
+      performed_by: 'agent',
     })
     if (!error) socialQueued++
   }
@@ -237,6 +239,7 @@ export async function GET(req: NextRequest) {
       channel: 'email',
       message: `Subject: ${subject}\n\n${text}`,
       status: 'draft',
+      performed_by: 'agent',
     })
     if (error) {
       errors.push(`FU ${lead.company_name}: ${error.message}`)

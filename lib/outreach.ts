@@ -295,6 +295,7 @@ export async function logTouch(
     gmailThreadId?: string
     gmailMessageId?: string
     gmailMessageIdHeader?: string
+    performedBy?: string | null
   },
 ): Promise<{ error: string | null }> {
   const { error: e1 } = await advanceLeadFollowUp(supabase, opts)
@@ -307,6 +308,7 @@ export async function logTouch(
     gmail_thread_id: opts.gmailThreadId || null,
     gmail_message_id: opts.gmailMessageId || null,
     gmail_message_id_header: opts.gmailMessageIdHeader || null,
+    performed_by: opts.performedBy || null,
   })
   return { error: e1 || e2?.message || null }
 }
@@ -326,6 +328,7 @@ export async function finalizeDraftSend(
     gmailMessageId?: string
     gmailMessageIdHeader?: string
     message?: string
+    performedBy?: string | null
   },
 ): Promise<{ error: string | null }> {
   const { error: e1 } = await advanceLeadFollowUp(supabase, opts)
@@ -337,6 +340,7 @@ export async function finalizeDraftSend(
       gmail_message_id: opts.gmailMessageId || null,
       gmail_message_id_header: opts.gmailMessageIdHeader || null,
       ...(opts.message ? { message: opts.message } : {}),
+      ...(opts.performedBy ? { performed_by: opts.performedBy } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq('id', opts.messageId)

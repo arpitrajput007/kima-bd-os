@@ -11,6 +11,7 @@ import {
 import { CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL } from '@/lib/types'
 import type { Lead } from '@/lib/types'
 import { buildTarget, channelDeepLink, logTouch, isRealEmail, type OutreachMeta } from '@/lib/outreach'
+import { getActor } from '@/lib/actor'
 
 const CHANNELS = ['telegram', 'linkedin', 'twitter', 'email'] as const
 const TONES = ['casual', 'professional', 'founder_to_founder', 'concise', 'strong_bd'] as const
@@ -472,6 +473,7 @@ function OutreachStudioContent() {
       call_opening: generated.call_opening,
       meeting_agenda: generated.meeting_agenda,
       status: 'draft',
+      performed_by: getActor(),
     })
     if (error) toast.error('Failed to save')
     else toast.success('Messages saved to lead')
@@ -487,6 +489,7 @@ function OutreachStudioContent() {
       tone: 'founder_to_founder',
       message: draft.subject ? `Subject: ${draft.subject}\n\n${draft.text}` : draft.text,
       status: 'draft',
+      performed_by: getActor(),
     })
     if (error) toast.error('Failed to save')
     else toast.success(`Saved to lead ✓`)
@@ -517,6 +520,7 @@ function OutreachStudioContent() {
         channel: 'email',
         message: draft.subject ? `Subject: ${draft.subject}\n\n${draft.text}` : draft.text,
         status: 'draft',
+        performed_by: getActor(),
       })
       .select('id')
       .single()
@@ -560,6 +564,7 @@ function OutreachStudioContent() {
       subject: draft.subject,
       contactId: autoMeta?.contact?.id,
       kind: 'initial',
+      performedBy: getActor(),
     })
     setSendingId(null)
     if (error) { toast.error('Could not log the touch'); return }

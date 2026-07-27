@@ -100,6 +100,7 @@ export function FollowUpDraftCard({ lead, onSent, delayMs = 0 }: { lead: Lead; o
       contactId: meta?.contact?.id,
       kind: 'followup',
       currentStage: lead.follow_up_stage ?? 0,
+      performedBy: getActor(),
     })
     if (!err) {
       await supabase.from('lead_activities').insert({

@@ -450,6 +450,7 @@ function ContactCard({ contact, leadId, region, website, hint, onRefresh, onUpda
       channel: draftChannel,
       message: draftText.trim(),
       status: 'draft',
+      performed_by: getActor(),
     })
     setSavingDraft(false)
     if (error) { toast.error('Could not save draft'); return }
@@ -558,6 +559,7 @@ function ContactCard({ contact, leadId, region, website, hint, onRefresh, onUpda
         channel: chId,
         message: msg,
         status: 'sent',
+        performed_by: getActor(),
       })
     }
 
@@ -2486,7 +2488,7 @@ function DraftSendBar({ lead, contacts, block }: { lead: Lead; contacts: Contact
 
     const url = channelDeepLink(channel, target, block.body)
     const { error } = await logTouch(supabase, {
-      leadId: lead.id, channel, text: block.body, contactId: matched?.id, kind: 'initial',
+      leadId: lead.id, channel, text: block.body, contactId: matched?.id, kind: 'initial', performedBy: getActor(),
     })
     setSending(false)
     if (error) { toast.error('Could not log the touch'); return }
@@ -3064,7 +3066,7 @@ function InlineOutreach({ lead, onSent }: { lead: Lead; onSent: () => void }) {
     const fullText = d.subject ? `${d.subject}\n\n${d.text}` : d.text
     const { error } = await logTouch(supabase, {
       leadId: lead.id, channel: d.channel, text: d.text, subject: d.subject,
-      contactId: meta?.contact?.id, kind: 'initial',
+      contactId: meta?.contact?.id, kind: 'initial', performedBy: getActor(),
     })
     setSendingId(null)
     if (error) { toast.error('Could not log the touch'); return }

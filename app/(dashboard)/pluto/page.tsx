@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import {
   Eye, RefreshCw, Send, CheckCircle2, Clock, Bell, Users, TrendingUp, Trash2, CalendarDays,
 } from 'lucide-react'
+import { ACTOR_LABEL, type Actor } from '@/lib/actor'
 import { cn, getStatusColor, getStatusLabel, formatDate } from '@/lib/utils'
 import type { Lead } from '@/lib/types'
 import { WEB3_AGENTS } from '@/lib/web3-agent-companies'
@@ -35,6 +36,16 @@ const SOURCE_META: Record<Group, { label: string; color: string }> = {
   web2: { label: 'Web2', color: '#38bdf8' },
   other: { label: 'Other', color: '#fbbf24' },
 }
+
+const CHANNEL_SHORT: Record<string, string> = {
+  telegram: 'Telegram', linkedin: 'LinkedIn', twitter: 'Twitter/X',
+  email: 'Email', discord: 'Discord', call: 'Call', other: 'Other',
+}
+
+// Per-lead touch history built from lead_activities — every channel used and
+// who last touched it, so "Contacted On" shows the full picture, not just
+// the single most recent channel.
+interface ContactInfo { channels: string[]; lastAt: string; lastBy: string | null }
 
 // 'YYYY-MM-DD' in the browser's local timezone — used to bucket leads by day.
 function dayKey(iso: string): string {
@@ -67,13 +78,14 @@ function StatCard({ icon: Icon, label, value, color }: {
   )
 }
 
-function LeadGroupTable({ title, icon: Icon, color, leads, now, onDelete }: {
+function LeadGroupTable({ title, icon: Icon, color, leads, now, onDelete, contactInfo }: {
   title: string
   icon: React.ComponentType<{ size?: number; color?: string }>
   color: string
   leads: Lead[]
   now: number
   onDelete: (id: string) => void
+  contactInfo: Record<string, ContactInfo>
 }) {
   if (leads.length === 0) return null
   return (
@@ -92,7 +104,7 @@ function LeadGroupTable({ title, icon: Icon, color, leads, now, onDelete }: {
               <tr style={{ background: 'rgba(255,255,255,0.015)' }}>
                 <th className="text-left">Company</th>
                 <th className="text-left">Status</th>
-                <th className="text-left">Last Channel</th>
+                <th className="text-left">Contacted On</th>
                 <th className="text-left">Next Follow-up</th>
                 <th className="text-left">Assigned</th>
                 <th className="text-left">Actions</th>
@@ -102,6 +114,12 @@ function LeadGroupTable({ title, icon: Icon, color, leads, now, onDelete }: {
               {leads.map(lead => {
                 const overdue = !!lead.next_follow_up_at && new Date(lead.next_follow_up_at).getTime() <= now
                 const source = SOURCE_META[groupOf(lead.company_name)]
+                // Fall back to the lead's own last_channel/last_contacted_at
+                // when there's no granular activity log for it (e.g. leads
+                // marked contacted before per-touch logging existed).
+                const info = contactInfo[lead.id] || (lead.last_channel
+                  ? { channels: [lead.last_channel], lastAt: lead.last_contacted_at || lead.updated_at, lastBy: null }
+                  : undefined)
                 return (
                   <tr key={lead.id}>
                     <td>
@@ -115,7 +133,24 @@ function LeadGroupTable({ title, icon: Icon, color, leads, now, onDelete }: {
                       </div>
                     </td>
                     <td><span className={cn('badge', getStatusColor(lead.status))}>{getStatusLabel(lead.status)}</span></td>
-                    <td><span className="text-xs" style={{ color: 'rgb(140,140,160)' }}>{lead.last_channel || '—'}</span></td>
+                    <td>
+                      {info ? (
+                        <div>
+                          <div className="flex flex-wrap gap-1 mb-1">
+                            {info.channels.map(ch => (
+                              <span key={ch} className="badge text-xs" style={{ background: 'rgba(96,165,250,0.1)', color: '#60a5fa', borderColor: 'rgba(96,165,250,0.25)', fontSize: '9px', padding: '1px 5px' }}>
+                                {CHANNEL_SHORT[ch] || ch}
+                              </span>
+                            ))}
+                          </div>
+                          <span className="text-xs" style={{ color: 'rgb(120,120,145)' }}>
+                            {formatDate(info.lastAt)}{info.lastBy && ` · ${ACTOR_LABEL[info.lastBy as Actor] ?? info.lastBy}`}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs" style={{ color: 'rgb(90,95,120)' }}>Not contacted yet</span>
+                      )}
+                    </td>
                     <td>
                       {lead.next_follow_up_at ? (
                         <span className="text-xs" style={{ color: overdue ? '#f87171' : 'rgb(140,140,160)', fontWeight: overdue ? 700 : 400 }}>
@@ -157,6 +192,7 @@ function LeadGroupTable({ title, icon: Icon, color, leads, now, onDelete }: {
 export default function PlutoPage() {
   const supabase = createClient()
   const [leads, setLeads] = useState<Lead[]>([])
+  const [contactInfo, setContactInfo] = useState<Record<string, ContactInfo>>({})
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<Tab>('all')
 
@@ -168,8 +204,29 @@ export default function PlutoPage() {
       .eq('assigned_to', 'pluto')
       .order('next_follow_up_at', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: false })
-    setLeads((data || []) as Lead[])
+    const loaded = (data || []) as Lead[]
+    setLeads(loaded)
     setLoading(false)
+
+    if (loaded.length > 0) {
+      const { data: activities } = await supabase
+        .from('lead_activities')
+        .select('lead_id, channel, performed_by, created_at')
+        .in('lead_id', loaded.map(l => l.id))
+        .not('channel', 'is', null)
+        .order('created_at', { ascending: true })
+      const byLead: Record<string, ContactInfo> = {}
+      for (const a of activities || []) {
+        const entry = byLead[a.lead_id] || { channels: [], lastAt: a.created_at, lastBy: null }
+        if (a.channel && !entry.channels.includes(a.channel)) entry.channels.push(a.channel)
+        entry.lastAt = a.created_at
+        entry.lastBy = a.performed_by
+        byLead[a.lead_id] = entry
+      }
+      setContactInfo(byLead)
+    } else {
+      setContactInfo({})
+    }
   }, [supabase])
 
   useEffect(() => { loadLeads() }, [loadLeads])
@@ -300,6 +357,7 @@ export default function PlutoPage() {
                 leads={g.leads}
                 now={now}
                 onDelete={deleteLead}
+                contactInfo={contactInfo}
               />
             ))}
           </>
