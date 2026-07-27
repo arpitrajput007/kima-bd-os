@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import {
-  Eye, RefreshCw, Send, CheckCircle2, Clock, Bell, Users, TrendingUp, Shield, Globe, Layers, Trash2,
+  Eye, RefreshCw, Send, CheckCircle2, Clock, Bell, Users, TrendingUp, Trash2, CalendarDays,
 } from 'lucide-react'
 import { cn, getStatusColor, getStatusLabel, formatDate } from '@/lib/utils'
 import type { Lead } from '@/lib/types'
@@ -27,6 +27,27 @@ function groupOf(companyName: string): Group {
   if (WEB3_NAMES.has(n)) return 'web3'
   if (WEB2_NAMES.has(n)) return 'web2'
   return 'other'
+}
+
+const SOURCE_META: Record<Group, { label: string; color: string }> = {
+  web3: { label: 'Web3', color: '#a78bfa' },
+  web2: { label: 'Web2', color: '#38bdf8' },
+  other: { label: 'Other', color: '#fbbf24' },
+}
+
+// 'YYYY-MM-DD' in the browser's local timezone — used to bucket leads by day.
+function dayKey(iso: string): string {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function dayHeading(iso: string): string {
+  const d = new Date(iso)
+  const today = new Date()
+  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1)
+  if (dayKey(iso) === dayKey(today.toISOString())) return 'Today'
+  if (dayKey(iso) === dayKey(yesterday.toISOString())) return 'Yesterday'
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 }
 
 function StatCard({ icon: Icon, label, value, color }: {
@@ -79,12 +100,18 @@ function LeadGroupTable({ title, icon: Icon, color, leads, now, onDelete }: {
             <tbody>
               {leads.map(lead => {
                 const overdue = !!lead.next_follow_up_at && new Date(lead.next_follow_up_at).getTime() <= now
+                const source = SOURCE_META[groupOf(lead.company_name)]
                 return (
                   <tr key={lead.id}>
                     <td>
-                      <Link href={`/leads/${lead.id}`} className="text-sm font-medium text-white hover:text-violet-300 transition-colors">
-                        {lead.company_name}
-                      </Link>
+                      <div className="flex items-center gap-1.5">
+                        <Link href={`/leads/${lead.id}`} className="text-sm font-medium text-white hover:text-violet-300 transition-colors">
+                          {lead.company_name}
+                        </Link>
+                        <span className="badge text-xs" style={{ background: `${source.color}15`, color: source.color, borderColor: `${source.color}35`, fontSize: '9px', padding: '1px 5px' }}>
+                          {source.label}
+                        </span>
+                      </div>
                     </td>
                     <td><span className={cn('badge', getStatusColor(lead.status))}>{getStatusLabel(lead.status)}</span></td>
                     <td><span className="text-xs" style={{ color: 'rgb(140,140,160)' }}>{lead.last_channel || '—'}</span></td>
@@ -96,7 +123,7 @@ function LeadGroupTable({ title, icon: Icon, color, leads, now, onDelete }: {
                         </span>
                       ) : <span className="text-xs" style={{ color: 'rgb(90,95,120)' }}>—</span>}
                     </td>
-                    <td><span className="text-xs" style={{ color: 'rgb(100,100,120)' }}>{formatDate(lead.created_at)}</span></td>
+                    <td><span className="text-xs" style={{ color: 'rgb(100,100,120)' }}>{formatDate(lead.assigned_at || lead.created_at)}</span></td>
                     <td>
                       <div className="flex items-center gap-1">
                         <Link href={`/leads/${lead.id}`} className="btn btn-ghost p-1.5" title="Open — Discuss Lead &amp; Mark Contacted" style={{ padding: 5 }}>
@@ -183,15 +210,23 @@ export default function PlutoPage() {
     }
   }, [leads, tab, now])
 
-  const groups = useMemo(() => {
-    const web3: Lead[] = [], web2: Lead[] = [], other: Lead[] = []
+  // Group into daily assignment batches — newest day first, leads within a
+  // day sorted newest-assigned first.
+  const dateGroups = useMemo(() => {
+    const byDay = new Map<string, Lead[]>()
     for (const l of filtered) {
-      const g = groupOf(l.company_name)
-      if (g === 'web3') web3.push(l)
-      else if (g === 'web2') web2.push(l)
-      else other.push(l)
+      const key = dayKey(l.assigned_at || l.created_at)
+      if (!byDay.has(key)) byDay.set(key, [])
+      byDay.get(key)!.push(l)
     }
-    return { web3, web2, other }
+    return Array.from(byDay.entries())
+      .sort(([a], [b]) => (a < b ? 1 : -1))
+      .map(([key, dayLeads]) => ({
+        key,
+        heading: dayHeading(dayLeads[0].assigned_at || dayLeads[0].created_at),
+        leads: [...dayLeads].sort((a, b) =>
+          new Date(b.assigned_at || b.created_at).getTime() - new Date(a.assigned_at || a.created_at).getTime()),
+      }))
   }, [filtered])
 
   return (
@@ -249,9 +284,17 @@ export default function PlutoPage() {
           </div>
         ) : (
           <>
-            <LeadGroupTable title="Web3 AI Agent Companies" icon={Shield} color="#a78bfa" leads={groups.web3} now={now} onDelete={deleteLead} />
-            <LeadGroupTable title="Web2 AI Agent Companies" icon={Globe} color="#38bdf8" leads={groups.web2} now={now} onDelete={deleteLead} />
-            <LeadGroupTable title="Other Assigned Leads" icon={Layers} color="#fbbf24" leads={groups.other} now={now} onDelete={deleteLead} />
+            {dateGroups.map(g => (
+              <LeadGroupTable
+                key={g.key}
+                title={`${g.heading} — Assigned Leads`}
+                icon={CalendarDays}
+                color="#a78bfa"
+                leads={g.leads}
+                now={now}
+                onDelete={deleteLead}
+              />
+            ))}
           </>
         )}
       </div>

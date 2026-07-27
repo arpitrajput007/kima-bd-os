@@ -271,6 +271,7 @@ export interface Lead {
   next_follow_up_at?: string
   last_channel?: string
   assigned_to?: string | null
+  assigned_at?: string | null
   created_at: string
   updated_at: string
   contacts?: Contact[]

@@ -188,9 +188,10 @@ export default function LeadsPage() {
 
   const assignLead = async (id: string, assignedTo: string | null) => {
     setActionLoading(id + 'assign')
+    const now = new Date().toISOString()
     const { error } = await supabase
       .from('leads')
-      .update({ assigned_to: assignedTo, updated_at: new Date().toISOString() })
+      .update({ assigned_to: assignedTo, assigned_at: assignedTo ? now : null, updated_at: now })
       .eq('id', id)
 
     if (error) toast.error('Assignment failed')

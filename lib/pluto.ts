@@ -27,10 +27,12 @@ export async function assignLeadToPluto(
 
   if (lookupError) return { ok: false, created: false, error: lookupError.message }
 
+  const now = new Date().toISOString()
+
   if (existing && existing.length > 0) {
     const { error } = await supabase
       .from('leads')
-      .update({ assigned_to: 'pluto', updated_at: new Date().toISOString() })
+      .update({ assigned_to: 'pluto', assigned_at: now, updated_at: now })
       .eq('id', existing[0].id)
     return { ok: !error, created: false, error: error?.message }
   }
@@ -41,7 +43,8 @@ export async function assignLeadToPluto(
     company_name: companyName,
     status: 'new',
     assigned_to: 'pluto',
-    updated_at: new Date().toISOString(),
+    assigned_at: now,
+    updated_at: now,
     ...createFields,
   })
   return { ok: !error, created: true, error: error?.message }
