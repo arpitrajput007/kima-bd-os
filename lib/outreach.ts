@@ -121,6 +121,18 @@ export async function recordOutcome(
     meeting_booked: 'meeting_booked',
     no_response: 'archived',
   }
+  // feedback_memory.outcome has a narrower check constraint than the lead
+  // status map above — translate rather than reuse.
+  const feedbackOutcomeMap: Record<OutreachOutcome, string> = {
+    replied: 'replied',
+    meeting_booked: 'meeting_booked',
+    no_response: 'no_response',
+  }
+  const feedbackActionMap: Record<OutreachOutcome, string> = {
+    replied: 'replied',
+    meeting_booked: 'meeting_booked',
+    no_response: 'needs_more_research',
+  }
   const now = new Date().toISOString()
 
   const { error: e1 } = await supabase
@@ -131,6 +143,7 @@ export async function recordOutcome(
   // A reply (or meeting) means the last message we sent landed — tag it so we
   // can learn from what actually converts.
   let e2: { message: string } | null = null
+  let lastMessageId: string | null = null
   if (opts.outcome !== 'no_response') {
     const { data: last } = await supabase
       .from('outreach_messages')
@@ -141,6 +154,7 @@ export async function recordOutcome(
       .limit(1)
       .maybeSingle()
     if (last?.id) {
+      lastMessageId = last.id
       const { error } = await supabase
         .from('outreach_messages')
         .update({ status: 'replied', updated_at: now })
@@ -148,6 +162,18 @@ export async function recordOutcome(
       e2 = error
     }
   }
+
+  // Every recorded outcome is a training signal — without this, the
+  // feedback/learning loop (loadFeedbackPatterns, getOutreachLearnings) never
+  // sees real results and stays permanently empty.
+  const { error: e3 } = await supabase.from('feedback_memory').insert({
+    lead_id: opts.leadId,
+    outreach_id: lastMessageId,
+    action_taken: feedbackActionMap[opts.outcome],
+    outcome: feedbackOutcomeMap[opts.outcome],
+  })
+  if (e3) console.error('[recordOutcome] feedback_memory insert failed', e3)
+
   return { error: e1?.message || e2?.message || null }
 }
 

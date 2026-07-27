@@ -54,10 +54,15 @@ export default function ReportsPage() {
 
   const approveRuleSuggestion = async (report: LearningReport, rule: AgentRule & { reasoning: string }) => {
     setApprovingRule(rule.rule)
+    // reject/score_penalty are always-loaded guardrails regardless of weight
+    // (see loadRules in lib/agent-memory.ts) — everything else is weight-
+    // ranked, so an unset weight of 0 would bury an approved rule at the
+    // bottom of an ever-growing list instead of actually applying it.
+    const isGuardrail = rule.rule_type === 'reject' || rule.rule_type === 'score_penalty'
     const { error } = await supabase.from('agent_rules').insert({
       rule_type: rule.rule_type,
       rule: rule.rule,
-      weight: rule.weight || 0,
+      weight: rule.weight || (isGuardrail ? 0 : 5),
       status: 'active',
     })
     if (error) toast.error('Failed to add rule')
@@ -204,14 +209,16 @@ export default function ReportsPage() {
                     </div>
                   )}
 
-                  {/* Suggested New Rules — requires approval */}
+                  {/* New Rules — prioritize/score_boost/outreach_style/source_preference
+                      apply automatically; reject/score_penalty need approval since they
+                      can broadly exclude whole categories of leads. */}
                   {report.new_rules_suggested && (report.new_rules_suggested as unknown as AgentRule[]).length > 0 && (
                     <div>
                       <div className="text-xs font-semibold mb-3" style={{ color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                        ⚡ New Rules Suggested — Approve to Activate
+                        ⚡ New Rules
                       </div>
                       <div className="space-y-2">
-                        {(report.new_rules_suggested as unknown as (AgentRule & {reasoning:string})[]).map((rule, i) => (
+                        {(report.new_rules_suggested as unknown as (AgentRule & { reasoning: string; auto_applied?: boolean; skipped_duplicate?: boolean })[]).map((rule, i) => (
                           <div key={i} className="flex items-start gap-3 p-3 rounded-lg" style={{ background: 'rgba(251,191,36,0.05)', border: '1px solid rgba(251,191,36,0.1)' }}>
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
@@ -223,18 +230,26 @@ export default function ReportsPage() {
                                     {rule.weight > 0 ? '+' : ''}{rule.weight}
                                   </span>
                                 )}
+                                {rule.auto_applied && (
+                                  <span className="badge bg-emerald-500/15 text-emerald-300 border-emerald-500/30" style={{ fontSize: '9px' }}>Auto-applied</span>
+                                )}
+                                {rule.skipped_duplicate && (
+                                  <span className="badge bg-zinc-500/15 text-zinc-400 border-zinc-500/30" style={{ fontSize: '9px' }}>Already covered</span>
+                                )}
                               </div>
                               <p className="text-xs" style={{ color: 'rgb(200,190,160)' }}>{rule.rule}</p>
                               {rule.reasoning && <p className="text-xs mt-1" style={{ color: 'rgb(140,130,100)' }}>Reason: {rule.reasoning}</p>}
                             </div>
-                            <button
-                              onClick={() => approveRuleSuggestion(report, rule)}
-                              disabled={approvingRule === rule.rule}
-                              className="btn btn-success flex-shrink-0" style={{ fontSize: '11px', padding: '4px 8px' }}
-                            >
-                              {approvingRule === rule.rule ? <Loader2 size={10} className="animate-spin" /> : <CheckSquare size={10} />}
-                              Approve
-                            </button>
+                            {!rule.auto_applied && !rule.skipped_duplicate && (
+                              <button
+                                onClick={() => approveRuleSuggestion(report, rule)}
+                                disabled={approvingRule === rule.rule}
+                                className="btn btn-success flex-shrink-0" style={{ fontSize: '11px', padding: '4px 8px' }}
+                              >
+                                {approvingRule === rule.rule ? <Loader2 size={10} className="animate-spin" /> : <CheckSquare size={10} />}
+                                Approve
+                              </button>
+                            )}
                           </div>
                         ))}
                       </div>

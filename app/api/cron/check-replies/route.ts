@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { recordOutcome } from '@/lib/outreach'
 import { sendEmail, isEmailConfigured } from '@/lib/email-sender'
 import { checkThreadForReply } from '@/lib/gmail'
+import { generateWeeklyReport } from '@/app/api/ai/weekly-report/route'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -82,6 +83,18 @@ export async function GET(req: NextRequest) {
     })
   }
 
+  // Piggyback the weekly learning report on this existing daily cron slot
+  // rather than registering a third Vercel cron — Hobby-tier projects are
+  // capped at 2 cron jobs, and this route already runs once a day.
+  // Before this, the report only ever ran once, by hand.
+  let weeklyReport: { generated: boolean; report_id?: string; rules_auto_applied?: number; error?: string } = { generated: false }
+  if (new Date().getUTCDay() === 1) { // Monday
+    const result = await generateWeeklyReport('last_7_days')
+    weeklyReport = 'error' in result
+      ? { generated: false, error: result.error }
+      : { generated: true, report_id: result.report_id, rules_auto_applied: result.rules_auto_applied }
+  }
+
   if (newReplies.length > 0 && isEmailConfigured()) {
     const notifyEmail = process.env.NOTIFY_EMAIL || 'arpitcoding007@gmail.com'
     const lines = [
@@ -103,5 +116,6 @@ export async function GET(req: NextRequest) {
     new_replies: newReplies.length,
     replies: newReplies,
     errors,
+    weekly_report: weeklyReport,
   })
 }

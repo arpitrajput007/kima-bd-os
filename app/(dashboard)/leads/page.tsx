@@ -17,6 +17,7 @@ import type { Lead } from '@/lib/types'
 import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL } from '@/lib/types'
 import { classifyLead, PRODUCT_TREE, type ProductFit } from '@/lib/product-fit'
 import type { Product } from '@/lib/products-showcase'
+import { recordOutcome } from '@/lib/outreach'
 
 const STATUS_OPTIONS = [
   'new', 'researching', 'qualified', 'approved', 'rejected',
@@ -167,10 +168,15 @@ export default function LeadsPage() {
 
   const updateLeadStatus = async (id: string, status: string) => {
     setActionLoading(id + status)
-    const { error } = await supabase
-      .from('leads')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', id)
+    // 'replied' / 'meeting_booked' are outcome signals, not just pipeline
+    // stages — route through recordOutcome so feedback_memory and the
+    // sent message that landed both get tagged for the learning loop.
+    const { error } = status === 'replied' || status === 'meeting_booked'
+      ? await recordOutcome(supabase, { leadId: id, outcome: status })
+      : await supabase
+          .from('leads')
+          .update({ status, updated_at: new Date().toISOString() })
+          .eq('id', id)
 
     if (error) toast.error('Update failed')
     else {

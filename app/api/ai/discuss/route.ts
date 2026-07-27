@@ -2,6 +2,7 @@ import { claudeJSON, claudeText, CLAUDE_RESEARCH, CLAUDE_MINI } from "@/lib/clau
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { FULL_BRAIN } from '@/lib/kima-knowledge'
+import { isDuplicateRule } from '@/lib/agent-memory'
 
 
 const supabase = createClient(
@@ -196,12 +197,27 @@ Set worth_saving=false if nothing durable came up.`,
   })
 
   let rulesCreated = 0
-  for (const rule of (parsed.new_rules || []).slice(0, 2)) {
-    if (!rule.rule || rule.rule.length < 12) continue
-    const { error } = await supabase.from('agent_rules').insert({
-      rule_type: rule.rule_type || 'prioritize', rule: rule.rule, weight: rule.weight || 0, status: 'active',
-    })
-    if (!error) rulesCreated++
+  const newRules = (parsed.new_rules || []).slice(0, 2)
+  if (newRules.length > 0) {
+    const { data: existingRules } = await supabase
+      .from('agent_rules').select('rule_type, rule').eq('status', 'active')
+    const createdRules: string[] = []
+
+    for (const rule of newRules) {
+      if (!rule.rule || rule.rule.length < 12) continue
+      const ruleType = rule.rule_type || 'prioritize'
+
+      const sameTypeExisting = (existingRules || [])
+        .filter(r => r.rule_type === ruleType)
+        .map(r => r.rule)
+      if (isDuplicateRule(rule.rule, [...sameTypeExisting, ...createdRules])) continue
+
+      const isGuardrail = ruleType === 'reject' || ruleType === 'score_penalty'
+      const { error } = await supabase.from('agent_rules').insert({
+        rule_type: ruleType, rule: rule.rule, weight: rule.weight || (isGuardrail ? 0 : 5), status: 'active',
+      })
+      if (!error) { rulesCreated++; createdRules.push(rule.rule) }
+    }
   }
 
   return { saved: true, title: parsed.title, rules_created: rulesCreated }

@@ -2,6 +2,7 @@ import { claudeJSON, claudeText, CLAUDE_RESEARCH } from "@/lib/claude"
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { FULL_BRAIN } from '@/lib/kima-knowledge'
+import { isDuplicateRule } from '@/lib/agent-memory'
 
 
 const supabase = createClient(
@@ -404,12 +405,30 @@ export async function POST(req: NextRequest) {
     if (synthesis.new_rules?.length > 0) {
       for (const rule of synthesis.new_rules.slice(0, 4)) {
         if (!rule.rule || rule.rule.length < 10) continue
+        const ruleType = rule.rule_type || 'prioritize'
+
+        // The prompt already asks the model not to duplicate existing rules,
+        // but it isn't reliable — 11 near-duplicate groups had already
+        // accumulated in agent_rules. Enforce it: compare against active
+        // rules of the same type, plus anything just created in this batch.
+        const sameTypeExisting = (existingRules || [])
+          .filter(r => r.rule_type === ruleType)
+          .map(r => r.rule)
+        if (isDuplicateRule(rule.rule, [...sameTypeExisting, ...createdRules])) continue
+
+        // reject/score_penalty are guardrails — always loaded regardless of
+        // weight (see loadRules in lib/agent-memory.ts), so 0 is fine there.
+        // Every other type is weight-ranked and truncated, so a model-omitted
+        // weight of 0 would permanently bury the rule at the bottom of an
+        // ever-growing list. Give it a modest default instead of silence.
+        const isGuardrail = ruleType === 'reject' || ruleType === 'score_penalty'
+        const weight = rule.weight || (isGuardrail ? 0 : 5)
         // No approval gate — what you teach applies immediately. The reason is
         // still recorded so each rule is auditable in the Agent Rules view.
         const { error } = await supabase.from('agent_rules').insert({
-          rule_type: rule.rule_type || 'prioritize',
+          rule_type: ruleType,
           rule: rule.rule,
-          weight: rule.weight || 0,
+          weight,
           status: 'active',
           suggestion_reason: rule.reason || null,
         })

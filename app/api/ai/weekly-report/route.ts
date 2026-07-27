@@ -1,17 +1,11 @@
-import { claudeJSON, claudeText, CLAUDE_RESEARCH } from "@/lib/claude"
+import { claudeJSON, CLAUDE_RESEARCH } from "@/lib/claude"
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { PRODUCT_BRAIN } from '@/lib/kima-knowledge'
+import { isDuplicateRule, GUARDRAIL_TYPES } from '@/lib/agent-memory'
 
-
-export async function POST(req: NextRequest) {
+export async function generateWeeklyReport(period: string) {
   const supabase = await createClient()
-
-  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your_openai_api_key_here') {
-    return NextResponse.json({ error: 'OpenAI API key not configured.' }, { status: 400 })
-  }
-
-  const body = await req.json()
 
   // Fetch all feedback and leads
   const [feedbackRes, leadsRes, rulesRes] = await Promise.all([
@@ -24,7 +18,7 @@ export async function POST(req: NextRequest) {
   const leads = leadsRes.data || []
   const rules = rulesRes.data || []
 
-  const reportPeriod = body.period || 'last_7_days'
+  const reportPeriod = period || 'last_7_days'
 
   const systemPrompt = `You are analyzing BD performance data for Kima/Aeredium and generating a learning report. Be specific and actionable.
 
@@ -62,7 +56,53 @@ Return JSON:
 }`
 
   try {
-    const result = await claudeJSON({ model: CLAUDE_RESEARCH, system: systemPrompt, user: userPrompt, maxTokens: 3000 })
+    const result = await claudeJSON<{
+      summary?: string
+      winning_patterns?: unknown[]
+      rejected_patterns?: unknown[]
+      best_customer_categories?: unknown[]
+      worst_customer_categories?: unknown[]
+      best_products_to_sell?: unknown[]
+      scoring_changes_suggested?: unknown[]
+      outreach_changes_suggested?: unknown[]
+      new_rules_suggested?: Array<{ rule_type?: string; rule?: string; weight?: number; reasoning?: string }>
+    }>({ model: CLAUDE_RESEARCH, system: systemPrompt, user: userPrompt, maxTokens: 3000 })
+
+    // Non-guardrail suggestions (prioritize/score_boost/outreach_style/
+    // source_preference) apply immediately — same "no approval gate" policy
+    // as the Learn page. reject/score_penalty stay pending_review since
+    // they can broadly exclude whole categories of leads; a human should
+    // see those before they take effect. Every suggestion still goes
+    // through the same dedup check as Learn/Discuss so a report can't
+    // re-teach a lesson already in agent_rules.
+    const createdRules: string[] = []
+    const annotatedSuggestions: Array<Record<string, unknown>> = []
+    for (const rule of result.new_rules_suggested || []) {
+      if (!rule.rule || rule.rule.length < 10) { annotatedSuggestions.push(rule); continue }
+      const ruleType = rule.rule_type || 'prioritize'
+      const isGuardrail = (GUARDRAIL_TYPES as readonly string[]).includes(ruleType)
+
+      if (isGuardrail) {
+        annotatedSuggestions.push({ ...rule, auto_applied: false })
+        continue
+      }
+
+      const sameTypeExisting = rules.filter(r => r.rule_type === ruleType).map(r => r.rule)
+      if (isDuplicateRule(rule.rule, [...sameTypeExisting, ...createdRules])) {
+        annotatedSuggestions.push({ ...rule, auto_applied: false, skipped_duplicate: true })
+        continue
+      }
+
+      const { error } = await supabase.from('agent_rules').insert({
+        rule_type: ruleType,
+        rule: rule.rule,
+        weight: rule.weight || 5,
+        status: 'active',
+        suggestion_reason: rule.reasoning || null,
+      })
+      if (!error) createdRules.push(rule.rule)
+      annotatedSuggestions.push({ ...rule, auto_applied: !error })
+    }
 
     // Save report to DB
     const { data: report } = await supabase.from('learning_reports').insert({
@@ -75,14 +115,21 @@ Return JSON:
       best_products_to_sell: result.best_products_to_sell || [],
       scoring_changes_suggested: result.scoring_changes_suggested || [],
       outreach_changes_suggested: result.outreach_changes_suggested || [],
-      new_rules_suggested: result.new_rules_suggested || [],
+      new_rules_suggested: annotatedSuggestions,
       status: 'pending_review',
     }).select().single()
 
-    return NextResponse.json({ success: true, data: result, report_id: report?.id })
+    return { success: true, data: result, report_id: report?.id, rules_auto_applied: createdRules.length }
 
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'AI request failed'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return { error: message }
   }
+}
+
+export async function POST(req: NextRequest) {
+  const body = await req.json()
+  const result = await generateWeeklyReport(body.period || 'last_7_days')
+  if ('error' in result) return NextResponse.json(result, { status: 500 })
+  return NextResponse.json(result)
 }

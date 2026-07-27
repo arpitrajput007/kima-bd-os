@@ -18,6 +18,7 @@ import type { Lead, Contact } from '@/lib/types'
 import type { LeadStatus } from '@/lib/types'
 import { AssignToPlutoButton } from '@/components/AssignToPlutoButton'
 import { getActor, ACTOR_LABEL } from '@/lib/actor'
+import { recordOutcome } from '@/lib/outreach'
 
 type ActivityType = 'note' | 'call' | 'email' | 'meeting' | 'follow_up' | 'status_change'
 
@@ -1249,7 +1250,14 @@ export default function CRMPage() {
   }
 
   const moveStage = async (id: string, status: LeadStatus) => {
-    await supabase.from('leads').update({ status, updated_at: new Date().toISOString() }).eq('id', id)
+    // 'replied' / 'meeting_booked' are outcome signals, not just pipeline
+    // stages — route through recordOutcome so feedback_memory and the
+    // sent message that landed both get tagged for the learning loop.
+    if (status === 'replied' || status === 'meeting_booked') {
+      await recordOutcome(supabase, { leadId: id, outcome: status })
+    } else {
+      await supabase.from('leads').update({ status, updated_at: new Date().toISOString() }).eq('id', id)
+    }
     await supabase.from('lead_activities').insert({
       lead_id: id, type: 'status_change',
       content: `Moved to ${PIPELINE_STAGES.find(s => s.status === status)?.label || status}`,

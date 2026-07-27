@@ -34,6 +34,7 @@ export interface AgentRule {
 }
 
 export interface AgentKnowledge {
+  id?: string
   title: string
   content: string
   knowledge_type: string
@@ -59,27 +60,91 @@ const KNOWLEDGE_TYPES = [
 const PER_TYPE_LIMIT = 8
 
 // Max rules to pull (ordered by weight desc so strongest rules first).
-const RULES_LIMIT = 60
+// 436 active rules at ~15 words each is well within budget for Sonnet/GPT-4o
+// context — a hard 60-row cap was silently dropping ~85% of everything
+// taught via the Learn page or weekly reports.
+const RULES_LIMIT = 300
+
+// rule_types that act as guardrails ("never do X") rather than a ranking —
+// these must never be cut by the weight sort, since a low/negative weight is
+// how a "reject" rule is normally written, not a sign it's unimportant.
+export const GUARDRAIL_TYPES = ['reject', 'score_penalty'] as const
+
+// ── Duplicate detection for newly-learned rules ────────────────
+// The Learn page and Discuss chat both mint new agent_rules from free-form
+// content, with no dedup — the same lesson taught twice (or phrased two
+// ways across two documents) creates two rows forever. This is a cheap
+// word-overlap check (Jaccard on normalized token sets) run before insert;
+// no new schema or extension needed.
+function normalizeRuleWords(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 2) // drop stopword-ish noise (a, to, is, ...)
+  )
+}
+
+export function isDuplicateRule(candidate: string, existingRules: string[], threshold = 0.6): boolean {
+  const candWords = normalizeRuleWords(candidate)
+  if (candWords.size === 0) return false
+  for (const existing of existingRules) {
+    const exWords = normalizeRuleWords(existing)
+    if (exWords.size === 0) continue
+    let overlap = 0
+    for (const w of candWords) if (exWords.has(w)) overlap++
+    const union = candWords.size + exWords.size - overlap
+    if (union > 0 && overlap / union >= threshold) return true
+  }
+  return false
+}
 
 // ── Load active rules ─────────────────────────────────────────
-// Pull all active rules, sorted by weight so the most important
-// ones appear first in the context window.
+// Guardrail rule_types (reject/score_penalty) are always included in full.
+// The remainder is sorted by weight desc so the strongest preferences fill
+// out the rest of the budget.
 export async function loadRules(opts?: {
   types?: string[] // filter to specific rule_types, e.g. ['outreach_style']
 }): Promise<AgentRule[]> {
-  let q = db()
+  const wantedTypes = opts?.types?.length ? opts.types : null
+  const guardrailTypes = wantedTypes
+    ? GUARDRAIL_TYPES.filter(t => wantedTypes.includes(t))
+    : GUARDRAIL_TYPES
+  const rankedTypes = wantedTypes
+    ? wantedTypes.filter(t => !(GUARDRAIL_TYPES as readonly string[]).includes(t))
+    : null // null = all non-guardrail types
+
+  let guardrailQ = db()
     .from('agent_rules')
     .select('rule_type, rule, weight')
     .eq('status', 'active')
+    .order('weight', { ascending: true }) // most-negative (strongest reject) first
+
+  guardrailQ = guardrailTypes.length
+    ? (guardrailQ.in('rule_type', guardrailTypes) as typeof guardrailQ)
+    : (guardrailQ.in('rule_type', []) as typeof guardrailQ) // caller excluded guardrails entirely
+
+  let rankedQ = db()
+    .from('agent_rules')
+    .select('rule_type, rule, weight')
+    .eq('status', 'active')
+    .not('rule_type', 'in', `(${GUARDRAIL_TYPES.join(',')})`)
     .order('weight', { ascending: false })
     .limit(RULES_LIMIT)
 
-  if (opts?.types?.length) {
-    q = q.in('rule_type', opts.types) as typeof q
+  if (rankedTypes) {
+    rankedQ = rankedTypes.length
+      ? (rankedQ.in('rule_type', rankedTypes) as typeof rankedQ)
+      : (rankedQ.in('rule_type', []) as typeof rankedQ)
   }
 
-  const { data } = await q
-  return (data || []) as AgentRule[]
+  const [guardrails, ranked] = await Promise.all([
+    guardrailTypes.length ? guardrailQ : Promise.resolve({ data: [] }),
+    rankedQ,
+  ])
+
+  return [...(guardrails.data || []), ...(ranked.data || [])] as AgentRule[]
 }
 
 // ── Load knowledge with type-diversity guarantee ──────────────
@@ -93,19 +158,49 @@ export async function loadKnowledge(opts?: {
 }): Promise<AgentKnowledge[]> {
   const types = opts?.types || [...KNOWLEDGE_TYPES]
   const limit = opts?.perTypeLimit ?? PER_TYPE_LIMIT
+  const tags = opts?.tags?.length ? opts.tags : null
+  const cols = 'id, title, content, knowledge_type, tags, created_at'
 
-  // Fetch each type in parallel
+  // Fetch each type in parallel. When tags are given, query tag-matching
+  // rows directly (not just reorder afterward) — otherwise a well-tagged
+  // but older entry sits outside the recency window and never gets pulled
+  // in at all, making the "boost" purely cosmetic.
   const batches = await Promise.all(
-    types.map(ktype =>
-      db()
-        .from('agent_knowledge')
-        .select('title, content, knowledge_type, tags, created_at')
-        .eq('status', 'active')
-        .eq('knowledge_type', ktype)
-        .order('created_at', { ascending: false })
-        .limit(limit)
-        .then(r => (r.data || []) as AgentKnowledge[])
-    )
+    types.map(async ktype => {
+      if (!tags) {
+        const { data } = await db()
+          .from('agent_knowledge')
+          .select(cols)
+          .eq('status', 'active')
+          .eq('knowledge_type', ktype)
+          .order('created_at', { ascending: false })
+          .limit(limit)
+        return (data || []) as AgentKnowledge[]
+      }
+
+      const [{ data: matched }, { data: recent }] = await Promise.all([
+        db()
+          .from('agent_knowledge')
+          .select(cols)
+          .eq('status', 'active')
+          .eq('knowledge_type', ktype)
+          .overlaps('tags', tags)
+          .order('created_at', { ascending: false })
+          .limit(limit),
+        db()
+          .from('agent_knowledge')
+          .select(cols)
+          .eq('status', 'active')
+          .eq('knowledge_type', ktype)
+          .order('created_at', { ascending: false })
+          .limit(limit),
+      ])
+
+      const matchedRows = (matched || []) as AgentKnowledge[]
+      const seen = new Set(matchedRows.map(r => r.id))
+      const fill = ((recent || []) as AgentKnowledge[]).filter(r => !seen.has(r.id))
+      return [...matchedRows, ...fill].slice(0, limit)
+    })
   )
 
   let all = batches.flat()
