@@ -47,6 +47,25 @@ const CHANNEL_SHORT: Record<string, string> = {
 // the single most recent channel.
 interface ContactInfo { channels: string[]; lastAt: string; lastBy: string | null }
 
+// formatDate() always renders "X ago", which reads as if the follow-up
+// already happened even when it's overdue (future-tense field, past-tense
+// text). This says explicitly whether it's overdue or still upcoming.
+function followUpLabel(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const hours = Math.floor(Math.abs(diffMs) / 3600000)
+  const days = Math.floor(Math.abs(diffMs) / 86400000)
+  if (diffMs >= 0) {
+    // Due in the past — overdue.
+    if (days >= 1) return `Overdue by ${days}d`
+    if (hours >= 1) return `Overdue by ${hours}h`
+    return 'Overdue — due now'
+  }
+  // Due in the future — still upcoming.
+  if (days >= 1) return `In ${days}d`
+  if (hours >= 1) return `In ${hours}h`
+  return 'Due soon'
+}
+
 // 'YYYY-MM-DD' in the browser's local timezone — used to bucket leads by day.
 function dayKey(iso: string): string {
   const d = new Date(iso)
@@ -155,7 +174,7 @@ function LeadGroupTable({ title, icon: Icon, color, leads, now, onDelete, contac
                       {lead.next_follow_up_at ? (
                         <span className="text-xs" style={{ color: overdue ? '#f87171' : 'rgb(140,140,160)', fontWeight: overdue ? 700 : 400 }}>
                           {overdue && <Clock size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: -1 }} />}
-                          {formatDate(lead.next_follow_up_at)}
+                          {followUpLabel(lead.next_follow_up_at)}
                         </span>
                       ) : <span className="text-xs" style={{ color: 'rgb(90,95,120)' }}>—</span>}
                     </td>
