@@ -35,13 +35,20 @@ export async function routeJSON<T = Record<string, unknown>>(params: {
   model?: string          // override the auto-selected model
   maxTokens?: number
   temperature?: number
+  // Optional trailing system content with its own prompt-cache breakpoint on
+  // Claude (see claudeJSON). OpenAI has no equivalent — falls back to plain
+  // concatenation so behavior is unchanged there.
+  systemDynamicSuffix?: string
 }): Promise<T> {
   if (params.provider === 'openai') {
     const client = openai()
+    const system = params.systemDynamicSuffix
+      ? `${params.system}\n${params.systemDynamicSuffix}`
+      : params.system
     const completion = await client.chat.completions.create({
       model: params.model ?? 'gpt-4o',
       messages: [
-        { role: 'system', content: params.system },
+        { role: 'system', content: system },
         { role: 'user',   content: params.user   },
       ],
       response_format: { type: 'json_object' },
@@ -53,11 +60,12 @@ export async function routeJSON<T = Record<string, unknown>>(params: {
 
   // Default: Claude (Sonnet 4.6 supports temperature — only Opus 4.8 + thinking rejects it)
   return claudeJSON<T>({
-    model:       params.model       ?? CLAUDE_FAST,
-    maxTokens:   params.maxTokens   ?? 4000,
-    system:      params.system,
-    user:        params.user,
-    temperature: params.temperature,
+    model:               params.model               ?? CLAUDE_FAST,
+    maxTokens:            params.maxTokens            ?? 4000,
+    system:               params.system,
+    user:                 params.user,
+    temperature:          params.temperature,
+    systemDynamicSuffix:  params.systemDynamicSuffix,
   })
 }
 

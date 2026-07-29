@@ -60,6 +60,13 @@ export async function claudeJSON<T = Record<string, unknown>>(params: {
   // Do NOT set when thinking=true — Opus 4.8 + thinking does not accept it.
   // Sonnet 4.6 supports temperature normally.
   temperature?: number
+  // Optional trailing system content that can vary between calls even when
+  // `system` itself is byte-identical (e.g. per-source learned-memory text
+  // appended after the static PRODUCT_BRAIN block). Gets its own cache_control
+  // breakpoint so a miss on this smaller, more volatile tail doesn't force a
+  // miss on the much larger static `system` prefix — see lib/prompt-caching notes
+  // in AGENTS.md / model-migration guidance: caching is a strict prefix match.
+  systemDynamicSuffix?: string
 }): Promise<T> {
   const client = _client()
   const model = params.model ?? CLAUDE_RESEARCH
@@ -70,10 +77,22 @@ export async function claudeJSON<T = Record<string, unknown>>(params: {
   // cache_control marks the system prompt for Anthropic prompt caching.
   // Cache hits cost 90% less on input tokens — critical when the same large
   // system prompt (PRODUCT_BRAIN ~4-5k tokens) is sent on multiple calls.
-  const systemBlock: Anthropic.TextBlockParam = {
-    type: 'text',
-    text: systemText,
-    cache_control: { type: 'ephemeral' },
+  //
+  // Two breakpoints when systemDynamicSuffix is provided: block 1 (static,
+  // e.g. PRODUCT_BRAIN + instructions) is byte-identical across every call in
+  // the whole discovery run (all sources), so it can hit cache far more often
+  // than if the volatile suffix were baked into the same string. Block 2 (the
+  // suffix) still caches within a run when its content repeats, but no longer
+  // holds block 1 hostage when it doesn't.
+  const systemBlocks: Anthropic.TextBlockParam[] = [
+    { type: 'text', text: systemText, cache_control: { type: 'ephemeral' } },
+  ]
+  if (params.systemDynamicSuffix?.trim()) {
+    systemBlocks.push({
+      type: 'text',
+      text: params.systemDynamicSuffix,
+      cache_control: { type: 'ephemeral' },
+    })
   }
 
   const response = await client.messages.create({
@@ -83,7 +102,7 @@ export async function claudeJSON<T = Record<string, unknown>>(params: {
     // (Opus 4.8 with thinking: adaptive rejects the temperature param).
     ...(params.thinking ? { thinking: { type: 'adaptive' } } : {}),
     ...(params.temperature != null && !params.thinking ? { temperature: params.temperature } : {}),
-    system: [systemBlock],
+    system: systemBlocks,
     messages: [{ role: 'user', content: params.user }],
   })
 

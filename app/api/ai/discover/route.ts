@@ -280,8 +280,7 @@ Evaluate ALL THREE product lines for every company — do not default to Kima/Ae
 SCORING (0-100):
 High score (70+): clear pain point, active product, matches a target category, decision maker findable
 Medium (40-69): possible fit but unclear pain point or no direct match
-Low (<40): no clear use case for Kima/Aeredium/Aerpolice
-${learnedIntelligence || ''}`
+Low (<40): no clear use case for Kima/Aeredium/Aerpolice`
 
     const deepResearchUser = `Do a deep BD research on this company for Kima/Aeredium:
 
@@ -357,6 +356,11 @@ Return this exact JSON:
       maxTokens: 4000,
       temperature: 0.2,
       system: deepResearchSystem,
+      // learnedIntelligence varies per source-run fetch; keeping it out of
+      // `system` means the (much larger) static PRODUCT_BRAIN block above can
+      // hit the prompt cache across ALL sources/companies in a run, not just
+      // within one source, even if this text differs slightly between fetches.
+      systemDynamicSuffix: learnedIntelligence || undefined,
       user: deepResearchUser,
     })
   } catch (e) {
