@@ -455,7 +455,7 @@ export default function TodayPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  const markContacted = async (id: string, channel: string, note: string, followUpDays: number) => {
+  const markContacted = async (id: string, channels: string[], note: string, followUpDays: number) => {
     setActionLoading(id)
     const now = new Date()
     const followUpAt = new Date(now.getTime() + followUpDays * 86400000)
@@ -463,18 +463,20 @@ export default function TodayPage() {
       status: 'contacted',
       contacted_at: now.toISOString(),
       last_contacted_at: now.toISOString(),
-      last_channel: channel,
+      last_channel: channels[channels.length - 1],
       follow_up_stage: 0,
       next_follow_up_at: followUpAt.toISOString(),
       updated_at: now.toISOString(),
     }).eq('id', id)
     if (!error) {
-      await supabase.from('lead_activities').insert({
-        lead_id: id, type: 'email', channel,
-        content: note || `Reached out via ${channel}`,
-        follow_up_at: followUpAt.toISOString(),
-        performed_by: getActor(),
-      })
+      await Promise.all(channels.map(channel =>
+        supabase.from('lead_activities').insert({
+          lead_id: id, type: 'email', channel,
+          content: note || `Reached out via ${channel}`,
+          follow_up_at: followUpAt.toISOString(),
+          performed_by: getActor(),
+        })
+      ))
       toast.success(`Logged — follow-up in ${followUpDays} days`); loadData()
     } else { toast.error('Update failed') }
     setActionLoading(null)
@@ -947,7 +949,7 @@ export default function TodayPage() {
     {/* Contacted Modal */}
     {contactingLead && <TodayContactedModal lead={contactingLead}
       onClose={() => setContactingLead(null)}
-      onSaved={(channel, note, days) => markContacted(contactingLead.id, channel, note, days)} />}
+      onSaved={(channels, note, days) => markContacted(contactingLead.id, channels, note, days)} />}
     </>
   )
 }
@@ -964,9 +966,9 @@ const TODAY_CHANNELS = [
 function TodayContactedModal({ lead, onClose, onSaved }: {
   lead: LeadWithContacts
   onClose: () => void
-  onSaved: (channel: string, note: string, days: number) => void
+  onSaved: (channels: string[], note: string, days: number) => void
 }) {
-  const [channel, setChannel] = useState('')
+  const [channels, setChannels] = useState<string[]>([])
   const [note, setNote] = useState('')
   const [days, setDays] = useState('7')
 
@@ -986,11 +988,11 @@ function TodayContactedModal({ lead, onClose, onSaved }: {
         <div style={{ fontSize: 11, fontWeight: 700, color: 'rgb(150,155,185)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Where? *</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
           {TODAY_CHANNELS.map(ch => (
-            <button key={ch.id} onClick={() => setChannel(ch.id)}
+            <button key={ch.id} onClick={() => setChannels(prev => prev.includes(ch.id) ? prev.filter(c => c !== ch.id) : [...prev, ch.id])}
               style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                border: `1px solid ${channel === ch.id ? ch.color + '60' : 'rgba(255,255,255,0.08)'}`,
-                background: channel === ch.id ? ch.color + '18' : 'rgba(255,255,255,0.03)',
-                color: channel === ch.id ? ch.color : 'rgb(150,155,185)' }}>
+                border: `1px solid ${channels.includes(ch.id) ? ch.color + '60' : 'rgba(255,255,255,0.08)'}`,
+                background: channels.includes(ch.id) ? ch.color + '18' : 'rgba(255,255,255,0.03)',
+                color: channels.includes(ch.id) ? ch.color : 'rgb(150,155,185)' }}>
               {ch.label}
             </button>
           ))}
@@ -1011,11 +1013,11 @@ function TodayContactedModal({ lead, onClose, onSaved }: {
           ))}
         </div>
 
-        <button onClick={() => channel && onSaved(channel, note, parseInt(days))} disabled={!channel}
-          style={{ width: '100%', padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: channel ? 'pointer' : 'not-allowed',
-            background: channel ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.04)',
-            border: `1px solid ${channel ? 'rgba(52,211,153,0.4)' : 'rgba(255,255,255,0.06)'}`,
-            color: channel ? '#34d399' : 'rgb(100,107,140)' }}>
+        <button onClick={() => channels.length > 0 && onSaved(channels, note, parseInt(days))} disabled={channels.length === 0}
+          style={{ width: '100%', padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: channels.length > 0 ? 'pointer' : 'not-allowed',
+            background: channels.length > 0 ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.04)',
+            border: `1px solid ${channels.length > 0 ? 'rgba(52,211,153,0.4)' : 'rgba(255,255,255,0.06)'}`,
+            color: channels.length > 0 ? '#34d399' : 'rgb(100,107,140)' }}>
           ✓ Log outreach &amp; set follow-up
         </button>
       </div>

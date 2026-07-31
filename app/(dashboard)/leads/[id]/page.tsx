@@ -918,7 +918,7 @@ function ContactedModal({ lead, onClose, onSaved }: {
   lead: Lead; onClose: () => void; onSaved: () => void
 }) {
   const supabase = createClient()
-  const [channel, setChannel] = useState('')
+  const [channels, setChannels] = useState<string[]>([])
   const [note, setNote] = useState('')
   const [followUpDays, setFollowUpDays] = useState('3')
   const [saving, setSaving] = useState(false)
@@ -941,7 +941,7 @@ function ContactedModal({ lead, onClose, onSaved }: {
   const isRecontact = CONTACTED_STATUSES_SET.has(lead.status)
 
   const save = async () => {
-    if (!channel) { toast.error('Pick a channel'); return }
+    if (channels.length === 0) { toast.error('Pick at least one channel'); return }
     setSaving(true)
     const now = new Date()
     const followUpAt = new Date(now.getTime() + parseInt(followUpDays) * 86400000)
@@ -951,21 +951,23 @@ function ContactedModal({ lead, onClose, onSaved }: {
       ...(isRecontact ? {} : { status: 'contacted' }),
       contacted_at: lead.contacted_at || now.toISOString(),   // preserve first-contact time
       last_contacted_at: now.toISOString(),
-      last_channel: channel,
+      last_channel: channels[channels.length - 1],
       next_follow_up_at: followUpAt.toISOString(),
       updated_at: now.toISOString(),
     }).eq('id', lead.id)
 
-    // 2. Log it as a CRM activity with channel + follow-up date
-    await supabase.from('lead_activities').insert({
-      lead_id: lead.id,
-      type: 'email',   // maps to outreach in the timeline
-      channel,
-      content: note.trim() || `Reached out via ${CHANNELS.find(c => c.id === channel)?.label}`,
-      scheduled_at: null,
-      follow_up_at: followUpAt.toISOString(),
-      performed_by: getActor(),
-    })
+    // 2. Log one CRM activity per channel reached out on, sharing the same note + follow-up date
+    await Promise.all(channels.map(ch =>
+      supabase.from('lead_activities').insert({
+        lead_id: lead.id,
+        type: 'email',   // maps to outreach in the timeline
+        channel: ch,
+        content: note.trim() || `Reached out via ${CHANNELS.find(c => c.id === ch)?.label}`,
+        scheduled_at: null,
+        follow_up_at: followUpAt.toISOString(),
+        performed_by: getActor(),
+      })
+    ))
 
     setSaving(false)
     toast.success(`Logged — follow-up in ${followUpDays} days`)
@@ -1013,13 +1015,13 @@ function ContactedModal({ lead, onClose, onSaved }: {
 
         {/* Channel picker */}
         <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'rgb(150,155,185)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Where did you reach out? *</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'rgb(150,155,185)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Where did you reach out? * <span style={{ textTransform: 'none', fontWeight: 500, opacity: 0.7 }}>(select all that apply)</span></div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
             {CHANNELS.map(ch => {
               const prevCount = prevChannelCounts[ch.id] || 0
-              const isSelected = channel === ch.id
+              const isSelected = channels.includes(ch.id)
               return (
-                <button key={ch.id} onClick={() => setChannel(ch.id)}
+                <button key={ch.id} onClick={() => setChannels(prev => prev.includes(ch.id) ? prev.filter(c => c !== ch.id) : [...prev, ch.id])}
                   style={{ padding: '10px 8px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center', fontFamily: 'inherit',
                     border: `1px solid ${isSelected ? ch.color + '70' : prevCount > 0 ? 'rgba(52,211,153,0.3)' : 'rgba(255,255,255,0.08)'}`,
                     background: isSelected ? ch.color + '1a' : prevCount > 0 ? 'rgba(52,211,153,0.07)' : 'rgba(255,255,255,0.03)',
@@ -1066,8 +1068,8 @@ function ContactedModal({ lead, onClose, onSaved }: {
             style={{ flex: 1, padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgb(150,155,185)' }}>
             Cancel
           </button>
-          <button onClick={save} disabled={saving || !channel}
-            style={{ flex: 2, padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: saving || !channel ? 'not-allowed' : 'pointer', background: channel ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${channel ? 'rgba(52,211,153,0.4)' : 'rgba(255,255,255,0.06)'}`, color: channel ? '#34d399' : 'rgb(100,107,140)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: saving ? 0.7 : 1 }}>
+          <button onClick={save} disabled={saving || channels.length === 0}
+            style={{ flex: 2, padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: saving || channels.length === 0 ? 'not-allowed' : 'pointer', background: channels.length > 0 ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${channels.length > 0 ? 'rgba(52,211,153,0.4)' : 'rgba(255,255,255,0.06)'}`, color: channels.length > 0 ? '#34d399' : 'rgb(100,107,140)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: saving ? 0.7 : 1 }}>
             {saving ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : <><CheckCircle size={14} /> Log & set follow-up</>}
           </button>
         </div>
