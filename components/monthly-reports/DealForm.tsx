@@ -8,7 +8,7 @@ import {
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
-  DEAL_STATUSES, BLOCKER_TYPES, KIMA_PRODUCTS, dealStatusMeta, blockerLabel, isNoiseBlockerLabel,
+  DEAL_STATUSES, BLOCKER_TYPES, KIMA_PRODUCTS, LEAD_TYPES, dealStatusMeta, blockerLabel, isNoiseBlockerLabel,
 } from '@/lib/monthly-reports-types'
 import type { MonthlyDeal, DealBlocker, DealProductFeedback } from '@/lib/monthly-reports-types'
 import { AiFixButton } from './ui'
@@ -329,6 +329,29 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
           </Field>
           <Field label="Deals In" hint="What the company deals in — industry / category">
             <Input value={form.industry} onChange={e => set('industry', e.target.value)} placeholder="e.g. Crypto, Banking, Agent Wallets" />
+          </Field>
+        </div>
+        <div style={{ padding: '0 22px 20px' }}>
+          <Field label="Deal Type" hint="Is this a B2B, B2C, or other kind of deal?">
+            <div className="flex flex-wrap gap-2">
+              {LEAD_TYPES.map(t => {
+                const isSelected = form.lead_type === t
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => set('lead_type', isSelected ? '' : t)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                    style={isSelected
+                      ? { background: 'rgba(96,165,250,0.2)', border: '1px solid rgba(96,165,250,0.5)', color: '#60a5fa' }
+                      : { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgb(130,130,160)' }
+                    }
+                  >
+                    {isSelected && <span className="mr-1">✓</span>}{t}
+                  </button>
+                )
+              })}
+            </div>
           </Field>
         </div>
       </div>
