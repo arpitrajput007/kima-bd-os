@@ -18,7 +18,7 @@ import {
 import {
   DEAL_STATUSES, LEAD_TYPES,
   dealStatusMeta, fmtMonthYear, fmtMonthShort, currentMonthYear, last12Months,
-  blockerLabel, channelLabel, isActiveBlocker,
+  blockerLabel, channelLabel, isActiveBlocker, sortCategoryBreakdown,
 } from '@/lib/monthly-reports-types'
 import type { MonthlyDeal, DealActivity, TimeAllocation } from '@/lib/monthly-reports-types'
 import { getOutreachStats, EMPTY_OUTREACH_STATS } from '@/lib/monthly-outreach-stats'
@@ -143,7 +143,7 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
   const chRows = Object.entries(ch).sort((a, b) => b[1] - a[1]).map(([k, v]) => [channelLabel(k), String(v)])
 
   // Companies contacted by category
-  const categoryRows = Object.entries(outreach.companyCategoryBreakdown).sort((a, b) => b[1] - a[1])
+  const categoryRows = sortCategoryBreakdown(outreach.companyCategoryBreakdown)
     .map(([k, v]) => [k, String(categoryOverrides[k] ?? v)])
 
   // Time allocation — by responsibility, as % of time
@@ -791,7 +791,7 @@ export default function MonthlyReportsPage() {
                     No categorized outreach yet — categories come from each lead&apos;s industry.
                   </p>
                 ) : (() => {
-                  const categoryEntries = Object.entries(outreachStats.companyCategoryBreakdown).sort((a, b) => b[1] - a[1])
+                  const categoryEntries = sortCategoryBreakdown(outreachStats.companyCategoryBreakdown)
                   const categoryMax = Math.max(...categoryEntries.map(([cat, count]) => categoryOverrides[cat] ?? count), 1)
                   return categoryEntries.map(([cat, count]) => {
                     const val = categoryOverrides[cat] ?? count

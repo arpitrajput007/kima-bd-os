@@ -230,6 +230,17 @@ export function isActiveBlocker(b: DealBlocker): boolean {
   return !b.resolved && !isNoiseBlockerLabel(blockerLabel(b))
 }
 
+// Sorts a category breakdown by count, but always keeps the catch-all "Other
+// (N categories)" bucket last — its count can be the largest in the set (it's
+// a sum of everything else), and a residual bucket reading as the #1 row
+// undercuts the point of grouping it out of the way.
+export function sortCategoryBreakdown(breakdown: Record<string, number>): [string, number][] {
+  const entries = Object.entries(breakdown)
+  const other = entries.filter(([k]) => k.startsWith('Other ('))
+  const rest = entries.filter(([k]) => !k.startsWith('Other ('))
+  return [...rest.sort((a, b) => b[1] - a[1]), ...other]
+}
+
 export function blockerLabel(b: DealBlocker): string {
   const meta = BLOCKER_TYPES.find(t => t.value === b.type)
   if (meta) return meta.label
