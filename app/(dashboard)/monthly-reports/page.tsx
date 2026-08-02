@@ -10,7 +10,7 @@ import {
   Plus, Search, Download, FileText, TrendingUp, Users,
   Trophy, XCircle, Calendar, BarChart2, Loader2, RefreshCw,
   Building2, ChevronDown, AlertCircle, Send, Reply, Sparkles,
-  Zap, Settings2, Target, DollarSign, RotateCcw, Check,
+  Zap, Settings2, Target, DollarSign, RotateCcw, Check, ArrowRightLeft,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -465,6 +465,10 @@ export default function MonthlyReportsPage() {
   const [openRowExport, setOpenRowExport] = useState<string | null>(null)
   const exportRef = useRef<HTMLDivElement>(null)
   const rowExportRef = useRef<HTMLDivElement>(null)
+  const [movingDeal, setMovingDeal] = useState<string | null>(null)
+  const [movingTo, setMovingTo] = useState('')
+  const [moveSaving, setMoveSaving] = useState(false)
+  const moveRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { setMounted(true) }, [])
 
@@ -517,10 +521,24 @@ export default function MonthlyReportsPage() {
     const handler = (e: MouseEvent) => {
       if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false)
       if (rowExportRef.current && !rowExportRef.current.contains(e.target as Node)) setOpenRowExport(null)
+      if (moveRef.current && !moveRef.current.contains(e.target as Node)) setMovingDeal(null)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  // Reassigns a deal to a different reporting month — it disappears from the
+  // currently viewed month's list since deals are always fetched scoped to `month`.
+  const moveDealToMonth = async (dealId: string, newMonth: string) => {
+    if (!newMonth || newMonth === month) { setMovingDeal(null); return }
+    setMoveSaving(true)
+    const { error } = await supabase.from('monthly_deals').update({ month_year: newMonth }).eq('id', dealId)
+    setMoveSaving(false)
+    if (error) { toast.error('Failed to move deal'); return }
+    toast.success(`Moved to ${fmtMonthYear(newMonth)}`)
+    setMovingDeal(null)
+    setDeals(prev => prev.filter(d => d.id !== dealId))
+  }
 
   // ── KPIs ──────────────────────────────────────────────────────
   const total    = deals.length
@@ -1112,37 +1130,73 @@ export default function MonthlyReportsPage() {
                           ) : null}
                         </div>
                         <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                          <div className="relative" ref={openRowExport === deal.id ? rowExportRef : undefined}>
-                            <button
-                              onClick={e => { e.preventDefault(); e.stopPropagation(); setOpenRowExport(openRowExport === deal.id ? null : deal.id) }}
-                              className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
-                              style={{ color: 'rgb(120,120,150)' }}
-                              title="Export this deal"
-                            >
-                              <Download size={13} />
-                            </button>
-                            {openRowExport === deal.id && (
-                              <div
-                                onClick={e => { e.preventDefault(); e.stopPropagation() }}
-                                className="absolute right-0 top-full mt-1 w-48 rounded-xl overflow-hidden z-50 shadow-xl"
-                                style={{ background: 'rgb(22,22,34)', border: '1px solid rgba(255,255,255,0.1)' }}
+                          <div className="flex items-center gap-1">
+                            <div className="relative" ref={movingDeal === deal.id ? moveRef : undefined}>
+                              <button
+                                onClick={e => { e.preventDefault(); e.stopPropagation(); setMovingTo(month); setMovingDeal(movingDeal === deal.id ? null : deal.id) }}
+                                className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                                style={{ color: 'rgb(120,120,150)' }}
+                                title="Move to a different month"
                               >
-                                <button
-                                  onClick={e => { e.preventDefault(); e.stopPropagation(); exportDealPDF(deal, activities.filter(a => a.deal_id === deal.id)); setOpenRowExport(null) }}
-                                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs hover:bg-white/5 text-left transition-colors"
-                                  style={{ color: 'rgb(180,180,210)' }}
+                                <ArrowRightLeft size={13} />
+                              </button>
+                              {movingDeal === deal.id && (
+                                <div
+                                  onClick={e => { e.preventDefault(); e.stopPropagation() }}
+                                  className="absolute right-0 top-full mt-1 w-56 rounded-xl overflow-hidden z-50 shadow-xl p-3"
+                                  style={{ background: 'rgb(22,22,34)', border: '1px solid rgba(255,255,255,0.1)' }}
                                 >
-                                  <FileText size={12} style={{ color: '#a78bfa' }} />Export as PDF
-                                </button>
-                                <button
-                                  onClick={e => { e.preventDefault(); e.stopPropagation(); exportDealDoc(deal, activities.filter(a => a.deal_id === deal.id)); setOpenRowExport(null) }}
-                                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs hover:bg-white/5 text-left transition-colors"
-                                  style={{ color: 'rgb(180,180,210)' }}
+                                  <div className="text-[11px] font-medium mb-2" style={{ color: 'rgb(150,150,180)' }}>Move to month</div>
+                                  <input
+                                    type="month"
+                                    value={movingTo}
+                                    onChange={e => setMovingTo(e.target.value)}
+                                    className="input-dark w-full mb-2"
+                                    style={{ fontSize: '12px', padding: '6px 8px' }}
+                                  />
+                                  <button
+                                    onClick={e => { e.preventDefault(); e.stopPropagation(); moveDealToMonth(deal.id, movingTo) }}
+                                    disabled={moveSaving || !movingTo || movingTo === month}
+                                    className="btn btn-ai w-full justify-center"
+                                    style={{ fontSize: '12px', padding: '6px 0', opacity: moveSaving || !movingTo || movingTo === month ? 0.5 : 1 }}
+                                  >
+                                    {moveSaving ? <Loader2 size={12} className="animate-spin" /> : `Move to ${movingTo ? fmtMonthYear(movingTo) : '…'}`}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            <div className="relative" ref={openRowExport === deal.id ? rowExportRef : undefined}>
+                              <button
+                                onClick={e => { e.preventDefault(); e.stopPropagation(); setOpenRowExport(openRowExport === deal.id ? null : deal.id) }}
+                                className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                                style={{ color: 'rgb(120,120,150)' }}
+                                title="Export this deal"
+                              >
+                                <Download size={13} />
+                              </button>
+                              {openRowExport === deal.id && (
+                                <div
+                                  onClick={e => { e.preventDefault(); e.stopPropagation() }}
+                                  className="absolute right-0 top-full mt-1 w-48 rounded-xl overflow-hidden z-50 shadow-xl"
+                                  style={{ background: 'rgb(22,22,34)', border: '1px solid rgba(255,255,255,0.1)' }}
                                 >
-                                  <FileText size={12} style={{ color: '#60a5fa' }} />Export as Word (.doc)
-                                </button>
-                              </div>
-                            )}
+                                  <button
+                                    onClick={e => { e.preventDefault(); e.stopPropagation(); exportDealPDF(deal, activities.filter(a => a.deal_id === deal.id)); setOpenRowExport(null) }}
+                                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs hover:bg-white/5 text-left transition-colors"
+                                    style={{ color: 'rgb(180,180,210)' }}
+                                  >
+                                    <FileText size={12} style={{ color: '#a78bfa' }} />Export as PDF
+                                  </button>
+                                  <button
+                                    onClick={e => { e.preventDefault(); e.stopPropagation(); exportDealDoc(deal, activities.filter(a => a.deal_id === deal.id)); setOpenRowExport(null) }}
+                                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs hover:bg-white/5 text-left transition-colors"
+                                    style={{ color: 'rgb(180,180,210)' }}
+                                  >
+                                    <FileText size={12} style={{ color: '#60a5fa' }} />Export as Word (.doc)
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                           {deal.expected_close_date && (
                             <div className="flex items-center gap-1 text-[10px]" style={{ color: 'rgb(110,110,140)' }}>
