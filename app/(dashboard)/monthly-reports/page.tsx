@@ -16,9 +16,9 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import {
-  DEAL_STATUSES, OUTREACH_CHANNELS, LEAD_TYPES,
+  DEAL_STATUSES, LEAD_TYPES,
   dealStatusMeta, fmtMonthYear, fmtMonthShort, currentMonthYear, last12Months,
-  blockerLabel,
+  blockerLabel, channelLabel, isActiveBlocker,
 } from '@/lib/monthly-reports-types'
 import type { MonthlyDeal, DealActivity, TimeAllocation } from '@/lib/monthly-reports-types'
 import { getOutreachStats, EMPTY_OUTREACH_STATS } from '@/lib/monthly-outreach-stats'
@@ -62,7 +62,7 @@ function dlFile(content: string, name: string, type: string) {
 function exportCSV(deals: MonthlyDeal[], month: string) {
   const rows = deals.map(d => {
     const pf = d.product_feedback || {}
-    const openBlockers = (d.blockers || []).filter(b => !b.resolved)
+    const openBlockers = (d.blockers || []).filter(isActiveBlocker)
     return {
       Company: d.company_name,
       Individual: d.individual_name ?? '',
@@ -140,10 +140,7 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
   // Channel breakdown (deal-level channel + raw outreach touches)
   const ch: Record<string, number> = { ...outreach.channelBreakdown }
   deals.forEach(d => { if (d.outreach_channel) ch[d.outreach_channel] = (ch[d.outreach_channel] || 0) + 1 })
-  const chRows = Object.entries(ch).sort((a, b) => b[1] - a[1]).map(([k, v]) => {
-    const meta = OUTREACH_CHANNELS.find(c => c.value === k)
-    return [meta?.label ?? k, String(v)]
-  })
+  const chRows = Object.entries(ch).sort((a, b) => b[1] - a[1]).map(([k, v]) => [channelLabel(k), String(v)])
 
   // Companies contacted by category
   const categoryRows = Object.entries(outreach.companyCategoryBreakdown).sort((a, b) => b[1] - a[1])
@@ -165,7 +162,7 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
 
   // Blockers summary — keyed by type, label resolved via blockerLabel (handles custom blockers)
   const blockerCount: Record<string, { label: string; count: number }> = {}
-  deals.forEach(d => (d.blockers || []).filter(b => !b.resolved).forEach(b => {
+  deals.forEach(d => (d.blockers || []).filter(isActiveBlocker).forEach(b => {
     const key = b.type
     if (!blockerCount[key]) blockerCount[key] = { label: blockerLabel(b), count: 0 }
     blockerCount[key].count++
@@ -302,7 +299,7 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
       d.company_name ?? '', d.individual_name ?? '', d.country ?? '', d.lead_type ?? '',
       dealStatusMeta(d.status).label, d.expected_monthly_volume ?? '', d.estimated_revenue ?? '',
       d.strategic_importance ?? '', d.expected_close_date ?? '',
-      (d.blockers || []).filter(b => !b.resolved).map(b => blockerLabel(b)).join(', '),
+      (d.blockers || []).filter(isActiveBlocker).map(b => blockerLabel(b)).join(', '),
     ]),
     styles: { ...tableTheme.styles, fontSize: 7.5 },
     headStyles: { ...tableTheme.headStyles, fontSize: 7.5 },
@@ -883,13 +880,13 @@ export default function MonthlyReportsPage() {
                 <div style={{ padding: '16px 22px', display: 'flex', flexDirection: 'column', gap: 11 }}>
                   {Object.keys(channelCounts).length === 0 ? (
                     <p className="text-xs text-center py-4" style={{ color: 'rgb(90,90,110)' }}>No channel activity logged yet.</p>
-                  ) : OUTREACH_CHANNELS.filter(c => channelCounts[c.value] > 0).map(c => (
-                    <div key={c.value}>
+                  ) : Object.entries(channelCounts).filter(([, count]) => count > 0).sort((a, b) => b[1] - a[1]).map(([value, count]) => (
+                    <div key={value}>
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[12px] font-medium" style={{ color: 'rgb(160,165,195)' }}>{c.label}</span>
-                        <span className="text-[14px] font-bold tabular-nums text-white">{channelCounts[c.value]}</span>
+                        <span className="text-[12px] font-medium" style={{ color: 'rgb(160,165,195)' }}>{channelLabel(value)}</span>
+                        <span className="text-[14px] font-bold tabular-nums text-white">{count}</span>
                       </div>
-                      <MiniBar value={channelCounts[c.value]} max={maxChannel} color="#a78bfa" />
+                      <MiniBar value={count} max={maxChannel} color="#a78bfa" />
                     </div>
                   ))}
                 </div>
@@ -1082,7 +1079,7 @@ export default function MonthlyReportsPage() {
                 <div className="text-xs mb-1" style={{ color: 'rgb(90,90,110)' }}>{filtered.length} deal{filtered.length !== 1 ? 's' : ''}</div>
                 {filtered.map(deal => {
                   const actCount = activities.filter(a => a.deal_id === deal.id).length
-                  const hasBlockers = (deal.blockers || []).some(b => !b.resolved)
+                  const hasBlockers = (deal.blockers || []).some(isActiveBlocker)
                   return (
                     <Link
                       key={deal.id}

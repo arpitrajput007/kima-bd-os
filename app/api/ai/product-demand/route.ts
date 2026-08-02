@@ -12,7 +12,7 @@
 import { NextResponse } from 'next/server'
 import { claudeJSON, CLAUDE_RESEARCH } from '@/lib/claude'
 import { createClient } from '@/lib/supabase/server'
-import { PRODUCT_DEMAND_CATEGORIES, blockerLabel, parseUsdMonthly } from '@/lib/monthly-reports-types'
+import { PRODUCT_DEMAND_CATEGORIES, blockerLabel, parseUsdMonthly, isActiveBlocker } from '@/lib/monthly-reports-types'
 import type { MonthlyDeal, ProductDemandClient } from '@/lib/monthly-reports-types'
 
 interface DemandCluster {
@@ -58,7 +58,7 @@ export async function POST() {
     const pf = d.product_feedback || {}
     Object.values(pf).forEach(v => { if (v) snippets.push({ company: d.company_name, text: v }) })
     ;(d.blockers || [])
-      .filter(b => !b.resolved && (b.type === 'technical' || b.type === 'product_limitation' || b.type.startsWith('custom_')) && (b.notes || b.label))
+      .filter(b => isActiveBlocker(b) && (b.type === 'technical' || b.type === 'product_limitation' || b.type.startsWith('custom_')) && (b.notes || b.label))
       .forEach(b => snippets.push({ company: d.company_name, text: b.notes ? `${blockerLabel(b)}: ${b.notes}` : blockerLabel(b) }))
   })
 

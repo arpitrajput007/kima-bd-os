@@ -3,7 +3,7 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import {
-  ACTIVITY_TYPES, dealStatusMeta, blockerLabel, fmtMonthYear,
+  ACTIVITY_TYPES, dealStatusMeta, blockerLabel, fmtMonthYear, isActiveBlocker, isNoiseBlockerLabel,
 } from './monthly-reports-types'
 import type { MonthlyDeal, DealActivity } from './monthly-reports-types'
 
@@ -41,8 +41,8 @@ function dlFile(content: string | Blob, name: string, type?: string) {
 export function exportDealPDF(deal: MonthlyDeal, activities: DealActivity[]) {
   const statusMeta = dealStatusMeta(deal.status)
   const statusColors = pdfStatusColors(deal.status)
-  const openBlockers = (deal.blockers || []).filter(b => !b.resolved)
-  const resolvedBlockers = (deal.blockers || []).filter(b => b.resolved)
+  const openBlockers = (deal.blockers || []).filter(isActiveBlocker)
+  const resolvedBlockers = (deal.blockers || []).filter(b => b.resolved && !isNoiseBlockerLabel(blockerLabel(b)))
   const pf = deal.product_feedback || {}
   const pfRows = (['feature_requested', 'missing_functionality', 'product_gaps', 'integration_requested', 'api_requirements', 'compliance_requirements', 'technical_blockers'] as const)
     .filter(k => pf[k]).map(k => [k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), pf[k] as string])
@@ -273,8 +273,8 @@ function docDataTable(head: string[], body: string[][]): string {
 
 export function exportDealDoc(deal: MonthlyDeal, activities: DealActivity[]) {
   const statusMeta = dealStatusMeta(deal.status)
-  const openBlockers = (deal.blockers || []).filter(b => !b.resolved)
-  const resolvedBlockers = (deal.blockers || []).filter(b => b.resolved)
+  const openBlockers = (deal.blockers || []).filter(isActiveBlocker)
+  const resolvedBlockers = (deal.blockers || []).filter(b => b.resolved && !isNoiseBlockerLabel(blockerLabel(b)))
   const pf = deal.product_feedback || {}
   const pfRows = (['feature_requested', 'missing_functionality', 'product_gaps', 'integration_requested', 'api_requirements', 'compliance_requirements', 'technical_blockers'] as const)
     .filter(k => pf[k]).map(k => [k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), pf[k] as string])

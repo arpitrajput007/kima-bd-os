@@ -61,9 +61,24 @@ export async function getOutreachStats(
 
   if (msgsRes.error && leadsRes.error && actsRes.error) return EMPTY_OUTREACH_STATS
 
+  // Total outreach and the channel breakdown must be built from the exact same
+  // touches, or the headline number and the per-channel table silently drift
+  // apart (previously totalOutreach only counted `msgs`, while channelBreakdown
+  // also folded in `acts` — so the channel table could sum to more than the
+  // headline total). Every message counts toward the total; only the ones with
+  // a channel also land in the breakdown, same as activities.
   const channelBreakdown: Record<string, number> = {}
-  msgs.forEach(m => { if (m.channel) channelBreakdown[m.channel] = (channelBreakdown[m.channel] || 0) + 1 })
-  acts.forEach(a => { if (a.channel) channelBreakdown[a.channel] = (channelBreakdown[a.channel] || 0) + 1 })
+  let totalOutreach = 0
+  msgs.forEach(m => {
+    totalOutreach++
+    if (m.channel) channelBreakdown[m.channel] = (channelBreakdown[m.channel] || 0) + 1
+  })
+  acts.forEach(a => {
+    if (a.channel) {
+      totalOutreach++
+      channelBreakdown[a.channel] = (channelBreakdown[a.channel] || 0) + 1
+    }
+  })
 
   const companySet = new Set<string>()
   msgs.forEach(m => { if (m.lead_id) companySet.add(m.lead_id) })
@@ -76,21 +91,32 @@ export async function getOutreachStats(
   const repliesInMonth = msgs.filter(m => m.status === 'replied').length
   const meetingsBooked = acts.filter(a => a.type === 'meeting').length
 
-  // Category breakdown of the companies contacted — grouped by leads.industry_category
+  // Category breakdown of the companies contacted — grouped by leads.industry_category.
+  // That field is AI-written free text per company (not a fixed list), so with
+  // enough leads it produces dozens of near-unique one-off strings. Capping to
+  // the top N + an "Other" bucket keeps this readable instead of dumping pages
+  // of count-1 rows into the report.
+  const CATEGORY_CAP = 8
   const companyCategoryBreakdown: Record<string, number> = {}
   if (companySet.size > 0) {
     const { data: catRows } = await supabase
       .from('leads')
       .select('id, industry_category')
       .in('id', Array.from(companySet))
+    const rawBreakdown: Record<string, number> = {}
     ;(catRows || []).forEach(r => {
       const cat = (r.industry_category as string | null)?.trim() || 'Uncategorized'
-      companyCategoryBreakdown[cat] = (companyCategoryBreakdown[cat] || 0) + 1
+      rawBreakdown[cat] = (rawBreakdown[cat] || 0) + 1
     })
+    const sorted = Object.entries(rawBreakdown).sort((a, b) => b[1] - a[1])
+    sorted.slice(0, CATEGORY_CAP).forEach(([cat, count]) => { companyCategoryBreakdown[cat] = count })
+    const rest = sorted.slice(CATEGORY_CAP)
+    const restTotal = rest.reduce((sum, [, count]) => sum + count, 0)
+    if (restTotal > 0) companyCategoryBreakdown[`Other (${rest.length} categories)`] = restTotal
   }
 
   return {
-    totalOutreach: msgs.length,
+    totalOutreach,
     companiesContacted: companySet.size,
     individualsContacted: individualSet.size,
     replies: repliesInMonth,

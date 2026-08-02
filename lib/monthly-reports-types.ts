@@ -23,10 +23,20 @@ export const OUTREACH_CHANNELS = [
   { value: 'twitter',    label: 'X (Twitter)'        },
   { value: 'telegram',   label: 'Telegram'           },
   { value: 'discord',    label: 'Discord'            },
+  { value: 'call',       label: 'Call'               },
   { value: 'event',      label: 'Event'              },
   { value: 'warm_intro', label: 'Warm Introduction'  },
   { value: 'other',      label: 'Other'              },
 ] as const
+
+// Any raw channel value (from outreach_messages / lead_activities) that isn't
+// in OUTREACH_CHANNELS falls back to this — title-cased instead of printed
+// verbatim, so an unlisted value like "call" still reads as "Call" in reports.
+export function channelLabel(value: string): string {
+  const meta = OUTREACH_CHANNELS.find(c => c.value === value)
+  if (meta) return meta.label
+  return value.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
 
 export const BLOCKER_TYPES = [
   { value: 'waiting_response',    label: 'Waiting for Response' },
@@ -205,6 +215,19 @@ export interface TimeAllocation {
 
 export function dealStatusMeta(status: DealStatus) {
   return DEAL_STATUSES.find(s => s.value === status) ?? DEAL_STATUSES[0]
+}
+
+// Custom blockers are free text — reps sometimes type "No blocker", "N/A", or
+// similar to mean the opposite of what this field is for. Catches that so it
+// never surfaces as an actual active blocker in a report.
+const NOISE_BLOCKER_PATTERN = /^\s*(no(ne)?|n\/?a)\b/i
+
+export function isNoiseBlockerLabel(label: string): boolean {
+  return NOISE_BLOCKER_PATTERN.test(label.trim())
+}
+
+export function isActiveBlocker(b: DealBlocker): boolean {
+  return !b.resolved && !isNoiseBlockerLabel(blockerLabel(b))
 }
 
 export function blockerLabel(b: DealBlocker): string {

@@ -1,11 +1,14 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
-import { Loader2, X, Sparkles } from 'lucide-react'
+import {
+  Loader2, X, Sparkles, Plus, Building2, Boxes, Target, FileText,
+  AlertTriangle, Lightbulb,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
-  DEAL_STATUSES, BLOCKER_TYPES, KIMA_PRODUCTS, dealStatusMeta, blockerLabel,
+  DEAL_STATUSES, BLOCKER_TYPES, KIMA_PRODUCTS, dealStatusMeta, blockerLabel, isNoiseBlockerLabel,
 } from '@/lib/monthly-reports-types'
 import type { MonthlyDeal, DealBlocker, DealProductFeedback } from '@/lib/monthly-reports-types'
 import { AiFixButton } from './ui'
@@ -107,24 +110,64 @@ function Select({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectEle
   )
 }
 
-function MultiChip({ options, selected, onChange }: { options: readonly string[]; selected: string[]; onChange: (v: string[]) => void }) {
+function MultiChip({
+  options, selected, onChange, customOptions, onRemoveCustom,
+}: {
+  options: readonly string[]
+  selected: string[]
+  onChange: (v: string[]) => void
+  customOptions?: string[]
+  onRemoveCustom?: (v: string) => void
+}) {
   const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter(s => s !== v) : [...selected, v])
+  const allOptions = customOptions ? [...options, ...customOptions] : options
   return (
     <div className="flex flex-wrap gap-2">
-      {options.map(o => (
-        <button
-          key={o}
-          type="button"
-          onClick={() => toggle(o)}
-          className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-          style={selected.includes(o)
-            ? { background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(167,139,250,0.5)', color: '#a78bfa' }
-            : { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgb(130,130,160)' }
-          }
-        >
-          {selected.includes(o) && <span className="mr-1">✓</span>}{o}
-        </button>
-      ))}
+      {allOptions.map(o => {
+        const isCustom = customOptions?.includes(o)
+        const isSelected = selected.includes(o)
+        return (
+          <span
+            key={o}
+            className="inline-flex items-center rounded-lg text-xs font-medium transition-all"
+            style={isSelected
+              ? { background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(167,139,250,0.5)', color: '#a78bfa' }
+              : { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgb(130,130,160)' }
+            }
+          >
+            <button type="button" onClick={() => toggle(o)} className="pl-3 pr-1.5 py-1.5">
+              {isSelected && <span className="mr-1">✓</span>}{o}
+            </button>
+            {isCustom && (
+              <button
+                type="button"
+                onClick={() => onRemoveCustom?.(o)}
+                title="Remove this product"
+                className="flex items-center justify-center rounded mr-1.5"
+                style={{ width: 16, height: 16, color: 'inherit', opacity: 0.6 }}
+              >
+                <X size={11} />
+              </button>
+            )}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
+function SectionHeader({ icon: Icon, color, title, subtitle }: { icon: React.ElementType; color: string; title: string; subtitle?: string }) {
+  return (
+    <div className="section-card-header">
+      <div className="flex items-center gap-2.5">
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${color}1a` }}>
+          <Icon size={14} style={{ color }} />
+        </div>
+        <div>
+          <div className="text-[13px] font-semibold text-white">{title}</div>
+          {subtitle && <div className="text-[11px]" style={{ color: 'rgb(100,106,135)' }}>{subtitle}</div>}
+        </div>
+      </div>
     </div>
   )
 }
@@ -174,6 +217,30 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
   const set = (field: keyof DealFormData, value: unknown) =>
     setForm(prev => ({ ...prev, [field]: value }))
 
+  // ── Custom products (Product Fit chips beyond the standard catalog) ──
+  const [customProducts, setCustomProducts] = useState<string[]>(
+    () => (d.products_interested || []).filter(p => !KIMA_PRODUCTS.includes(p as never))
+  )
+  const [customProductInput, setCustomProductInput] = useState('')
+
+  const addCustomProduct = () => {
+    const label = customProductInput.trim()
+    if (!label) return
+    if (KIMA_PRODUCTS.includes(label as never) || customProducts.includes(label)) {
+      set('products_interested', form.products_interested.includes(label) ? form.products_interested : [...form.products_interested, label])
+      setCustomProductInput('')
+      return
+    }
+    setCustomProducts(prev => [...prev, label])
+    set('products_interested', [...form.products_interested, label])
+    setCustomProductInput('')
+  }
+
+  const removeCustomProduct = (label: string) => {
+    setCustomProducts(prev => prev.filter(p => p !== label))
+    set('products_interested', form.products_interested.filter(p => p !== label))
+  }
+
   const toggleBlocker = (type: string) => {
     const exists = form.blockers.find(b => b.type === type)
     if (exists) {
@@ -188,6 +255,11 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
   const addCustomBlocker = () => {
     const label = customBlockerInput.trim()
     if (!label) return
+    if (isNoiseBlockerLabel(label)) {
+      toast.message("If there's no blocker, just leave this section empty instead of adding one", { duration: 4000 })
+      setCustomBlockerInput('')
+      return
+    }
     const slug = 'custom_' + label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
     if (!slug || form.blockers.some(b => b.type === slug)) { setCustomBlockerInput(''); return }
     set('blockers', [...form.blockers, { type: slug, label, notes: '', resolved: false }])
@@ -241,11 +313,12 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
   const statusMeta = dealStatusMeta(form.status as never)
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="section-card card-hover" style={{ padding: '24px 26px' }}>
+    <form onSubmit={handleSubmit} className="space-y-5">
 
-        {/* Row 1 — Company Name / Deals In */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* ── Company ──────────────────────────────────── */}
+      <div className="section-card card-hover">
+        <SectionHeader icon={Building2} color="#60a5fa" title="Company" subtitle="Who they are and what they deal in" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4" style={{ padding: '20px 22px' }}>
           <Field label="Company Name">
             <Input
               value={form.company_name}
@@ -258,62 +331,90 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
             <Input value={form.industry} onChange={e => set('industry', e.target.value)} placeholder="e.g. Crypto, Banking, Agent Wallets" />
           </Field>
         </div>
+      </div>
 
-        <div className="my-5" style={{ borderTop: '1px solid var(--border)' }} />
-
-        {/* Row 2 — Product Fit */}
-        <Field label="Product Fit" hint="Which Kima / Aeredium / Aerpolice products fit this lead">
-          <MultiChip options={KIMA_PRODUCTS} selected={form.products_interested} onChange={v => set('products_interested', v)} />
-        </Field>
-
-        <div className="my-5" style={{ borderTop: '1px solid var(--border)' }} />
-
-        {/* Row 3 — Stage / Expected Close Date */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Stage">
-            <Select value={form.status} onChange={e => set('status', e.target.value)}>
-              {DEAL_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </Select>
-          </Field>
-          <Field label="Expected Close Date">
-            <Input value={form.expected_close_date} onChange={e => set('expected_close_date', e.target.value)} type="date" />
-          </Field>
-        </div>
-
-        <div className="my-5" style={{ borderTop: '1px solid var(--border)' }} />
-
-        {/* Row 4 — Monthly Volume / Rev Opportunity */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field
-            label="Monthly Volume"
-            hint={estimating ? 'Estimating from public data…' : volumeSource === 'ai' ? 'AI estimate — edit if you know the real number' : 'Auto-fills after Company Name if public data exists'}
-            action={estimating ? <Loader2 size={12} className="animate-spin" style={{ color: 'rgb(140,140,170)' }} /> : volumeSource === 'ai' ? <span className="flex items-center gap-1 text-[10px] font-medium" style={{ color: '#a78bfa' }}><Sparkles size={10} />AI</span> : undefined}
-          >
+      {/* ── Product Fit ──────────────────────────────── */}
+      <div className="section-card card-hover">
+        <SectionHeader icon={Boxes} color="#a78bfa" title="Product Fit" subtitle="Which Kima / Aeredium / Aerpolice products fit this lead" />
+        <div style={{ padding: '20px 22px' }}>
+          <MultiChip
+            options={KIMA_PRODUCTS}
+            selected={form.products_interested}
+            onChange={v => set('products_interested', v)}
+            customOptions={customProducts}
+            onRemoveCustom={removeCustomProduct}
+          />
+          <div className="flex items-center gap-2 mt-3">
             <Input
-              value={form.expected_monthly_volume}
-              onChange={e => { set('expected_monthly_volume', e.target.value); setVolumeSource(null) }}
-              placeholder="e.g. $2M/month"
+              value={customProductInput}
+              onChange={e => setCustomProductInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomProduct() } }}
+              placeholder="Add a product not in the list…"
+              className="flex-1"
             />
-          </Field>
-          <Field label="Rev Opportunity">
-            <Input value={form.estimated_revenue} onChange={e => set('estimated_revenue', e.target.value)} placeholder="e.g. $200K/year" />
+            <button
+              type="button"
+              onClick={addCustomProduct}
+              disabled={!customProductInput.trim()}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex-shrink-0 inline-flex items-center gap-1"
+              style={{ background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.35)', color: '#a78bfa', opacity: customProductInput.trim() ? 1 : 0.5 }}
+            >
+              <Plus size={12} />Add
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Deal Details ─────────────────────────────── */}
+      <div className="section-card card-hover">
+        <SectionHeader icon={Target} color="#34d399" title="Deal Details" subtitle="Stage, timing, and size of the opportunity" />
+        <div style={{ padding: '20px 22px' }} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Stage">
+              <Select value={form.status} onChange={e => set('status', e.target.value)}>
+                {DEAL_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </Select>
+            </Field>
+            <Field label="Expected Close Date">
+              <Input value={form.expected_close_date} onChange={e => set('expected_close_date', e.target.value)} type="date" />
+            </Field>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field
+              label="Monthly Volume"
+              hint={estimating ? 'Estimating from public data…' : volumeSource === 'ai' ? 'AI estimate — edit if you know the real number' : 'Auto-fills after Company Name if public data exists'}
+              action={estimating ? <Loader2 size={12} className="animate-spin" style={{ color: 'rgb(140,140,170)' }} /> : volumeSource === 'ai' ? <span className="flex items-center gap-1 text-[10px] font-medium" style={{ color: '#a78bfa' }}><Sparkles size={10} />AI</span> : undefined}
+            >
+              <Input
+                value={form.expected_monthly_volume}
+                onChange={e => { set('expected_monthly_volume', e.target.value); setVolumeSource(null) }}
+                placeholder="e.g. $2M/month"
+              />
+            </Field>
+            <Field label="Rev Opportunity">
+              <Input value={form.estimated_revenue} onChange={e => set('estimated_revenue', e.target.value)} placeholder="e.g. $200K/year" />
+            </Field>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Lead Context ─────────────────────────────── */}
+      <div className="section-card card-hover">
+        <SectionHeader icon={FileText} color="#22d3ee" title="Lead Context" />
+        <div style={{ padding: '20px 22px' }}>
+          <Field
+            label="Brief about Lead Context"
+            action={<AiFixButton value={form.requirement} onFixed={v => set('requirement', v)} />}
+          >
+            <Textarea value={form.requirement} onChange={e => set('requirement', e.target.value)} placeholder="Who they are, what they need, why now…" />
           </Field>
         </div>
+      </div>
 
-        <div className="my-5" style={{ borderTop: '1px solid var(--border)' }} />
-
-        {/* Row 5 — Lead Context */}
-        <Field
-          label="Brief about Lead Context"
-          action={<AiFixButton value={form.requirement} onFixed={v => set('requirement', v)} />}
-        >
-          <Textarea value={form.requirement} onChange={e => set('requirement', e.target.value)} placeholder="Who they are, what they need, why now…" />
-        </Field>
-
-        <div className="my-5" style={{ borderTop: '1px solid var(--border)' }} />
-
-        {/* Row 6 — Blockers */}
-        <Field label="Blockers">
+      {/* ── Blockers ─────────────────────────────────── */}
+      <div className="section-card card-hover">
+        <SectionHeader icon={AlertTriangle} color="#f87171" title="Blockers" subtitle="What's standing between this lead and a close" />
+        <div style={{ padding: '20px 22px' }}>
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Select
@@ -374,18 +475,20 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
               </div>
             )}
           </div>
-        </Field>
+        </div>
+      </div>
 
-        <div className="my-5" style={{ borderTop: '1px solid var(--border)' }} />
-
-        {/* Row 7 — Solution */}
-        <Field
-          label="Solution"
-          hint="The Kima / Aeredium / Aerpolice solution proposed for this lead"
-          action={<AiFixButton value={form.best_product_fit} onFixed={v => set('best_product_fit', v)} />}
-        >
-          <Textarea value={form.best_product_fit} onChange={e => set('best_product_fit', e.target.value)} placeholder="e.g. Aerpolice cross-chain settlement solves their bridge exposure…" />
-        </Field>
+      {/* ── Solution ─────────────────────────────────── */}
+      <div className="section-card card-hover">
+        <SectionHeader icon={Lightbulb} color="#fbbf24" title="Solution" subtitle="The Kima / Aeredium / Aerpolice solution proposed for this lead" />
+        <div style={{ padding: '20px 22px' }}>
+          <Field
+            label="Solution"
+            action={<AiFixButton value={form.best_product_fit} onFixed={v => set('best_product_fit', v)} />}
+          >
+            <Textarea value={form.best_product_fit} onChange={e => set('best_product_fit', e.target.value)} placeholder="e.g. Aerpolice cross-chain settlement solves their bridge exposure…" />
+          </Field>
+        </div>
       </div>
 
       {/* ── Actions ────────────────────────────────────── */}
