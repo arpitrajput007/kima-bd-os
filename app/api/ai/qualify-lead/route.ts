@@ -187,6 +187,8 @@ Return a single JSON object with ALL of these fields:
 
   // ── Scoring ────────────────────────────────────────────────
   "lead_score": 0-100,
+  "urgency_score": 0-100,
+  "urgency_reasoning": "1-2 sentences: what dated trigger and pain severity drove this number — say explicitly if there is no dated trigger",
   "confidence_score": 0-100,
   "priority": "excellent | qualified | needs_research | low_priority",
 
@@ -272,11 +274,17 @@ Return a single JSON object with ALL of these fields:
   ]
 }
 
-SCORING:
+SCORING (lead_score) — general ICP fit, independent of timing:
 - 85-100 (excellent): perfect ICP fit, clear pain, verified trigger, easy integration
 - 70-84 (qualified): good fit, real pain, some trigger signals
 - 50-69 (needs_research): possible fit but missing key info
 - 0-49 (low_priority): poor fit, speculative pain, not really a Kima customer
+
+URGENCY (urgency_score) — how urgent it is to reach out THIS WEEK, driven ONLY
+by trigger recency + pain severity, NOT by how good a long-term fit they are:
+- 70-100: dated trigger in roughly the last 30-60 days (funding, hack, launch, expansion) AND pain_point_severity critical/high
+- 40-69: real but older/vaguer trigger, or high-severity pain with no dated trigger
+- 0-39: no trigger_reason found, or it's stale/speculative — can still be a high lead_score company
 
 VERDICT:
 - good_lead: score ≥ 55 AND at least one concrete pain Kima/Aeredium can solve

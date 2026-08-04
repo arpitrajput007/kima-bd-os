@@ -8,10 +8,10 @@ import {
   Plus, Search, Filter, Star, ExternalLink, ChevronDown, ChevronRight,
   CheckCircle, XCircle, Eye, MessageSquare, Loader2, RefreshCw,
   AtSign, Send, MessageCircle, Sparkles, LayoutList, Layers, Clock,
-  Boxes, Package, Landmark, ShieldCheck, LayoutGrid, UserPlus, UserMinus,
+  Boxes, Package, Landmark, ShieldCheck, LayoutGrid, UserPlus, UserMinus, Flame,
 } from 'lucide-react'
 import {
-  cn, getScoreBg, getStatusColor, getStatusLabel, formatDate, truncate
+  cn, getScoreBg, getUrgencyBg, getStatusColor, getStatusLabel, formatDate, truncate
 } from '@/lib/utils'
 import type { Lead } from '@/lib/types'
 import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL } from '@/lib/types'
@@ -81,6 +81,7 @@ export default function LeadsPage() {
     let query = supabase
       .from('leads')
       .select('*')
+      .order('urgency_score', { ascending: false, nullsFirst: false })
       .order('lead_score', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
 
@@ -484,13 +485,14 @@ export default function LeadsPage() {
                         <th className="text-left">Company</th>
                         <th className="text-left">Also fits</th>
                         <th className="text-left">Pain Point</th>
+                        <th className="text-left">Urgency</th>
                         <th className="text-left">Score</th>
                         <th className="text-left">Status</th>
                         <th className="text-left">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {visibleLeads.sort((a, b) => (b.lead_score || 0) - (a.lead_score || 0)).map(lead => {
+                      {visibleLeads.sort((a, b) => (b.urgency_score || 0) - (a.urgency_score || 0) || (b.lead_score || 0) - (a.lead_score || 0)).map(lead => {
                         const fits = leadFits.get(lead.id) || []
                         const otherFits = fits.filter(f => !selectedNode || selectedNode.slug === 'unclassified' || f.companySlug !== selectedNode.slug)
                         return (
@@ -531,6 +533,14 @@ export default function LeadsPage() {
                               </div>
                             </td>
                             <td><span className="text-xs" style={{ color: 'rgb(140,140,160)' }}>{lead.pain_point ? truncate(lead.pain_point, 50) : '—'}</span></td>
+                            <td>
+                              {lead.urgency_score != null ? (
+                                <span className={cn('badge', getUrgencyBg(lead.urgency_score))} title={lead.urgency_reasoning || ''}>
+                                  {lead.urgency_score >= 70 && <Flame size={10} style={{ marginRight: 3, display: 'inline' }} />}
+                                  {lead.urgency_score}
+                                </span>
+                              ) : '—'}
+                            </td>
                             <td>{lead.lead_score != null ? <span className={cn('badge', getScoreBg(lead.lead_score))}>{lead.lead_score}</span> : '—'}</td>
                             <td><span className={cn('badge', getStatusColor(lead.status))}>{getStatusLabel(lead.status)}</span></td>
                             <td>
@@ -593,6 +603,7 @@ export default function LeadsPage() {
                     <th className="text-left">Industry</th>
                     <th className="text-left">Product</th>
                     <th className="text-left">Pain Point</th>
+                    <th className="text-left">Urgency</th>
                     <th className="text-left">Score</th>
                     <th className="text-left">Status</th>
                     <th className="text-left">Date</th>
@@ -679,6 +690,14 @@ export default function LeadsPage() {
                         <span className="text-xs" style={{ color: 'rgb(140,140,160)' }}>
                           {lead.pain_point ? truncate(lead.pain_point, 40) : '—'}
                         </span>
+                      </td>
+                      <td>
+                        {lead.urgency_score != null ? (
+                          <span className={cn('badge', getUrgencyBg(lead.urgency_score))} title={lead.urgency_reasoning || ''}>
+                            {lead.urgency_score >= 70 && <Flame size={10} style={{ marginRight: 3, display: 'inline' }} />}
+                            {lead.urgency_score}
+                          </span>
+                        ) : '—'}
                       </td>
                       <td>
                         {lead.lead_score != null ? (

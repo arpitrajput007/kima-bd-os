@@ -14,10 +14,10 @@ import {
   FileSearch, Puzzle, Calendar, Mail, Wand2,
   MapPin, AtSign, MessageCircle, Plus, Trash2, History,
   BadgeCheck, AlertCircle, Lightbulb, Layers, UserPlus, UserMinus,
-  Image as ImageIcon
+  Image as ImageIcon, Flame
 } from 'lucide-react'
 import {
-  cn, getScoreBg, getStatusColor, getStatusLabel, getSeverityColor,
+  cn, getScoreBg, getUrgencyBg, getStatusColor, getStatusLabel, getSeverityColor,
   getConfidenceColor, formatDate, isHttpUrl, pickBestUrl
 } from '@/lib/utils'
 import {
@@ -1663,6 +1663,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         const s = json.data.lead_score
         await supabase.from('leads').update({
           lead_score: s, confidence_score: json.data.confidence_score,
+          urgency_score: json.data.urgency_score ?? null,
+          urgency_reasoning: json.data.urgency_reasoning ?? null,
           priority: s >= 85 ? 'excellent' : s >= 70 ? 'qualified' : s >= 50 ? 'needs_research' : 'low_priority',
           updated_at: new Date().toISOString()
         }).eq('id', id); loadLead()
@@ -1786,8 +1788,14 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   </h1>
                   {lead.priority === 'excellent' && <Star size={18} color="#c084fc" fill="#c084fc" />}
                   {lead.lead_score != null && (
-                    <span style={{ borderRadius: 999, border: '1px solid rgba(168,85,247,0.4)', background: 'rgba(168,85,247,0.13)', padding: '4px 14px', fontSize: 13, color: 'rgb(196,167,252)' }}>
+                    <span style={{ borderRadius: 999, border: '1px solid rgba(168,85,247,0.4)', background: 'rgba(168,85,247,0.13)', padding: '4px 14px', fontSize: 13, color: 'rgb(196,167,252)' }} title="Lead score — general fit">
                       {lead.lead_score}
+                    </span>
+                  )}
+                  {lead.urgency_score != null && (
+                    <span className={cn('badge', getUrgencyBg(lead.urgency_score))} style={{ borderRadius: 999, padding: '4px 14px', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 4 }} title={lead.urgency_reasoning || 'Urgency score — trigger recency + pain severity'}>
+                      {lead.urgency_score >= 70 && <Flame size={13} />}
+                      {lead.urgency_score}
                     </span>
                   )}
                   <span style={{ borderRadius: 999, padding: '4px 14px', fontSize: 13, ...statusBadgeStyle }}>
@@ -1949,6 +1957,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   <div>
                     <label style={{ display: 'block', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgb(100,107,140)', marginBottom: 6 }}>Lead Score</label>
                     <input className={ic} style={is} type="number" min="0" max="100" value={editForm.lead_score || ''} onChange={e => setEditForm(f => ({ ...f, lead_score: parseInt(e.target.value) || undefined }))} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgb(100,107,140)', marginBottom: 6 }}>Urgency Score</label>
+                    <input className={ic} style={is} type="number" min="0" max="100" value={editForm.urgency_score || ''} onChange={e => setEditForm(f => ({ ...f, urgency_score: parseInt(e.target.value) || undefined }))} />
                   </div>
                 </div>
               ) : (

@@ -262,6 +262,8 @@ export interface Lead {
   use_cases?: UseCase[]
   bd_brief?: BDBrief
   lead_score?: number
+  urgency_score?: number      // distinct from lead_score: driven by trigger recency + pain severity, not general fit
+  urgency_reasoning?: string
   confidence_score?: number
   priority?: LeadPriority
   status: LeadStatus

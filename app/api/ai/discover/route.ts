@@ -277,10 +277,18 @@ Evaluate ALL THREE product lines for every company — do not default to Kima/Ae
 - If this company builds or ships AI agents that take financial actions (payments, procurement, treasury, trading), Aerpolice governance is likely the lead pitch, not settlement.
 - If this company is a custodian, MPC wallet provider, exchange, or institution with key-signing/custody policy needs, evaluate AERKey specifically (see AERKEY section above) — don't collapse it into a generic "Aeredium" mention.
 
-SCORING (0-100):
+You must produce TWO separate scores — do not blend them:
+
+LEAD_SCORE (0-100) — general ICP fit, independent of timing:
 High score (70+): clear pain point, active product, matches a target category, decision maker findable
 Medium (40-69): possible fit but unclear pain point or no direct match
-Low (<40): no clear use case for Kima/Aeredium/Aerpolice`
+Low (<40): no clear use case for Kima/Aeredium/Aerpolice
+
+URGENCY_SCORE (0-100) — how urgent it is to reach out THIS WEEK, driven ONLY by
+trigger recency and pain severity, NOT by how good a long-term fit they are:
+High (70+): a dated, concrete trigger in roughly the last 30-60 days (funding round, hack/exploit, product launch, expansion, new regulation hitting them) AND pain_point_severity is critical or high
+Medium (40-69): a real but older or vaguer trigger, or high-severity pain with no dated trigger
+Low (<40): no trigger_reason found, or trigger is stale/speculative — this can still be a HIGH lead_score company, just not one to prioritize contacting right now`
 
     const deepResearchUser = `Do a deep BD research on this company for Kima/Aeredium:
 
@@ -330,6 +338,8 @@ Return this exact JSON:
   "integration_feasibility": "high|medium|low — with one sentence of reasoning",
   "revenue_potential": "realistic ARR estimate for Kima based on their volume/scale",
   "lead_score": 0,
+  "urgency_score": 0,
+  "urgency_reasoning": "1-2 sentences: what dated trigger and pain severity drove this urgency number — say explicitly if there is no dated trigger",
   "priority": "excellent|qualified|needs_research|low_priority",
   "score_reasoning": "2-3 sentences: what drives the score up and what limits it",
   "contacts": [
@@ -676,6 +686,8 @@ export async function POST(req: NextRequest) {
           integration_feasibility: research.integration_feasibility,
           revenue_potential: research.revenue_potential,
           lead_score: research.lead_score,
+          urgency_score: research.urgency_score ?? null,
+          urgency_reasoning: research.urgency_reasoning ?? null,
           priority: research.priority,
           source_url: pickBestUrl([
             company.source_url,            // exact link copied from the source page (most reliable)

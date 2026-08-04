@@ -148,14 +148,22 @@ Company: ${company_name}
 Website: ${website || 'unknown'}
 Description: ${description || 'unknown'}
 
-SCORING SYSTEM:
+SCORING SYSTEM (lead_score — general ICP fit, independent of timing):
 Base scores: pain_point (25), traction (20), contact_found (15), trigger (15), category_fit (10), integration_feasibility (10), revenue_potential (5)
 Boosts: agentic_payments_fit (+25), LayerZero+real_value (+20), Hacked_protocol+bridge_exploit (+25), needs_ramp (+15), fireblocks_customer (+15), web2_stablecoin (+25), recent_trigger (+15), decision_maker_found (+15)
 Penalties: no_pain_point (-25), no_active_product (-20), no_decision_maker (-15), nft_only (-30), no_source_proof (-30), generic_web3_only (-25)
 
+URGENCY SCORING (urgency_score — separate 0-100, how urgent to reach out THIS WEEK):
+Driven ONLY by trigger recency + pain severity, NOT by how good a long-term fit they are.
+70-100: dated trigger in roughly the last 30-60 days (funding, hack, launch, expansion) AND severe pain
+40-69: real but older/vaguer trigger, or severe pain with no dated trigger
+0-39: no trigger found, or it's stale/speculative — can still be a high lead_score company
+
 Return JSON:
 {
   "lead_score": 0-100,
+  "urgency_score": 0-100,
+  "urgency_reasoning": "1-2 sentences: what dated trigger and pain severity drove this number",
   "confidence_score": 0-100,
   "priority": "excellent|qualified|needs_research|low_priority",
   "score_breakdown": {

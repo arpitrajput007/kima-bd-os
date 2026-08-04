@@ -20,6 +20,12 @@ export function getScoreBg(score: number): string {
   return 'bg-rose-500/15 text-rose-300 border-rose-500/30'
 }
 
+export function getUrgencyBg(score: number): string {
+  if (score >= 70) return 'bg-red-500/15 text-red-300 border-red-500/30'
+  if (score >= 40) return 'bg-orange-500/15 text-orange-300 border-orange-500/30'
+  return 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+}
+
 export function getPriorityLabel(score: number): LeadPriority {
   if (score >= 85) return 'excellent'
   if (score >= 70) return 'qualified'

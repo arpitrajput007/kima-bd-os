@@ -38,7 +38,8 @@ interface QualifyResult {
   revenue_potential: string; integration_feasibility: string
   twitter_url: string; telegram_url: string; discord_url: string
   facts: FactItem[]; assumptions: FactItem[]
-  lead_score: number; confidence_score: number; priority: string
+  lead_score: number; urgency_score: number; urgency_reasoning: string
+  confidence_score: number; priority: string
   verdict: 'good_lead' | 'not_a_lead'
   verdict_reasoning: string; verdict_flags: string[]; verdict_strengths: string[]
   source_url: string; source_summary: string
@@ -558,7 +559,9 @@ export default function NewLeadPage() {
       discord_url: s(form.discord_url),
       facts: form.facts?.length ? form.facts : null,
       assumptions: form.assumptions?.length ? form.assumptions : null,
-      lead_score: score, confidence_score: Number(form.confidence_score) || null,
+      lead_score: score, urgency_score: Number(form.urgency_score) || null,
+      urgency_reasoning: s(form.urgency_reasoning),
+      confidence_score: Number(form.confidence_score) || null,
       priority, source_url: s(form.source_url), source_summary: s(form.source_summary),
       product_matches: result?.product_matches?.length ? result.product_matches : null,
       status: 'new',
@@ -1160,9 +1163,13 @@ export default function NewLeadPage() {
                 <div><FL>Lead Score (0–100)</FL>
                   <input type="number" min={0} max={100} value={form.lead_score} onChange={e => set('lead_score', parseInt(e.target.value)||0)} style={{ ...inputStyle }} />
                 </div>
+                <div><FL>Urgency Score (0–100)</FL>
+                  <input type="number" min={0} max={100} value={form.urgency_score} onChange={e => set('urgency_score', parseInt(e.target.value)||0)} style={{ ...inputStyle }} />
+                </div>
                 <div><FL>Confidence Score (0–100)</FL>
                   <input type="number" min={0} max={100} value={form.confidence_score} onChange={e => set('confidence_score', parseInt(e.target.value)||0)} style={{ ...inputStyle }} />
                 </div>
+                <div style={{ gridColumn: '1 / -1' }}><FL>Urgency Reasoning</FL><Inp value={form.urgency_reasoning} onChange={v => set('urgency_reasoning', v)} rows={2} /></div>
                 <div><FL>Source URL</FL><Inp value={form.source_url} onChange={v => set('source_url', v)} /></div>
                 <div><FL>Source Summary</FL><Inp value={form.source_summary} onChange={v => set('source_summary', v)} /></div>
               </div>

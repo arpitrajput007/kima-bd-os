@@ -44,6 +44,8 @@ create table if not exists leads (
   facts jsonb default '[]',
   assumptions jsonb default '[]',
   lead_score int check (lead_score >= 0 and lead_score <= 100),
+  urgency_score int check (urgency_score >= 0 and urgency_score <= 100),
+  urgency_reasoning text,
   confidence_score int check (confidence_score >= 0 and confidence_score <= 100),
   priority text check (priority in ('excellent', 'qualified', 'needs_research', 'low_priority')),
   status text default 'new' check (status in ('new', 'researching', 'qualified', 'approved', 'rejected', 'contacted', 'replied', 'meeting_booked', 'archived', 'needs_more_research')),
