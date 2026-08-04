@@ -293,7 +293,19 @@ export async function POST(req: NextRequest) {
 
     const agentContext = await loadAgentContext(lead_id)
 
-    const systemPrompt = `You are the BD Intelligence Agent for Kima, Aeredium (incl. AERKey), and Aerpolice — complementary products we sell together. You are in a focused, deep-dive discussion about ONE specific lead. The BD person wants to truly understand this company — its tech, how AI agents feature in their product, and where Kima / Aeredium / AERKey / Aerpolice can each plug in — so they can have a smart, credible conversation with the prospect.
+    // Three cache tiers, cheapest-to-invalidate last:
+    //  1. systemStatic — identical for every lead, every conversation, every user.
+    //     The big one (~5k tokens of FULL_BRAIN + instructions). Cached once,
+    //     reused across the whole app.
+    //  2. systemLeadContext — fixed for the life of one lead's conversation
+    //     (saved facts + dossier, the latter fetched once and resent by the
+    //     client). Its own breakpoint so it can still cache turn-to-turn without
+    //     depending on tier 1 staying byte-identical.
+    //  3. systemVolatile — re-queried from the DB on every turn (agentContext)
+    //     plus the per-message image note. Never cached (it would never hit
+    //     anyway), so no cache-write premium — just appended after the cached
+    //     prefix.
+    const systemStatic = `You are the BD Intelligence Agent for Kima, Aeredium (incl. AERKey), and Aerpolice — complementary products we sell together. You are in a focused, deep-dive discussion about ONE specific lead. The BD person wants to truly understand this company — its tech, how AI agents feature in their product, and where Kima / Aeredium / AERKey / Aerpolice can each plug in — so they can have a smart, credible conversation with the prospect.
 
 ${FULL_BRAIN}
 
@@ -309,14 +321,13 @@ HOW YOU ANSWER:
 - For every relevant product (Kima, Aeredium, AERKey, Aerpolice), state concretely WHERE it plugs in and what problem it solves for them specifically.
 - If the research doesn't cover something, say what you'd verify and give your best-reasoned read, clearly marked as inference — don't bluff.
 - Anticipate the PROSPECT's likely cross-questions and objections, and arm the BD person with crisp answers.
-- Be direct and substantive. Short paragraphs or tight bullets. No fluff, no "great question", no corporate filler.
+- Be direct and substantive. Short paragraphs or tight bullets. No fluff, no "great question", no corporate filler.`
 
-=== SAVED FACTS ON THIS LEAD ===
+    const systemLeadContext = `=== SAVED FACTS ON THIS LEAD ===
 ${leadFacts(lead as LeadRow)}
 
 === LIVE RESEARCH (fetched just now) ===
-${dossier || '(live research returned nothing — rely on saved facts and reasoning, and flag the gap)'}
-${agentContext}`
+${dossier || '(live research returned nothing — rely on saved facts and reasoning, and flag the gap)'}`
 
     const historyMessages: { role: 'user' | 'assistant'; content: string }[] = Array.isArray(history) ? history : []
 
@@ -334,7 +345,9 @@ If the screenshot is a conversation between multiple people, attribution matters
       model: CLAUDE_RESEARCH,
       maxTokens: 1100,
       temperature: 0.7,
-      system: systemPrompt + imageNote,
+      system: systemStatic,
+      systemCachedSuffix: systemLeadContext,
+      systemVolatileSuffix: agentContext + imageNote,
       user: [
         ...historyMessages.slice(-16).map(m => `${m.role === 'user' ? 'BD' : 'Agent'}: ${m.content}`),
         `BD: ${message}`,

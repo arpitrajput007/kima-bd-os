@@ -125,13 +125,33 @@ export async function claudeText(params: {
   // Optional screenshot/image attached to the user turn (e.g. a pasted chat
   // screenshot in Discuss Lead). `data` is base64 with no `data:` prefix.
   image?: { mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'; data: string }
+  // Second cache breakpoint: content that's stable across repeated calls in the
+  // same session (e.g. a lead's saved facts + research dossier across turns of
+  // one Discuss Lead conversation) but varies between sessions, so it shouldn't
+  // share a cache entry with `system`. Gets its own cache_control so a miss here
+  // doesn't force a miss on the much larger, truly-static `system` block.
+  systemCachedSuffix?: string
+  // Trailing system content that changes on every call (e.g. memory re-queried
+  // per turn, or a per-message image note). Appended plain with NO cache_control
+  // — it would never hit cache anyway, so marking it would only add the 25%
+  // cache-write premium for nothing. Still benefits from `system` /
+  // `systemCachedSuffix` caching ahead of it since caching is a prefix match.
+  systemVolatileSuffix?: string
 }): Promise<string> {
   const client = _client()
 
-  const systemBlock: Anthropic.TextBlockParam = {
-    type: 'text',
-    text: params.system,
-    cache_control: { type: 'ephemeral' },
+  const systemBlocks: Anthropic.TextBlockParam[] = [
+    { type: 'text', text: params.system, cache_control: { type: 'ephemeral' } },
+  ]
+  if (params.systemCachedSuffix?.trim()) {
+    systemBlocks.push({
+      type: 'text',
+      text: params.systemCachedSuffix,
+      cache_control: { type: 'ephemeral' },
+    })
+  }
+  if (params.systemVolatileSuffix?.trim()) {
+    systemBlocks.push({ type: 'text', text: params.systemVolatileSuffix })
   }
 
   const content: Anthropic.MessageParam['content'] = params.image
@@ -146,7 +166,7 @@ export async function claudeText(params: {
     max_tokens: params.maxTokens ?? 4000,
     ...(params.thinking ? { thinking: { type: 'adaptive' } } : {}),
     ...(params.temperature != null && !params.thinking ? { temperature: params.temperature } : {}),
-    system: [systemBlock],
+    system: systemBlocks,
     messages: [{ role: 'user', content }],
   })
 
