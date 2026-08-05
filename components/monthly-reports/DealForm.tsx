@@ -1,17 +1,27 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import {
   Loader2, X, Sparkles, Plus, Building2, Boxes, Target, FileText,
   AlertTriangle, Lightbulb,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 import {
   DEAL_STATUSES, BLOCKER_TYPES, KIMA_PRODUCTS, LEAD_TYPES, dealStatusMeta, blockerLabel, isNoiseBlockerLabel,
 } from '@/lib/monthly-reports-types'
 import type { MonthlyDeal, DealBlocker, DealProductFeedback } from '@/lib/monthly-reports-types'
+import type { Lead } from '@/lib/types'
 import { AiFixButton } from './ui'
+
+// Minimal shape pulled from `leads` for the Company Name autocomplete — just
+// enough to filter by name and auto-fill the handful of Deal fields that have
+// a clean 1:1 source in the CRM record.
+type CrmLeadOption = Pick<Lead,
+  | 'id' | 'company_name' | 'industry_category' | 'pain_point' | 'description'
+  | 'kima_fit' | 'aeredium_fit' | 'aerpolice_fit' | 'product_matches'
+>
 
 // ── Types ─────────────────────────────────────────────────────
 // Keeps every column DealForm has ever written so nothing already saved on
@@ -217,6 +227,62 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
   const set = (field: keyof DealFormData, value: unknown) =>
     setForm(prev => ({ ...prev, [field]: value }))
 
+  // ── Company Name autocomplete against existing CRM leads ─────
+  // Loaded once on mount; filtered client-side as the rep types so picking a
+  // known company can auto-fill the rest of the form from what's already
+  // known about them, without a round-trip per keystroke.
+  const [crmLeads, setCrmLeads] = useState<CrmLeadOption[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('leads')
+      .select('id, company_name, industry_category, pain_point, description, kima_fit, aeredium_fit, aerpolice_fit, product_matches')
+      .order('company_name')
+      .limit(1000)
+      .then(({ data }) => { if (data) setCrmLeads(data as CrmLeadOption[]) })
+  }, [])
+
+  const companyQuery = form.company_name.trim().toLowerCase()
+  const companySuggestions = useMemo(() => {
+    if (!companyQuery) return []
+    return crmLeads
+      .filter(l => l.company_name.toLowerCase().includes(companyQuery))
+      .slice(0, 8)
+  }, [crmLeads, companyQuery])
+
+  // Fills every field below that has a clean source on the CRM record —
+  // Industry, Product Fit, Lead Context, and Solution. Overwrites rather than
+  // only filling blanks since this only runs on an explicit click of a named
+  // company, so the rep clearly means "load Acme's data now."
+  const applyLeadAutofill = (lead: CrmLeadOption) => {
+    set('company_name', lead.company_name)
+    if (lead.industry_category) set('industry', lead.industry_category)
+
+    const context = lead.pain_point || lead.description
+    if (context) set('requirement', context)
+
+    const fits = [
+      lead.kima_fit && `Kima: ${lead.kima_fit}`,
+      lead.aeredium_fit && `Aeredium: ${lead.aeredium_fit}`,
+      lead.aerpolice_fit && `Aerpolice: ${lead.aerpolice_fit}`,
+    ].filter(Boolean) as string[]
+    if (fits.length) set('best_product_fit', fits.join('\n\n'))
+
+    const matchedProducts = (lead.product_matches || [])
+      .filter(m => m.match === 'strong' || m.match === 'partial')
+      .map(m => m.product)
+    if (matchedProducts.length) {
+      const newCustom = matchedProducts.filter(p => !KIMA_PRODUCTS.includes(p as never) && !customProducts.includes(p))
+      if (newCustom.length) setCustomProducts(prev => [...prev, ...newCustom])
+      set('products_interested', Array.from(new Set([...form.products_interested, ...matchedProducts])))
+    }
+
+    setShowSuggestions(false)
+    toast.success(`Auto-filled from ${lead.company_name}'s CRM record — review before saving`)
+  }
+
   // ── Custom products (Product Fit chips beyond the standard catalog) ──
   const [customProducts, setCustomProducts] = useState<string[]>(
     () => (d.products_interested || []).filter(p => !KIMA_PRODUCTS.includes(p as never))
@@ -319,13 +385,60 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
       <div className="section-card card-hover">
         <SectionHeader icon={Building2} color="#60a5fa" title="Company" subtitle="Who they are and what they deal in" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4" style={{ padding: '20px 22px' }}>
-          <Field label="Company Name">
-            <Input
-              value={form.company_name}
-              onChange={e => set('company_name', e.target.value)}
-              onBlur={estimateVolume}
-              placeholder="e.g. Stripe, Binance, Coinbase"
-            />
+          <Field label="Company Name" hint="Pick a match from your CRM to auto-fill Industry, Product Fit, Lead Context, and Solution">
+            <div style={{ position: 'relative' }}>
+              <Input
+                value={form.company_name}
+                onChange={e => { set('company_name', e.target.value); setShowSuggestions(true) }}
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => { setTimeout(() => setShowSuggestions(false), 150); estimateVolume() }}
+                placeholder="e.g. Stripe, Binance, Coinbase"
+                autoComplete="off"
+              />
+              {showSuggestions && companySuggestions.length > 0 && (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 100,
+                  background: 'rgb(14,16,28)', border: '1px solid rgba(124,58,237,0.25)',
+                  borderRadius: 12, overflow: 'hidden',
+                  boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
+                }}>
+                  {companySuggestions.map((lead, idx) => {
+                    const name = lead.company_name
+                    const qi = name.toLowerCase().indexOf(companyQuery)
+                    return (
+                      <button
+                        key={lead.id}
+                        type="button"
+                        onMouseDown={() => applyLeadAutofill(lead)}
+                        style={{
+                          width: '100%', display: 'flex', flexDirection: 'column', gap: 2,
+                          padding: '9px 14px', background: 'none', border: 'none', cursor: 'pointer',
+                          borderBottom: idx < companySuggestions.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                          textAlign: 'left', transition: 'background 0.1s',
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(124,58,237,0.1)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                      >
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'white' }}>
+                          {qi === -1 ? name : (
+                            <>
+                              {name.slice(0, qi)}
+                              <mark style={{ background: 'rgba(167,139,250,0.3)', color: '#c4b5fd', borderRadius: 3, padding: '0 2px' }}>
+                                {name.slice(qi, qi + companyQuery.length)}
+                              </mark>
+                              {name.slice(qi + companyQuery.length)}
+                            </>
+                          )}
+                        </span>
+                        {lead.industry_category && (
+                          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{lead.industry_category}</span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </Field>
           <Field label="Deals In" hint="What the company deals in — industry / category">
             <Input value={form.industry} onChange={e => set('industry', e.target.value)} placeholder="e.g. Crypto, Banking, Agent Wallets" />
