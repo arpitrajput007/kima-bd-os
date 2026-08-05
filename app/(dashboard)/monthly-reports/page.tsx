@@ -11,6 +11,7 @@ import {
   Trophy, XCircle, Calendar, BarChart2, Loader2, RefreshCw,
   Building2, ChevronDown, AlertCircle, Send, Reply, Sparkles,
   Zap, Settings2, Target, DollarSign, RotateCcw, Check, ArrowRightLeft,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -403,6 +404,24 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
   }
 
   doc.save(`kima-bd-report-${month}.pdf`)
+}
+
+// ── Move-to-month helpers ────────────────────────────────────────
+// The "move deal to a different month" picker needs a wider window than the
+// last-12-months report selector — reps also move deals INTO future months
+// (e.g. an expected close date next quarter), so this spans 12 months back
+// through 12 months ahead of today, oldest first.
+
+function shiftMonth(monthYear: string, delta: number): string {
+  const [y, m] = monthYear.split('-').map(Number)
+  const d = new Date(y, m - 1 + delta, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function moveMonthOptions(): string[] {
+  const options: string[] = []
+  for (let i = -12; i <= 12; i++) options.push(shiftMonth(currentMonthYear(), i))
+  return options
 }
 
 // ── Badges ───────────────────────────────────────────────────────
@@ -1130,9 +1149,12 @@ export default function MonthlyReportsPage() {
                           <div className="flex items-center gap-1">
                             <div className="relative" ref={movingDeal === deal.id ? moveRef : undefined}>
                               <button
-                                onClick={e => { e.preventDefault(); e.stopPropagation(); setMovingTo(month); setMovingDeal(movingDeal === deal.id ? null : deal.id) }}
-                                className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
-                                style={{ color: 'rgb(120,120,150)' }}
+                                onClick={e => { e.preventDefault(); e.stopPropagation(); setMovingTo(deal.month_year || month); setMovingDeal(movingDeal === deal.id ? null : deal.id) }}
+                                className="flex items-center gap-1 px-2 py-1.5 rounded-lg transition-colors"
+                                style={movingDeal === deal.id
+                                  ? { color: '#a78bfa', background: 'rgba(124,58,237,0.15)' }
+                                  : { color: 'rgb(120,120,150)', background: 'rgba(255,255,255,0.03)' }
+                                }
                                 title="Move to a different month"
                               >
                                 <ArrowRightLeft size={13} />
@@ -1140,22 +1162,45 @@ export default function MonthlyReportsPage() {
                               {movingDeal === deal.id && (
                                 <div
                                   onClick={e => { e.preventDefault(); e.stopPropagation() }}
-                                  className="absolute right-0 top-full mt-1 w-56 rounded-xl overflow-hidden z-50 shadow-xl p-3"
+                                  className="absolute right-0 top-full mt-1.5 w-64 rounded-xl overflow-hidden z-50 shadow-xl p-3.5 fade-in"
                                   style={{ background: 'rgb(22,22,34)', border: '1px solid rgba(255,255,255,0.1)' }}
                                 >
-                                  <div className="text-[11px] font-medium mb-2" style={{ color: 'rgb(150,150,180)' }}>Move to month</div>
-                                  <input
-                                    type="month"
-                                    value={movingTo}
-                                    onChange={e => setMovingTo(e.target.value)}
-                                    className="input-dark w-full mb-2"
-                                    style={{ fontSize: '12px', padding: '6px 8px' }}
-                                  />
+                                  <div className="text-[11px] font-medium mb-2.5" style={{ color: 'rgb(150,150,180)' }}>Move this deal to</div>
+                                  <div className="flex items-center gap-1.5 mb-3">
+                                    <button
+                                      type="button"
+                                      onClick={() => setMovingTo(m => shiftMonth(m, -1))}
+                                      className="flex items-center justify-center rounded-lg transition-colors flex-shrink-0"
+                                      style={{ width: 30, height: 34, color: 'rgb(160,160,190)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+                                      title="Previous month"
+                                    >
+                                      <ChevronLeft size={14} />
+                                    </button>
+                                    <div className="relative flex-1">
+                                      <select
+                                        value={movingTo}
+                                        onChange={e => setMovingTo(e.target.value)}
+                                        className="input-dark w-full appearance-none text-center"
+                                        style={{ fontSize: '12.5px', padding: '7px 8px' }}
+                                      >
+                                        {moveMonthOptions().map(m => <option key={m} value={m}>{fmtMonthYear(m)}</option>)}
+                                      </select>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setMovingTo(m => shiftMonth(m, 1))}
+                                      className="flex items-center justify-center rounded-lg transition-colors flex-shrink-0"
+                                      style={{ width: 30, height: 34, color: 'rgb(160,160,190)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+                                      title="Next month"
+                                    >
+                                      <ChevronRight size={14} />
+                                    </button>
+                                  </div>
                                   <button
                                     onClick={e => { e.preventDefault(); e.stopPropagation(); moveDealToMonth(deal.id, movingTo) }}
-                                    disabled={moveSaving || !movingTo || movingTo === month}
+                                    disabled={moveSaving || !movingTo || movingTo === (deal.month_year || month)}
                                     className="btn btn-ai w-full justify-center"
-                                    style={{ fontSize: '12px', padding: '6px 0', opacity: moveSaving || !movingTo || movingTo === month ? 0.5 : 1 }}
+                                    style={{ fontSize: '12px', padding: '7px 0', opacity: moveSaving || !movingTo || movingTo === (deal.month_year || month) ? 0.5 : 1 }}
                                   >
                                     {moveSaving ? <Loader2 size={12} className="animate-spin" /> : `Move to ${movingTo ? fmtMonthYear(movingTo) : '…'}`}
                                   </button>
