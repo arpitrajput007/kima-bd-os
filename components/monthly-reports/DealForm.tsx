@@ -444,6 +444,14 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
             <Input value={form.industry} onChange={e => set('industry', e.target.value)} placeholder="e.g. Crypto, Banking, Agent Wallets" />
           </Field>
         </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4" style={{ padding: '0 22px 20px' }}>
+          <Field label="Contact Name" hint="Who you're dealing with at the company">
+            <Input value={form.individual_name} onChange={e => set('individual_name', e.target.value)} placeholder="e.g. Jane Doe" />
+          </Field>
+          <Field label="Contact Designation" hint="Their role or title">
+            <Input value={form.designation} onChange={e => set('designation', e.target.value)} placeholder="e.g. Head of Payments, CTO" />
+          </Field>
+        </div>
         <div style={{ padding: '0 22px 20px' }}>
           <Field label="Deal Type" hint="Is this a B2B, B2C, or other kind of deal?">
             <div className="flex flex-wrap gap-2">
