@@ -1146,7 +1146,25 @@ export default function MonthlyReportsPage() {
                           ) : null}
                         </div>
                         <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={e => { e.preventDefault(); e.stopPropagation(); moveDealToMonth(deal.id, shiftMonth(deal.month_year || month, -1)) }}
+                              disabled={moveSaving}
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors hover:bg-white/10"
+                              style={{ color: 'rgb(170,170,200)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', opacity: moveSaving ? 0.5 : 1 }}
+                              title="Move deal to previous month"
+                            >
+                              <ChevronLeft size={13} />Prev
+                            </button>
+                            <button
+                              onClick={e => { e.preventDefault(); e.stopPropagation(); moveDealToMonth(deal.id, shiftMonth(deal.month_year || month, 1)) }}
+                              disabled={moveSaving}
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors hover:bg-white/10"
+                              style={{ color: 'rgb(170,170,200)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', opacity: moveSaving ? 0.5 : 1 }}
+                              title="Move deal to next month"
+                            >
+                              Next<ChevronRight size={13} />
+                            </button>
                             <div className="relative" ref={movingDeal === deal.id ? moveRef : undefined}>
                               <button
                                 onClick={e => { e.preventDefault(); e.stopPropagation(); setMovingTo(deal.month_year || month); setMovingDeal(movingDeal === deal.id ? null : deal.id) }}
@@ -1155,7 +1173,7 @@ export default function MonthlyReportsPage() {
                                   ? { color: '#a78bfa', background: 'rgba(124,58,237,0.15)' }
                                   : { color: 'rgb(120,120,150)', background: 'rgba(255,255,255,0.03)' }
                                 }
-                                title="Move to a different month"
+                                title="Jump to a specific month"
                               >
                                 <ArrowRightLeft size={13} />
                               </button>
