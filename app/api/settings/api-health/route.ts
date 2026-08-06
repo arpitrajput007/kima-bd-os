@@ -153,6 +153,23 @@ async function checkApollo(key: string): Promise<APIHealth> {
   }
 }
 
+// Hunter supports a fallback key (HUNTER_API_KEY_2) — report the first one that's usable.
+async function checkHunterWithFallback(): Promise<APIHealth> {
+  const hk = process.env.HUNTER_API_KEY
+  const hk2 = process.env.HUNTER_API_KEY_2
+  if (!hk && !hk2) return NOT_CONFIGURED
+  const primary = hk ? await checkHunter(hk) : null
+  if (primary && primary.status !== 'exhausted' && primary.status !== 'unauthorized' && primary.status !== 'error') return primary
+  if (hk2) {
+    const fallback = await checkHunter(hk2)
+    if (fallback.status === 'ok' || fallback.status === 'rate_limited') {
+      return { ...fallback, detail: `Using fallback key — ${fallback.detail}` }
+    }
+    return fallback
+  }
+  return primary ?? NOT_CONFIGURED
+}
+
 const NOT_CONFIGURED: APIHealth = { status: 'not_configured', detail: 'API key not set in .env.local' }
 
 export async function GET(req: Request) {
@@ -164,7 +181,6 @@ export async function GET(req: Request) {
 
   const ak = process.env.ANTHROPIC_API_KEY
   const ok = process.env.OPENAI_API_KEY
-  const hk = process.env.HUNTER_API_KEY
   const ek = process.env.EXA_API_KEY
   const tk = process.env.TAVILY_API_KEY
   const apk = process.env.APOLLO_API_KEY
@@ -173,7 +189,7 @@ export async function GET(req: Request) {
   const [anthropic, openai, hunter, exa, tavily, apollo, perplexity] = await Promise.all([
     ak  ? checkAnthropic(ak)   : Promise.resolve(NOT_CONFIGURED),
     ok  ? checkOpenAI(ok)      : Promise.resolve(NOT_CONFIGURED),
-    hk  ? checkHunter(hk)      : Promise.resolve(NOT_CONFIGURED),
+    checkHunterWithFallback(),
     ek  ? checkExa(ek)         : Promise.resolve(NOT_CONFIGURED),
     tk  ? checkTavily(tk)      : Promise.resolve(NOT_CONFIGURED),
     apk ? checkApollo(apk)     : Promise.resolve(NOT_CONFIGURED),

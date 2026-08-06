@@ -12,6 +12,6 @@ export async function GET() {
     tavily:    !!process.env.TAVILY_API_KEY,
     exa:       !!process.env.EXA_API_KEY,
     apollo:    !!process.env.APOLLO_API_KEY,
-    hunter:    !!process.env.HUNTER_API_KEY,
+    hunter:    !!process.env.HUNTER_API_KEY || !!process.env.HUNTER_API_KEY_2,
   })
 }
