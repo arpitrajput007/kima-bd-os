@@ -537,8 +537,8 @@ export default function TodayPage() {
   const freshLeads = readyLeads.filter(l => new Date(l.created_at) >= last24h)
   // Goal = however many fresh leads came in, capped at DAILY_GOAL_CAP. Never forced.
   const DAILY_GOAL = Math.min(freshLeads.length, DAILY_GOAL_CAP)
-  // Reserved leads (saved for later — too big right now)
-  const reservedLeads = leads.filter(l => l.status === 'reserved')
+  // Reserved leads (saved for later — too big right now). Pluto's already on it once assigned.
+  const reservedLeads = leads.filter(l => l.status === 'reserved' && l.assigned_to !== 'pluto')
   // Group EVERY un-contacted lead by the day it came in, newest day first — this is
   // the date-wise plan: "on Jun 1 reach out to these, on Jun 2 these…".
   const planGroups: { key: string; label: string; leads: LeadWithContacts[] }[] = []
@@ -571,9 +571,9 @@ export default function TodayPage() {
         .slice(0, 8)
     : []
 
-  const followUps = leads.filter(followUpDue)
+  const followUps = leads.filter(l => l.assigned_to !== 'pluto' && followUpDue(l))
 
-  const toBook = leads.filter(l => l.status === 'replied')
+  const toBook = leads.filter(l => l.status === 'replied' && l.assigned_to !== 'pluto')
 
   const contactedToday = leads.filter(
     l => ['contacted', 'replied', 'meeting_booked'].includes(l.status) &&
