@@ -290,8 +290,13 @@ export default function DealDetailPage() {
               </div>
               <div className="space-y-1.5" style={{ padding: '14px 20px' }}>
                 {deal.blockers.map(b => (
-                  <div key={b.type} className="text-xs" style={{ color: b.resolved ? 'rgb(100,106,135)' : '#f87171', textDecoration: b.resolved ? 'line-through' : 'none' }}>
-                    {blockerLabel(b)}{b.notes ? ` — ${b.notes}` : ''}
+                  <div key={b.type} className="text-xs" style={{ textDecoration: b.resolved ? 'line-through' : 'none' }}>
+                    <span style={{ color: b.resolved ? 'rgb(100,106,135)' : '#f87171' }}>
+                      {blockerLabel(b)}{b.notes ? ` — ${b.notes}` : ''}
+                    </span>
+                    {b.action && !b.resolved && (
+                      <div style={{ color: 'rgb(140,140,170)', marginTop: 2 }}>→ {b.action}</div>
+                    )}
                   </div>
                 ))}
               </div>

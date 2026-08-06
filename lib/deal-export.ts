@@ -187,10 +187,10 @@ export function exportDealPDF(deal: MonthlyDeal, activities: DealActivity[]) {
     sectionTitle('Blockers', 10)
     autoTable(doc, {
       ...tableTheme, startY: y, margin: { left: MARGIN },
-      head: [['Blocker', 'Status', 'Notes']],
+      head: [['Blocker', 'Status', 'Notes', 'Action to Resolve']],
       body: [
-        ...openBlockers.map(b => [blockerLabel(b), 'Open', b.notes ?? '']),
-        ...resolvedBlockers.map(b => [blockerLabel(b), 'Resolved', b.notes ?? '']),
+        ...openBlockers.map(b => [blockerLabel(b), 'Open', b.notes ?? '', b.action ?? '']),
+        ...resolvedBlockers.map(b => [blockerLabel(b), 'Resolved', b.notes ?? '', b.action ?? '']),
       ],
       didParseCell: data => {
         if (data.section === 'body' && data.column.index === 1) {
@@ -322,9 +322,9 @@ export function exportDealDoc(deal: MonthlyDeal, activities: DealActivity[]) {
   }
 
   if (openBlockers.length || resolvedBlockers.length) {
-    sections.push(docSection('Blockers') + docDataTable(['Blocker', 'Status', 'Notes'], [
-      ...openBlockers.map(b => [blockerLabel(b), 'Open', b.notes ?? '']),
-      ...resolvedBlockers.map(b => [blockerLabel(b), 'Resolved', b.notes ?? '']),
+    sections.push(docSection('Blockers') + docDataTable(['Blocker', 'Status', 'Notes', 'Action to Resolve'], [
+      ...openBlockers.map(b => [blockerLabel(b), 'Open', b.notes ?? '', b.action ?? '']),
+      ...resolvedBlockers.map(b => [blockerLabel(b), 'Resolved', b.notes ?? '', b.action ?? '']),
     ]))
   }
 

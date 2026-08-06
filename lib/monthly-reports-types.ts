@@ -108,6 +108,7 @@ export interface DealBlocker {
   type: string          // one of BLOCKER_TYPES values, or a custom slug
   label?: string         // display label for custom blockers (not in BLOCKER_TYPES)
   notes?: string
+  action?: string        // what needs to happen to resolve this blocker — the team's next step
   resolved: boolean
 }
 

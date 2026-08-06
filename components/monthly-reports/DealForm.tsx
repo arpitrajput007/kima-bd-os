@@ -614,6 +614,17 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
                       }}
                       placeholder="Notes on this blocker…"
                     />
+                    <div className="text-[10px] font-medium mt-2 mb-1" style={{ color: 'rgb(140,140,170)' }}>Action to resolve</div>
+                    <Textarea
+                      rows={2}
+                      value={bl.action || ''}
+                      onChange={e => {
+                        const updated = [...form.blockers]
+                        updated[i] = { ...updated[i], action: e.target.value }
+                        set('blockers', updated)
+                      }}
+                      placeholder="What needs to happen to unblock this — and who owns it…"
+                    />
                   </div>
                 ))}
               </div>
