@@ -66,6 +66,7 @@ function exportCSV(deals: MonthlyDeal[], month: string) {
     const openBlockers = (d.blockers || []).filter(isActiveBlocker)
     return {
       Company: d.company_name,
+      Website: d.website ?? '',
       Individual: d.individual_name ?? '',
       Designation: d.designation ?? '',
       Country: d.country ?? '',
@@ -107,6 +108,13 @@ function exportCSV(deals: MonthlyDeal[], month: string) {
 }
 
 type PdfDoc = jsPDF & { lastAutoTable: { finalY: number } }
+
+// Strips the protocol/www/trailing slash so a full URL fits the narrow
+// Website column in the pipeline table — "https://www.acme.com/" → "acme.com".
+function bareDomain(url?: string): string {
+  if (!url) return ''
+  return url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '')
+}
 
 // Status → badge colors used in the pipeline table (mirrors the on-screen StatusBadge palette).
 function pdfStatusColors(status: string): { bg: string; text: string } {
@@ -295,9 +303,9 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
   sectionTitle(`Full Pipeline — ${deals.length} Deal${deals.length === 1 ? '' : 's'}`, 10)
   autoTable(doc, {
     ...tableTheme, startY: y, margin: { left: MARGIN, top: MARGIN + 10 },
-    head: [['Company', 'Individual', 'Country', 'Type', 'Status', 'Monthly Vol.', 'Revenue Opp.', 'Importance', 'Close Date', 'Open Blockers']],
+    head: [['Company', 'Website', 'Individual', 'Country', 'Type', 'Status', 'Monthly Vol.', 'Revenue Opp.', 'Importance', 'Close Date', 'Open Blockers']],
     body: deals.map(d => [
-      d.company_name ?? '', d.individual_name ?? '', d.country ?? '', d.lead_type ?? '',
+      d.company_name ?? '', bareDomain(d.website), d.individual_name ?? '', d.country ?? '', d.lead_type ?? '',
       dealStatusMeta(d.status).label, d.expected_monthly_volume ?? '', d.estimated_revenue ?? '',
       d.strategic_importance ?? '', d.expected_close_date ?? '',
       (d.blockers || []).filter(isActiveBlocker).map(b => blockerLabel(b)).join(', '),
@@ -305,12 +313,12 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
     styles: { ...tableTheme.styles, fontSize: 7.5 },
     headStyles: { ...tableTheme.headStyles, fontSize: 7.5 },
     columnStyles: {
-      0: { cellWidth: 22, fontStyle: 'bold', textColor: '#1a1a2e' }, 1: { cellWidth: 19 },
-      2: { cellWidth: 18 }, 3: { cellWidth: 10 }, 4: { cellWidth: 19 }, 5: { cellWidth: 15 },
-      6: { cellWidth: 16 }, 7: { cellWidth: 15 }, 8: { cellWidth: 19 }, 9: { cellWidth: 29 },
+      0: { cellWidth: 22, fontStyle: 'bold', textColor: '#1a1a2e' }, 1: { cellWidth: 15, textColor: '#2563eb' },
+      2: { cellWidth: 16 }, 3: { cellWidth: 14 }, 4: { cellWidth: 10 }, 5: { cellWidth: 19 },
+      6: { cellWidth: 15 }, 7: { cellWidth: 16 }, 8: { cellWidth: 15 }, 9: { cellWidth: 16 }, 10: { cellWidth: 24 },
     },
     didParseCell: data => {
-      if (data.section === 'body' && data.column.index === 4) {
+      if (data.section === 'body' && data.column.index === 5) {
         const s = pdfStatusColors(deals[data.row.index].status)
         data.cell.styles.fillColor = s.bg
         data.cell.styles.textColor = s.text

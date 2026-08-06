@@ -19,7 +19,7 @@ import { AiFixButton } from './ui'
 // enough to filter by name and auto-fill the handful of Deal fields that have
 // a clean 1:1 source in the CRM record.
 type CrmLeadOption = Pick<Lead,
-  | 'id' | 'company_name' | 'industry_category' | 'pain_point' | 'description'
+  | 'id' | 'company_name' | 'website' | 'industry_category' | 'pain_point' | 'description'
   | 'kima_fit' | 'aeredium_fit' | 'aerpolice_fit' | 'product_matches'
 >
 
@@ -238,7 +238,7 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
     const supabase = createClient()
     supabase
       .from('leads')
-      .select('id, company_name, industry_category, pain_point, description, kima_fit, aeredium_fit, aerpolice_fit, product_matches')
+      .select('id, company_name, website, industry_category, pain_point, description, kima_fit, aeredium_fit, aerpolice_fit, product_matches')
       .order('company_name')
       .limit(1000)
       .then(({ data }) => { if (data) setCrmLeads(data as CrmLeadOption[]) })
@@ -258,6 +258,7 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
   // company, so the rep clearly means "load Acme's data now."
   const applyLeadAutofill = (lead: CrmLeadOption) => {
     set('company_name', lead.company_name)
+    if (lead.website) set('website', lead.website)
     if (lead.industry_category) set('industry', lead.industry_category)
 
     const context = lead.pain_point || lead.description
@@ -442,6 +443,11 @@ export default function DealForm({ initialData, defaultMonthYear, saving, onSave
           </Field>
           <Field label="Deals In" hint="What the company deals in — industry / category">
             <Input value={form.industry} onChange={e => set('industry', e.target.value)} placeholder="e.g. Crypto, Banking, Agent Wallets" />
+          </Field>
+        </div>
+        <div style={{ padding: '0 22px 20px' }}>
+          <Field label="Website" hint="Auto-fills when you pick a company from your CRM — shown on the monthly report">
+            <Input value={form.website} onChange={e => set('website', e.target.value)} placeholder="e.g. https://acme.com" />
           </Field>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4" style={{ padding: '0 22px 20px' }}>
