@@ -229,8 +229,8 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
 
   // ── Executive Summary ─────────────────────────────────────────
   const kpis: [string, number | string][] = [
-    ['Total Outreach', heroTotalOutreach], ['Companies Contacted', heroCompaniesContacted],
-    ['Individuals Contacted', heroIndividualsContacted], ['Replies', heroReplies],
+    ['Total Outreach', heroTotalOutreach], ['Companies Targeted', heroCompaniesContacted],
+    ['Individuals Targeted', heroIndividualsContacted], ['Replies', heroReplies],
     ['Successfully Contacted', heroSuccessfullyContacted], ['Response Rate', `${heroResponseRate}%`],
     ['Total Deals', deals.length], ['Companies (Deals)', uniqueCos],
     ['Active', heroActive], ['Won', heroWon],
@@ -791,9 +791,9 @@ export default function MonthlyReportsPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
                 <KpiCard label="Total Outreach"        value={displayValue('total_outreach', outreachStats.totalOutreach)}             color="#22d3ee" icon={Send}      loading={loading}
                   editable isOverridden={fakeOverrides.total_outreach != null} onEditSave={v => applyFakeEdit('total_outreach', v)} onResetOverride={() => resetFakeEdit('total_outreach')} />
-                <KpiCard label="Companies Contacted"   value={displayValue('companies_contacted', outreachStats.companiesContacted)}   color="#67e8f9" icon={Building2} loading={loading}
+                <KpiCard label="Companies Targeted"    value={displayValue('companies_contacted', outreachStats.companiesContacted)}   color="#67e8f9" icon={Building2} loading={loading}
                   editable isOverridden={fakeOverrides.companies_contacted != null} onEditSave={v => applyFakeEdit('companies_contacted', v)} onResetOverride={() => resetFakeEdit('companies_contacted')} />
-                <KpiCard label="Individuals Contacted" value={displayValue('individuals_contacted', outreachStats.individualsContacted)} color="#c084fc" icon={Users}     loading={loading}
+                <KpiCard label="Individuals Targeted"  value={displayValue('individuals_contacted', outreachStats.individualsContacted)} color="#c084fc" icon={Users}     loading={loading}
                   editable isOverridden={fakeOverrides.individuals_contacted != null} onEditSave={v => applyFakeEdit('individuals_contacted', v)} onResetOverride={() => resetFakeEdit('individuals_contacted')} />
                 <KpiCard label="Replies"               value={displayReplies}                                                          color="#34d399" icon={Reply}     loading={loading}
                   editable isOverridden={fakeOverrides.replies != null} onEditSave={v => applyFakeEdit('replies', v)} onResetOverride={() => resetFakeEdit('replies')} />
