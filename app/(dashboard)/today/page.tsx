@@ -517,19 +517,20 @@ export default function TodayPage() {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
-  // Company names already touched in any way (non-ready status OR contacted_at set).
-  // Used to deduplicate: if "Acme" is 'contacted' in one row and 'new' in another,
-  // the 'new' row is also excluded.
+  // Company names already touched in any way (non-ready status, contacted_at set,
+  // or handed off to Pluto). Used to deduplicate: if "Acme" is 'contacted' in one
+  // row and 'new' in another, the 'new' row is also excluded.
   const touchedCompanyNames = new Set(
     leads
-      .filter(l => !READY_STATUSES.includes(l.status) || !!l.contacted_at)
+      .filter(l => !READY_STATUSES.includes(l.status) || !!l.contacted_at || l.assigned_to === 'pluto')
       .map(l => l.company_name.toLowerCase().trim())
   )
 
   // planLeads is already server-side filtered (READY status + contacted_at IS NULL).
-  // Client-side: also remove company-name duplicates against the touched set.
+  // Client-side: also remove company-name duplicates against the touched set, and
+  // any lead assigned to Pluto (Pluto handles it — it shouldn't clutter your plan).
   const readyLeads = planLeads.filter(
-    l => !touchedCompanyNames.has(l.company_name.toLowerCase().trim())
+    l => !touchedCompanyNames.has(l.company_name.toLowerCase().trim()) && l.assigned_to !== 'pluto'
   )
 
   // Leads that arrived in the last 24 hours — drives the dynamic daily goal.
