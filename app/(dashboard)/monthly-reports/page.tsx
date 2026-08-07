@@ -216,11 +216,6 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
     blockerCount[key].count++
   }))
 
-  // Next-month priorities (open deals with close date)
-  const priorities = active
-    .filter(d => d.expected_close_date)
-    .sort((a, b) => (a.expected_close_date ?? '') < (b.expected_close_date ?? '') ? -1 : 1)
-    .slice(0, 5)
 
   // ── Document setup ────────────────────────────────────────────
   const doc = new jsPDF({ unit: 'mm', format: 'a4' }) as PdfDoc
@@ -538,24 +533,16 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
   }
 
   // ── Next Month Priorities ──────────────────────────────────────
-  if (priorityNotes || priorities.length) {
+  // Just the user's own notes — an auto-generated "top 5 open deals by close
+  // date" list used to run underneath, but close dates are already on every
+  // deal's card in the pipeline section above, so it was pure redundancy.
+  if (priorityNotes) {
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5)
-    const noteLines = priorityNotes ? doc.splitTextToSize(priorityNotes, CONTENT_W) : []
-    sectionTitle('Next Month Priorities', noteLines.length * 4.8 + (noteLines.length ? 4 : 0) + priorities.length * 6.5)
-    if (noteLines.length) {
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor('#374151')
-      doc.text(noteLines, MARGIN, y, { lineHeightFactor: 1.5 })
-      y += noteLines.length * 4.8 + 4
-    }
-    priorities.forEach(d => {
-      ensureSpace(6.5)
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor('#1a1a2e')
-      doc.text(d.company_name, MARGIN, y + 3.5)
-      const w = doc.getTextWidth(d.company_name)
-      doc.setFont('helvetica', 'normal'); doc.setTextColor('#6b7280')
-      doc.text(`   —   ${dealStatusMeta(d.status).label}   ·   Close: ${d.expected_close_date}`, MARGIN + w, y + 3.5)
-      y += 6.5
-    })
+    const noteLines = doc.splitTextToSize(priorityNotes, CONTENT_W)
+    sectionTitle('Next Month Priorities', noteLines.length * 4.8)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor('#374151')
+    doc.text(noteLines, MARGIN, y, { lineHeightFactor: 1.5 })
+    y += noteLines.length * 4.8 + 4
   }
 
   // ── Footer on every page ───────────────────────────────────────
