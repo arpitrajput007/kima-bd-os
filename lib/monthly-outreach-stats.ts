@@ -4,6 +4,7 @@
 // actual BD effort, not just manually-tracked deals.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { groupIndustryCategory } from './monthly-reports-types'
 
 export interface OutreachStats {
   totalOutreach: number
@@ -14,6 +15,7 @@ export interface OutreachStats {
   followUpsSent: number
   channelBreakdown: Record<string, number>
   companyCategoryBreakdown: Record<string, number>
+  channelCompanies: Record<string, string[]>
 }
 
 export const EMPTY_OUTREACH_STATS: OutreachStats = {
@@ -25,6 +27,7 @@ export const EMPTY_OUTREACH_STATS: OutreachStats = {
   followUpsSent: 0,
   channelBreakdown: {},
   companyCategoryBreakdown: {},
+  channelCompanies: {},
 }
 
 export function monthDateRange(monthYear: string): { start: string; end: string } {
@@ -93,19 +96,22 @@ export async function getOutreachStats(
 
   // Category breakdown of the companies contacted — grouped by leads.industry_category.
   // That field is AI-written free text per company (not a fixed list), so with
-  // enough leads it produces dozens of near-unique one-off strings. Capping to
-  // the top N + an "Other" bucket keeps this readable instead of dumping pages
-  // of count-1 rows into the report.
-  const CATEGORY_CAP = 8
+  // enough leads it produces dozens of near-unique one-off strings. groupIndustryCategory
+  // buckets it into a fixed, domain-relevant taxonomy first; capping the (now few)
+  // buckets to the top N + an "Other" bucket is just a safety net past that.
+  const CATEGORY_CAP = 12
   const companyCategoryBreakdown: Record<string, number> = {}
+  const channelCompanies: Record<string, string[]> = {}
   if (companySet.size > 0) {
     const { data: catRows } = await supabase
       .from('leads')
-      .select('id, industry_category')
+      .select('id, company_name, industry_category')
       .in('id', Array.from(companySet))
+    const nameMap: Record<string, string> = {}
     const rawBreakdown: Record<string, number> = {}
     ;(catRows || []).forEach(r => {
-      const cat = (r.industry_category as string | null)?.trim() || 'Uncategorized'
+      if (r.company_name) nameMap[r.id as string] = r.company_name as string
+      const cat = groupIndustryCategory((r.industry_category as string | null)?.trim() || 'Uncategorized')
       rawBreakdown[cat] = (rawBreakdown[cat] || 0) + 1
     })
     const sorted = Object.entries(rawBreakdown).sort((a, b) => b[1] - a[1])
@@ -113,6 +119,18 @@ export async function getOutreachStats(
     const rest = sorted.slice(CATEGORY_CAP)
     const restTotal = rest.reduce((sum, [, count]) => sum + count, 0)
     if (restTotal > 0) companyCategoryBreakdown[`Other (${rest.length} categories)`] = restTotal
+
+    // Which company each channel touch belongs to — lets the report name the
+    // company behind a low-volume channel (e.g. "Call — 1") instead of just a count.
+    const addChannelCompany = (channel: string | null | undefined, leadId: string | null | undefined) => {
+      if (!channel || !leadId) return
+      const name = nameMap[leadId]
+      if (!name) return
+      const list = channelCompanies[channel] || (channelCompanies[channel] = [])
+      if (!list.includes(name)) list.push(name)
+    }
+    msgs.forEach(m => addChannelCompany(m.channel, m.lead_id))
+    acts.forEach(a => addChannelCompany(a.channel, a.lead_id))
   }
 
   return {
@@ -124,5 +142,6 @@ export async function getOutreachStats(
     followUpsSent: acts.filter(a => a.type === 'follow_up').length,
     channelBreakdown,
     companyCategoryBreakdown,
+    channelCompanies,
   }
 }

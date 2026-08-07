@@ -231,6 +231,32 @@ export function isActiveBlocker(b: DealBlocker): boolean {
   return !b.resolved && !isNoiseBlockerLabel(blockerLabel(b))
 }
 
+// Buckets the AI-written industry_category free text (one string per lead,
+// effectively unbounded — dozens of near-unique variants) into a fixed,
+// domain-relevant taxonomy so the report reads as a handful of meaningful
+// segments instead of 8 real categories plus a giant unlabeled "Other" pile.
+// Order matters — first matching bucket wins, so more specific buckets (e.g.
+// AI Agents) are checked before generic ones (e.g. Infrastructure).
+const CATEGORY_GROUPS: [string, RegExp][] = [
+  ['AI Agents & Agentic Commerce',       /\bagent(ic)?\b|autonomous|ai[\s-]?workforce|ai[\s-]?native|ai commerce/i],
+  ['Crypto & DeFi',                      /crypto|\bdefi\b|blockchain|web3|\btoken|on-?chain|cross-?chain|\bdex\b/i],
+  ['Wallets & Custody',                  /wallet|custody|custodial/i],
+  ['Payments & Commerce',                /payment|commerce|checkout|billing|merchant|\bpos\b|settlement|remittance/i],
+  ['Banking & Traditional Finance',      /\bbank|asset management|securities|fintech|lending|\bcredit\b|investment/i],
+  ['Security & Compliance',              /security|cyber|compliance|fraud|\bkyc\b|\baml\b|\brisk\b/i],
+  ['Infrastructure & Interoperability',  /infrastructure|interoperab|protocol|\bapi\b|\bsdk\b|platform|middleware/i],
+  ['Data & Analytics',                   /\bdata\b|analytics|intelligence/i],
+]
+
+export function groupIndustryCategory(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed || /^uncategorized$/i.test(trimmed)) return 'Uncategorized'
+  for (const [bucket, pattern] of CATEGORY_GROUPS) {
+    if (pattern.test(trimmed)) return bucket
+  }
+  return 'Other'
+}
+
 // Sorts a category breakdown by count, but always keeps the catch-all "Other
 // (N categories)" bucket last — its count can be the largest in the set (it's
 // a sum of everything else), and a residual bucket reading as the #1 row

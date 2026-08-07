@@ -60,6 +60,37 @@ function dlFile(content: string, name: string, type: string) {
   URL.revokeObjectURL(url)
 }
 
+// jsPDF has no native pie-chart primitive, so a slice is drawn as a filled
+// polygon: center → points sampled along the arc every ~4° → back to center
+// (closed=true). Fine-grained enough to read as a smooth circle at report scale.
+function drawPieSlice(doc: jsPDF, cx: number, cy: number, r: number, startDeg: number, endDeg: number, color: string) {
+  const span = endDeg - startDeg
+  const steps = Math.max(1, Math.ceil(Math.abs(span) / 4))
+  const pts: [number, number][] = []
+  for (let i = 0; i <= steps; i++) {
+    const deg = startDeg + span * (i / steps)
+    const rad = (deg * Math.PI) / 180
+    pts.push([cx + r * Math.cos(rad), cy + r * Math.sin(rad)])
+  }
+  const segments: [number, number][] = [[pts[0][0] - cx, pts[0][1] - cy]]
+  for (let i = 1; i < pts.length; i++) segments.push([pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]])
+  doc.setFillColor(color)
+  doc.lines(segments, cx, cy, [1, 1], 'F', true)
+}
+
+function drawDonutChart(doc: jsPDF, cx: number, cy: number, r: number, data: [string, number][], colors: string[]) {
+  const total = data.reduce((sum, [, v]) => sum + v, 0)
+  if (total <= 0) return
+  let angle = -90
+  data.forEach(([, v], i) => {
+    const sweep = (v / total) * 360
+    if (sweep > 0) drawPieSlice(doc, cx, cy, r, angle, angle + sweep, colors[i % colors.length])
+    angle += sweep
+  })
+  doc.setFillColor('#ffffff')
+  doc.circle(cx, cy, r * 0.55, 'F')
+}
+
 function exportCSV(deals: MonthlyDeal[], month: string) {
   const rows = deals.map(d => {
     const pf = d.product_feedback || {}
@@ -129,7 +160,6 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
   const won     = deals.filter(d => d.status === 'closed_won')
   const lost    = deals.filter(d => d.status === 'closed_lost')
   const active  = deals.filter(d => !['closed_won','closed_lost'].includes(d.status))
-  const uniqueCos  = new Set(deals.map(d => d.company_name)).size
 
   // Hero KPI badges reflect whatever's currently on screen (including any
   // unsaved presentation-mode edits) — everything below (deal tables, wins,
@@ -150,8 +180,15 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
 
   // Channel breakdown (deal-level channel + raw outreach touches)
   const ch: Record<string, number> = { ...outreach.channelBreakdown }
-  deals.forEach(d => { if (d.outreach_channel) ch[d.outreach_channel] = (ch[d.outreach_channel] || 0) + 1 })
-  const chRows = Object.entries(ch).sort((a, b) => b[1] - a[1]).map(([k, v]) => [channelLabel(k), String(v)])
+  const chCompanies: Record<string, string[]> = {}
+  Object.entries(outreach.channelCompanies).forEach(([k, names]) => { chCompanies[k] = [...names] })
+  deals.forEach(d => {
+    if (!d.outreach_channel) return
+    ch[d.outreach_channel] = (ch[d.outreach_channel] || 0) + 1
+    const list = chCompanies[d.outreach_channel] || (chCompanies[d.outreach_channel] = [])
+    if (!list.includes(d.company_name)) list.push(d.company_name)
+  })
+  const chEntries = Object.entries(ch).sort((a, b) => b[1] - a[1])
 
   // Companies contacted by category
   const categoryRows = sortCategoryBreakdown(outreach.companyCategoryBreakdown)
@@ -232,7 +269,6 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
     ['Total Outreach', heroTotalOutreach], ['Companies Targeted', heroCompaniesContacted],
     ['Individuals Targeted', heroIndividualsContacted], ['Replies', heroReplies],
     ['Successfully Contacted', heroSuccessfullyContacted], ['Response Rate', `${heroResponseRate}%`],
-    ['Total Deals', deals.length], ['Companies (Deals)', uniqueCos],
     ['Active', heroActive], ['Won', heroWon],
     ['Lost', heroLost],
   ]
@@ -263,16 +299,47 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
     y += lines.length * 4.8 + 8
   }
 
-  // ── Outreach by Channel + Companies Contacted by Category (side by side) ──
-  if (chRows.length || categoryRows.length) {
-    sectionTitle('Outreach Breakdown', Math.max(chRows.length, categoryRows.length) * 6.2)
+  // ── Outreach by Channel (donut chart) + Companies Contacted by Category (side by side) ──
+  if (chEntries.length || categoryRows.length) {
     const halfW = (CONTENT_W - 8) / 2
+    const chTotal = chEntries.reduce((sum, [, v]) => sum + v, 0)
+    // Channels this small or smaller get their company name(s) named inline —
+    // enough volume to be curious about, too little to bloat the legend.
+    const CH_LOW_COUNT = 3
+    const LEGEND_LINE_H = 4.2, LEGEND_ROW_GAP = 1.4
+    const legendLines: string[][] = chEntries.map(([k, v]) => {
+      const pct = chTotal > 0 ? Math.round((v / chTotal) * 100) : 0
+      let line = `${channelLabel(k)} — ${v} (${pct}%)`
+      if (v <= CH_LOW_COUNT) {
+        const names = chCompanies[k] || []
+        if (names.length) {
+          const shown = names.slice(0, 2).join(', ')
+          const extra = names.length > 2 ? ` +${names.length - 2} more` : ''
+          line += `: ${shown}${extra}`
+        }
+      }
+      return doc.splitTextToSize(line, halfW - 8) as string[]
+    })
+    const PIE_R = 17, PIE_D = PIE_R * 2 + 6
+    const legendHeight = legendLines.reduce((sum, ls) => sum + ls.length * LEGEND_LINE_H + LEGEND_ROW_GAP, 0)
+    const chartBlockH = chEntries.length ? PIE_D + 4 + legendHeight : 0
+    sectionTitle('Outreach Breakdown', Math.max(chartBlockH, categoryRows.length * 6.2))
     const blockStartY = y
     let leftEnd = y, rightEnd = y
-    if (chRows.length) {
-      autoTable(doc, { ...tableTheme, startY: y, margin: { left: MARGIN }, tableWidth: halfW,
-        head: [['Channel', 'Count']], body: chRows, columnStyles: { 1: { cellWidth: 20, halign: 'right' } } })
-      leftEnd = doc.lastAutoTable.finalY
+
+    if (chEntries.length) {
+      const cx = MARGIN + halfW / 2, cy = y + PIE_R + 2
+      drawDonutChart(doc, cx, cy, PIE_R, chEntries, TIME_PIE_COLORS)
+      let ly = cy + PIE_R + 6
+      chEntries.forEach((_entry, i) => {
+        const lines = legendLines[i]
+        doc.setFillColor(TIME_PIE_COLORS[i % TIME_PIE_COLORS.length])
+        doc.circle(MARGIN + 2, ly + 1, 1.3, 'F')
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7.8); doc.setTextColor('#374151')
+        lines.forEach((ln, li) => doc.text(ln, MARGIN + 6, ly + 1.6 + li * LEGEND_LINE_H))
+        ly += lines.length * LEGEND_LINE_H + LEGEND_ROW_GAP
+      })
+      leftEnd = ly
     }
     if (categoryRows.length) {
       autoTable(doc, { ...tableTheme, startY: blockStartY, margin: { left: MARGIN + halfW + 8 }, tableWidth: halfW,
@@ -301,35 +368,124 @@ function exportPDF(deals: MonthlyDeal[], activities: DealActivity[], month: stri
     y = doc.lastAutoTable.finalY + 8
   }
 
-  // ── Full Pipeline ──────────────────────────────────────────────
+  // ── Full Pipeline — grouped by stage, one card per deal ─────────
+  // A dense 11-column table forced long values (websites, blockers) to wrap
+  // mid-word and gave every deal the same cramped strip regardless of how
+  // much is actually known about it. Cards give each deal room to breathe,
+  // grouping by stage puts everything in the same conversation (e.g. every
+  // "Technical Discussion" deal) next to each other, and surfacing
+  // requirement/problem statement/use case/notes pulls in the context that
+  // was captured on the deal but previously never made it into the report.
   sectionTitle(`Full Pipeline — ${deals.length} Deal${deals.length === 1 ? '' : 's'}`, 10)
-  autoTable(doc, {
-    ...tableTheme, startY: y, margin: { left: MARGIN, top: MARGIN + 10 },
-    head: [['Company', 'Website', 'Individual', 'Country', 'Type', 'Status', 'Monthly Vol.', 'Revenue Opp.', 'Importance', 'Close Date', 'Open Blockers']],
-    body: deals.map(d => [
-      d.company_name ?? '', bareDomain(d.website), d.individual_name ?? '', d.country ?? '', d.lead_type ?? '',
-      dealStatusMeta(d.status).label, d.expected_monthly_volume ?? '', d.estimated_revenue ?? '',
-      d.strategic_importance ?? '', d.expected_close_date ?? '',
-      (d.blockers || []).filter(isActiveBlocker).map(b => blockerLabel(b)).join(', '),
-    ]),
-    styles: { ...tableTheme.styles, fontSize: 7.5 },
-    headStyles: { ...tableTheme.headStyles, fontSize: 7.5 },
-    columnStyles: {
-      0: { cellWidth: 22, fontStyle: 'bold', textColor: '#1a1a2e' }, 1: { cellWidth: 15, textColor: '#2563eb' },
-      2: { cellWidth: 16 }, 3: { cellWidth: 14 }, 4: { cellWidth: 10 }, 5: { cellWidth: 19 },
-      6: { cellWidth: 15 }, 7: { cellWidth: 16 }, 8: { cellWidth: 15 }, 9: { cellWidth: 16 }, 10: { cellWidth: 24 },
-    },
-    didParseCell: data => {
-      if (data.section === 'body' && data.column.index === 5) {
-        const s = pdfStatusColors(deals[data.row.index].status)
-        data.cell.styles.fillColor = s.bg
-        data.cell.styles.textColor = s.text
-        data.cell.styles.fontStyle = 'bold'
-      }
-    },
-    didDrawPage: data => { if (data.pageNumber > 1) newContinuationPage() },
+  const FIELD_LABEL_COLOR = '#9ca3af', FIELD_VALUE_COLOR = '#374151'
+  const dealsByStage = new Map<string, MonthlyDeal[]>()
+  deals.forEach(d => {
+    const list = dealsByStage.get(d.status) || []
+    list.push(d)
+    dealsByStage.set(d.status, list)
   })
-  y = doc.lastAutoTable.finalY + 8
+  DEAL_STATUSES.forEach(({ value: stageValue }) => {
+    const stageDeals = dealsByStage.get(stageValue)
+    if (!stageDeals || !stageDeals.length) return
+    const meta = dealStatusMeta(stageValue)
+    const sColors = pdfStatusColors(stageValue)
+
+    ensureSpace(12)
+    doc.setFillColor(sColors.bg)
+    doc.roundedRect(MARGIN, y, CONTENT_W, 7.5, 1.2, 1.2, 'F')
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(sColors.text)
+    doc.text(`${meta.label.toUpperCase()}   —   ${stageDeals.length} deal${stageDeals.length === 1 ? '' : 's'}`, MARGIN + 4, y + 5.2)
+    y += 7.5 + 4
+
+    stageDeals.forEach(d => {
+      const facts: [string, string][] = [
+        ['Country', d.country ?? ''], ['Type', d.lead_type ?? ''],
+        ['Monthly Vol.', d.expected_monthly_volume ?? ''], ['Revenue Opp.', d.estimated_revenue ?? ''],
+        ['Importance', d.strategic_importance ?? ''], ['Close Date', d.expected_close_date ?? ''],
+      ].filter((f): f is [string, string] => !!f[1])
+      const blockersText = (d.blockers || []).filter(isActiveBlocker).map(b => blockerLabel(b)).join(', ')
+      const paragraphFields: [string, string][] = [
+        ['Requirement', d.requirement ?? ''], ['Problem Statement', d.problem_statement ?? ''],
+        ['Use Case', d.use_case ?? ''], ['Notes', d.notes ?? ''],
+      ].filter((f): f is [string, string] => !!f[1])
+      const productsList = [...(d.products_interested ?? []), ...(d.products_proposed ?? [])]
+      const uniqueProducts = Array.from(new Set(productsList))
+
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8)
+      const paragraphLines = paragraphFields.map(([label, text]) => ({
+        label, lines: doc.splitTextToSize(text, CONTENT_W - 12) as string[],
+      }))
+
+      // Each "row" holds a label line (at fy) and a bold value line (at fy+3.6) —
+      // 5.4 wasn't enough clearance for the value's descenders before the next
+      // row's label, so wrapped facts (4+ per deal) visually collided.
+      const FACT_COLS = 3, FACT_ROW_H = 7.6
+      const factRows = Math.ceil(facts.length / FACT_COLS)
+      const headerH = 6 + (d.individual_name || d.designation || d.website ? 5 : 0)
+      const factsH = facts.length ? factRows * FACT_ROW_H + 2 : 0
+      const blockersH = blockersText ? 5 : 0
+      const productsH = uniqueProducts.length ? 5 : 0
+      const paragraphsH = paragraphLines.reduce((sum, p) => sum + 4 + p.lines.length * 3.9, 0)
+      const cardH = 6 + headerH + factsH + blockersH + productsH + paragraphsH + 4
+
+      ensureSpace(cardH + 4)
+      doc.setFillColor('#fafafb'); doc.setDrawColor('#eceaf3'); doc.setLineWidth(0.25)
+      doc.roundedRect(MARGIN, y, CONTENT_W, cardH, 1.5, 1.5, 'FD')
+      doc.setFillColor(meta.color)
+      doc.roundedRect(MARGIN, y, 1.4, cardH, 0.7, 0.7, 'F')
+
+      let cy = y + 6.5
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); doc.setTextColor('#1a1a2e')
+      doc.text(d.company_name || 'Untitled', MARGIN + 5, cy)
+      if (d.individual_name || d.designation || d.website) {
+        cy += 4.8
+        const bits = [
+          d.individual_name && d.designation ? `${d.individual_name} · ${d.designation}` : (d.individual_name || d.designation),
+          d.website ? bareDomain(d.website) : null,
+        ].filter(Boolean)
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7.8); doc.setTextColor('#6b7280')
+        doc.text(bits.join('     ·     '), MARGIN + 5, cy)
+      }
+      cy += 6
+
+      if (facts.length) {
+        const factColW = (CONTENT_W - 10) / FACT_COLS
+        facts.forEach(([label, value], i) => {
+          const col = i % FACT_COLS, row = Math.floor(i / FACT_COLS)
+          const fx = MARGIN + 5 + col * factColW, fy = cy + row * FACT_ROW_H
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(6.8); doc.setTextColor(FIELD_LABEL_COLOR)
+          doc.text(label.toUpperCase(), fx, fy)
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(FIELD_VALUE_COLOR)
+          doc.text(value, fx, fy + 3.6, { maxWidth: factColW - 4 })
+        })
+        cy += factRows * FACT_ROW_H + 2
+      }
+
+      if (blockersText) {
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor('#b45309')
+        doc.text(`⚠ Blockers: ${blockersText}`, MARGIN + 5, cy)
+        cy += 5
+      }
+
+      if (uniqueProducts.length) {
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor('#6d28d9')
+        doc.text(`Products: ${uniqueProducts.join(', ')}`, MARGIN + 5, cy, { maxWidth: CONTENT_W - 10 })
+        cy += 5
+      }
+
+      paragraphLines.forEach(({ label, lines }) => {
+        cy += 4
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(7.2); doc.setTextColor('#4c1d95')
+        doc.text(label.toUpperCase(), MARGIN + 5, cy)
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(FIELD_VALUE_COLOR)
+        doc.text(lines, MARGIN + 5, cy + 3.6)
+        cy += lines.length * 3.9
+      })
+
+      y += cardH + 4
+    })
+  })
+  y += 4
 
   // ── Wins This Month ────────────────────────────────────────────
   if (won.length) {
