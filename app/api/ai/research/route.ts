@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   const memory = await scoringMemory()
 
-  const systemPrompt = `You are a senior BD researcher for Kima and Aeredium — financial infrastructure companies.
+  const systemPrompt = `You are a senior BD researcher for Aerpolice (AI-agent governance) and AER360 (hardware-enforced custody and key-signing) — the only two products this pipeline evaluates leads for.
 
 ${PRODUCT_BRAIN}
 ${memory}
@@ -64,67 +64,51 @@ Return JSON with this exact structure:
 }`
 
     } else if (action === 'pain_points') {
-      userPrompt = `Identify the exact pain points this company has that Kima/Aeredium can solve:
+      userPrompt = `Identify the exact pain points this company has that Aerpolice/AER360 can solve:
 Company: ${company_name}
 Website: ${website || 'unknown'}
 Description: ${description || 'unknown'}
 
 Return JSON:
 {
-  "pain_point": "The single most important pain point Kima can solve",
+  "pain_point": "The single most important pain point Aerpolice/AER360 can solve",
   "pain_point_severity": "critical|high|medium|low",
-  "pain_point_evidence": "Specific evidence. If from a real article/news/hack report, paste the exact quote. If reasoned from their public tech stack or business model, explain the reasoning.",
-  "pain_point_source_url": "EXACT URL to article/news/blog/tweet/hack report that proves this pain. Empty string if no real URL — never invent one.",
+  "pain_point_evidence": "Specific evidence. If from a real article/news/incident report, paste the exact quote. If reasoned from their public tech stack or business model, explain the reasoning.",
+  "pain_point_source_url": "EXACT URL to article/news/blog/tweet/incident report that proves this pain. Empty string if no real URL — never invent one.",
   "pain_point_evidence_type": "verified_source if pain_point_source_url is a real article that explicitly mentions this pain | agent_analysis if reasoned from publicly known facts | inferred if general industry knowledge with no specific backing",
   "why_it_matters": "Why this pain point matters to their business",
   "how_urgent": "How urgent is this problem for them?",
   "secondary_pain_points": ["other pain point 1", "other pain point 2"]
 }`
 
-    } else if (action === 'kima_fit') {
-      userPrompt = `Identify how Kima can specifically help this company:
-Company: ${company_name}
-Website: ${website || 'unknown'}
-Description: ${description || 'unknown'}
-
-Return JSON:
-{
-  "kima_fit": "Specific way Kima helps this company",
-  "suggested_use_case": "Exact Kima use case to pitch",
-  "integration_angle": "How they would integrate Kima",
-  "revenue_potential": "Revenue/business impact for them",
-  "possible_objections": ["objection1", "objection2"],
-  "objection_responses": ["response1", "response2"],
-  "settlement_angle": "How Kima improves their settlement",
-  "integration_feasibility": "How easy is integration? (high/medium/low)"
-}`
-
     } else if (action === 'aeredium_fit') {
-      userPrompt = `Identify how Aeredium can specifically strengthen the pitch for this company:
+      userPrompt = `Identify how AER360 (AERKey threshold signing / Policy Engine / AERKey Wallet / Agent Control Center) can specifically help this company:
 Company: ${company_name}
 Website: ${website || 'unknown'}
 Description: ${description || 'unknown'}
 
 Return JSON:
 {
-  "aeredium_fit": "How Aeredium specifically helps this company",
-  "security_angle": "TEE/security/compliance angle",
-  "risk_angle": "Risk reduction angle",
-  "why_aeredium_matters": "Why Aeredium makes the Kima pitch stronger for this company"
+  "aeredium_fit": "How AER360 specifically helps this company — which pillar(s), tied to their actual stack. Or, if no genuine fit, say so honestly.",
+  "security_angle": "Threshold-signing/hardware-enclave/policy-enforcement angle",
+  "risk_angle": "Risk reduction angle (key theft, insider threat, unaudited transactions)",
+  "suggested_use_case": "Exact AER360 use case to pitch, or null",
+  "integration_feasibility": "How easy is integration? (high/medium/low)",
+  "revenue_potential": "Revenue/business impact for them, or null"
 }`
 
     } else if (action === 'aerpolice_fit') {
-      userPrompt = `Identify how Aerpolice (governance & control layer for AI agents that move money) can specifically help this company:
+      userPrompt = `Identify how Aerpolice (governance & control layer for AI agents that move money or take system actions) can specifically help this company:
 Company: ${company_name}
 Website: ${website || 'unknown'}
 Description: ${description || 'unknown'}
 
-Aerpolice only fits if this company has autonomous AI agents that take consequential financial actions (payments, procurement, treasury, trading). "Uses AI" is NOT sufficient — the agents must have real economic authority. If they don't, say so honestly in aerpolice_fit.
+Aerpolice only fits if this company has autonomous AI agents that take consequential financial or system actions. "Uses AI" is NOT sufficient — the agents must have real economic or system authority. If they don't, say so honestly in aerpolice_fit.
 
 Return JSON:
 {
   "aerpolice_fit": "Specific way Aerpolice helps this company — what governance gap exists, or an honest explanation of why it's not a fit",
-  "agent_control_angle": "The specific control/governance angle (execution gate, audit trail, spend limits, identity) for their situation, or null"
+  "agent_control_angle": "The specific control/governance angle (Triple Gate, audit trail, spend limits, identity, kill switch) for their situation, or null"
 }`
 
     } else if (action === 'classify') {
@@ -135,23 +119,23 @@ Description: ${description || 'unknown'}
 
 Return JSON:
 {
-  "industry_category": "One of: Cross-border payment company, PSP/payment gateway, On/off-ramp provider, Stablecoin payment company, Wallet, DEX, Perp DEX, Launchpad, RWA platform, iGaming/payment-heavy platform, Neobank, Fintech, Exchange, Chain ecosystem, AI commerce/payment agent, Treasury management platform, Custody/payment infrastructure company, Web2 company with payment/settlement friction, Other",
-  "customer_category": ["Array of: Agentic Payments Customer, LayerZero Customer, Hacked Protocol, Needs On/Off Ramp, Fireblocks Customer, Web2 Stablecoin Settlement Customer, Other"],
-  "product_to_sell": "One of: Agentic payment rails, Cross-chain settlement, Stablecoin settlement, Fiat on/off-ramp, Treasury movement, DvP settlement, iGaming payments, RWA settlement, PSP settlement, Wallet onboarding, Launchpad participation, Payment orchestration, Cross-border USDT/USDC settlement",
+  "industry_category": "One of: AI agent / agentic commerce company, AI-native SaaS selling to enterprise, Custody / MPC wallet provider, Exchange, Treasury or fund, Fintech, Robotics / autonomous systems, Other",
+  "customer_category": ["Array of: Agentic Payments Customer, Aerpolice Governance Customer, AER360 Custody / Key-Governance Customer, Other"],
+  "product_to_sell": "One of: Aerpolice agent identity, Aerpolice policy + execution gate, Aerpolice audit trail, AER360 threshold signing, AER360 policy engine, AER360 wallet, AER360 agent control center",
   "region": "Their primary market region",
   "classification_reasoning": "Why you classified them this way"
 }`
 
     } else if (action === 'score') {
-      userPrompt = `Score this lead for Kima/Aeredium BD purposes (0-100):
+      userPrompt = `Score this lead for Aerpolice/AER360 BD purposes (0-100):
 Company: ${company_name}
 Website: ${website || 'unknown'}
 Description: ${description || 'unknown'}
 
 SCORING SYSTEM (lead_score — general ICP fit, independent of timing):
 Base scores: pain_point (25), traction (20), contact_found (15), trigger (15), category_fit (10), integration_feasibility (10), revenue_potential (5)
-Boosts: agentic_payments_fit (+25), LayerZero+real_value (+20), Hacked_protocol+bridge_exploit (+25), needs_ramp (+15), fireblocks_customer (+15), web2_stablecoin (+25), recent_trigger (+15), decision_maker_found (+15)
-Penalties: no_pain_point (-25), no_active_product (-20), no_decision_maker (-15), nft_only (-30), no_source_proof (-30), generic_web3_only (-25)
+Boosts: agentic_payments_fit (+25), aer360_custody_gap (+20), fireblocks_or_mpc_customer (+15), giving_agent_spend_authority (+20), recent_trigger (+15), decision_maker_found (+15)
+Penalties: no_pain_point (-25), no_active_product (-20), no_decision_maker (-15), no_source_proof (-30), generic_ai_only_no_agent_authority (-25)
 
 URGENCY SCORING (urgency_score — separate 0-100, how urgent to reach out THIS WEEK):
 Driven ONLY by trigger recency + pain severity, NOT by how good a long-term fit they are.
@@ -215,7 +199,7 @@ Return JSON:
         ? `\nVerified emails from Hunter.io:\n${hunterData}\nUse these real emails. Do NOT guess emails.`
         : '\nNo verified emails found. Do NOT invent email addresses — leave email_pattern null.'
 
-      userPrompt = `Find real contacts at this company for Kima BD outreach.
+      userPrompt = `Find real contacts at this company for Aerpolice/AER360 BD outreach.
 Company: ${company_name}
 Website: ${website || 'unknown'}
 Description: ${description || 'unknown'}${hunterContext}

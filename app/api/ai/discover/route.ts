@@ -36,15 +36,14 @@ async function getHunterContacts(website: string): Promise<string> {
 }
 
 
+// Scoped to the two products this agent sources for: Aerpolice + AER360.
+// (Previously included LayerZero Customer, Hacked Protocol, Needs On/Off Ramp,
+// and Web2 Stablecoin Settlement Customer — those were Kima-only categories
+// and have been dropped along with the sources that targeted them.)
 const CUSTOMER_CATEGORIES = [
   'Agentic Payments Customer',
   'Aerpolice Governance Customer',
-  'AERKey / Key Governance Customer',
-  'LayerZero Customer',
-  'Hacked Protocol',
-  'Needs On/Off Ramp',
-  'Fireblocks Customer',
-  'Web2 Stablecoin Settlement Customer',
+  'AER360 Custody / Key-Governance Customer',
 ]
 // Cap = how many *unworked* prospects we allow to sit in a category at once.
 // Only leads still in the top-of-funnel (see CAP_BLOCKING_STATUSES) count toward
@@ -52,6 +51,14 @@ const CUSTOMER_CATEGORIES = [
 // so the daily pipeline keeps surfacing fresh leads instead of clogging.
 const CATEGORY_CAP = 8
 const CAP_BLOCKING_STATUSES = ['new', 'researching', 'needs_more_research']
+
+// ── "Immediate pain" quality gate ──────────────────────────────────────────
+// A lead can have a great long-term ICP fit but no reason to contact them
+// THIS week. Per user decision: only save leads with both a strong general
+// fit AND a genuinely urgent, severe pain point — not just fit.
+const MIN_LEAD_SCORE = 50
+const MIN_URGENCY_SCORE = 50
+const REQUIRED_PAIN_SEVERITIES = new Set(['critical', 'high'])
 
 // Read any URL as clean text via Jina.ai (free, no key needed)
 async function readUrl(url: string): Promise<string> {
@@ -198,22 +205,22 @@ async function extractCompanies(
       model: provider === 'claude' ? CLAUDE_FAST : 'gpt-4o',
       maxTokens: 2000,
       temperature: 0.2,
-      system: `You are a BD researcher for Kima and Aeredium.
+      system: `You are a BD researcher for Aerpolice (AI-agent governance) and AER360 (hardware-enforced custody and key-signing).
 
 ${PRODUCT_BRAIN_COMPACT}
 
-Output REAL, SPECIFIC, NAMED companies that could be B2B customers for payment/settlement infrastructure — never categories.
+Output REAL, SPECIFIC, NAMED companies that could be B2B customers for AI-agent governance or institutional custody/key-signing infrastructure — never categories.
 
 CRITICAL — every "name" MUST be a single real company you could google and land on one company's website:
-- GOOD (real companies): "Bybit", "Coinbase", "Binance", "Circle", "MetaMask", "Fireblocks", "JPMorgan", "Revolut", "Stripe", "Ripple".
-- BANNED (categories / segments / groupings — NEVER output these as a name): "Crypto Exchanges", "Banks", "Exchanges", "Stablecoin Issuers", "Lending Platforms", "Custody", "Wallets", "DEXs", "Payment Companies", "RWA Platforms", "Neobanks", "Bridges", "Cross-border Payment Providers", "Fintechs".
+- GOOD (real companies): "Skyfire", "Fireblocks", "Copper", "Fordefi", "Anthropic", "Bybit", "Coinbase", "Circle", "Ramp", "Brex".
+- BANNED (categories / segments / groupings — NEVER output these as a name): "AI Agents", "Custody Providers", "MPC Wallets", "Exchanges", "Crypto Exchanges", "Custodians", "Fintechs", "Agent Frameworks".
 
 EXPAND CATEGORIES INTO REAL COMPANIES:
-- If the content points at a CATEGORY, expand it into specific real companies that best fit Kima/Aeredium's ICP.
-  · "crypto exchanges" → Binance, Bybit, OKX, Kraken, Bitget, KuCoin
-  · "banks" → JPMorgan, Standard Chartered, DBS Bank, BBVA, HSBC
-  · "wallets" → MetaMask, Trust Wallet, Phantom, Rabby
-  · "stablecoin issuers" → Circle, Tether, Paxos, Ethena
+- If the content points at a CATEGORY, expand it into specific real companies that best fit Aerpolice/AER360's ICP.
+  · "agentic commerce / AI agents that pay" → Skyfire, Payman, Crossmint agent-wallet customers
+  · "MPC/custody providers" → Fireblocks, Copper, Fordefi, Coinbase Custody, BitGo
+  · "AI agent frameworks / MCP tooling" → companies building on Claude/OpenAI agent SDKs, MCP server authors, agent-marketplace listings
+  · "exchanges / treasuries" → Bybit, OKX, Kraken, Circle
 - Only name companies that genuinely exist with a findable website.
 - Return 5 high-quality real companies rather than 15 vague ones.`,
       user: `Source: ${sourceContext}
@@ -267,46 +274,49 @@ async function deepResearch(
     // where Opus earns its cost. Extended thinking reasons through company-specific
     // pain points and finds real contacts rather than generic ones.
     // For OpenAI: standard gpt-4o via routeJSON.
-    const deepResearchSystem = `You are a senior BD researcher for Kima, Aeredium (including AERKey threshold signing), and Aerpolice.
+    const deepResearchSystem = `You are a senior BD researcher for Aerpolice (AI-agent governance) and AER360 (hardware-enforced custody and key-signing). These are the ONLY two products this pipeline sources leads for — do not evaluate or invoke any other product, even if you know of one.
 
 ${PRODUCT_BRAIN}
 
-FIRST, validate the input is a REAL, SPECIFIC company (a brand you can google to one company's site like "Bybit", "JPMorgan", "Circle") and NOT a generic category/segment ("Crypto Exchanges", "Banks", "Fintechs", "Infrastructure", "AI", "RWA Platforms"). If it is a category, set "is_specific_real_company": false and leave other fields minimal.
+FIRST, validate the input is a REAL, SPECIFIC company (a brand you can google to one company's site like "Skyfire", "Fireblocks", "Circle") and NOT a generic category/segment ("AI Agents", "Custody Providers", "Exchanges", "Fintechs", "Infrastructure"). If it is a category, set "is_specific_real_company": false and leave other fields minimal.
 
-Evaluate ALL THREE product lines for every company — do not default to Kima/Aeredium framing out of habit:
-- If this company builds or ships AI agents that take financial actions (payments, procurement, treasury, trading), Aerpolice governance is likely the lead pitch, not settlement.
-- If this company is a custodian, MPC wallet provider, exchange, or institution with key-signing/custody policy needs, evaluate AERKey specifically (see AERKEY section above) — don't collapse it into a generic "Aeredium" mention.
+Evaluate BOTH products for every company — do not default to one out of habit:
+- If this company builds or ships AI agents that take financial or system actions (payments, procurement, treasury, trading, data access), Aerpolice governance is the lead pitch.
+- If this company is a custodian, MPC wallet provider, exchange, treasury, or fund with key-signing/custody policy needs, AER360 is the lead pitch.
+- Some companies genuinely need both (an agentic-payments company that also needs a hardware-governed wallet for its agents) — say so explicitly rather than picking one arbitrarily.
+- If NEITHER product solves a real, specific problem for this company, say so honestly — do not force a fit.
 
 You must produce TWO separate scores — do not blend them:
 
 LEAD_SCORE (0-100) — general ICP fit, independent of timing:
 High score (70+): clear pain point, active product, matches a target category, decision maker findable
 Medium (40-69): possible fit but unclear pain point or no direct match
-Low (<40): no clear use case for Kima/Aeredium/Aerpolice
+Low (<40): no clear use case for Aerpolice or AER360
 
 URGENCY_SCORE (0-100) — how urgent it is to reach out THIS WEEK, driven ONLY by
 trigger recency and pain severity, NOT by how good a long-term fit they are:
-High (70+): a dated, concrete trigger in roughly the last 30-60 days (funding round, hack/exploit, product launch, expansion, new regulation hitting them) AND pain_point_severity is critical or high
+High (70+): a dated, concrete trigger in roughly the last 30-60 days (funding round, security incident/near-miss, product launch giving an agent financial authority, compliance/security hire, institutional client onboarding) AND pain_point_severity is critical or high
 Medium (40-69): a real but older or vaguer trigger, or high-severity pain with no dated trigger
-Low (<40): no trigger_reason found, or trigger is stale/speculative — this can still be a HIGH lead_score company, just not one to prioritize contacting right now`
+Low (<40): no trigger_reason found, or trigger is stale/speculative — this can still be a HIGH lead_score company, just not one to prioritize contacting right now
 
-    const deepResearchUser = `Do a deep BD research on this company for Kima/Aeredium:
+IMPORTANT — only leads with BOTH a strong fit AND a genuinely urgent, severe pain point get saved (lead_score ≥ ${MIN_LEAD_SCORE}, pain_point_severity critical/high, urgency_score ≥ ${MIN_URGENCY_SCORE}). Do not inflate urgency_score or pain_point_severity just to help a good-fit company clear the bar — an honest "good fit, not urgent right now" is a more useful answer than a manufactured one, even though it means this lead won't be saved today.`
+
+    const deepResearchUser = `Do a deep BD research on this company for Aerpolice/AER360:
 
 Company: ${company.name}
 Website: ${company.website || 'unknown'}
 Description: ${company.description}${hunterContext}
 
 PAIN POINT RULES — be specific, not generic:
-- Do NOT write "they need faster settlement" or "they face cross-chain challenges". Anyone can write that.
-- DO write the SPECIFIC pain: what exact product/feature breaks, what exact cost/risk/delay they face, what specific incident or architecture choice creates the vulnerability. Cite real facts about this company.
-- For hacked protocols: name the exploit type, the amount lost, the exact vulnerability (bridge verifier set, oracle, relayer, smart-contract bug).
-- For LayerZero users: explain what specific cross-chain flows they run and why bridge failure is existential for them.
-- For Fireblocks users: what custody/signing limitation blocks their growth.
-- pain_point_severity = critical only if there is a real incident or a blocking architectural dependency.
+- Do NOT write "they need better agent governance" or "they face custody risk". Anyone can write that.
+- DO write the SPECIFIC pain: what exact product/feature is exposed, what exact cost/risk/incident they face, what specific architecture choice creates the vulnerability. Cite real facts about this company.
+- For AI-agent companies: name the specific financial or system action their agent takes unsupervised, and what happens if that action is wrong or hijacked.
+- For custody/Fireblocks/MPC-wallet users: what specific signing/custody limitation (software-level MPC, single-cloud dependency, seed-phrase exposure) blocks their growth or fails a due-diligence question.
+- pain_point_severity = critical only if there is a real incident, a live enterprise-deal blocker, or a blocking architectural dependency.
 
 CONTACT RULES — find the REAL decision maker, not a generic title:
 - Priority 1: Head of BD / VP Partnerships / Head of Growth — this person signs integration deals.
-- Priority 2: CTO / VP Engineering / Head of Protocol — needs to evaluate technical fit.
+- Priority 2: CTO / VP Engineering / Head of Security / Head of Trust — needs to evaluate technical fit.
 - Priority 3: CEO / Co-Founder — for companies < 100 people, this person often owns BD.
 - If you know their real name (from public LinkedIn, press releases, Twitter) use it. Otherwise null — never fabricate names.
 - linkedin_hint must be specific: "FirstName LastName CompanyName Title"
@@ -316,27 +326,25 @@ Return this exact JSON:
 {
   "is_specific_real_company": true,
   "industry_category": "one specific industry category",
-  "customer_category": ["array — pick from: Agentic Payments Customer, Aerpolice Governance Customer, AERKey / Key Governance Customer, LayerZero Customer, Hacked Protocol, Needs On/Off Ramp, Fireblocks Customer, Web2 Stablecoin Settlement Customer, Other"],
-  "product_to_sell": "the single most relevant Kima/Aeredium/Aerpolice product for this company and WHY — e.g. 'AERKey threshold signing — they run MPC custody today with no hardware-attested signing policy' or 'Aerpolice agent governance — their AI agent handles payouts with no execution gate'",
+  "customer_category": ["array — pick from: Agentic Payments Customer, Aerpolice Governance Customer, AER360 Custody / Key-Governance Customer, Other"],
+  "product_to_sell": "the single most relevant Aerpolice/AER360 product for this company and WHY — e.g. 'AER360 threshold signing — they run software-only MPC custody today with no hardware-attested signing policy' or 'Aerpolice agent governance — their AI agent handles payouts with no execution gate'",
   "region": "their primary market region",
   "company_summary": "3-4 sentence summary: what they do, how big, what stack they use, what stage they're at",
   "business_model": "how they specifically make money",
-  "supported_chains_or_rails": "exact blockchains or payment rails they currently use",
-  "current_providers": "specific known payment/bridge/settlement providers they currently use",
+  "supported_chains_or_rails": "blockchains, wallets, or agent frameworks they currently use",
+  "current_providers": "specific known custody/MPC/agent-governance providers they currently use, if any",
   "pain_point": "THE specific pain point — one crisp sentence with a concrete fact",
   "pain_point_severity": "critical|high|medium|low",
-  "pain_point_evidence": "concrete evidence: exact quote, hack amount + date, specific architectural dependency, or named product limitation",
+  "pain_point_evidence": "concrete evidence: exact quote, incident + date, specific architectural dependency, or named product limitation",
   "pain_point_source_url": "EXACT full URL to the article/post proving the pain point. Empty string if none.",
   "pain_point_evidence_type": "verified_source|agent_analysis|inferred",
-  "kima_fit": "exactly how Kima's specific product solves their specific pain — tied to their actual stack",
-  "suggested_use_case": "the precise Kima integration to pitch",
-  "aeredium_fit": "how Aeredium's TEE validators / AERKey / AERLink addresses their trust or compliance gap — if AERKey (threshold signing / key governance) is the specific angle, say so explicitly",
-  "aerpolice_fit": "how Aerpolice's Agent Identity / Execution Gate / Audit Trail addresses their AI-agent governance gap, or null if this company has no AI agents taking financial actions — never force this",
-  "trigger_reason": "why reach out NOW — a specific recent event (funding, product launch, hire, hack). Must be datable and real.",
+  "aeredium_fit": "how AER360 (AERKey threshold signing / Policy Engine / AERKey Wallet / Agent Control Center) addresses their custody, key-signing, or agent-spend-control gap — specific pillar(s), or null if there is genuinely no fit",
+  "suggested_use_case": "the precise AER360 integration to pitch, or the precise Aerpolice integration if that's the stronger fit",
+  "aerpolice_fit": "how Aerpolice's Agent Identity / Triple Gate / Audit Trail addresses their AI-agent governance gap, or null if this company has no AI agents taking financial or system actions — never force this",
+  "trigger_reason": "why reach out NOW — a specific recent event (funding, product launch, security incident, compliance hire). Must be datable and real.",
   "source_url": "exact URL to the trigger event. NOT a homepage. null if none.",
-  "settlement_angle": "the exact settlement improvement Kima delivers for their specific flow",
   "integration_feasibility": "high|medium|low — with one sentence of reasoning",
-  "revenue_potential": "realistic ARR estimate for Kima based on their volume/scale",
+  "revenue_potential": "realistic ARR estimate for Aerpolice/AER360 based on their volume/scale/headcount",
   "lead_score": 0,
   "urgency_score": 0,
   "urgency_reasoning": "1-2 sentences: what dated trigger and pain severity drove this urgency number — say explicitly if there is no dated trigger",
@@ -572,6 +580,8 @@ export async function POST(req: NextRequest) {
       skipped_generic: companies.length - realCompanies.length,
       skipped_cap: 0,
       skipped_low_score: 0,
+      skipped_not_urgent: 0,
+      skipped_no_product_fit: 0,
       leads_saved: [] as string[],
     }
 
@@ -619,8 +629,28 @@ export async function POST(req: NextRequest) {
       // Hard gate: the model itself confirms this is a real company, not a category.
       if (research.is_specific_real_company === false) { results.skipped_generic++; continue }
 
-      // Skip low-quality leads
-      if ((research.lead_score as number) < 50) { results.skipped_low_score++; continue }
+      // Skip low-quality leads (general ICP fit gate).
+      if ((research.lead_score as number) < MIN_LEAD_SCORE) { results.skipped_low_score++; continue }
+
+      // "Immediate pain" gate — a good long-term fit is not enough on its own.
+      // Require a severe pain point AND a genuinely urgent trigger before saving.
+      const severity = String(research.pain_point_severity || '').toLowerCase()
+      const urgency = (research.urgency_score as number) ?? 0
+      if (!REQUIRED_PAIN_SEVERITIES.has(severity) || urgency < MIN_URGENCY_SCORE) {
+        results.skipped_not_urgent++
+        continue
+      }
+
+      // Product-relevance gate — reject unless there's a genuine, specific fit
+      // for one of our two products. A non-empty lead_score alone isn't proof
+      // of that; the model must have actually named a fit for Aerpolice or
+      // AER360 (aeredium_fit doubles as the AER360 fit field).
+      const hasAerpoliceFit = typeof research.aerpolice_fit === 'string' && research.aerpolice_fit.trim().length > 0
+      const hasAer360Fit = typeof research.aeredium_fit === 'string' && research.aeredium_fit.trim().length > 0
+      if (!hasAerpoliceFit && !hasAer360Fit) {
+        results.skipped_no_product_fit++
+        continue
+      }
 
       // Determine relevant customer categories
       const categories = ((research.customer_category as string[]) || [])

@@ -2,7 +2,7 @@
 // /api/ai/enrich-lead
 //
 // Full AI enrichment pipeline for a freshly-added lead.
-// Runs: research + classify + kima_fit + aeredium_fit (parallel)
+// Runs: research + classify + aerpolice_fit + aeredium_fit(AER360) (parallel)
 //       → score (sequential, needs research data)
 //       → contacts (findAndSaveContacts)
 //       → sets status = 'approved'
@@ -31,7 +31,7 @@ const supabase = createClient(
 // The PRODUCT_BRAIN now includes the CONSULTANT_FRAMEWORK which
 // instructs the model to understand the company BEFORE evaluating
 // product fit. This is the most important quality lever.
-const SYS_BASE = `You are a senior solutions consultant and BD strategist for Kima, Aeredium, and Aerpolice — financial infrastructure companies.
+const SYS_BASE = `You are a senior solutions consultant and BD strategist for Aerpolice (AI-agent governance) and AER360 (hardware-enforced custody and key-signing) — the only two products this pipeline evaluates leads for.
 
 ${PRODUCT_BRAIN}
 
@@ -124,17 +124,16 @@ Research summary: ${researchSummary}
 
 Return JSON:
 {
-  "industry_category": "One of: Cross-border payment company, PSP/payment gateway, On/off-ramp provider, Stablecoin payment company, Wallet, DEX, Perp DEX, Launchpad, RWA platform, iGaming/payment-heavy platform, Neobank, Fintech, Exchange, Chain ecosystem, AI commerce/payment agent, Treasury management platform, Custody/payment infrastructure company, Web2 company with payment/settlement friction, Other",
-  "customer_category": ["Array — only include categories that genuinely apply: Agentic Payments Customer, LayerZero Customer, Hacked Protocol, Needs On/Off Ramp, Fireblocks Customer, Web2 Stablecoin Settlement Customer, Other"],
-  "product_to_sell": "One of: Agentic payment rails, Cross-chain settlement, Stablecoin settlement, Fiat on/off-ramp, Treasury movement, DvP settlement, iGaming payments, RWA settlement, PSP settlement, Wallet onboarding, Launchpad participation, Payment orchestration, Cross-border USDT/USDC settlement — choose NO_FIT if none genuinely apply",
+  "industry_category": "One of: AI agent / agentic commerce company, AI-native SaaS selling to enterprise, Custody / MPC wallet provider, Exchange, Treasury or fund, Fintech, Robotics / autonomous systems, Other",
+  "customer_category": ["Array — only include categories that genuinely apply: Agentic Payments Customer, Aerpolice Governance Customer, AER360 Custody / Key-Governance Customer, Other"],
+  "product_to_sell": "One of: Aerpolice agent identity, Aerpolice policy + execution gate, Aerpolice audit trail, AER360 threshold signing, AER360 policy engine, AER360 wallet, AER360 agent control center — choose NO_FIT if none genuinely apply",
   "region": "Their primary market region"
 }`
 }
 
 // ── PHASE 3: Honest product fit evaluation ────────────────────
 // Runs AFTER deep research and pain identification.
-// Evaluates all three products with "no_fit" as a valid answer.
-// This replaces the old pKima + pAeredium separate calls.
+// Evaluates both products with "no_fit" as a valid answer.
 function pFit(name: string, researchSummary: string, painSummary: string) {
   return `Evaluate our products against this company.
 
@@ -154,67 +153,59 @@ The output must be specific to THIS company. If the analysis still makes sense w
 
 Evaluate each product:
 
-KIMA (settlement + interoperability infrastructure):
-- Does this company have a REAL gap in settlement or cross-rail value movement that Kima fills?
-- Check: what settlement infrastructure do they already have? If they've solved this themselves, Kima is a competitor scenario, not a customer scenario.
+AERPOLICE (governance for AI agents with financial or system authority):
+- Does this company have autonomous AI agents that move money, approve payments, or take consequential financial/system actions?
+- "Uses AI" is NOT sufficient. The agents must have real economic or system authority.
+- Check: are agents executing actions, or only recommending them?
 - Verdict options: strong_fit | moderate_fit | weak_fit | no_fit
 
-AEREDIUM (institutional-grade L1 infrastructure):
-- Is this company at a stage/scale/partner mix where Aeredium's TEE validators, 250k TPS, or institutional-grade infrastructure genuinely matters?
-- Check: are they serving banks or institutions? Do they have throughput needs or regulatory requirements that justify this?
-- Verdict options: strong_fit | moderate_fit | weak_fit | no_fit
-
-AERPOLICE (governance for AI agents with financial authority):
-- Does this company have autonomous AI agents that move money, approve payments, or take consequential financial actions?
-- "Uses AI" is NOT sufficient. The agents must have economic authority.
-- Check: are agents executing financial transactions, or only recommending them?
+AER360 (hardware-enforced custody, threshold signing, and per-agent wallet policy):
+- Does this company have a REAL gap in how it custodies funds or signs transactions — software-only MPC, ad hoc multisig, seed-phrase-based wallets, or no per-agent spend policy?
+- Check: are they a custodian, exchange, treasury, or fund handling institutional volume? Are they about to give an AI agent real spending authority with no bounded wallet for it?
+- If they've already solved this with hardware-attested signing themselves, AER360 is a competitor scenario, not a customer scenario.
 - Verdict options: strong_fit | moderate_fit | weak_fit | no_fit
 
 Return JSON:
 {
-  "kima": {
+  "aerpolice": {
     "verdict": "strong_fit|moderate_fit|weak_fit|no_fit",
-    "kima_fit": "Specific reasoning for THIS company — what gap exists, what workflow breaks without Kima. Or, if no_fit, explain exactly why.",
-    "suggested_use_case": "Exact Kima use case if applicable, or null",
-    "settlement_angle": "Specific settlement opportunity, or null",
+    "aerpolice_fit": "Specific reasoning — do they have agents with financial/system authority? What governance gap exists? Or, if no_fit, explain exactly why.",
+    "agent_control_angle": "Specific control/governance angle, or null",
+    "suggested_use_case": "Exact Aerpolice use case if applicable, or null",
     "integration_feasibility": "high|medium|low|not_applicable",
     "revenue_potential": "Estimated value this creates for them, or null"
   },
-  "aeredium": {
+  "aer360": {
     "verdict": "strong_fit|moderate_fit|weak_fit|no_fit",
-    "aeredium_fit": "Specific reasoning for THIS company, or explanation of why it's not relevant",
-    "security_angle": "TEE/compliance/throughput angle specific to their situation, or null",
-    "risk_angle": "Risk reduction angle, or null"
+    "aeredium_fit": "Specific reasoning for THIS company — what custody/signing gap exists, tied to their actual stack. Or, if no_fit, explain exactly why.",
+    "security_angle": "Threshold-signing/hardware-enclave/policy-enforcement angle specific to their situation, or null",
+    "risk_angle": "Risk reduction angle (key theft, insider threat, unaudited transactions), or null",
+    "suggested_use_case": "Exact AER360 use case if applicable, or null",
+    "integration_feasibility": "high|medium|low|not_applicable",
+    "revenue_potential": "Estimated value this creates for them, or null"
   },
-  "aerpolice": {
-    "verdict": "strong_fit|moderate_fit|weak_fit|no_fit",
-    "aerpolice_fit": "Specific reasoning — do they have agents with financial authority? What governance gap exists?",
-    "agent_control_angle": "Specific control/governance angle, or null"
-  },
-  "combined_opportunity": "Is there a genuine case for combining products? Be specific. If not, say so clearly.",
+  "combined_opportunity": "Is there a genuine case for combining Aerpolice + AER360 (e.g. an agentic-payments company that needs both a decision gate and a hardware-governed wallet)? Be specific. If not, say so clearly.",
   "strategic_hypotheses": [
-    "If they expand into X, then Kima becomes relevant because...",
-    "When they add agent-based automation, Aerpolice will matter because..."
+    "When they start giving agents financial authority, Aerpolice becomes critical because...",
+    "If they start handling institutional volume, AER360's hardware-enforced signing will matter because..."
   ],
   "honest_assessment": "One paragraph. Plain English. Is this a real opportunity? Which product and why? If weak or no fit across the board, say that clearly. The BD team needs honest signal, not manufactured confidence.",
-  "competitor_context": "Are any of our products in competition with something they already have? Be explicit.",
+  "competitor_context": "Are either of our products in competition with something they already have? Be explicit.",
 
   // ── Product & use-case match matrix ────────────────────────
-  // The verdicts above are company-level (Kima/Aeredium/Aerpolice as a whole).
-  // Now break Aeredium and Aerpolice down into their SPECIFIC sub-products —
-  // e.g. a company can be a no_fit for Aeredium's L1 but a strong fit for
-  // AERKey specifically. Return exactly 9 entries, one per product below.
-  // match values: "strong" | "partial" | "none"
+  // The verdicts above are company-level (Aerpolice/AER360 as a whole).
+  // Now break each down into its SPECIFIC sub-products — e.g. a company can
+  // be a no_fit for AER360's wallet but a strong fit for AERKey specifically.
+  // Return exactly 8 entries, one per product below. match values: "strong" | "partial" | "none"
   "product_matches": [
-    { "product": "Kima UPR", "company": "Kima", "match": "strong | partial | none", "why": "...", "use_case": "" },
-    { "product": "Kima LaaS", "company": "Kima", "match": "strong | partial | none", "why": "...", "use_case": "" },
-    { "product": "Kima DvP", "company": "Kima", "match": "strong | partial | none", "why": "...", "use_case": "" },
-    { "product": "Aeredium Institutional L1", "company": "Aeredium", "match": "strong | partial | none", "why": "...", "use_case": "" },
-    { "product": "Aeredium AERLink", "company": "Aeredium", "match": "strong | partial | none", "why": "...", "use_case": "" },
-    { "product": "Aeredium AERKey", "company": "Aeredium", "match": "strong | partial | none", "why": "...", "use_case": "" },
     { "product": "Aerpolice Agent Identity", "company": "Aerpolice", "match": "strong | partial | none", "why": "...", "use_case": "" },
-    { "product": "Aerpolice Execution Gate", "company": "Aerpolice", "match": "strong | partial | none", "why": "...", "use_case": "" },
-    { "product": "Aerpolice Audit Trail", "company": "Aerpolice", "match": "strong | partial | none", "why": "...", "use_case": "" }
+    { "product": "Aerpolice Agent Policy + Execution Gate", "company": "Aerpolice", "match": "strong | partial | none", "why": "...", "use_case": "" },
+    { "product": "Aerpolice Audit Trail", "company": "Aerpolice", "match": "strong | partial | none", "why": "...", "use_case": "" },
+    { "product": "Aerpolice Controls (kill switch)", "company": "Aerpolice", "match": "strong | partial | none", "why": "...", "use_case": "" },
+    { "product": "AER360 AERKey (Threshold Signing)", "company": "AER360", "match": "strong | partial | none", "why": "...", "use_case": "" },
+    { "product": "AER360 Policy Engine", "company": "AER360", "match": "strong | partial | none", "why": "...", "use_case": "" },
+    { "product": "AER360 AERKey Wallet", "company": "AER360", "match": "strong | partial | none", "why": "...", "use_case": "" },
+    { "product": "AER360 Agent Control Center", "company": "AER360", "match": "strong | partial | none", "why": "...", "use_case": "" }
   ]
 }`
 }
@@ -234,9 +225,9 @@ SCORING FRAMEWORK (0–100):
 Base factors: genuine_pain_identified(25) + clear_product_fit(25) + traction_and_stage(15) + timing_signal(15) + contact_accessibility(10) + revenue_potential(10)
 
 Boosts (add to base):
-+20 if agentic payments fit is strong (clear AI agents with financial authority)
-+20 if strong Kima fit with specific settlement gap identified
-+15 if there is a live trigger event (recent funding, product launch, expansion, hack)
++20 if agentic payments fit is strong (clear AI agents with financial or system authority)
++20 if strong AER360 fit with specific custody/key-signing gap identified
++15 if there is a live trigger event (recent funding, security incident, product launch, expansion)
 +10 if this is an enterprise or growth-stage company with budget
 
 Penalties (subtract):
@@ -418,11 +409,11 @@ export async function POST(req: NextRequest) {
       await supabase.from('leads').update(patch2).eq('id', lead_id)
     }
 
-    // ── Phase 3: Honest product fit (all 3 products, one call) ──
+    // ── Phase 3: Honest product fit (both products, one call) ──
     // Runs AFTER company understanding + pain — this is the key change.
     type FitSection = Record<string, unknown>
     type FitResult = {
-      kima?: FitSection; aeredium?: FitSection; aerpolice?: FitSection
+      aer360?: FitSection; aerpolice?: FitSection
       combined_opportunity?: string; strategic_hypotheses?: string[]
       honest_assessment?: string; competitor_context?: string
       product_matches?: ProductMatch[]
@@ -433,33 +424,33 @@ export async function POST(req: NextRequest) {
     }).catch(() => null)
 
     const fitSum = fitData ? JSON.stringify({
-      kima_verdict:     fitData.kima?.verdict,
-      aeredium_verdict: fitData.aeredium?.verdict,
-      aerpolice_verdict:   fitData.aerpolice?.verdict,
+      aer360_verdict:    fitData.aer360?.verdict,
+      aerpolice_verdict: fitData.aerpolice?.verdict,
       honest_assessment: fitData.honest_assessment,
     }) : 'Fit evaluation: not available'
 
     const patch3: Record<string, unknown> = {}
     if (fitData) {
-      const k = fitData.kima ?? {}
-      if (k.kima_fit)               patch3.kima_fit               = k.kima_fit
-      if (k.suggested_use_case)     patch3.suggested_use_case     = k.suggested_use_case
-      if (k.settlement_angle)       patch3.settlement_angle       = k.settlement_angle
-      if (k.integration_feasibility) patch3.integration_feasibility = k.integration_feasibility
-      if (k.revenue_potential)      patch3.revenue_potential      = k.revenue_potential
-
-      const ae = fitData.aeredium ?? {}
+      const ae = fitData.aer360 ?? {}
       if (ae.aeredium_fit)   patch3.aeredium_fit  = ae.aeredium_fit
       if (ae.security_angle) patch3.security_angle = ae.security_angle
       if (ae.risk_angle)     patch3.risk_angle    = ae.risk_angle
+      // Shared single-value fields — set from AER360 first, Aerpolice below
+      // overwrites if it also has a value, since Aerpolice is the
+      // highest-priority wedge when both products genuinely fit.
+      if (ae.suggested_use_case)      patch3.suggested_use_case      = ae.suggested_use_case
+      if (ae.integration_feasibility) patch3.integration_feasibility = ae.integration_feasibility
+      if (ae.revenue_potential)       patch3.revenue_potential       = ae.revenue_potential
 
-      // Aerpolice fit was evaluated but previously thrown away — persist it now.
       const ag = fitData.aerpolice ?? {}
-      if (ag.aerpolice_fit)          patch3.aerpolice_fit          = ag.aerpolice_fit
+      if (ag.aerpolice_fit)       patch3.aerpolice_fit       = ag.aerpolice_fit
       if (ag.agent_control_angle) patch3.agent_control_angle = ag.agent_control_angle
+      if (ag.suggested_use_case)      patch3.suggested_use_case      = ag.suggested_use_case
+      if (ag.integration_feasibility) patch3.integration_feasibility = ag.integration_feasibility
+      if (ag.revenue_potential)       patch3.revenue_potential       = ag.revenue_potential
 
-      // Full 9-product match matrix (which specific product — e.g. AERKey —
-      // is the best fit), not just the 3 company-level verdicts above.
+      // Full 8-product match matrix (which specific product — e.g. AERKey —
+      // is the best fit), not just the 2 company-level verdicts above.
       if (fitData.product_matches?.length) patch3.product_matches = fitData.product_matches
 
       // Store honest_assessment in competitor_context field (re-purposed for

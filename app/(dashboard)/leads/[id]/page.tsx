@@ -29,7 +29,7 @@ import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL, REGIONS } f
 import { actStart, actFinish, ACTION_TOOL, ACTION_LABEL } from '@/lib/agent-activity'
 import { getActor, ACTOR_LABEL } from '@/lib/actor'
 
-type AIAction = 'research' | 'pain_points' | 'kima_fit' | 'aeredium_fit' | 'aerpolice_fit' | 'classify' | 'score' | 'contacts' | null
+type AIAction = 'research' | 'pain_points' | 'aeredium_fit' | 'aerpolice_fit' | 'classify' | 'score' | 'contacts' | null
 
 /* ── Design tokens (matching reference exactly) ──────────────── */
 const C = {
@@ -1490,12 +1490,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     if (typeof window === 'undefined') return
     if (!window.__bda) window.__bda = { events: [], v: 0 }
     const toolMap: Record<string, string> = {
-      research: 'Claude', classify: 'Claude', kima_fit: 'Claude',
+      research: 'Claude', classify: 'Claude',
       aeredium_fit: 'Claude', aerpolice_fit: 'Claude', score: 'Claude', contacts: 'ContactFinder', pain_points: 'Claude',
     }
     const labelMap: Record<string, string> = {
-      research: 'Research Company', classify: 'Classify Lead', kima_fit: 'Kima Fit Analysis',
-      aeredium_fit: 'Aeredium Fit Analysis', aerpolice_fit: 'Aerpolice Fit Analysis', score: 'Score Lead',
+      research: 'Research Company', classify: 'Classify Lead',
+      aeredium_fit: 'AER360 Fit Analysis', aerpolice_fit: 'Aerpolice Fit Analysis', score: 'Score Lead',
       contacts: 'Find Contacts', pain_points: 'Identify Pain Points',
     }
     if (aiAction) {
@@ -1546,7 +1546,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [discussOpen, setDiscussOpen] = useState(false)
   const [contactedModalOpen, setContactedModalOpen] = useState(false)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
-    overview: true, research: true, pain: true, kima: true,
+    overview: true, research: true, pain: true,
     aeredium: true, aerpolice: true, contacts: true, outreach: true, feedback: false
   })
 
@@ -1643,16 +1643,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           pain_point_evidence_type: json.data.pain_point_evidence_type || 'agent_analysis',
           updated_at: new Date().toISOString()
         }).eq('id', id); loadLead()
-      } else if (action === 'kima_fit') {
-        await supabase.from('leads').update({
-          kima_fit: json.data.kima_fit, suggested_use_case: json.data.suggested_use_case,
-          settlement_angle: json.data.settlement_angle, integration_feasibility: json.data.integration_feasibility,
-          updated_at: new Date().toISOString()
-        }).eq('id', id); loadLead()
       } else if (action === 'aeredium_fit') {
         await supabase.from('leads').update({
           aeredium_fit: json.data.aeredium_fit, security_angle: json.data.security_angle,
-          risk_angle: json.data.risk_angle, updated_at: new Date().toISOString()
+          risk_angle: json.data.risk_angle, suggested_use_case: json.data.suggested_use_case,
+          integration_feasibility: json.data.integration_feasibility,
+          updated_at: new Date().toISOString()
         }).eq('id', id); loadLead()
       } else if (action === 'aerpolice_fit') {
         await supabase.from('leads').update({
@@ -1867,8 +1863,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             {([
               { action: 'research' as AIAction,    label: 'Research Company'     },
               { action: 'pain_points' as AIAction, label: 'Identify Pain Points' },
-              { action: 'kima_fit' as AIAction,    label: 'Kima Fit'             },
-              { action: 'aeredium_fit' as AIAction,label: 'Aeredium Fit'         },
+              { action: 'aeredium_fit' as AIAction,label: 'AER360 Fit'           },
               { action: 'aerpolice_fit' as AIAction,  label: 'Aerpolice Fit'           },
               { action: 'classify' as AIAction,    label: 'Classify'             },
               { action: 'score' as AIAction,       label: 'Score Lead'           },
@@ -2075,21 +2070,21 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               )}
             </FindingCard>
 
-            {/* Kima Fit */}
+            {/* AER360 Fit */}
             <FindingCard
-              icon={Puzzle} title="Kima Fit" pillVariant="green"
-              body={lead.kima_fit ? lead.kima_fit.split('\n')[0] : 'Kima fit not analyzed yet.'}
-              expanded={expanded.kima} onToggle={() => toggle('kima')}
+              icon={Shield} title="AER360 Fit" pillVariant="purple"
+              body={lead.aeredium_fit ? lead.aeredium_fit.split('\n')[0] : 'AER360 fit not analyzed yet.'}
+              expanded={expanded.aeredium} onToggle={() => toggle('aeredium')}
             >
-              {lead.kima_fit ? (
+              {lead.aeredium_fit ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   {/* Main pitch */}
-                  <div style={{ borderRadius: 12, border: '1px solid rgba(52,211,153,0.2)', background: 'rgba(52,211,153,0.06)', padding: '14px 16px' }}>
+                  <div style={{ borderRadius: 12, border: '1px solid rgba(168,85,247,0.2)', background: 'rgba(168,85,247,0.06)', padding: '14px 16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                      <Puzzle size={14} color="#34d399" />
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.08em' }}>How Kima helps</span>
+                      <Shield size={14} color="#c084fc" />
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#c084fc', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Trust & Security</span>
                     </div>
-                    <ProseBullets text={lead.kima_fit!} color="rgb(220,225,240)" dotColor="rgba(52,211,153,0.7)" />
+                    <ProseBullets text={lead.aeredium_fit!} color="rgb(220,225,240)" dotColor="rgba(192,132,252,0.7)" />
                   </div>
                   {/* Use case + feasibility */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -2108,41 +2103,6 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                       </div>
                     )}
                   </div>
-                  {/* Settlement Angle */}
-                  {lead.settlement_angle && (
-                    <div style={{ borderRadius: 12, border: '1px solid rgba(168,85,247,0.2)', background: 'rgba(168,85,247,0.06)', padding: '14px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                        <ArrowRight size={14} color="#c084fc" />
-                        <span style={{ fontSize: 11, fontWeight: 700, color: '#c084fc', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Settlement Angle</span>
-                      </div>
-                      <ProseBullets text={lead.settlement_angle} color="rgb(220,225,240)" dotColor="rgba(192,132,252,0.7)" />
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <button onClick={() => runAI('kima_fit')} disabled={aiAction !== null}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 9, border: '1px solid rgba(52,211,153,0.28)', background: 'rgba(52,211,153,0.09)', padding: '8px 14px', fontSize: 13, color: 'rgb(110,231,183)', cursor: 'pointer', fontFamily: 'inherit' }}>
-                  <Sparkles size={12} />Analyze Kima Fit
-                </button>
-              )}
-            </FindingCard>
-
-            {/* Aeredium Fit */}
-            <FindingCard
-              icon={Shield} title="Aeredium Fit" pillVariant="purple"
-              body={lead.aeredium_fit ? lead.aeredium_fit.split('\n')[0] : 'Aeredium fit not analyzed yet.'}
-              expanded={expanded.aeredium} onToggle={() => toggle('aeredium')}
-            >
-              {lead.aeredium_fit ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {/* Main pitch */}
-                  <div style={{ borderRadius: 12, border: '1px solid rgba(168,85,247,0.2)', background: 'rgba(168,85,247,0.06)', padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                      <Shield size={14} color="#c084fc" />
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#c084fc', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Trust & Security</span>
-                    </div>
-                    <ProseBullets text={lead.aeredium_fit!} color="rgb(220,225,240)" dotColor="rgba(192,132,252,0.7)" />
-                  </div>
                   {/* Risk Angle */}
                   {lead.risk_angle && (
                     <div style={{ borderRadius: 12, border: '1px solid rgba(244,114,182,0.2)', background: 'rgba(244,114,182,0.06)', padding: '14px 16px' }}>
@@ -2157,7 +2117,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               ) : (
                 <button onClick={() => runAI('aeredium_fit')} disabled={aiAction !== null}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 9, border: '1px solid rgba(168,85,247,0.28)', background: 'rgba(168,85,247,0.09)', padding: '8px 14px', fontSize: 13, color: 'rgb(196,167,252)', cursor: 'pointer', fontFamily: 'inherit' }}>
-                  <Sparkles size={12} />Analyze Aeredium Fit
+                  <Sparkles size={12} />Analyze AER360 Fit
                 </button>
               )}
             </FindingCard>

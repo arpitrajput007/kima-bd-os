@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import {
   Sun, Target, Flame, ArrowRight, MessageSquare, Mail, Link2,
   AtSign, CheckCircle, Eye, Loader2, RefreshCw, Clock, CalendarCheck,
-  Sparkles, Zap, TrendingUp, Wand2, Copy, ExternalLink, Download, ShieldAlert, Trash2,
+  Sparkles, Zap, TrendingUp, Wand2, Copy, ExternalLink, Download, Trash2,
   Search, X,
 } from 'lucide-react'
 import { cn, getScoreBg, truncate } from '@/lib/utils'
@@ -325,7 +325,6 @@ export default function TodayPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [fetching, setFetching] = useState(false)
   const [forceRunAll, setForceRunAll] = useState(false)
-  const [hackFetching, setHackFetching] = useState(false)
   const [bgJob, setBgJob] = useState<{ status: string; sources_done: number; sources_total: number; leads_saved: number; current_source?: string } | null>(null)
   const [contactingLead, setContactingLead] = useState<LeadWithContacts | null>(null)
   const [searchQuery, setSearchQuery]   = useState('')
@@ -405,26 +404,6 @@ export default function TodayPage() {
       toast.error('Discovery failed')
     } finally {
       setFetching(false)
-    }
-  }
-
-  // Scan rekt.news + Exa for recently hacked protocols.
-  const fetchHackedLeads = async () => {
-    setHackFetching(true)
-    try {
-      const res = await fetch('/api/leads/hack-monitor', { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) { toast.error(data.error || 'Hack monitor failed'); return }
-      if (data.saved > 0) {
-        toast.success(`Found ${data.saved} hacked protocol${data.saved > 1 ? 's' : ''} from last 120 days: ${data.leads_saved?.join(', ')}`)
-        loadData()
-      } else {
-        toast(data.message || 'No new hacked protocols found')
-      }
-    } catch {
-      toast.error('Hack monitor failed')
-    } finally {
-      setHackFetching(false)
     }
   }
 
@@ -627,13 +606,6 @@ export default function TodayPage() {
               style={{ accentColor: '#fbbf24', width: 13, height: 13 }} />
             Force run all
           </label>
-          <button onClick={fetchHackedLeads} disabled={hackFetching}
-            className="btn btn-secondary" style={{ padding: '7px 14px', fontSize: '12px', borderColor: 'rgba(251,113,133,0.35)', color: '#fb7185' }}
-            title="Scan rekt.news + Exa for bridge/protocol hacks in the last 120 days and add them as leads">
-            {hackFetching
-              ? <><Loader2 size={13} className="animate-spin" /> Scanning hacks…</>
-              : <><ShieldAlert size={13} /> Scan hacked protocols</>}
-          </button>
         </div>
       </div>
 

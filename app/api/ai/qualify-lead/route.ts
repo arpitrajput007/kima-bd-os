@@ -18,7 +18,7 @@
 
 import { claudeJSON, CLAUDE_RESEARCH } from '@/lib/claude'
 import { NextRequest, NextResponse } from 'next/server'
-import { PRODUCT_BRAIN, AERPOLICE_KNOWLEDGE, PRODUCTS_CATALOG } from '@/lib/kima-knowledge'
+import { PRODUCT_BRAIN, PRODUCTS_CATALOG } from '@/lib/kima-knowledge'
 import { scoringMemory } from '@/lib/agent-memory'
 
 // ── Infer company name from a URL ─────────────────────────────
@@ -98,19 +98,16 @@ export async function POST(req: NextRequest) {
     scoringMemory(),
   ])
 
-  const systemPrompt = `You are a senior BD researcher for Kima, Aeredium, and Aerpolice — three complementary financial and AI infrastructure products.
+  const systemPrompt = `You are a senior BD researcher for Aerpolice (AI-agent governance) and AER360 (hardware-enforced custody and key-signing) — two complementary trust-layer products. These are the ONLY two products this agent sources leads for.
 
 ${PRODUCT_BRAIN}
-
---- AERPOLICE ---
-${AERPOLICE_KNOWLEDGE}
 
 --- FULL PRODUCT CATALOG ---
 ${PRODUCTS_CATALOG}
 
 Your job is to:
-1. Qualify a company as a potential lead for ANY or ALL of our three products (Kima, Aeredium, Aerpolice)
-2. Fill EVERY field in the BD database — including risk_angle, settlement_angle, security_angle, revenue_potential, integration_feasibility, competitive positioning, social links, verified facts vs assumptions
+1. Qualify a company as a potential lead for either or both of our two products (Aerpolice, AER360)
+2. Fill EVERY field in the BD database — including risk_angle, security_angle, revenue_potential, integration_feasibility, competitive positioning, social links, verified facts vs assumptions
 3. Evaluate every product in the catalog against this company and produce a product_matches array
 
 Apply the agent rules below when scoring and classifying leads. prioritize/reject rules override the base score. score_boost/score_penalty rules adjust the final score.
@@ -118,7 +115,7 @@ ${memory}
 
 Return ONLY valid JSON. No markdown, no prose outside JSON.`
 
-  const userPrompt = `Qualify this company as a Kima/Aeredium lead and fill EVERY field below:
+  const userPrompt = `Qualify this company as an Aerpolice/AER360 lead and fill EVERY field below:
 
 Company: ${companyName}
 Website: ${url}
@@ -136,40 +133,39 @@ Return a single JSON object with ALL of these fields:
   "description": "2-3 sentence summary of what this company does",
   "business_model": "How they make money — be specific (B2B SaaS, transaction fees, AUM, etc.)",
   "product_summary": "What their main product does in 2-3 sentences",
-  "supported_chains_or_rails": "Blockchains, fiat corridors, or payment rails they support (comma-separated)",
-  "current_providers": "Payment, bridge, custody, settlement providers they use today",
+  "supported_chains_or_rails": "Blockchains, wallets, or agent frameworks they support (comma-separated)",
+  "current_providers": "Custody, MPC, or agent-governance providers they use today, if any",
 
   // ── Competitive intelligence ───────────────────────────────
-  "competitor_or_current_provider": "The single most relevant competitor or incumbent provider they use that Kima/Aeredium displaces (e.g. LayerZero, Fireblocks, Wormhole, Stripe, SWIFT, Circle)",
-  "competitor_context": "Why they chose that provider and what limitations that choice creates for them — this is the wedge for Kima's pitch",
+  "competitor_or_current_provider": "The single most relevant competitor or incumbent provider they use that Aerpolice/AER360 displaces (e.g. Fireblocks, Coinbase Custody, Copper, Fordefi, Skyfire, a software-only MCP/RBAC governance tool)",
+  "competitor_context": "Why they chose that provider and what limitations that choice creates for them — this is the wedge for our pitch",
 
   // ── Classification ─────────────────────────────────────────
-  "industry_category": "Exactly one of: Cross-border payment company | PSP/payment gateway | On/off-ramp provider | Stablecoin payment company | Wallet | DEX | Perp DEX | Launchpad | RWA platform | iGaming/payment-heavy platform | Neobank | Fintech | Exchange | Chain ecosystem | AI commerce/payment agent | Treasury management platform | Custody/payment infrastructure company | Web2 company with payment/settlement friction | Other",
-  "customer_category": ["Array — pick all that apply: Agentic Payments Customer | Aerpolice Governance Customer | AERKey / Key Governance Customer | LayerZero Customer | Hacked Protocol | Needs On/Off Ramp | Fireblocks Customer | Web2 Stablecoin Settlement Customer | Other"],
-  "product_to_sell": "Exactly one of: Agentic payment rails | Aerpolice agent governance | AERKey threshold signing | Cross-chain settlement | Stablecoin settlement | Fiat on/off-ramp | Treasury movement | DvP settlement | iGaming payments | RWA settlement | PSP settlement | Wallet onboarding | Launchpad participation | Payment orchestration | Cross-border USDT/USDC settlement",
-  "region": "Primary market — one of: Global | North America | Europe | Asia | Middle East | Africa | Southeast Asia | South Asia | Latin America | MENA | EU-India corridor | UAE-India corridor | US-India corridor",
+  "industry_category": "Exactly one of: AI agent / agentic commerce company | AI-native SaaS selling to enterprise | Custody / MPC wallet provider | Exchange | Treasury or fund | Fintech | Robotics / autonomous systems | Other",
+  "customer_category": ["Array — pick all that apply: Agentic Payments Customer | Aerpolice Governance Customer | AER360 Custody / Key-Governance Customer | Other"],
+  "product_to_sell": "Exactly one of: Aerpolice agent identity | Aerpolice policy + execution gate | Aerpolice audit trail | AER360 threshold signing | AER360 policy engine | AER360 wallet | AER360 agent control center",
+  "region": "Primary market — one of: Global | North America | Europe | Asia | Middle East | Africa | Southeast Asia | South Asia | Latin America | MENA",
 
   // ── Pain point ─────────────────────────────────────────────
-  "pain_point": "The single most important pain point Kima/Aeredium can solve for this specific company",
+  "pain_point": "The single most important pain point Aerpolice/AER360 can solve for this specific company",
   "pain_point_severity": "critical | high | medium | low",
-  "pain_point_evidence": "Specific evidence — quote a real article/hack report if found, or explain the reasoning from their tech stack",
+  "pain_point_evidence": "Specific evidence — quote a real article/incident report if found, or explain the reasoning from their tech stack",
   "pain_point_source_url": "Exact URL proving this pain — empty string if none, NEVER invent a URL",
   "pain_point_evidence_type": "verified_source (real article explicitly mentions this pain) | agent_analysis (reasoned from public facts) | inferred (general industry knowledge)",
 
   // ── Trigger ────────────────────────────────────────────────
-  "trigger_reason": "Why reach out NOW — recent funding, hack, expansion, product launch, regulatory change, etc.",
+  "trigger_reason": "Why reach out NOW — recent funding, security incident, expansion, product launch giving an agent financial authority, compliance hire, etc.",
   "trigger_source_url": "URL to the trigger event — empty string if not found",
 
-  // ── Kima / Aeredium fit ────────────────────────────────────
-  "kima_fit": "Exactly how Kima helps this company — specific use case and integration angle",
-  "suggested_use_case": "The single best Kima use case to pitch",
-  "settlement_angle": "How Kima's atomic cross-chain settlement specifically improves their current setup",
-  "aeredium_fit": "How Aeredium's TEE/trust layer strengthens the pitch for this company",
-  "security_angle": "The specific TEE / MPC / compliance / execution-integrity angle for Aeredium",
-  "risk_angle": "What specific risks (bridge exploits, custody failure, settlement failure) Aeredium mitigates for them",
+  // ── Aerpolice / AER360 fit ─────────────────────────────────
+  "aerpolice_fit": "Exactly how Aerpolice helps this company — specific agent-governance use case, or null if there is genuinely no AI-agent angle",
+  "aeredium_fit": "How AER360 (AERKey threshold signing / Policy Engine / AERKey Wallet / Agent Control Center) strengthens the pitch for this company, or null if there is genuinely no custody/key-signing angle",
+  "suggested_use_case": "The single best Aerpolice or AER360 use case to pitch — whichever is the stronger fit",
+  "security_angle": "The specific threshold-signing / hardware-enclave / policy-enforcement angle that matters for this company",
+  "risk_angle": "What specific risks (key theft, insider threat, unauthorized agent action, unaudited transactions) Aerpolice/AER360 mitigates for them",
 
   // ── Commercial ─────────────────────────────────────────────
-  "revenue_potential": "Estimated revenue/business impact for them if they integrate Kima (be specific — transaction volume, cost savings, new markets)",
+  "revenue_potential": "Estimated revenue/business impact for them if they integrate Aerpolice/AER360 (be specific — transaction volume, headcount, risk avoided)",
   "integration_feasibility": "high | medium | low — and one sentence explaining why",
 
   // ── Social links (research from web) ──────────────────────
@@ -194,7 +190,7 @@ Return a single JSON object with ALL of these fields:
 
   // ── Verdict ────────────────────────────────────────────────
   "verdict": "good_lead | not_a_lead",
-  "verdict_reasoning": "3-5 sentences on why this is or isn't a good Kima/Aeredium lead",
+  "verdict_reasoning": "3-5 sentences on why this is or isn't a good Aerpolice/AER360 lead",
   "verdict_flags": ["concerns or red flags — empty array if none"],
   "verdict_strengths": ["positive signals — things that make this a strong lead"],
 
@@ -203,62 +199,20 @@ Return a single JSON object with ALL of these fields:
   "source_summary": "One sentence describing what that source reveals",
 
   // ── Product & use-case match matrix ────────────────────────
-  // Evaluate EVERY product in the catalog. Return exactly 9 entries — one per product.
+  // Evaluate EVERY product in the catalog. Return exactly 8 entries — one per product.
   // match values: "strong" | "partial" | "none"
   // why: 1-2 specific sentences explaining the match or mismatch for THIS company
   // use_case: concrete use case sentence if match is strong or partial, else ""
   "product_matches": [
     {
-      "product": "Kima UPR",
-      "company": "Kima",
-      "match": "strong | partial | none",
-      "why": "specific reason for this company",
-      "use_case": "e.g. Enable cross-chain USDC deposits across 5 chains via one API integration"
-    },
-    {
-      "product": "Kima LaaS",
-      "company": "Kima",
-      "match": "strong | partial | none",
-      "why": "...",
-      "use_case": ""
-    },
-    {
-      "product": "Kima DvP",
-      "company": "Kima",
-      "match": "strong | partial | none",
-      "why": "...",
-      "use_case": ""
-    },
-    {
-      "product": "Aeredium Institutional L1",
-      "company": "Aeredium",
-      "match": "strong | partial | none",
-      "why": "...",
-      "use_case": ""
-    },
-    {
-      "product": "Aeredium AERLink",
-      "company": "Aeredium",
-      "match": "strong | partial | none",
-      "why": "...",
-      "use_case": ""
-    },
-    {
-      "product": "Aeredium AERKey",
-      "company": "Aeredium",
-      "match": "strong | partial | none",
-      "why": "...",
-      "use_case": ""
-    },
-    {
       "product": "Aerpolice Agent Identity",
       "company": "Aerpolice",
       "match": "strong | partial | none",
-      "why": "...",
-      "use_case": ""
+      "why": "specific reason for this company",
+      "use_case": "e.g. Bind every payout agent to a verifiable identity before it's allowed to touch the treasury API"
     },
     {
-      "product": "Aerpolice Execution Gate",
+      "product": "Aerpolice Agent Policy + Execution Gate",
       "company": "Aerpolice",
       "match": "strong | partial | none",
       "why": "...",
@@ -270,6 +224,41 @@ Return a single JSON object with ALL of these fields:
       "match": "strong | partial | none",
       "why": "...",
       "use_case": ""
+    },
+    {
+      "product": "Aerpolice Controls (kill switch)",
+      "company": "Aerpolice",
+      "match": "strong | partial | none",
+      "why": "...",
+      "use_case": ""
+    },
+    {
+      "product": "AER360 AERKey (Threshold Signing)",
+      "company": "AER360",
+      "match": "strong | partial | none",
+      "why": "...",
+      "use_case": ""
+    },
+    {
+      "product": "AER360 Policy Engine",
+      "company": "AER360",
+      "match": "strong | partial | none",
+      "why": "...",
+      "use_case": ""
+    },
+    {
+      "product": "AER360 AERKey Wallet",
+      "company": "AER360",
+      "match": "strong | partial | none",
+      "why": "...",
+      "use_case": ""
+    },
+    {
+      "product": "AER360 Agent Control Center",
+      "company": "AER360",
+      "match": "strong | partial | none",
+      "why": "...",
+      "use_case": ""
     }
   ]
 }
@@ -278,17 +267,17 @@ SCORING (lead_score) — general ICP fit, independent of timing:
 - 85-100 (excellent): perfect ICP fit, clear pain, verified trigger, easy integration
 - 70-84 (qualified): good fit, real pain, some trigger signals
 - 50-69 (needs_research): possible fit but missing key info
-- 0-49 (low_priority): poor fit, speculative pain, not really a Kima customer
+- 0-49 (low_priority): poor fit, speculative pain, not really an Aerpolice/AER360 customer
 
 URGENCY (urgency_score) — how urgent it is to reach out THIS WEEK, driven ONLY
 by trigger recency + pain severity, NOT by how good a long-term fit they are:
-- 70-100: dated trigger in roughly the last 30-60 days (funding, hack, launch, expansion) AND pain_point_severity critical/high
+- 70-100: dated trigger in roughly the last 30-60 days (funding, security incident, launch, expansion) AND pain_point_severity critical/high
 - 40-69: real but older/vaguer trigger, or high-severity pain with no dated trigger
 - 0-39: no trigger_reason found, or it's stale/speculative — can still be a high lead_score company
 
-VERDICT:
-- good_lead: score ≥ 55 AND at least one concrete pain Kima/Aeredium can solve
-- not_a_lead: score < 55 OR company clearly doesn't need our infrastructure`
+VERDICT — only mark good_lead if the pain is both real AND urgent, not just a good fit:
+- good_lead: lead_score ≥ 50 AND pain_point_severity is critical or high AND urgency_score ≥ 50 AND at least one of aerpolice_fit/aeredium_fit is a genuine, non-null fit
+- not_a_lead: any of the above fail, or the company clearly doesn't need our infrastructure`
 
   try {
     const result = await claudeJSON({
