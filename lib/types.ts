@@ -216,13 +216,20 @@ export interface Lead {
   pain_point_evidence?: string
   pain_point_source_url?: string
   pain_point_evidence_type?: 'verified_source' | 'agent_analysis' | 'inferred'
+  potential_gap?: string
+  financial_activity?: string
+  agent_activity?: string
+  classification?: 'customer' | 'partner' | 'competitor' | 'integration' | 'investor_ecosystem' | 'not_relevant' | 'unclear'
   kima_fit?: string
   aeredium_fit?: string
   aerpolice_fit?: string
   agent_control_angle?: string
   product_matches?: ProductMatch[]
   suggested_use_case?: string
+  outreach_angle?: string
   trigger_reason?: string
+  trigger_date?: string
+  trigger_source_url?: string
   risk_angle?: string
   settlement_angle?: string
   security_angle?: string
@@ -235,6 +242,7 @@ export interface Lead {
   discord_url?: string
   facts?: Record<string, unknown>[]
   assumptions?: Record<string, unknown>[]
+  unknowns?: string[]
   use_cases?: UseCase[]
   bd_brief?: BDBrief
   lead_score?: number

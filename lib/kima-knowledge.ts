@@ -192,18 +192,105 @@ KEY COMPETITORS IN THIS SPACE:
 - Fireblocks / Coinbase Custody-style MPC custody: signing computation runs in ordinary server processes, not hardware-attested enclaves — see battlecard above.`
 
 // ── Target customer categories ───────────────────────────────────────────────
-export const TARGET_CATEGORIES_BLOCK = `TARGET CUSTOMER CATEGORIES:
-1. Agentic Payments / AI-Agent Customer — AI agents or agentic-commerce products that take financial or system actions and need both a decision-layer gate (Aerpolice) and a hardware-governed wallet (AER360) to move money safely
-2. Aerpolice Governance Customer — company building/operating AI agents with financial or system authority and no identity/policy/audit layer yet
-3. AER360 Custody / Key-Governance Customer — custodians, MPC wallet providers, exchanges, treasuries, or funds relying on software-only key management or ad hoc multisig`
+// AER360-primary as of 2026-08-11 (per user decision): AER360 is the product
+// this agent sells first. Aerpolice is a secondary note, surfaced only when a
+// prospect has an especially strong AI-agent governance angle on top of its
+// AER360 fit — never pitched as co-equal by default anymore.
+export const TARGET_CATEGORIES_BLOCK = `TARGET CUSTOMER CATEGORIES (AER360 is the primary product — Aerpolice is a secondary note, not a co-equal pitch):
+1. AER360 Custody / Key-Governance Customer — custodians, MPC wallet providers, exchanges, treasuries, or funds relying on software-only key management or ad hoc multisig, OR any company about to give a human or AI agent real financial authority for the first time with no per-agent wallet/policy framework
+2. Agentic Payments / AI-Agent Customer — AI agents or agentic-commerce products that move money and need a hardware-governed wallet (AER360) to execute from; note Aerpolice as an additive decision-layer gate only if their AI-agent governance need is unusually strong
+3. Aerpolice Governance Customer — company building/operating AI agents with financial or system authority and no identity/policy/audit layer yet, with no genuine AER360 custody/wallet angle (pure governance case)`
 
 // ── Ideal customer profile ───────────────────────────────────────────────────
-export const ICP_BLOCK = `IDEAL CUSTOMER PROFILES (ICP):
-- AI agent / agentic-commerce builders needing safe autonomous payments — specifically seed–Series A AI-native product companies selling agent products to enterprises where agents take consequential actions (payments, procurement, data access); primary urgency = enterprise deals stalling in security review
-- MCP-based tooling, AI wallet builders, agent marketplaces, autonomous-checkout startups
+export const ICP_BLOCK = `IDEAL CUSTOMER PROFILES (ICP) — AER360-primary:
 - Custodians and MPC wallet providers (Fireblocks-style) wanting a stronger signing guarantee, or a white-label story for institutional clients, than software-only MPC gives them
 - Exchanges, prime brokers, OTC desks, and treasuries handling institutional volume on software-only or ad hoc multisig key management
-- Companies about to give an AI agent real financial authority for the first time (treasury, payroll, procurement agents) with no per-agent policy/spend-limit framework in place`
+- Companies about to give a human or AI agent real financial authority for the first time (treasury, payroll, procurement agents) with no per-agent policy/spend-limit framework in place
+- AI agent / agentic-commerce builders needing a governed wallet to actually execute autonomous payments from — specifically seed–Series A AI-native product companies selling agent products to enterprises where agents take consequential actions (payments, procurement, data access)
+- MCP-based tooling, AI wallet builders, agent marketplaces, autonomous-checkout startups
+- Only when there is no genuine AER360 wallet/custody angle at all: pure AI-agent governance cases where Aerpolice is the sole fit — primary urgency there is enterprise deals stalling in security review over agent identity/policy/audit`
+
+// ── AER360 discovery/qualification rigor ─────────────────────────────────────
+// Composed ONLY into discovery + qualification prompts (discover/route.ts,
+// qualify-lead/route.ts, research/route.ts) — NOT into PRODUCT_BRAIN/FULL_BRAIN,
+// so outreach/chat/copilot/bd-brief don't carry this token weight for tasks
+// that don't need it. Distilled from the 2026-08-11 ChainGPT AER360 BD-agent
+// spec Arpit provided — condensed to the operative rules, not copied verbatim.
+
+export const AER360_ICP_TIERS = `AER360 ICP TIERS — rank every prospect into one of these:
+
+TIER 1 (highest priority):
+A. AI companies whose agents move money — AI trading/portfolio/treasury/payment/procurement agents, autonomous DeFi execution agents, agentic commerce infrastructure, "AI employees" that need payment authority
+B. Agentic fintech/payment companies — agent-to-agent payments, stablecoin payment infrastructure, autonomous settlement, machine-to-machine payments
+C. AI trading / crypto trading infrastructure — algorithmic trading platforms, AI market-making systems, AI hedge-fund infrastructure, autonomous DeFi execution
+
+TIER 2:
+D. Stablecoin/payment infrastructure — cross-border payment infra, stablecoin treasury platforms, crypto payroll, merchant settlement, payment APIs
+E. Crypto financial institutions — exchanges, custodians, OTC desks, market makers, treasury providers, institutional DeFi platforms
+F. Enterprises actively deploying financial AI agents — banks, fintechs, asset managers, trading institutions, treasury departments
+
+TIER 3:
+G. DAOs/protocols with significant automated treasury activity
+H. Crypto companies needing sophisticated employee/operations financial permissions
+
+NOT ICP — strongly deprioritize: ordinary retail crypto users, consumer wallet users, companies with no meaningful financial transactions, generic AI SaaS with no financial execution, AI used only for text/content/customer support, no wallet/treasury/payment activity, negligible financial exposure, generic Web3 projects with no operational treasury problem, companies wanting only basic wallet creation or cheap custody, companies whose only AI use case is internal productivity.
+
+THE CRITICAL DISTINCTION: "uses AI" is NOT the same as "AI/automation has financial authority." Only the second is valuable — do not score a company up just because it mentions AI, agents, or crypto.`
+
+export const TRIGGER_DICTIONARY = `TRIGGER DICTIONARY — find a reason to contact them NOW, not just a category match:
+
+VERY HIGH VALUE: launched an AI agent capable of moving money; launched autonomous trading; launched agentic payments; announced agent wallet infrastructure; raised funding specifically to build agentic finance; announced stablecoin settlement for agents; announced autonomous treasury; announced agent-to-agent payments; announced automated financial execution; suffered a wallet/security incident; announced a major expansion of financial automation; announced a large institutional/enterprise deployment.
+
+HIGH VALUE: hiring for agent infrastructure, wallet/security engineers, or treasury automation; integrating stablecoins or x402/agentic payment standards; adding autonomous trading; expanding wallet infrastructure; launching new financial automation.
+
+MEDIUM VALUE: general AI adoption; general crypto/stablecoin expansion; generic funding round; generic hiring.
+
+LOW VALUE (do not treat as a real trigger): generic AI announcement; generic blockchain/token launch; marketing language with no actual financial activity behind it.
+
+TRIGGER FRESHNESS — score the dated trigger's age:
+0-7 days = VERY STRONG · 8-30 days = STRONG · 31-90 days = MODERATE · 91-180 days = WEAK · 180+ days = background only.
+If the best trigger you found is old, search again for a fresher one before finalizing the score. A company can stay a prospect on an old signal, but the recommended outreach angle should prefer a recent one whenever available. Always state the trigger's actual date — never leave it implicit.
+
+OPERATING TEST: always ask "why would this company talk to AER360 THIS WEEK?" If you can't answer that concretely from a dated, specific event, do not score urgency high — "they announced a new AI strategy" is weak; "they raised $30M to build autonomous payments and now need to scale agent transactions" is extremely strong.`
+
+export const EVIDENCE_STANDARDS = `EVIDENCE STANDARDS — read the full page you're given, not just a snippet, and be honest about what you actually know:
+
+SOURCE HIERARCHY (higher levels are stronger proof):
+Level 1: company's own announcement, official docs, official blog/press release
+Level 2: Reuters, FT, Bloomberg, WSJ, TechCrunch, The Block, CoinDesk, Fortune, major reputable fintech/crypto publications
+Level 3: other reputable industry publications, funding announcements, founder interviews/podcasts, engineering blogs
+Level 4 (discovery signal only, not sufficient proof on its own): LinkedIn, X, Reddit, Hacker News, community posts
+
+FACT vs INFERENCE vs UNKNOWN — keep these separate, always:
+- FACT: directly stated in a real source you can cite
+- INFERENCE: reasoned from their public tech stack, business model, or category — label it as reasoning, never present it as verified
+- UNKNOWN: genuinely unconfirmed — say so plainly rather than guessing
+
+NEVER CLAIM WITHOUT EVIDENCE: that a company uses a specific wallet/vendor (Fireblocks, Turnkey, etc.) unless a source confirms it; a specific security weakness; that they lost money; that they "have no controls"; that they "need AER360"; that they're a "perfect customer"; a specific dollar amount of assets — unless sourced. Use hedged language instead: "Evidence suggests...", "Not confirmed...", "Potential gap — requires validation during discovery...".
+
+A confidently invented detail is worse than an honest "unknown" — it's what makes a BD agent untrustworthy. Prefer fewer, better-evidenced leads over more leads with padded claims.`
+
+export const COMPETITOR_CLASSIFICATION = `CUSTOMER vs COMPETITOR vs PARTNER — classify every company as exactly one of: customer | partner | competitor | integration | investor_ecosystem | not_relevant | unclear.
+
+Known competitive/adjacent companies (do NOT auto-classify these as customers just because they're in the wallet/custody/agent-governance space): Fireblocks, Turnkey, Circle, Coinbase, Privy, Fordefi, BitGo, Copper, Safe, Cobo, MoonPay, MetaMask, Stripe, Tether, and other agent-wallet/custody/policy infrastructure providers.
+
+How to reason about a company using or building one of these:
+- A company building infrastructure for OTHER companies' AI agents/wallets is likely a PARTNER or INTEGRATION opportunity, not a straight competitor — could AER360 fill a missing layer underneath or alongside what they offer?
+- A company building an AI agent that itself needs financial authority is a likely CUSTOMER, even if it currently uses one of the above as a vendor — investigate what gap remains: is enforcement software-level only (bypassable by a compromised runtime), is there no per-agent wallet/policy, no hardware-attested signing? A satisfied user of a competitor with no visible gap should be scored down, not disqualified outright.
+- A VC or fund with no operating product of their own is INVESTOR_ECOSYSTEM, never a customer.
+- If you cannot tell which bucket a company belongs in from available evidence, mark UNCLEAR rather than guessing customer.
+
+Do not silently drop competitors from output — classify them explicitly so they're never mistaken for a prospect to pitch.`
+
+export const AER360_DISCOVERY_BRAIN = `${AER360_ICP_TIERS}
+
+${TRIGGER_DICTIONARY}
+
+${EVIDENCE_STANDARDS}
+
+${COMPETITOR_CLASSIFICATION}
+
+LEAD QUALITY RULE: a company is not a qualified lead just because it mentions AI, crypto, agents, funding, or a wallet launch. A qualified lead requires PROBLEM + FINANCIAL ACTIVITY + RELEVANT ARCHITECTURE + TRIGGER + PLAUSIBLE AER360 FIT together. Quality over quantity — a handful of well-evidenced A-tier leads beats a long list of plausible-sounding ones.`
 
 // ── AERPOLICE ───────────────────────────────────────────────────────────────────
 export const AERPOLICE_KNOWLEDGE = `AERPOLICE — "The agentic trust fabric." Binds every AI agent to a cryptographic identity, governs what it's allowed to do with policy you set, and proves every action with a signed audit trail.
@@ -395,9 +482,11 @@ export function productFocusDirective(lead: LeadFocusInput): { focus: ProductFoc
   else if (hasAer360Fit) focus = 'aer360'
   else {
     // No saved fit yet (e.g. called pre-qualification) — fall back to keyword heuristics.
+    // AER360-primary (2026-08-11): default to 'aer360' unless there's a pure
+    // agent-governance signal with no custody/wallet signal at all.
     const agent = isAiAgentLead(lead)
     const custody = isCustodyLead(lead)
-    focus = agent && custody ? 'both' : custody ? 'aer360' : 'aerpolice'
+    focus = agent && !custody ? 'aerpolice' : agent && custody ? 'both' : 'aer360'
   }
 
   const directive =

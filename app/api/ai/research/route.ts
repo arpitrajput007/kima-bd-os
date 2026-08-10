@@ -1,7 +1,8 @@
-import { claudeJSON, claudeText, CLAUDE_RESEARCH } from "@/lib/claude"
+import { claudeJSON, claudeText, claudeConfigured, CLAUDE_RESEARCH } from "@/lib/claude"
 import { NextRequest, NextResponse } from 'next/server'
-import { PRODUCT_BRAIN } from '@/lib/kima-knowledge'
+import { PRODUCT_BRAIN, AER360_DISCOVERY_BRAIN } from '@/lib/kima-knowledge'
 import { scoringMemory } from '@/lib/agent-memory'
+import { readUrl } from '@/lib/webRead'
 
 
 async function getHunterContacts(website: string): Promise<string> {
@@ -24,21 +25,33 @@ async function getHunterContacts(website: string): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
-  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your_openai_api_key_here') {
-    return NextResponse.json({ error: 'OpenAI API key not configured. Please add OPENAI_API_KEY to your .env.local file.' }, { status: 400 })
+  if (!claudeConfigured()) {
+    return NextResponse.json({ error: 'ANTHROPIC_API_KEY is not configured. Add it to your .env.local (local) or hosting provider environment (production).' }, { status: 400 })
   }
 
   const { company_name, website, description, action } = await req.json()
 
-  const memory = await scoringMemory()
+  // Real evidence beats guessing from a short description — crawl the
+  // company's own site once (skip for 'contacts', which already does real
+  // multi-source lookup via lib/contactFinder).
+  const [memory, homepageText] = await Promise.all([
+    scoringMemory(),
+    website && action !== 'contacts' ? readUrl(website, 4000) : Promise.resolve(''),
+  ])
+  const evidenceContext = homepageText
+    ? `\nCOMPANY'S OWN WEBSITE (Level 1 evidence — crawled live, treat as ground truth over training data):\n${homepageText}\n`
+    : ''
 
-  const systemPrompt = `You are a senior BD researcher for Aerpolice (AI-agent governance) and AER360 (hardware-enforced custody and key-signing) — the only two products this pipeline evaluates leads for.
+  const systemPrompt = `You are a senior BD researcher for AER360 (hardware-enforced custody and key-signing — the primary product) and Aerpolice (AI-agent governance — a secondary note, only when it's an unusually strong additional angle). These are the only two products this pipeline evaluates leads for.
 
 ${PRODUCT_BRAIN}
+
+${AER360_DISCOVERY_BRAIN}
 ${memory}
 
 Always respond with valid JSON only. No markdown, no prose outside JSON.
-Always separate FACTS (verified) from ASSUMPTIONS (inferred).
+Always separate FACTS (verified) from ASSUMPTIONS (inferred) from UNKNOWNS (genuinely unconfirmed).
+Classify the company (customer | partner | competitor | integration | investor_ecosystem | not_relevant | unclear) before evaluating fit — never score a competitor or investor as if it were a prospect.
 Quality over quantity. Be specific and business-focused.`
 
   try {
@@ -49,7 +62,7 @@ Quality over quantity. Be specific and business-focused.`
 Company: ${company_name}
 Website: ${website || 'unknown'}
 Description: ${description || 'unknown'}
-
+${evidenceContext}
 Return JSON with this exact structure:
 {
   "company_summary": "2-3 sentence summary of what they do",
@@ -59,23 +72,26 @@ Return JSON with this exact structure:
   "current_providers": "Known payment/bridge/settlement providers they use",
   "facts": ["fact1", "fact2"],
   "assumptions": ["assumption1", "assumption2"],
-  "trigger_reason": "Why is this a good time to reach out? Recent news, funding, expansion, hack, etc.",
+  "unknowns": ["thing1 that matters but is genuinely unconfirmed"],
+  "trigger_reason": "Why is this a good time to reach out? Use the trigger dictionary above — must be datable and real, not a generic AI/crypto mention.",
+  "trigger_date": "The trigger's actual date if known (e.g. '2026-07-15' or 'July 2026'), or null if undated",
   "source_urls": ["exact, specific page URLs (article/news/funding post) that evidence the trigger — full links to specific pages, NOT homepages"]
 }`
 
     } else if (action === 'pain_points') {
-      userPrompt = `Identify the exact pain points this company has that Aerpolice/AER360 can solve:
+      userPrompt = `Identify the exact pain points this company has that AER360 (primary) or Aerpolice (secondary) can solve:
 Company: ${company_name}
 Website: ${website || 'unknown'}
 Description: ${description || 'unknown'}
-
+${evidenceContext}
 Return JSON:
 {
-  "pain_point": "The single most important pain point Aerpolice/AER360 can solve",
+  "pain_point": "The single most important pain point AER360/Aerpolice can solve",
   "pain_point_severity": "critical|high|medium|low",
   "pain_point_evidence": "Specific evidence. If from a real article/news/incident report, paste the exact quote. If reasoned from their public tech stack or business model, explain the reasoning.",
   "pain_point_source_url": "EXACT URL to article/news/blog/tweet/incident report that proves this pain. Empty string if no real URL — never invent one.",
   "pain_point_evidence_type": "verified_source if pain_point_source_url is a real article that explicitly mentions this pain | agent_analysis if reasoned from publicly known facts | inferred if general industry knowledge with no specific backing",
+  "potential_gap": "What's architecturally missing that AER360 could fill, or exactly 'Gap not confirmed' if unsupported by evidence",
   "why_it_matters": "Why this pain point matters to their business",
   "how_urgent": "How urgent is this problem for them?",
   "secondary_pain_points": ["other pain point 1", "other pain point 2"]
@@ -86,7 +102,7 @@ Return JSON:
 Company: ${company_name}
 Website: ${website || 'unknown'}
 Description: ${description || 'unknown'}
-
+${evidenceContext}
 Return JSON:
 {
   "aeredium_fit": "How AER360 specifically helps this company — which pillar(s), tied to their actual stack. Or, if no genuine fit, say so honestly.",
@@ -98,11 +114,11 @@ Return JSON:
 }`
 
     } else if (action === 'aerpolice_fit') {
-      userPrompt = `Identify how Aerpolice (governance & control layer for AI agents that move money or take system actions) can specifically help this company:
+      userPrompt = `Identify how Aerpolice (governance & control layer for AI agents that move money or take system actions) can specifically help this company, as a SECONDARY note to AER360 — only surface it if there's a genuinely strong, separate agent-governance angle:
 Company: ${company_name}
 Website: ${website || 'unknown'}
 Description: ${description || 'unknown'}
-
+${evidenceContext}
 Aerpolice only fits if this company has autonomous AI agents that take consequential financial or system actions. "Uses AI" is NOT sufficient — the agents must have real economic or system authority. If they don't, say so honestly in aerpolice_fit.
 
 Return JSON:
@@ -112,39 +128,46 @@ Return JSON:
 }`
 
     } else if (action === 'classify') {
-      userPrompt = `Classify this company for BD purposes:
+      userPrompt = `Classify this company for BD purposes. Do TWO classifications:
 Company: ${company_name}
 Website: ${website || 'unknown'}
 Description: ${description || 'unknown'}
+${evidenceContext}
+1. customer/partner/competitor classification (see the classification rules above) — this comes first and gates everything else.
+2. Industry/category classification.
 
 Return JSON:
 {
+  "classification": "customer|partner|competitor|integration|investor_ecosystem|not_relevant|unclear",
   "industry_category": "One of: AI agent / agentic commerce company, AI-native SaaS selling to enterprise, Custody / MPC wallet provider, Exchange, Treasury or fund, Fintech, Robotics / autonomous systems, Other",
-  "customer_category": ["Array of: Agentic Payments Customer, Aerpolice Governance Customer, AER360 Custody / Key-Governance Customer, Other"],
-  "product_to_sell": "One of: Aerpolice agent identity, Aerpolice policy + execution gate, Aerpolice audit trail, AER360 threshold signing, AER360 policy engine, AER360 wallet, AER360 agent control center",
+  "customer_category": ["Array of: AER360 Custody / Key-Governance Customer, Agentic Payments Customer, Aerpolice Governance Customer, Other"],
+  "product_to_sell": "One of: AER360 threshold signing, AER360 policy engine, AER360 wallet, AER360 agent control center, Aerpolice agent identity, Aerpolice policy + execution gate, Aerpolice audit trail",
   "region": "Their primary market region",
-  "classification_reasoning": "Why you classified them this way"
+  "classification_reasoning": "Why you classified them this way, for both classifications above"
 }`
 
     } else if (action === 'score') {
-      userPrompt = `Score this lead for Aerpolice/AER360 BD purposes (0-100):
+      userPrompt = `Score this lead for AER360 (primary) / Aerpolice (secondary) BD purposes (0-100):
 Company: ${company_name}
 Website: ${website || 'unknown'}
 Description: ${description || 'unknown'}
+${evidenceContext}
+Reason through the AER360 fit dimensions above (financial exposure, agent/automation activity, need for transaction controls, security sensitivity, recent trigger, likelihood of buying external infrastructure, AER360's differentiation for them, buyer accessibility) before committing to a number.
 
 SCORING SYSTEM (lead_score — general ICP fit, independent of timing):
 Base scores: pain_point (25), traction (20), contact_found (15), trigger (15), category_fit (10), integration_feasibility (10), revenue_potential (5)
-Boosts: agentic_payments_fit (+25), aer360_custody_gap (+20), fireblocks_or_mpc_customer (+15), giving_agent_spend_authority (+20), recent_trigger (+15), decision_maker_found (+15)
-Penalties: no_pain_point (-25), no_active_product (-20), no_decision_maker (-15), no_source_proof (-30), generic_ai_only_no_agent_authority (-25)
+Boosts: aer360_custody_gap (+25), giving_agent_or_human_spend_authority (+20), fireblocks_or_mpc_customer_with_visible_gap (+15), agentic_payments_fit (+15), recent_trigger (+15), decision_maker_found (+15)
+Penalties: no_pain_point (-25), no_active_product (-20), no_decision_maker (-15), no_source_proof (-30), generic_ai_only_no_financial_authority (-25), classification_is_competitor_or_investor (-100)
 
 URGENCY SCORING (urgency_score — separate 0-100, how urgent to reach out THIS WEEK):
-Driven ONLY by trigger recency + pain severity, NOT by how good a long-term fit they are.
-70-100: dated trigger in roughly the last 30-60 days (funding, hack, launch, expansion) AND severe pain
+Use the trigger dictionary and freshness bands above. Driven ONLY by trigger recency + pain severity, NOT by how good a long-term fit they are.
+70-100: dated VERY HIGH/HIGH value trigger in roughly the last 30-60 days AND severe pain
 40-69: real but older/vaguer trigger, or severe pain with no dated trigger
 0-39: no trigger found, or it's stale/speculative — can still be a high lead_score company
 
 Return JSON:
 {
+  "classification": "customer|partner|competitor|integration|investor_ecosystem|not_relevant|unclear",
   "lead_score": 0-100,
   "urgency_score": 0-100,
   "urgency_reasoning": "1-2 sentences: what dated trigger and pain severity drove this number",

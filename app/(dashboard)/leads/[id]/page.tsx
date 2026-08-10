@@ -1797,6 +1797,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   <span style={{ borderRadius: 999, padding: '4px 14px', fontSize: 13, ...statusBadgeStyle }}>
                     {getStatusLabel(lead.status)}
                   </span>
+                  {lead.classification && lead.classification !== 'customer' && lead.classification !== 'unclear' && (
+                    <span title="Classified as non-customer — verify before working this lead" style={{ borderRadius: 999, border: '1px solid rgba(251,113,133,0.4)', background: 'rgba(251,113,133,0.13)', padding: '4px 14px', fontSize: 13, color: '#fb7185' }}>
+                      {lead.classification.replace('_', ' ')}
+                    </span>
+                  )}
                   {bestFit && (
                     <span title={bestFit.why} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 999, border: '1px solid rgba(34,211,238,0.35)', background: 'rgba(34,211,238,0.1)', padding: '4px 14px', fontSize: 13, color: 'rgb(103,232,249)' }}>
                       <Layers size={12} />Best fit: {bestFit.product}

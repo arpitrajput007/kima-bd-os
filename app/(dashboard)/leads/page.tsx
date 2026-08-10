@@ -36,6 +36,7 @@ export default function LeadsPage() {
     product_to_sell: '',
     min_score: '',
     priority: '',
+    classification: '',
   })
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [showFilters, setShowFilters] = useState(false)
@@ -91,6 +92,7 @@ export default function LeadsPage() {
     if (filters.industry_category) query = query.eq('industry_category', filters.industry_category)
     if (filters.product_to_sell) query = query.eq('product_to_sell', filters.product_to_sell)
     if (filters.priority) query = query.eq('priority', filters.priority)
+    if (filters.classification) query = query.eq('classification', filters.classification)
     if (filters.min_score) query = query.gte('lead_score', parseInt(filters.min_score))
     if (filters.customer_category) query = query.contains('customer_category', [filters.customer_category])
 
@@ -204,7 +206,7 @@ export default function LeadsPage() {
   }
 
   const clearFilters = () => {
-    setFilters({ status: '', industry_category: '', customer_category: '', product_to_sell: '', min_score: '', priority: '' })
+    setFilters({ status: '', industry_category: '', customer_category: '', product_to_sell: '', min_score: '', priority: '', classification: '' })
     setSearch('')
   }
 
@@ -320,6 +322,22 @@ export default function LeadsPage() {
               <option value="qualified">Qualified (70-84)</option>
               <option value="needs_research">Needs Research (50-69)</option>
               <option value="low_priority">Low Priority (&lt;50)</option>
+            </select>
+
+            <select
+              value={filters.classification}
+              onChange={e => setFilters(f => ({ ...f, classification: e.target.value }))}
+              className="input-dark"
+              style={{ width: 'auto', fontSize: '12px', padding: '5px 8px' }}
+            >
+              <option value="">All Classifications</option>
+              <option value="customer">Customer</option>
+              <option value="partner">Partner</option>
+              <option value="competitor">Competitor</option>
+              <option value="integration">Integration</option>
+              <option value="investor_ecosystem">Investor/Ecosystem</option>
+              <option value="not_relevant">Not Relevant</option>
+              <option value="unclear">Unclear</option>
             </select>
 
             <select
@@ -542,7 +560,14 @@ export default function LeadsPage() {
                               ) : '—'}
                             </td>
                             <td>{lead.lead_score != null ? <span className={cn('badge', getScoreBg(lead.lead_score))}>{lead.lead_score}</span> : '—'}</td>
-                            <td><span className={cn('badge', getStatusColor(lead.status))}>{getStatusLabel(lead.status)}</span></td>
+                            <td>
+                              <span className={cn('badge', getStatusColor(lead.status))}>{getStatusLabel(lead.status)}</span>
+                              {lead.classification && lead.classification !== 'customer' && lead.classification !== 'unclear' && (
+                                <span className="badge" title="Classified as non-customer — verify before working this lead" style={{ marginLeft: 4, color: '#fb7185', background: 'rgba(251,113,133,0.12)' }}>
+                                  {lead.classification.replace('_', ' ')}
+                                </span>
+                              )}
+                            </td>
                             <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                 <Link href={`/leads/${lead.id}`} className="btn btn-ghost p-1.5" title="View" style={{ padding: 5 }}><Eye size={13} /></Link>
@@ -710,6 +735,11 @@ export default function LeadsPage() {
                         <span className={cn('badge', getStatusColor(lead.status))}>
                           {getStatusLabel(lead.status)}
                         </span>
+                        {lead.classification && lead.classification !== 'customer' && lead.classification !== 'unclear' && (
+                          <span className="badge" title="Classified as non-customer — verify before working this lead" style={{ marginLeft: 4, color: '#fb7185', background: 'rgba(251,113,133,0.12)' }}>
+                            {lead.classification.replace('_', ' ')}
+                          </span>
+                        )}
                       </td>
                       <td>
                         <span className="text-xs" style={{ color: 'rgb(100,100,120)' }}>

@@ -18,7 +18,7 @@
 
 import { claudeJSON, CLAUDE_RESEARCH } from '@/lib/claude'
 import { NextRequest, NextResponse } from 'next/server'
-import { PRODUCT_BRAIN, PRODUCTS_CATALOG } from '@/lib/kima-knowledge'
+import { PRODUCT_BRAIN, PRODUCTS_CATALOG, AER360_DISCOVERY_BRAIN } from '@/lib/kima-knowledge'
 import { scoringMemory } from '@/lib/agent-memory'
 
 // ── Infer company name from a URL ─────────────────────────────
@@ -98,17 +98,20 @@ export async function POST(req: NextRequest) {
     scoringMemory(),
   ])
 
-  const systemPrompt = `You are a senior BD researcher for Aerpolice (AI-agent governance) and AER360 (hardware-enforced custody and key-signing) — two complementary trust-layer products. These are the ONLY two products this agent sources leads for.
+  const systemPrompt = `You are a senior BD researcher for AER360 (hardware-enforced custody and key-signing — the primary product) and Aerpolice (AI-agent governance — a secondary note, only when it's an unusually strong additional angle). These are the ONLY two products this agent sources leads for.
 
 ${PRODUCT_BRAIN}
+
+${AER360_DISCOVERY_BRAIN}
 
 --- FULL PRODUCT CATALOG ---
 ${PRODUCTS_CATALOG}
 
 Your job is to:
-1. Qualify a company as a potential lead for either or both of our two products (Aerpolice, AER360)
-2. Fill EVERY field in the BD database — including risk_angle, security_angle, revenue_potential, integration_feasibility, competitive positioning, social links, verified facts vs assumptions
-3. Evaluate every product in the catalog against this company and produce a product_matches array
+1. Classify this company (customer | partner | competitor | integration | investor_ecosystem | not_relevant | unclear) BEFORE evaluating fit — never score a competitor or investor as if it were a prospect.
+2. Qualify it as a potential lead for AER360 first, and Aerpolice only as a secondary note if there's a genuinely strong separate agent-governance angle.
+3. Fill EVERY field in the BD database — including risk_angle, security_angle, revenue_potential, integration_feasibility, competitive positioning, social links, verified facts vs assumptions vs unknowns, and the new gap/trigger-dating/outreach-angle fields below.
+4. Evaluate every product in the catalog against this company and produce a product_matches array
 
 Apply the agent rules below when scoring and classifying leads. prioritize/reject rules override the base score. score_boost/score_penalty rules adjust the final score.
 ${memory}
@@ -128,6 +131,9 @@ ${webResearch || 'No live web research available — use training knowledge.'}
 Return a single JSON object with ALL of these fields:
 
 {
+  // ── Classification (decide this FIRST) ─────────────────────
+  "classification": "customer | partner | competitor | integration | investor_ecosystem | not_relevant | unclear",
+
   // ── Core identity ──────────────────────────────────────────
   "company_name": "The real company name (correct the domain-derived guess if needed)",
   "description": "2-3 sentence summary of what this company does",
@@ -135,37 +141,42 @@ Return a single JSON object with ALL of these fields:
   "product_summary": "What their main product does in 2-3 sentences",
   "supported_chains_or_rails": "Blockchains, wallets, or agent frameworks they support (comma-separated)",
   "current_providers": "Custody, MPC, or agent-governance providers they use today, if any",
+  "financial_activity": "What money/assets they appear to control or move — concrete, or 'Unknown' if not established",
+  "agent_activity": "What autonomous/AI/automated activity exists that touches money or system actions — or 'None confirmed' if there isn't any",
 
   // ── Competitive intelligence ───────────────────────────────
-  "competitor_or_current_provider": "The single most relevant competitor or incumbent provider they use that Aerpolice/AER360 displaces (e.g. Fireblocks, Coinbase Custody, Copper, Fordefi, Skyfire, a software-only MCP/RBAC governance tool)",
+  "competitor_or_current_provider": "The single most relevant competitor or incumbent provider they use that AER360/Aerpolice displaces (e.g. Fireblocks, Coinbase Custody, Copper, Fordefi, Turnkey, Skyfire, a software-only MCP/RBAC governance tool)",
   "competitor_context": "Why they chose that provider and what limitations that choice creates for them — this is the wedge for our pitch",
 
   // ── Classification ─────────────────────────────────────────
   "industry_category": "Exactly one of: AI agent / agentic commerce company | AI-native SaaS selling to enterprise | Custody / MPC wallet provider | Exchange | Treasury or fund | Fintech | Robotics / autonomous systems | Other",
-  "customer_category": ["Array — pick all that apply: Agentic Payments Customer | Aerpolice Governance Customer | AER360 Custody / Key-Governance Customer | Other"],
-  "product_to_sell": "Exactly one of: Aerpolice agent identity | Aerpolice policy + execution gate | Aerpolice audit trail | AER360 threshold signing | AER360 policy engine | AER360 wallet | AER360 agent control center",
+  "customer_category": ["Array — pick all that apply: AER360 Custody / Key-Governance Customer | Agentic Payments Customer | Aerpolice Governance Customer | Other"],
+  "product_to_sell": "Exactly one of: AER360 threshold signing | AER360 policy engine | AER360 wallet | AER360 agent control center | Aerpolice agent identity | Aerpolice policy + execution gate | Aerpolice audit trail",
   "region": "Primary market — one of: Global | North America | Europe | Asia | Middle East | Africa | Southeast Asia | South Asia | Latin America | MENA",
 
   // ── Pain point ─────────────────────────────────────────────
-  "pain_point": "The single most important pain point Aerpolice/AER360 can solve for this specific company",
+  "pain_point": "The single most important pain point AER360/Aerpolice can solve for this specific company",
   "pain_point_severity": "critical | high | medium | low",
   "pain_point_evidence": "Specific evidence — quote a real article/incident report if found, or explain the reasoning from their tech stack",
   "pain_point_source_url": "Exact URL proving this pain — empty string if none, NEVER invent a URL",
   "pain_point_evidence_type": "verified_source (real article explicitly mentions this pain) | agent_analysis (reasoned from public facts) | inferred (general industry knowledge)",
+  "potential_gap": "What's architecturally missing that AER360 could fill — or exactly 'Gap not confirmed' if the evidence doesn't support a specific gap",
 
   // ── Trigger ────────────────────────────────────────────────
   "trigger_reason": "Why reach out NOW — recent funding, security incident, expansion, product launch giving an agent financial authority, compliance hire, etc.",
+  "trigger_date": "The trigger event's actual date if known (e.g. '2026-07-15' or 'July 2026'), or null if undated",
   "trigger_source_url": "URL to the trigger event — empty string if not found",
 
-  // ── Aerpolice / AER360 fit ─────────────────────────────────
-  "aerpolice_fit": "Exactly how Aerpolice helps this company — specific agent-governance use case, or null if there is genuinely no AI-agent angle",
+  // ── AER360 / Aerpolice fit ──────────────────────────────────
   "aeredium_fit": "How AER360 (AERKey threshold signing / Policy Engine / AERKey Wallet / Agent Control Center) strengthens the pitch for this company, or null if there is genuinely no custody/key-signing angle",
-  "suggested_use_case": "The single best Aerpolice or AER360 use case to pitch — whichever is the stronger fit",
+  "aerpolice_fit": "Exactly how Aerpolice helps this company as a SECONDARY note — specific agent-governance use case, or null if there is no strong separate AI-agent angle or if AER360 alone is the stronger story",
+  "suggested_use_case": "The single best AER360 use case to pitch (or Aerpolice if that's genuinely the stronger fit)",
+  "outreach_angle": "One specific sentence referencing their actual trigger/situation — not a generic 'would love to introduce AER360' line",
   "security_angle": "The specific threshold-signing / hardware-enclave / policy-enforcement angle that matters for this company",
-  "risk_angle": "What specific risks (key theft, insider threat, unauthorized agent action, unaudited transactions) Aerpolice/AER360 mitigates for them",
+  "risk_angle": "What specific risks (key theft, insider threat, unauthorized agent action, unaudited transactions) AER360/Aerpolice mitigates for them",
 
   // ── Commercial ─────────────────────────────────────────────
-  "revenue_potential": "Estimated revenue/business impact for them if they integrate Aerpolice/AER360 (be specific — transaction volume, headcount, risk avoided)",
+  "revenue_potential": "Estimated revenue/business impact for them if they integrate AER360/Aerpolice (be specific — transaction volume, headcount, risk avoided)",
   "integration_feasibility": "high | medium | low — and one sentence explaining why",
 
   // ── Social links (research from web) ──────────────────────
@@ -173,13 +184,14 @@ Return a single JSON object with ALL of these fields:
   "telegram_url": "Full https://t.me/... URL if found — empty string if not",
   "discord_url": "Full https://discord.gg/... or discord.com/invite/... URL if found — empty string if not",
 
-  // ── Verified facts vs assumptions ──────────────────────────
+  // ── Verified facts vs assumptions vs unknowns ──────────────
   "facts": [
     {"label": "short label", "value": "verified fact from web research or public source"}
   ],
   "assumptions": [
     {"label": "short label", "value": "inferred/assumed — not directly verified"}
   ],
+  "unknowns": ["specific things that matter but are genuinely unconfirmed — empty array if none"],
 
   // ── Scoring ────────────────────────────────────────────────
   "lead_score": 0-100,
@@ -263,21 +275,26 @@ Return a single JSON object with ALL of these fields:
   ]
 }
 
-SCORING (lead_score) — general ICP fit, independent of timing:
+SCORING (lead_score) — general ICP fit, independent of timing. Reason through the
+AER360 fit dimensions in the discovery brain above (financial exposure, agent/
+automation activity, need for transaction controls, security sensitivity, recent
+trigger, likelihood of buying external infrastructure, AER360's differentiation
+for them, buyer accessibility) before committing to a number:
 - 85-100 (excellent): perfect ICP fit, clear pain, verified trigger, easy integration
 - 70-84 (qualified): good fit, real pain, some trigger signals
 - 50-69 (needs_research): possible fit but missing key info
-- 0-49 (low_priority): poor fit, speculative pain, not really an Aerpolice/AER360 customer
+- 0-49 (low_priority): poor fit, speculative pain, not really an AER360/Aerpolice customer
 
 URGENCY (urgency_score) — how urgent it is to reach out THIS WEEK, driven ONLY
-by trigger recency + pain severity, NOT by how good a long-term fit they are:
-- 70-100: dated trigger in roughly the last 30-60 days (funding, security incident, launch, expansion) AND pain_point_severity critical/high
+by trigger recency + pain severity, NOT by how good a long-term fit they are —
+use the trigger dictionary and freshness bands above:
+- 70-100: dated VERY HIGH/HIGH value trigger in roughly the last 30-60 days AND pain_point_severity critical/high
 - 40-69: real but older/vaguer trigger, or high-severity pain with no dated trigger
 - 0-39: no trigger_reason found, or it's stale/speculative — can still be a high lead_score company
 
-VERDICT — only mark good_lead if the pain is both real AND urgent, not just a good fit:
-- good_lead: lead_score ≥ 50 AND pain_point_severity is critical or high AND urgency_score ≥ 50 AND at least one of aerpolice_fit/aeredium_fit is a genuine, non-null fit
-- not_a_lead: any of the above fail, or the company clearly doesn't need our infrastructure`
+VERDICT — only mark good_lead if classification is customer AND the pain is both real AND urgent, not just a good fit:
+- good_lead: classification is "customer" AND lead_score ≥ 50 AND pain_point_severity is critical or high AND urgency_score ≥ 50 AND at least one of aerpolice_fit/aeredium_fit is a genuine, non-null fit
+- not_a_lead: any of the above fail, classification is competitor/partner/integration/investor_ecosystem/not_relevant/unclear, or the company clearly doesn't need our infrastructure`
 
   try {
     const result = await claudeJSON({

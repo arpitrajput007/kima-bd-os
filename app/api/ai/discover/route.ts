@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { PRODUCT_BRAIN, PRODUCT_BRAIN_COMPACT } from '@/lib/kima-knowledge'
+import { PRODUCT_BRAIN, PRODUCT_BRAIN_COMPACT, AER360_DISCOVERY_BRAIN } from '@/lib/kima-knowledge'
 import { pickBestUrl, extractSocials, type Socials } from '@/lib/utils'
 import { apolloConfigured, apolloEnrichContacts, apolloSearchCompanies, toDomain } from '@/lib/apollo'
 import { isGenericName } from '@/lib/leadQuality'
 import { exaConfigured, exaSearchCompanies, exaCompanyNews } from '@/lib/exa'
-import { perplexityConfigured, researchCompanyTrigger } from '@/lib/perplexity'
 import { routeJSON, type AIProvider } from '@/lib/ai-router'
 import { CLAUDE_FAST } from '@/lib/claude'
 import { discoveryMemory } from '@/lib/agent-memory'
+import { readUrl } from '@/lib/webRead'
 
 // Deep research (OpenAI + Exa + crawling) per company is slow. Without this the
 // function hits Vercel's default timeout and gets killed before saving leads.
@@ -59,23 +59,6 @@ const CAP_BLOCKING_STATUSES = ['new', 'researching', 'needs_more_research']
 const MIN_LEAD_SCORE = 50
 const MIN_URGENCY_SCORE = 50
 const REQUIRED_PAIN_SEVERITIES = new Set(['critical', 'high'])
-
-// Read any URL as clean text via Jina.ai (free, no key needed)
-async function readUrl(url: string): Promise<string> {
-  try {
-    const jinaUrl = `https://r.jina.ai/${url}`
-    const res = await fetch(jinaUrl, {
-      headers: { Accept: 'text/plain' },
-      signal: AbortSignal.timeout(20000),
-    })
-    if (!res.ok) throw new Error(`Jina fetch failed: ${res.status}`)
-    const text = await res.text()
-    return text.slice(0, 10000) // cap to stay within GPT token budget
-  } catch (e) {
-    console.error('[readUrl]', e)
-    return ''
-  }
-}
 
 // Check a URL against ChainPatrol's phishing registry (free, no key needed).
 // Used by MetaMask, SEAL, and other Web3 security tools.
@@ -198,25 +181,25 @@ async function extractCompanies(
   content: string,
   sourceContext: string,
   provider: AIProvider = 'claude'
-): Promise<Array<{ name: string; website: string; description: string; source_url: string }>> {
+): Promise<Array<{ name: string; website: string; description: string; source_url: string; source_excerpt: string }>> {
   try {
-    const result = await routeJSON<{ companies: Array<{ name: string; website: string; description: string; source_url: string }> }>({
+    const result = await routeJSON<{ companies: Array<{ name: string; website: string; description: string; source_url: string; source_excerpt: string }> }>({
       provider,
       model: provider === 'claude' ? CLAUDE_FAST : 'gpt-4o',
-      maxTokens: 2000,
+      maxTokens: 2500,
       temperature: 0.2,
-      system: `You are a BD researcher for Aerpolice (AI-agent governance) and AER360 (hardware-enforced custody and key-signing).
+      system: `You are a BD researcher for AER360 (hardware-enforced custody and key-signing — primary product) and Aerpolice (AI-agent governance — secondary note).
 
 ${PRODUCT_BRAIN_COMPACT}
 
-Output REAL, SPECIFIC, NAMED companies that could be B2B customers for AI-agent governance or institutional custody/key-signing infrastructure — never categories.
+Read the ENTIRE page, not just the first company mentioned. Output REAL, SPECIFIC, NAMED companies that could be B2B customers for institutional custody/key-signing or AI-agent governance infrastructure — never categories.
 
 CRITICAL — every "name" MUST be a single real company you could google and land on one company's website:
 - GOOD (real companies): "Skyfire", "Fireblocks", "Copper", "Fordefi", "Anthropic", "Bybit", "Coinbase", "Circle", "Ramp", "Brex".
 - BANNED (categories / segments / groupings — NEVER output these as a name): "AI Agents", "Custody Providers", "MPC Wallets", "Exchanges", "Crypto Exchanges", "Custodians", "Fintechs", "Agent Frameworks".
 
 EXPAND CATEGORIES INTO REAL COMPANIES:
-- If the content points at a CATEGORY, expand it into specific real companies that best fit Aerpolice/AER360's ICP.
+- If the content points at a CATEGORY, expand it into specific real companies that best fit AER360/Aerpolice's ICP.
   · "agentic commerce / AI agents that pay" → Skyfire, Payman, Crossmint agent-wallet customers
   · "MPC/custody providers" → Fireblocks, Copper, Fordefi, Coinbase Custody, BitGo
   · "AI agent frameworks / MCP tooling" → companies building on Claude/OpenAI agent SDKs, MCP server authors, agent-marketplace listings
@@ -228,14 +211,15 @@ EXPAND CATEGORIES INTO REAL COMPANIES:
 Content:
 ${content}
 
-Return up to 8 SPECIFIC, REAL, NAMED companies (quality over quantity — 8 great picks beats 15 mediocre ones). Never output a category/segment as a name. Return JSON:
+Return up to 8 SPECIFIC, REAL, NAMED companies (quality over quantity — 8 great picks beats 15 mediocre ones). Never output a category/segment as a name. For each company, pull the exact sentence(s) from the content above that mention them — this is real evidence, don't discard it. Return JSON:
 {
   "companies": [
     {
       "name": "Real brand name (e.g. 'Bybit', 'JPMorgan') — NEVER a category",
       "website": "https://<real domain>",
       "description": "1-2 sentence description of what this company does",
-      "source_url": "EXACT link from content about this company, or empty string"
+      "source_url": "EXACT link from content about this company, or empty string",
+      "source_excerpt": "The exact sentence(s) from the content above that mention this company and any trigger/pain evidence — empty string if nothing specific"
     }
   ]
 }`,
@@ -257,6 +241,7 @@ async function deepResearch(
   name: string
   website: string
   description: string
+  source_excerpt?: string
 },
   learnedIntelligence?: string,
   provider: AIProvider = 'claude'
@@ -267,52 +252,66 @@ async function deepResearch(
     .trim()
 
   try {
-    const hunterData = await getHunterContacts(company.website)
+    // Real evidence beats a search snippet. Pull the company's own homepage
+    // and, if this company surfaced from a specific article, keep the exact
+    // excerpt that mentioned them — both run in parallel with Hunter.
+    const [hunterData, homepageText] = await Promise.all([
+      getHunterContacts(company.website),
+      company.website ? readUrl(company.website, 4000) : Promise.resolve(''),
+    ])
     const hunterContext = hunterData ? `\nVerified emails from Hunter.io database:\n${hunterData}\nSelect the most relevant BD contacts from this list if any, otherwise guess patterns.` : ''
+    const homepageContext = homepageText ? `\n\nCOMPANY'S OWN WEBSITE (Level 1 evidence — crawled live, treat as ground truth over training data):\n${homepageText}` : ''
+    const excerptContext = company.source_excerpt ? `\n\nSOURCE ARTICLE EXCERPT (the exact text that surfaced this company — Level 1/2 evidence depending on the source):\n${company.source_excerpt}` : ''
 
-    // For Claude: Opus + extended thinking — the ONE place in the whole codebase
-    // where Opus earns its cost. Extended thinking reasons through company-specific
-    // pain points and finds real contacts rather than generic ones.
-    // For OpenAI: standard gpt-4o via routeJSON.
-    const deepResearchSystem = `You are a senior BD researcher for Aerpolice (AI-agent governance) and AER360 (hardware-enforced custody and key-signing). These are the ONLY two products this pipeline sources leads for — do not evaluate or invoke any other product, even if you know of one.
+    // Sonnet for Claude, gpt-4o for OpenAI. NOTE: this intentionally does NOT
+    // use Opus + extended thinking — on a 300s function budget, Opus per
+    // company × up to 8 companies risks the timeout. Sonnet is fast enough to
+    // process a full batch and, combined with the real evidence above (was
+    // previously just an 800-char search snippet), is the higher-leverage fix.
+    const deepResearchSystem = `You are a senior BD researcher for AER360 (hardware-enforced custody and key-signing — the primary product) and Aerpolice (AI-agent governance — a secondary note, only when it's an unusually strong additional angle). These are the ONLY two products this pipeline sources leads for — do not evaluate or invoke any other product, even if you know of one.
 
 ${PRODUCT_BRAIN}
 
+${AER360_DISCOVERY_BRAIN}
+
 FIRST, validate the input is a REAL, SPECIFIC company (a brand you can google to one company's site like "Skyfire", "Fireblocks", "Circle") and NOT a generic category/segment ("AI Agents", "Custody Providers", "Exchanges", "Fintechs", "Infrastructure"). If it is a category, set "is_specific_real_company": false and leave other fields minimal.
 
-Evaluate BOTH products for every company — do not default to one out of habit:
-- If this company builds or ships AI agents that take financial or system actions (payments, procurement, treasury, trading, data access), Aerpolice governance is the lead pitch.
-- If this company is a custodian, MPC wallet provider, exchange, treasury, or fund with key-signing/custody policy needs, AER360 is the lead pitch.
-- Some companies genuinely need both (an agentic-payments company that also needs a hardware-governed wallet for its agents) — say so explicitly rather than picking one arbitrarily.
+SECOND, classify the company (customer | partner | competitor | integration | investor_ecosystem | not_relevant | unclear) before you evaluate fit — see the classification rules above. Do not score a competitor or investor as if it were a prospect.
+
+Evaluate AER360 first for every company, and only add Aerpolice as a secondary note:
+- If this company is a custodian, MPC wallet provider, exchange, treasury, or fund with key-signing/custody policy needs, OR is about to give a human or AI agent real financial authority for the first time, AER360 is the lead pitch.
+- Only bring in Aerpolice if there's a genuinely strong, separate AI-agent governance angle on top — never as the default.
 - If NEITHER product solves a real, specific problem for this company, say so honestly — do not force a fit.
 
-You must produce TWO separate scores — do not blend them:
+You must produce TWO separate scores — do not blend them. Reason through the AER360 fit dimensions above (financial exposure, agent/automation activity, need for transaction controls, security sensitivity, recent trigger, likelihood of buying external infrastructure, AER360's differentiation for them, buyer accessibility) before you commit to a number — don't just pick a round number that feels right:
 
 LEAD_SCORE (0-100) — general ICP fit, independent of timing:
 High score (70+): clear pain point, active product, matches a target category, decision maker findable
 Medium (40-69): possible fit but unclear pain point or no direct match
-Low (<40): no clear use case for Aerpolice or AER360
+Low (<40): no clear use case for AER360 or Aerpolice
 
 URGENCY_SCORE (0-100) — how urgent it is to reach out THIS WEEK, driven ONLY by
-trigger recency and pain severity, NOT by how good a long-term fit they are:
-High (70+): a dated, concrete trigger in roughly the last 30-60 days (funding round, security incident/near-miss, product launch giving an agent financial authority, compliance/security hire, institutional client onboarding) AND pain_point_severity is critical or high
+trigger recency and pain severity, NOT by how good a long-term fit they are — use the trigger dictionary and freshness bands above:
+High (70+): a dated, concrete VERY HIGH or HIGH value trigger in roughly the last 30-60 days AND pain_point_severity is critical or high
 Medium (40-69): a real but older or vaguer trigger, or high-severity pain with no dated trigger
 Low (<40): no trigger_reason found, or trigger is stale/speculative — this can still be a HIGH lead_score company, just not one to prioritize contacting right now
 
 IMPORTANT — only leads with BOTH a strong fit AND a genuinely urgent, severe pain point get saved (lead_score ≥ ${MIN_LEAD_SCORE}, pain_point_severity critical/high, urgency_score ≥ ${MIN_URGENCY_SCORE}). Do not inflate urgency_score or pain_point_severity just to help a good-fit company clear the bar — an honest "good fit, not urgent right now" is a more useful answer than a manufactured one, even though it means this lead won't be saved today.`
 
-    const deepResearchUser = `Do a deep BD research on this company for Aerpolice/AER360:
+    const deepResearchUser = `Do a deep BD research on this company for AER360 (primary) / Aerpolice (secondary):
 
 Company: ${company.name}
 Website: ${company.website || 'unknown'}
-Description: ${company.description}${hunterContext}
+Description: ${company.description}${hunterContext}${homepageContext}${excerptContext}
 
 PAIN POINT RULES — be specific, not generic:
 - Do NOT write "they need better agent governance" or "they face custody risk". Anyone can write that.
-- DO write the SPECIFIC pain: what exact product/feature is exposed, what exact cost/risk/incident they face, what specific architecture choice creates the vulnerability. Cite real facts about this company.
+- DO write the SPECIFIC pain: what exact product/feature is exposed, what exact cost/risk/incident they face, what specific architecture choice creates the vulnerability. Cite real facts about this company, using the homepage text and source excerpt above where available.
 - For AI-agent companies: name the specific financial or system action their agent takes unsupervised, and what happens if that action is wrong or hijacked.
 - For custody/Fireblocks/MPC-wallet users: what specific signing/custody limitation (software-level MPC, single-cloud dependency, seed-phrase exposure) blocks their growth or fails a due-diligence question.
 - pain_point_severity = critical only if there is a real incident, a live enterprise-deal blocker, or a blocking architectural dependency.
+
+GAP RULE: potential_gap is distinct from pain_point — it's specifically what's architecturally MISSING from their current setup that AER360 could fill (no agent-specific wallet, unrestricted access, weak limits, no destination allowlist, excessive human approvals, no policy enforcement at signing, no tamper-evident audit, hot-wallet/API-key exposure, etc.). If the evidence doesn't support a specific gap, set potential_gap to exactly "Gap not confirmed" — never invent one.
 
 CONTACT RULES — find the REAL decision maker, not a generic title:
 - Priority 1: Head of BD / VP Partnerships / Head of Growth — this person signs integration deals.
@@ -320,17 +319,20 @@ CONTACT RULES — find the REAL decision maker, not a generic title:
 - Priority 3: CEO / Co-Founder — for companies < 100 people, this person often owns BD.
 - If you know their real name (from public LinkedIn, press releases, Twitter) use it. Otherwise null — never fabricate names.
 - linkedin_hint must be specific: "FirstName LastName CompanyName Title"
-- why_this_person must explain the specific buying authority, not just the title.
+- why_this_person must explain the specific buying authority, not just the title (e.g. "CTO because the pain is architectural" or "Head of Treasury because the problem is financial-authority controls").
 
 Return this exact JSON:
 {
   "is_specific_real_company": true,
+  "classification": "customer|partner|competitor|integration|investor_ecosystem|not_relevant|unclear",
   "industry_category": "one specific industry category",
-  "customer_category": ["array — pick from: Agentic Payments Customer, Aerpolice Governance Customer, AER360 Custody / Key-Governance Customer, Other"],
-  "product_to_sell": "the single most relevant Aerpolice/AER360 product for this company and WHY — e.g. 'AER360 threshold signing — they run software-only MPC custody today with no hardware-attested signing policy' or 'Aerpolice agent governance — their AI agent handles payouts with no execution gate'",
+  "customer_category": ["array — pick from: AER360 Custody / Key-Governance Customer, Agentic Payments Customer, Aerpolice Governance Customer, Other"],
+  "product_to_sell": "the single most relevant AER360/Aerpolice product for this company and WHY — e.g. 'AER360 threshold signing — they run software-only MPC custody today with no hardware-attested signing policy' or 'Aerpolice agent governance — their AI agent handles payouts with no execution gate'",
   "region": "their primary market region",
   "company_summary": "3-4 sentence summary: what they do, how big, what stack they use, what stage they're at",
   "business_model": "how they specifically make money",
+  "financial_activity": "what money/assets they appear to control or move — be concrete, or 'Unknown' if not established",
+  "agent_activity": "what autonomous/AI/automated activity exists that touches money or system actions — or 'None confirmed' if there isn't any",
   "supported_chains_or_rails": "blockchains, wallets, or agent frameworks they currently use",
   "current_providers": "specific known custody/MPC/agent-governance providers they currently use, if any",
   "pain_point": "THE specific pain point — one crisp sentence with a concrete fact",
@@ -338,18 +340,25 @@ Return this exact JSON:
   "pain_point_evidence": "concrete evidence: exact quote, incident + date, specific architectural dependency, or named product limitation",
   "pain_point_source_url": "EXACT full URL to the article/post proving the pain point. Empty string if none.",
   "pain_point_evidence_type": "verified_source|agent_analysis|inferred",
+  "potential_gap": "what's architecturally missing that AER360 could fill, or exactly 'Gap not confirmed' if unsupported",
   "aeredium_fit": "how AER360 (AERKey threshold signing / Policy Engine / AERKey Wallet / Agent Control Center) addresses their custody, key-signing, or agent-spend-control gap — specific pillar(s), or null if there is genuinely no fit",
   "suggested_use_case": "the precise AER360 integration to pitch, or the precise Aerpolice integration if that's the stronger fit",
-  "aerpolice_fit": "how Aerpolice's Agent Identity / Triple Gate / Audit Trail addresses their AI-agent governance gap, or null if this company has no AI agents taking financial or system actions — never force this",
+  "outreach_angle": "one specific sentence referencing their actual trigger/situation — not a generic 'would love to introduce AER360' line",
+  "aerpolice_fit": "how Aerpolice's Agent Identity / Triple Gate / Audit Trail addresses their AI-agent governance gap, or null if this company has no AI agents taking financial or system actions, or if AER360 alone is the stronger story — never force this",
   "trigger_reason": "why reach out NOW — a specific recent event (funding, product launch, security incident, compliance hire). Must be datable and real.",
+  "trigger_date": "the trigger event's actual date if known (e.g. '2026-07-15' or 'July 2026'), or null if undated",
   "source_url": "exact URL to the trigger event. NOT a homepage. null if none.",
+  "trigger_source_url": "same as source_url if it's specifically the trigger citation, else the best available citation for the trigger, or null",
   "integration_feasibility": "high|medium|low — with one sentence of reasoning",
-  "revenue_potential": "realistic ARR estimate for Aerpolice/AER360 based on their volume/scale/headcount",
+  "revenue_potential": "realistic ARR estimate for AER360/Aerpolice based on their volume/scale/headcount",
   "lead_score": 0,
   "urgency_score": 0,
   "urgency_reasoning": "1-2 sentences: what dated trigger and pain severity drove this urgency number — say explicitly if there is no dated trigger",
   "priority": "excellent|qualified|needs_research|low_priority",
   "score_reasoning": "2-3 sentences: what drives the score up and what limits it",
+  "facts": ["short, directly-sourced factual statements — leave empty if none"],
+  "assumptions": ["reasoned inferences, clearly labeled as such — leave empty if none"],
+  "unknowns": ["specific things that matter but are genuinely unconfirmed — leave empty if none"],
   "contacts": [
     {
       "role": "exact title of the ideal person to contact",
@@ -363,15 +372,10 @@ Return this exact JSON:
   ]
 }`
 
-    // Sonnet for Claude, gpt-4o for OpenAI.
-    // NOTE: Do NOT use Opus + thinking here — on Vercel Hobby (60s hard cap),
-    // Opus takes ~20-25s per company × 8 companies = ~200s → timeout → 0 leads.
-    // Sonnet takes ~3-5s per company × 8 = ~30-40s → fits comfortably within 60s.
-    // Sonnet quality is more than sufficient for company pain-point research.
     return await routeJSON({
       provider,
       model: provider === 'claude' ? CLAUDE_FAST : 'gpt-4o',
-      maxTokens: 4000,
+      maxTokens: 4500,
       temperature: 0.2,
       system: deepResearchSystem,
       // learnedIntelligence varies per source-run fetch; keeping it out of
@@ -456,7 +460,7 @@ export async function POST(req: NextRequest) {
 
     // 2b. Cheap early exit: if this source's own target category is already at
     // cap, every company we'd find is going to get thrown away at the cap check
-    // anyway (see step 6) — but only AFTER paying for Perplexity/Exa-news/Hunter/
+    // anyway (see step 6) — but only AFTER paying for Exa-news/Hunter/homepage-crawl/
     // Claude research on each one. Bail before any of that spend happens.
     // Don't touch last_run_at — this source didn't actually run, so it should be
     // retried as soon as the category drains, not wait out its full cadence.
@@ -582,6 +586,7 @@ export async function POST(req: NextRequest) {
       skipped_low_score: 0,
       skipped_not_urgent: 0,
       skipped_no_product_fit: 0,
+      skipped_not_customer: 0,
       leads_saved: [] as string[],
     }
 
@@ -598,22 +603,19 @@ export async function POST(req: NextRequest) {
       if (domainKey && existingDomains.has(domainKey)) { results.skipped_duplicate++; continue }
 
       // Enrich company context with real-time research before the main deep-dive.
-      // Perplexity: grounded trigger research (recent news, funding, events).
-      // Exa: recent news as additional context.
-      // Both run in parallel; both fail soft.
-      const websiteForResearch = company.website || ''
-      const [perplexityContext, exaNewsContext] = await Promise.all([
-        perplexityConfigured() ? researchCompanyTrigger(company.name, websiteForResearch, company.description) : Promise.resolve({ trigger: '', sourceUrls: [] }),
-        exaConfigured() ? exaCompanyNews(company.name) : Promise.resolve(''),
-      ])
+      // Exa: recent news as corroborating context (Perplexity dropped — not
+      // configured for this account, was always contributing nothing).
+      const exaNewsContext = exaConfigured() ? await exaCompanyNews(company.name) : ''
 
       // Merge the enriched context into company description for deepResearch.
+      // The source_excerpt (the exact text that surfaced this company, if any)
+      // is passed through separately — deepResearch treats it as real evidence,
+      // not folded into the generic description.
       const enrichedCompany = {
         ...company,
         description: [
           company.description,
-          perplexityContext.trigger ? `\n\nRECENT INTELLIGENCE (Perplexity, grounded):\n${perplexityContext.trigger}` : '',
-          exaNewsContext ? `\n\nRECENT NEWS (Exa):\n${exaNewsContext.slice(0, 800)}` : '',
+          exaNewsContext ? `\n\nRECENT NEWS (Exa):\n${exaNewsContext.slice(0, 1500)}` : '',
         ].filter(Boolean).join(''),
       }
 
@@ -621,13 +623,16 @@ export async function POST(req: NextRequest) {
       const research = await deepResearch(enrichedCompany, learnedIntelligence, researchProvider)
       if (!research) continue
 
-      // If Perplexity found citation URLs, prefer them as source_url.
-      if (perplexityContext.sourceUrls.length) {
-        research.source_url = perplexityContext.sourceUrls[0]
-      }
-
       // Hard gate: the model itself confirms this is a real company, not a category.
       if (research.is_specific_real_company === false) { results.skipped_generic++; continue }
+
+      // Classification gate — never save a competitor, investor, or clearly
+      // irrelevant company as a prospect just because it cleared the score bar.
+      const classification = String(research.classification || '').toLowerCase()
+      if (['competitor', 'investor_ecosystem', 'not_relevant'].includes(classification)) {
+        results.skipped_not_customer++
+        continue
+      }
 
       // Skip low-quality leads (general ICP fit gate).
       if ((research.lead_score as number) < MIN_LEAD_SCORE) { results.skipped_low_score++; continue }
@@ -707,14 +712,24 @@ export async function POST(req: NextRequest) {
           pain_point_evidence: research.pain_point_evidence,
           pain_point_source_url: research.pain_point_source_url || null,
           pain_point_evidence_type: research.pain_point_evidence_type || 'agent_analysis',
+          potential_gap: research.potential_gap || null,
           kima_fit: research.kima_fit,
           aeredium_fit: research.aeredium_fit,
           aerpolice_fit: research.aerpolice_fit || null,
           suggested_use_case: research.suggested_use_case,
+          outreach_angle: research.outreach_angle || null,
           trigger_reason: research.trigger_reason,
+          trigger_date: research.trigger_date || null,
+          trigger_source_url: (research.trigger_source_url as string) || (research.source_url as string) || null,
           settlement_angle: research.settlement_angle,
           integration_feasibility: research.integration_feasibility,
           revenue_potential: research.revenue_potential,
+          classification: research.classification || 'unclear',
+          financial_activity: research.financial_activity || null,
+          agent_activity: research.agent_activity || null,
+          facts: research.facts || [],
+          assumptions: research.assumptions || [],
+          unknowns: research.unknowns || [],
           lead_score: research.lead_score,
           urgency_score: research.urgency_score ?? null,
           urgency_reasoning: research.urgency_reasoning ?? null,

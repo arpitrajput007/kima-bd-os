@@ -32,14 +32,17 @@ interface QualifyResult {
   product_to_sell: string; region: string
   pain_point: string; pain_point_severity: string; pain_point_evidence: string
   pain_point_source_url: string; pain_point_evidence_type: string
-  trigger_reason: string; trigger_source_url: string
+  potential_gap: string; financial_activity: string; agent_activity: string
+  trigger_reason: string; trigger_source_url: string; trigger_date: string
   kima_fit: string; suggested_use_case: string; settlement_angle: string
   aeredium_fit: string; security_angle: string; risk_angle: string
+  outreach_angle: string
   revenue_potential: string; integration_feasibility: string
   twitter_url: string; telegram_url: string; discord_url: string
-  facts: FactItem[]; assumptions: FactItem[]
+  facts: FactItem[]; assumptions: FactItem[]; unknowns: string[]
   lead_score: number; urgency_score: number; urgency_reasoning: string
   confidence_score: number; priority: string
+  classification: string
   verdict: 'good_lead' | 'not_a_lead'
   verdict_reasoning: string; verdict_flags: string[]; verdict_strengths: string[]
   source_url: string; source_summary: string
@@ -549,16 +552,22 @@ export default function NewLeadPage() {
       pain_point_evidence: s(form.pain_point_evidence),
       pain_point_source_url: s(form.pain_point_source_url),
       pain_point_evidence_type: s(form.pain_point_evidence_type),
+      potential_gap: s(form.potential_gap),
+      financial_activity: s(form.financial_activity), agent_activity: s(form.agent_activity),
       trigger_reason: s(form.trigger_reason),
+      trigger_date: s(form.trigger_date), trigger_source_url: s(form.trigger_source_url),
       kima_fit: s(form.kima_fit), suggested_use_case: s(form.suggested_use_case),
       settlement_angle: s(form.settlement_angle), aeredium_fit: s(form.aeredium_fit),
       security_angle: s(form.security_angle), risk_angle: s(form.risk_angle),
+      outreach_angle: s(form.outreach_angle),
       revenue_potential: s(form.revenue_potential),
       integration_feasibility: s(form.integration_feasibility),
       twitter_url: s(form.twitter_url), telegram_url: s(form.telegram_url),
       discord_url: s(form.discord_url),
       facts: form.facts?.length ? form.facts : null,
       assumptions: form.assumptions?.length ? form.assumptions : null,
+      unknowns: form.unknowns?.length ? form.unknowns : null,
+      classification: s(form.classification) || 'unclear',
       lead_score: score, urgency_score: Number(form.urgency_score) || null,
       urgency_reasoning: s(form.urgency_reasoning),
       confidence_score: Number(form.confidence_score) || null,
