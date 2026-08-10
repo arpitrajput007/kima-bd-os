@@ -70,56 +70,35 @@ export type FeedbackAction =
   | 'deal_closed'
   | 'needs_more_research'
 
+// Scoped to Aerpolice + AER360 (2026-08-10) — Kima/Aeredium-Institutional-L1
+// categories dropped. Matches the enums in app/api/ai/discover/route.ts,
+// qualify-lead/route.ts, and enrich-lead/route.ts.
 export const INDUSTRY_CATEGORIES = [
-  'Cross-border payment company',
-  'PSP/payment gateway',
-  'On/off-ramp provider',
-  'Stablecoin payment company',
-  'Wallet',
-  'DEX',
-  'Perp DEX',
-  'Launchpad',
-  'RWA platform',
-  'iGaming/payment-heavy platform',
-  'Neobank',
-  'Fintech',
+  'AI agent / agentic commerce company',
+  'AI-native SaaS selling to enterprise',
+  'Custody / MPC wallet provider',
   'Exchange',
-  'Chain ecosystem',
-  'AI commerce/payment agent',
-  'Treasury management platform',
-  'Custody/payment infrastructure company',
-  'Web2 company with payment/settlement friction',
+  'Treasury or fund',
+  'Fintech',
+  'Robotics / autonomous systems',
   'Other',
 ] as const
 
 export const CUSTOMER_CATEGORIES = [
   'Agentic Payments Customer',
   'Aerpolice Governance Customer',
-  'AERKey / Key Governance Customer',
-  'LayerZero Customer',
-  'Hacked Protocol',
-  'Needs On/Off Ramp',
-  'Fireblocks Customer',
-  'Web2 Stablecoin Settlement Customer',
+  'AER360 Custody / Key-Governance Customer',
   'Other',
 ] as const
 
 export const PRODUCTS_TO_SELL = [
-  'Agentic payment rails',
-  'Aerpolice agent governance',
-  'AERKey threshold signing',
-  'Cross-chain settlement',
-  'Stablecoin settlement',
-  'Fiat on/off-ramp',
-  'Treasury movement',
-  'DvP settlement',
-  'iGaming payments',
-  'RWA settlement',
-  'PSP settlement',
-  'Wallet onboarding',
-  'Launchpad participation',
-  'Payment orchestration',
-  'Cross-border USDT/USDC settlement',
+  'Aerpolice agent identity',
+  'Aerpolice policy + execution gate',
+  'Aerpolice audit trail',
+  'AER360 threshold signing',
+  'AER360 policy engine',
+  'AER360 wallet',
+  'AER360 agent control center',
 ] as const
 
 export const REGIONS = [
@@ -133,9 +112,6 @@ export const REGIONS = [
   'South Asia',
   'Latin America',
   'MENA',
-  'EU-India corridor',
-  'UAE-India corridor',
-  'US-India corridor',
 ] as const
 
 export type IndustryCategory = (typeof INDUSTRY_CATEGORIES)[number]
