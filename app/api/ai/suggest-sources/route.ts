@@ -132,20 +132,21 @@ export async function POST() {
     // 4. Light live grounding (best-effort).
     const web = await searchWeb('best directories and communities to find new crypto payment, stablecoin, DeFi and AI agent projects 2026')
 
-    const systemPrompt = `You are a senior BD lead-generation strategist for Kima, Aeredium (including AERKey threshold signing), and Aerpolice.
+    const systemPrompt = `You are a senior BD lead-generation strategist for Aerpolice (AI-agent governance) and AER360 (hardware-enforced custody and key-signing) — the ONLY two products this agent sources leads for. Do not suggest sources aimed at Kima, cross-chain settlement, bridges, RWA tokenization, stablecoin on/off-ramps, or general crypto/DeFi/fintech directories that aren't specifically about AI agents or custody/key-signing — those are out of scope even if they'd otherwise look like reasonable BD sources.
 
 ${PRODUCT_BRAIN}
 
 Your job: suggest NEW discovery sources the user should add to their lead-finding agent.
-A "source" is a place the agent can crawl/search to find target companies: an ecosystem directory,
+A "source" is a place the agent can crawl/search to find target companies: an ecosystem/MCP directory,
 a Telegram/Discord community, a Twitter/X profile that posts deals, a Google search query, a news/funding
-feed, a DeFiLlama category, a Crunchbase list, a hackathon directory, etc.
+feed, a Crunchbase list, a hackathon directory, an agent marketplace, etc.
 
-Good sources are: high-signal, regularly updated, full of companies that match any of the three product
-lines' ICPs — Kima/Aeredium (payment/settlement/cross-chain/stablecoin/RWA/wallets/exchanges/fintech),
-AERKey (custodians, MPC/custody wallet providers, exchanges, institutions needing key-signing governance),
-and Aerpolice (AI-native companies whose agents take financial actions — payments, procurement, treasury,
-trading — especially ones facing enterprise security review). Actively look for gaps: if AERKey or
+Good sources are: high-signal, regularly updated, full of companies that match either product's ICP —
+Aerpolice (AI-native companies whose agents take consequential financial or system actions — payments,
+procurement, treasury, trading, data access — especially ones facing enterprise security review; MCP-based
+tooling; agentic-commerce/autonomous-checkout startups; AI wallet builders), and AER360 (custodians, MPC/
+custody wallet providers, exchanges, treasuries, or funds needing hardware-enforced key-signing governance,
+or companies about to give an AI agent real spending authority). Actively look for gaps: if AER360 or
 Aerpolice have few or no dedicated sources yet, prioritize suggesting sources for whichever is thinnest.
 Sources must be realistically crawlable from a public URL or a search query.
 

@@ -13,15 +13,15 @@ import { cn, getScoreBg } from '@/lib/utils'
 import Link from 'next/link'
 import type { Lead } from '@/lib/types'
 
+// Scoped to Aerpolice + AER360 — matches CUSTOMER_CATEGORIES in
+// app/api/ai/discover/route.ts. Kima-only categories (LayerZero,
+// Hacked Protocol, Needs On/Off Ramp, Web2 Stablecoin Settlement) dropped.
 const CUSTOMER_CATEGORIES = [
-  { label: 'Agentic Payments Customer',           color: '#f472b6', bar: 'rgba(244,114,182,0.7)' },
-  { label: 'LayerZero Customer',                  color: '#60a5fa', bar: 'rgba(96,165,250,0.7)'  },
-  { label: 'Hacked Protocol',                     color: '#f87171', bar: 'rgba(248,113,113,0.7)' },
-  { label: 'Needs On/Off Ramp',                   color: '#34d399', bar: 'rgba(52,211,153,0.7)'  },
-  { label: 'Fireblocks Customer',                 color: '#a78bfa', bar: 'rgba(167,139,250,0.7)' },
-  { label: 'Web2 Stablecoin Settlement Customer', color: '#fbbf24', bar: 'rgba(251,191,36,0.7)'  },
+  { label: 'Agentic Payments Customer',              color: '#f472b6', bar: 'rgba(244,114,182,0.7)' },
+  { label: 'Aerpolice Governance Customer',          color: '#22d3ee', bar: 'rgba(34,211,238,0.7)'  },
+  { label: 'AER360 Custody / Key-Governance Customer', color: '#a78bfa', bar: 'rgba(167,139,250,0.7)' },
 ]
-const CATEGORY_CAP = 5
+const CATEGORY_CAP = 8
 
 const CHANNEL_META: Record<string, { label: string; color: string; icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }> }> = {
   telegram: { label: 'Telegram',  color: '#22d3ee', icon: Send         },

@@ -2,11 +2,11 @@
 // /api/ai/use-cases
 //
 // Generates 2-3 concrete, story-driven use cases showing exactly
-// how Kima / Aeredium can work with a specific company.
+// how Aerpolice / AER360 can work with a specific company.
 //
 // KEY: This route is customer-category aware:
 //   - "Agentic Payments Customer" → Agentic Payments + Aerpolice playbook
-//   - Everything else → Settlement / cross-chain playbook
+//   - Everything else → AER360 custody / key-governance playbook
 //
 // Also injects agent memory (learned knowledge + active rules)
 // so the agent's ongoing learning is actually applied here.
@@ -46,13 +46,11 @@ YOUR PRIMARY FRAME IS THE AGENTIC PAYMENTS PLAYBOOK:
 ${AGENTIC_PAYMENTS}
 
 MANDATORY RULES FOR THIS LEAD:
-1. Focus on agent identity, spend policy enforcement, hardware-attested execution, and settlement rails for agentic flows — NOT generic cross-chain settlement.
-2. The three gaps: (a) narrow settlement rails, (b) software-level mandate enforcement, (c) no verifiable audit trail. Map which ones apply to this company.
-3. Kima's role: single-API settlement across any rail for agent-initiated transactions.
-4. Aeredium's role: TEE-attested execution gate + AERKey threshold ECDSA = hardware-level policy enforcement + cryptographic audit trail.
-5. If Aerpolice is a competitor or in their stack, explicitly address the "governance sidecar vs. full stack" angle.
-6. Do NOT generate cross-chain settlement use cases unless the company explicitly does cross-chain work AND it's relevant to agent flows.
-7. Use the ANUM framework (Authority, Need, Urgency, Money) lens when describing "why now" — enterprise deals stalling in security review is the strongest urgency signal.
+1. Focus on agent identity, spend policy enforcement, and hardware-attested signing/execution for agentic flows.
+2. The two gaps: (a) software-level mandate enforcement, (b) no verifiable audit trail down to the signature. Map which ones apply to this company.
+3. Aerpolice's role: Triple Gate (identity, intent, limits) decides whether an agent's action is allowed to happen, before it executes.
+4. AER360's role: the agent's own child wallet, bound to a hardware-enforced policy template — it physically cannot sign outside the policy you set.
+5. Use the ANUM framework (Authority, Need, Urgency, Money) lens when describing "why now" — enterprise deals stalling in security review is the strongest urgency signal.
 `
   }
 
@@ -60,11 +58,8 @@ MANDATORY RULES FOR THIS LEAD:
 ══ CATEGORY ROUTING — STANDARD LEAD ══
 Categories: ${cats.join(', ') || 'unclassified'}
 Use the appropriate section of the PRODUCT_BRAIN above for this company's category.
-For LayerZero/bridge leads: focus on bridge-risk elimination angle.
-For Hacked Protocols: focus on security hardening + no-smart-contract settlement.
-For Needs On/Off Ramp: focus on UPR fiat corridor use cases.
-For Fireblocks customers: use the Fireblocks battlecard.
-For Web2 Stablecoin Settlement: focus on SWIFT replacement use cases.
+For AER360 Custody / Key-Governance leads: focus on the AERKey threshold-signing / Policy Engine / AERKey Wallet angle — whatever specific pillar fits their custody gap.
+For companies using Fireblocks or similar software-only MPC: use the Fireblocks/MPC battlecard.
 `
 }
 
@@ -102,7 +97,7 @@ export async function POST(req: NextRequest) {
   // ── Category routing block ───────────────────────────────────
   const routingBlock = categoryRoutingBlock(lead as Record<string, unknown>)
 
-  const system = `You are a senior solutions architect for Kima, Aeredium, and Aerpolice.
+  const system = `You are a senior solutions architect for Aerpolice and AER360 — the only two products this pipeline evaluates leads for.
 
 ${PRODUCT_BRAIN}
 
@@ -145,8 +140,8 @@ Every use case MUST follow this structure:
    - What would happen without it?
 
 4. PRODUCTS & FEATURES — for each product used, name the EXACT feature/capability and explain WHY it matters for this specific company.
-   ❌ "Aeredium provides MPC."
-   ✅ "Because traders should not hold private keys directly, Aeredium's MPC custody lets treasury, compliance, and ops jointly authorize sensitive actions without ever assembling a single signing key."
+   ❌ "AER360 provides MPC."
+   ✅ "Because traders should not hold private keys directly, AER360's threshold signing lets treasury, compliance, and ops jointly authorize sensitive actions without ever assembling a single signing key."
 
 5. BUSINESS OUTCOME — the measurable result.
 
@@ -154,9 +149,9 @@ If a use case cannot answer "What exactly triggered this? Which exact feature? W
 
 HONESTY RULES:
 - Only generate use cases where the fit is genuine. 2 deeply concrete use cases beat 3 forced ones.
-- Pick the RIGHT product for each scenario. Do not shoehorn all three products into every use case.
-- For Aerpolice scenarios, the trigger is usually an agent attempting an action that hits a policy boundary (amount threshold, recipient not on whitelist, unusual transaction). Show the policy evaluation → approval → execution → audit flow.
-- If Aeredium genuinely isn't needed in a use case, leave its products out — don't force it.
+- Pick the RIGHT product for each scenario. Do not shoehorn both products into every use case.
+- For Aerpolice scenarios, the trigger is usually an agent attempting an action that hits a policy boundary (amount threshold, recipient not on whitelist, unusual transaction). Show the Triple Gate evaluation → approval → execution → audit flow.
+- If AER360 genuinely isn't needed in a use case, leave it out — don't force it.
 
 Return ONLY valid JSON — no markdown, no text outside the array.`
 
@@ -176,9 +171,8 @@ Competitor Context: ${lead.competitor_context || 'N/A'}
 Pain Point: ${lead.pain_point || 'N/A'}
 Pain Severity: ${lead.pain_point_severity || 'N/A'}
 Pain Evidence / Proof: ${lead.pain_point_evidence || 'N/A'}
-Kima Fit: ${lead.kima_fit || 'N/A'}
-Aeredium Fit: ${lead.aeredium_fit || 'N/A'}
-Settlement Angle: ${lead.settlement_angle || 'N/A'}
+Aerpolice Fit: ${lead.aerpolice_fit || 'N/A'}
+AER360 Fit: ${lead.aeredium_fit || 'N/A'}
 Security Angle: ${lead.security_angle || 'N/A'}
 Risk Angle: ${lead.risk_angle || 'N/A'}
 Revenue Potential: ${lead.revenue_potential || 'N/A'}
@@ -191,25 +185,25 @@ Return a JSON array of 2-3 use case objects in this EXACT structure:
   {
     "id": "short-kebab-slug",
     "title": "Specific title naming the actual workflow (e.g. 'Funding an arbitrage trade before the spread closes')",
-    "category": "Settlement | Payments | Treasury | Security | On/Off-ramp | Agentic | DvP | Other",
-    "scenario": "1-2 sentences. Who at this company operates what system. Set the stage concretely. E.g. 'An institutional trading desk runs an automated BTC arbitrage strategy through Alpaca, with treasury held as USDC on Ethereum.'",
-    "trigger": "The EXACT triggering event with a number or named condition. E.g. 'BTC spot on Exchange A trades 2.4% below CME futures — above the firm's configured 2.0% execution threshold.' NEVER 'an opportunity arises'.",
-    "decision": "What the system/agent decides to do. E.g. 'The agent decides to deploy an additional $500,000 of capital immediately to capture the spread before it closes.'",
+    "category": "Agent Governance | Agent Identity | Audit Trail | Key Signing | Custody | Treasury | Agent Wallet Policy | Other",
+    "scenario": "1-2 sentences. Who at this company operates what system. Set the stage concretely. E.g. 'A treasury team runs an automated payroll agent that pays contractors from a shared hot wallet with no per-agent spend limit.'",
+    "trigger": "The EXACT triggering event with a number or named condition. E.g. 'The payroll agent receives a request to pay a new payee not on its approved list, for $42,000.' NEVER 'an opportunity arises'.",
+    "decision": "What the system/agent decides to do. E.g. 'The agent proposes the payment; the Triple Gate evaluates identity, intent, and limits before it's allowed to execute.'",
     "workflow": [
       "Numbered concrete steps as an array. Each step names what moved, from where, to where, through which infrastructure, and which of our components was involved. E.g.:",
-      "1. The trading agent requests $500K capital deployment to its Alpaca account.",
-      "2. Treasury funds are held as USDC in the firm's Ethereum wallet.",
-      "3. Kima initiates atomic settlement from the Ethereum treasury to the trading environment — no bridge, no wrapped asset.",
-      "4. Funds arrive and the arbitrage executes before the spread disappears."
+      "1. The payroll agent proposes a $42,000 payment to a new payee.",
+      "2. Aerpolice's Triple Gate checks the agent's identity, the payee against the allowlist, and the amount against its spend limit.",
+      "3. The payee isn't on the allowlist, so the Pact is held for owner approval instead of executing automatically.",
+      "4. Once approved, the agent's AER360 child wallet signs the payment — the enclaves refuse to sign without the Policy Engine's cryptographic verdict."
     ],
     "products_used": [
       {
-        "product": "Kima | Aeredium | Aerpolice",
-        "features": ["Exact features used, e.g. 'Atomic settlement', 'Cross-system interoperability', 'Instant settlement', 'MPC custody', 'Execution Gate', 'Policy enforcement', 'Immutable audit trail'"],
-        "why": "Why THESE features matter for THIS company's specific situation — explain the necessity, not the feature. E.g. 'Without atomic settlement the firm risks a half-completed transfer leaving capital stranded mid-trade while the arbitrage window closes.'"
+        "product": "Aerpolice | AER360",
+        "features": ["Exact features used, e.g. 'Triple Gate', 'Agent Identity', 'Audit Trail', 'Kill Switch', 'AERKey threshold signing', 'Policy Engine', 'Agent Control Center'"],
+        "why": "Why THESE features matter for THIS company's specific situation — explain the necessity, not the feature. E.g. 'Without a policy gate, a compromised agent runtime could approve its own out-of-policy payment before anyone notices.'"
       }
     ],
-    "without_us": "What concretely happens today WITHOUT our product — the failure mode, the delay, the risk. E.g. 'The firm relies on manual treasury ops or a centralized bridge that can take 10-20 minutes, by which time the arbitrage spread has usually closed.'",
+    "without_us": "What concretely happens today WITHOUT our product — the failure mode, the delay, the risk. E.g. 'The agent has standing access to a shared hot wallet with no per-payee allowlist, so a bad instruction or prompt injection could move funds before a human reviews it.'",
     "business_outcome": "The measurable result. E.g. 'The firm captures arbitrage spreads it currently misses, while eliminating settlement risk and manual treasury intervention.'",
     "feasibility": "high | medium | low",
     "impact": "transformative | significant | incremental",
