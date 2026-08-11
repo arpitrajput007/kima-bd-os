@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import type { Source } from '@/lib/types'
 import { cn, formatDate } from '@/lib/utils'
+import { getSelectedSourceIds, setSelectedSourceIds, clearSelectedSourceIds } from '@/lib/sourceSelection'
 
 const SOURCE_TYPES = [
   'exa_search', 'exa_similar', 'apollo_search',
@@ -75,13 +76,25 @@ export default function SourcesPage() {
   const [batchRunning, setBatchRunning] = useState(false)
   const stopRequestedRef = useRef(false)
 
+  // Hydrate from localStorage after mount (not during SSR/first client render,
+  // to avoid a hydration mismatch — window isn't available server-side).
+  useEffect(() => { setSelectedIds(new Set(getSelectedSourceIds())) }, [])
+
   const toggleSelect = (id: string) => setSelectedIds(prev => {
     const next = new Set(prev)
     if (next.has(id)) next.delete(id); else next.add(id)
+    setSelectedSourceIds(Array.from(next))
     return next
   })
-  const selectAllVisible = () => setSelectedIds(new Set(filteredSources.map(s => s.id)))
-  const clearSelection = () => setSelectedIds(new Set())
+  const selectAllVisible = () => {
+    const next = new Set(filteredSources.map(s => s.id))
+    setSelectedIds(next)
+    setSelectedSourceIds(Array.from(next))
+  }
+  const clearSelection = () => {
+    setSelectedIds(new Set())
+    clearSelectedSourceIds()
+  }
 
   // Ask the agent which new sources are worth adding.
   const suggestSources = async () => {

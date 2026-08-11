@@ -19,6 +19,7 @@ import {
 import { isSourceDue } from '@/lib/source-scheduling'
 import { AssignToPlutoButton } from '@/components/AssignToPlutoButton'
 import { getActor } from '@/lib/actor'
+import { getSelectedSourceIds, clearSelectedSourceIds } from '@/lib/sourceSelection'
 
 type LeadActivity = { id: string; type: string; channel?: string }
 type LeadWithContacts = Lead & { contacts?: Contact[]; lead_activities?: LeadActivity[] }
@@ -325,6 +326,10 @@ export default function TodayPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [fetching, setFetching] = useState(false)
   const [forceRunAll, setForceRunAll] = useState(false)
+  // Sources checked on the Sources page (via localStorage — see lib/sourceSelection.ts).
+  // When non-empty, "Fetch fresh leads" runs only these, ignoring cadence/force-all.
+  const [manualSourceIds, setManualSourceIds] = useState<string[]>([])
+  useEffect(() => { setManualSourceIds(getSelectedSourceIds()) }, [])
   const [bgJob, setBgJob] = useState<{ status: string; sources_done: number; sources_total: number; leads_saved: number; current_source?: string } | null>(null)
   const [contactingLead, setContactingLead] = useState<LeadWithContacts | null>(null)
   const [searchQuery, setSearchQuery]   = useState('')
@@ -359,18 +364,25 @@ export default function TodayPage() {
   // for when you want a full run regardless of schedule.
   const fetchFreshLeads = async () => {
     setFetching(true)
+    // Re-read at click time (not just the mount-time state) in case the user
+    // picked sources on the Sources page in another tab, or cleared them here.
+    const manualIds = getSelectedSourceIds()
     try {
-      const { data: allSources, error } = await supabase
+      let query = supabase
         .from('sources')
         .select('id, source_name, frequency, last_run_at')
         .eq('status', 'active')
         .not('source_url_or_query', 'is', null)
+      if (manualIds.length) query = query.in('id', manualIds)
+      const { data: allSources, error } = await query
       if (error || !allSources?.length) {
-        toast.error('No active sources. Add some in Discovery Sources.')
+        toast.error(manualIds.length ? 'None of the selected sources are active anymore.' : 'No active sources. Add some in Discovery Sources.')
         return
       }
-      const sources = forceRunAll ? allSources : allSources.filter(s => isSourceDue(s, 'manual'))
-      const skippedNotDue = allSources.length - sources.length
+      // A manual pick from the Sources page runs exactly what was checked,
+      // ignoring cadence/force-all — same behavior as "Run selected" there.
+      const sources = manualIds.length ? allSources : forceRunAll ? allSources : allSources.filter(s => isSourceDue(s, 'manual'))
+      const skippedNotDue = manualIds.length ? 0 : allSources.length - sources.length
       if (!sources.length) {
         toast(`All ${allSources.length} sources already ran within their schedule. Check "Force run all" to run them anyway.`)
         return
@@ -393,12 +405,17 @@ export default function TodayPage() {
         setBgJob({ status: 'running', sources_done: i + 1, sources_total: sources.length, leads_saved: totalSaved, current_source: src.source_name })
       }
       setBgJob(null)
+      // Manual picks are one-shot — clear so the next click without re-selecting
+      // falls back to the normal "all active, due" behavior instead of silently
+      // staying scoped to whatever was picked earlier.
+      if (manualIds.length) { clearSelectedSourceIds(); setManualSourceIds([]) }
       const skippedNote = skippedNotDue > 0 ? ` (${skippedNotDue} source${skippedNotDue !== 1 ? 's' : ''} skipped — not due yet)` : ''
+      const scopeNote = manualIds.length ? ` from ${sources.length} selected source${sources.length !== 1 ? 's' : ''}` : ''
       if (totalSaved > 0) {
-        toast.success(`Discovery complete — ${totalSaved} new lead${totalSaved !== 1 ? 's' : ''} added${skippedNote}`)
+        toast.success(`Discovery complete — ${totalSaved} new lead${totalSaved !== 1 ? 's' : ''} added${scopeNote}${skippedNote}`)
         loadData()
       } else {
-        toast(`Discovery complete — no new leads found (all already in pipeline or below quality threshold)${skippedNote}`)
+        toast(`Discovery complete — no new leads found (all already in pipeline or below quality threshold)${scopeNote}${skippedNote}`)
       }
     } catch {
       toast.error('Discovery failed')
@@ -592,8 +609,20 @@ export default function TodayPage() {
             className="btn btn-primary" style={{ padding: '7px 14px', fontSize: '12px', opacity: (fetching || bgJob) ? 0.8 : 1 }}>
             {fetching
               ? <><Loader2 size={13} className="animate-spin" /> Starting…</>
+              : manualSourceIds.length > 0
+              ? <><Download size={13} /> Fetch from {manualSourceIds.length} selected</>
               : <><Download size={13} /> Fetch fresh leads</>}
           </button>
+          {manualSourceIds.length > 0 && !fetching && (
+            <button
+              onClick={() => { clearSelectedSourceIds(); setManualSourceIds([]) }}
+              className="btn btn-ghost"
+              title="Run all active/due sources instead of the picked ones"
+              style={{ padding: '6px 10px', fontSize: '11px', color: '#fbbf24' }}
+            >
+              <X size={12} /> Use all sources instead
+            </button>
+          )}
           <label
             title="Off (default): only run sources that are actually due per their daily/weekly schedule. On: ignore schedule and run every active source now — costs more, use sparingly."
             style={{
