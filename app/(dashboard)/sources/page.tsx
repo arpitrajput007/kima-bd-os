@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import {
   Plus, Edit, Trash2, Loader2, Save, X,
   Database, Play, Pause, Zap, CheckCircle, AlertCircle, Clock,
-  Sparkles, Lightbulb, Check, Square,
+  Sparkles, Lightbulb, Check, Square, ListChecks,
 } from 'lucide-react'
 import type { Source } from '@/lib/types'
 import { cn, formatDate } from '@/lib/utils'
@@ -69,6 +69,19 @@ export default function SourcesPage() {
   const [suggestions, setSuggestions] = useState<SourceSuggestion[]>([])
   const [addingIdx, setAddingIdx] = useState<number | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+
+  // ── Manual multi-select: pick which sources to run, skip the rest ──
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [batchRunning, setBatchRunning] = useState(false)
+  const stopRequestedRef = useRef(false)
+
+  const toggleSelect = (id: string) => setSelectedIds(prev => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
+  const selectAllVisible = () => setSelectedIds(new Set(filteredSources.map(s => s.id)))
+  const clearSelection = () => setSelectedIds(new Set())
 
   // Ask the agent which new sources are worth adding.
   const suggestSources = async () => {
@@ -166,18 +179,24 @@ export default function SourcesPage() {
     setShowForm(true)
   }
 
+  // Stops whatever is currently in flight. During a batch run, also halts
+  // the queue — the loop checks stopRequestedRef before starting the next source.
   const stopDiscovery = () => {
+    stopRequestedRef.current = true
     abortRef.current?.abort()
     abortRef.current = null
     setRunningId(null)
+    setBatchRunning(false)
     toast('Discovery stopped')
   }
 
-  // Run the discovery pipeline for a single source
-  const runDiscovery = async (source: Source) => {
+  // Run the discovery pipeline for a single source. Shared by the per-row
+  // "Run Now" button and the batch runner below — returns the result (or
+  // null on abort/skip) so the batch loop can tally totals.
+  const runOneDiscovery = async (source: Source): Promise<RunResult | null> => {
     if (!source.source_url_or_query) {
-      toast.error('No URL configured for this source')
-      return
+      toast.error(`${source.source_name}: no URL configured, skipping`)
+      return null
     }
     setRunningId(source.id)
     setRunResults(prev => {
@@ -199,21 +218,54 @@ export default function SourcesPage() {
       const data: RunResult = await res.json()
       setRunResults(prev => ({ ...prev, [source.id]: data }))
       if (data.error) {
-        toast.error(`Discovery failed: ${data.error}`)
+        toast.error(`${source.source_name}: ${data.error}`)
       } else {
-        toast.success(`Done! Saved ${data.saved} new leads from ${source.source_name}`)
-        loadSources()
+        toast.success(`${source.source_name}: saved ${data.saved} new leads`)
       }
+      return data
     } catch (e) {
-      if (e instanceof Error && e.name === 'AbortError') return
-      toast.error('Network error during discovery')
-      setRunResults(prev => ({
-        ...prev,
-        [source.id]: { found: 0, saved: 0, skipped_duplicate: 0, skipped_cap: 0, skipped_low_score: 0, leads_saved: [], error: 'Network error' },
-      }))
+      if (e instanceof Error && e.name === 'AbortError') return null
+      toast.error(`${source.source_name}: network error`)
+      const errResult: RunResult = { found: 0, saved: 0, skipped_duplicate: 0, skipped_cap: 0, skipped_low_score: 0, leads_saved: [], error: 'Network error' }
+      setRunResults(prev => ({ ...prev, [source.id]: errResult }))
+      return errResult
     } finally {
-      setRunningId(null)
       abortRef.current = null
+    }
+  }
+
+  // Single "Run Now" click — same as before, wraps the shared runner.
+  const runDiscovery = async (source: Source) => {
+    await runOneDiscovery(source)
+    setRunningId(null)
+    loadSources()
+  }
+
+  // Run only the sources the user checked, one at a time (each discovery
+  // call can take up to ~5 min, so sequential keeps it legible and avoids
+  // hammering Claude/Exa/Hunter concurrently). Stop button aborts the
+  // in-flight one and halts the rest of the queue.
+  const runSelected = async () => {
+    const queue = sources.filter(s => selectedIds.has(s.id))
+    if (!queue.length) { toast.error('Select at least one source first'); return }
+
+    setBatchRunning(true)
+    stopRequestedRef.current = false
+    let saved = 0
+    let ran = 0
+
+    for (const source of queue) {
+      if (stopRequestedRef.current) break
+      const result = await runOneDiscovery(source)
+      ran++
+      if (result && !result.error) saved += result.saved
+    }
+
+    setRunningId(null)
+    setBatchRunning(false)
+    loadSources()
+    if (!stopRequestedRef.current) {
+      toast.success(`Batch done — ${saved} leads saved across ${ran} source${ran === 1 ? '' : 's'}`)
     }
   }
 
@@ -397,14 +449,49 @@ export default function SourcesPage() {
           </div>
         )}
 
-        {/* Search */}
-        <input
-          className="input-dark max-w-xs"
-          style={{ fontSize: '13px' }}
-          placeholder="Search sources..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
+        {/* Search + manual multi-select run */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <input
+            className="input-dark max-w-xs"
+            style={{ fontSize: '13px' }}
+            placeholder="Search sources..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          <div className="flex items-center gap-2">
+            <button onClick={selectAllVisible} className="btn btn-ghost" style={{ fontSize: '12px', padding: '6px 10px', color: 'rgb(150,155,185)' }}>
+              Select all{search ? ' (filtered)' : ''}
+            </button>
+            {selectedIds.size > 0 && (
+              <button onClick={clearSelection} className="btn btn-ghost" style={{ fontSize: '12px', padding: '6px 10px', color: 'rgb(150,155,185)' }}>
+                Clear ({selectedIds.size})
+              </button>
+            )}
+            <button
+              onClick={batchRunning ? stopDiscovery : runSelected}
+              disabled={!batchRunning && (selectedIds.size === 0 || !!runningId)}
+              className="btn btn-ai flex items-center gap-1.5"
+              style={{
+                padding: '6px 12px', fontSize: '12px',
+                ...(batchRunning
+                  ? { color: '#fb7185', border: '1px solid rgba(248,113,133,0.35)', background: 'rgba(248,113,133,0.1)' }
+                  : { opacity: selectedIds.size === 0 || !!runningId ? 0.5 : 1 }),
+              }}
+              title={batchRunning ? 'Stop the batch run' : 'Run discovery for only the sources you checked'}
+            >
+              {batchRunning ? (
+                <><Loader2 size={12} className="animate-spin" /><Square size={10} fill="#fb7185" style={{ marginLeft: 2 }} /> Stop batch</>
+              ) : (
+                <><ListChecks size={12} /> Run selected ({selectedIds.size})</>
+              )}
+            </button>
+          </div>
+        </div>
+        {selectedIds.size === 0 && (
+          <p className="text-xs" style={{ color: 'rgb(100,100,120)', marginTop: -8 }}>
+            Check the sources you want, then hit Run Selected — everything else stays untouched, no automatic run.
+          </p>
+        )}
 
         {/* Sources List */}
         {loading ? (
@@ -435,6 +522,15 @@ export default function SourcesPage() {
                 >
                   {/* Source Row */}
                   <div className="flex items-center gap-4 p-4">
+                    {/* Select for batch run */}
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(source.id)}
+                      onChange={() => toggleSelect(source.id)}
+                      style={{ width: 15, height: 15, accentColor: '#8b5cf6', cursor: 'pointer', flexShrink: 0 }}
+                      title="Select for batch run"
+                    />
+
                     {/* Status dot */}
                     <div
                       className="w-2 h-2 rounded-full flex-shrink-0"
