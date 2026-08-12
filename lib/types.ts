@@ -200,6 +200,7 @@ export interface Lead {
   id: string
   company_name: string
   website?: string
+  source_id?: string | null
   industry_category?: string
   customer_category?: string[]
   product_to_sell?: string

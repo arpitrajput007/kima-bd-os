@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import Link from 'next/link'
 import {
   Plus, Edit, Trash2, Loader2, Save, X,
   Database, Play, Pause, Zap, CheckCircle, AlertCircle, Clock,
-  Sparkles, Lightbulb, Check, Square, ListChecks,
+  Sparkles, Lightbulb, Check, Square, ListChecks, ChevronDown, ChevronUp, ExternalLink,
 } from 'lucide-react'
-import type { Source } from '@/lib/types'
-import { cn, formatDate } from '@/lib/utils'
+import type { Source, Lead } from '@/lib/types'
+import { cn, formatDate, getScoreBg } from '@/lib/utils'
 import { getSelectedSourceIds, setSelectedSourceIds, clearSelectedSourceIds } from '@/lib/sourceSelection'
 
 const SOURCE_TYPES = [
@@ -94,6 +95,26 @@ export default function SourcesPage() {
   const clearSelection = () => {
     setSelectedIds(new Set())
     clearSelectedSourceIds()
+  }
+
+  // ── Per-source lead breakdown: which leads did this source actually bring? ──
+  const [expandedSourceId, setExpandedSourceId] = useState<string | null>(null)
+  const [sourceLeadsCache, setSourceLeadsCache] = useState<Record<string, Lead[]>>({})
+  const [loadingSourceLeads, setLoadingSourceLeads] = useState<string | null>(null)
+
+  const toggleSourceLeads = async (source: Source) => {
+    if (expandedSourceId === source.id) { setExpandedSourceId(null); return }
+    setExpandedSourceId(source.id)
+    if (sourceLeadsCache[source.id]) return // already fetched
+    setLoadingSourceLeads(source.id)
+    const { data, error } = await supabase
+      .from('leads')
+      .select('id, company_name, lead_score, urgency_score, status, classification, created_at')
+      .eq('source_id', source.id)
+      .order('created_at', { ascending: false })
+      .limit(50)
+    if (!error) setSourceLeadsCache(prev => ({ ...prev, [source.id]: (data as Lead[]) || [] }))
+    setLoadingSourceLeads(null)
   }
 
   // Ask the agent which new sources are worth adding.
@@ -571,7 +592,15 @@ export default function SourcesPage() {
                           </span>
                         )}
                         {source.leads_generated != null && source.leads_generated > 0 && (
-                          <span style={{ color: '#34d399' }}>· {source.leads_generated} leads generated total</span>
+                          <button
+                            onClick={() => toggleSourceLeads(source)}
+                            className="flex items-center gap-1"
+                            style={{ color: '#34d399', background: 'none', border: 'none', cursor: 'pointer', padding: 0, font: 'inherit' }}
+                            title="Show which leads this source brought"
+                          >
+                            · {source.leads_generated} leads generated total
+                            {expandedSourceId === source.id ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                          </button>
                         )}
                       </div>
                     </div>
@@ -657,6 +686,47 @@ export default function SourcesPage() {
                               → {result.leads_saved.join(', ')}
                             </span>
                           )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Per-source lead breakdown — which leads did this source actually bring */}
+                  {expandedSourceId === source.id && (
+                    <div className="px-4 py-3 text-xs" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(139,92,246,0.03)' }}>
+                      {loadingSourceLeads === source.id ? (
+                        <div className="flex items-center gap-2" style={{ color: 'rgb(130,135,165)' }}>
+                          <Loader2 size={12} className="animate-spin" /> Loading leads…
+                        </div>
+                      ) : (sourceLeadsCache[source.id] || []).length === 0 ? (
+                        <span style={{ color: 'rgb(110,110,135)' }}>
+                          No leads with tracked attribution yet
+                          {source.leads_generated ? ' — this source\'s counter predates per-lead tracking' : ''}.
+                        </span>
+                      ) : (
+                        <div className="flex flex-col gap-1.5">
+                          {(sourceLeadsCache[source.id] || []).map(lead => (
+                            <div key={lead.id} className="flex items-center gap-2 flex-wrap">
+                              <Link
+                                href={`/leads/${lead.id}`}
+                                className="flex items-center gap-1 hover:underline"
+                                style={{ color: 'rgb(210,212,230)', fontWeight: 500 }}
+                              >
+                                {lead.company_name} <ExternalLink size={10} />
+                              </Link>
+                              {lead.lead_score != null && (
+                                <span className={cn('badge', getScoreBg(lead.lead_score))} style={{ fontSize: '10px', padding: '1px 6px' }}>
+                                  {lead.lead_score}
+                                </span>
+                              )}
+                              {lead.classification && lead.classification !== 'customer' && lead.classification !== 'unclear' && (
+                                <span className="badge" style={{ fontSize: '10px', padding: '1px 6px', color: '#fb7185', background: 'rgba(251,113,133,0.12)' }}>
+                                  {lead.classification.replace('_', ' ')}
+                                </span>
+                              )}
+                              <span style={{ color: 'rgb(100,100,120)' }}>{lead.status} · {formatDate(lead.created_at)}</span>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>

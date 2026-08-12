@@ -695,6 +695,7 @@ export async function POST(req: NextRequest) {
         .insert({
           company_name: company.name,
           website: website || null,
+          source_id: source.id,
           twitter_url: socials.twitter_url || null,
           telegram_url: socials.telegram_url || null,
           discord_url: socials.discord_url || null,
