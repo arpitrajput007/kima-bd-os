@@ -626,10 +626,12 @@ export async function POST(req: NextRequest) {
       // Hard gate: the model itself confirms this is a real company, not a category.
       if (research.is_specific_real_company === false) { results.skipped_generic++; continue }
 
-      // Classification gate — never save a competitor, investor, or clearly
-      // irrelevant company as a prospect just because it cleared the score bar.
+      // Classification gate — never save a competitor, investor, partner, or
+      // clearly irrelevant company as a prospect just because it cleared the
+      // score bar. "partner" means a channel/co-marketing relationship, not a
+      // buyer — Arpit wants customer leads, not partners occupying cap slots.
       const classification = String(research.classification || '').toLowerCase()
-      if (['competitor', 'investor_ecosystem', 'not_relevant'].includes(classification)) {
+      if (['competitor', 'investor_ecosystem', 'not_relevant', 'partner'].includes(classification)) {
         results.skipped_not_customer++
         continue
       }
