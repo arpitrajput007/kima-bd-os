@@ -60,6 +60,42 @@ const MIN_LEAD_SCORE = 50
 const MIN_URGENCY_SCORE = 50
 const REQUIRED_PAIN_SEVERITIES = new Set(['critical', 'high'])
 
+// ── Confidence score — computed in code, not self-reported by the model ────
+// Deliberately NOT another "rate your own work" LLM field (that's exactly how
+// severity got inflated). Derived instead from signals already present in the
+// deepResearch() output, so it costs zero extra API calls/credits: real
+// citations, a dated trigger, the ratio of sourced facts to guesses, and
+// whether a real contact was found.
+function computeConfidenceScore(research: Record<string, unknown>, isVerified: boolean): number {
+  let score = 20
+
+  if (isVerified) score += 30
+
+  const triggerDate = String(research.trigger_date || '').trim().toLowerCase()
+  if (triggerDate && triggerDate !== 'null' && triggerDate !== 'unknown') score += 15
+
+  const triggerSourceUrl = String(research.trigger_source_url || research.source_url || '').trim()
+  if (triggerSourceUrl) score += 15
+
+  const facts = Array.isArray(research.facts) ? research.facts.length : 0
+  const assumptions = Array.isArray(research.assumptions) ? research.assumptions.length : 0
+  const unknowns = Array.isArray(research.unknowns) ? research.unknowns.length : 0
+  score += Math.min(20, facts * 4)
+  score -= Math.min(15, assumptions * 3)
+  score -= Math.min(15, unknowns * 3)
+
+  const contacts = Array.isArray(research.contacts) ? research.contacts as Record<string, unknown>[] : []
+  const confidenceRank: Record<string, number> = { high: 2, medium: 1, low: 0 }
+  const bestContactRank = contacts.reduce((best, c) => {
+    const rank = confidenceRank[String(c.contact_confidence || '').toLowerCase()] ?? -1
+    return Math.max(best, rank)
+  }, -1)
+  if (bestContactRank === 2) score += 15
+  else if (bestContactRank === 1) score += 7
+
+  return Math.max(0, Math.min(100, Math.round(score)))
+}
+
 // Check a URL against ChainPatrol's phishing registry (free, no key needed).
 // Used by MetaMask, SEAL, and other Web3 security tools.
 // Returns true if safe, false if flagged as phishing/malicious.
@@ -587,6 +623,7 @@ export async function POST(req: NextRequest) {
       skipped_not_urgent: 0,
       skipped_no_product_fit: 0,
       skipped_not_customer: 0,
+      downgraded_unverified_severity: 0,
       leads_saved: [] as string[],
     }
 
@@ -638,6 +675,23 @@ export async function POST(req: NextRequest) {
 
       // Skip low-quality leads (general ICP fit gate).
       if ((research.lead_score as number) < MIN_LEAD_SCORE) { results.skipped_low_score++; continue }
+
+      // Evidence gate — a model can label its OWN reasoning "critical" with no
+      // real proof behind it. Don't trust the self-reported severity unless
+      // it's actually backed by a verified source: pain_point_evidence_type
+      // must be 'verified_source' AND a real pain_point_source_url must exist.
+      // Everything else (agent_analysis, inferred, or no citation) gets capped
+      // at 'medium' here, in code, before the severity gate below ever sees it
+      // — this is what caught the templated/static-list leads that scored
+      // themselves 'critical' with zero real evidence and converted at 0%.
+      const evidenceType = String(research.pain_point_evidence_type || '').toLowerCase()
+      const hasSourceUrl = typeof research.pain_point_source_url === 'string' && research.pain_point_source_url.trim().length > 0
+      const isVerified = evidenceType === 'verified_source' && hasSourceUrl
+      if (!isVerified && ['critical', 'high'].includes(String(research.pain_point_severity || '').toLowerCase())) {
+        results.downgraded_unverified_severity++
+        research.pain_point_severity = 'medium'
+      }
+      const confidenceScore = computeConfidenceScore(research, isVerified)
 
       // "Immediate pain" gate — a good long-term fit is not enough on its own.
       // Require a severe pain point AND a genuinely urgent trigger before saving.
@@ -736,6 +790,7 @@ export async function POST(req: NextRequest) {
           lead_score: research.lead_score,
           urgency_score: research.urgency_score ?? null,
           urgency_reasoning: research.urgency_reasoning ?? null,
+          confidence_score: confidenceScore,
           priority: research.priority,
           source_url: pickBestUrl([
             company.source_url,            // exact link copied from the source page (most reliable)
