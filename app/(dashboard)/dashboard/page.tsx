@@ -13,13 +13,15 @@ import { cn, getScoreBg } from '@/lib/utils'
 import Link from 'next/link'
 import type { Lead } from '@/lib/types'
 
-// Scoped to Aerpolice + AER360 — matches CUSTOMER_CATEGORIES in
-// app/api/ai/discover/route.ts. Kima-only categories (LayerZero,
-// Hacked Protocol, Needs On/Off Ramp, Web2 Stablecoin Settlement) dropped.
+// Scoped to Aerpolice + AER360 + AERseal — matches CUSTOMER_CATEGORIES in
+// app/api/ai/discover/route.ts (AERseal added 2026-08-19). Kima-only
+// categories (LayerZero, Hacked Protocol, Needs On/Off Ramp, Web2 Stablecoin
+// Settlement) dropped.
 const CUSTOMER_CATEGORIES = [
   { label: 'Agentic Payments Customer',              color: '#f472b6', bar: 'rgba(244,114,182,0.7)' },
   { label: 'Aerpolice Governance Customer',          color: '#22d3ee', bar: 'rgba(34,211,238,0.7)'  },
   { label: 'AER360 Custody / Key-Governance Customer', color: '#a78bfa', bar: 'rgba(167,139,250,0.7)' },
+  { label: 'AERseal Contract-Authority Customer',     color: '#fbbf24', bar: 'rgba(251,191,36,0.7)'  },
 ]
 const CATEGORY_CAP = 8
 

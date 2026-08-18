@@ -70,8 +70,9 @@ export type FeedbackAction =
   | 'deal_closed'
   | 'needs_more_research'
 
-// Scoped to Aerpolice + AER360 (2026-08-10) — Kima/Aeredium-Institutional-L1
-// categories dropped. Matches the enums in app/api/ai/discover/route.ts,
+// Scoped to Aerpolice + AER360 + AERseal (2026-08-19, AERseal added as a
+// third co-equal product) — Kima/Aeredium-Institutional-L1 categories
+// dropped. Matches the enums in app/api/ai/discover/route.ts,
 // qualify-lead/route.ts, and enrich-lead/route.ts.
 export const INDUSTRY_CATEGORIES = [
   'AI agent / agentic commerce company',
@@ -81,6 +82,7 @@ export const INDUSTRY_CATEGORIES = [
   'Treasury or fund',
   'Fintech',
   'Robotics / autonomous systems',
+  'DeFi protocol / DAO / token issuer with a deployed contract',
   'Other',
 ] as const
 
@@ -88,6 +90,7 @@ export const CUSTOMER_CATEGORIES = [
   'Agentic Payments Customer',
   'Aerpolice Governance Customer',
   'AER360 Custody / Key-Governance Customer',
+  'AERseal Contract-Authority Customer',
   'Other',
 ] as const
 
@@ -99,6 +102,7 @@ export const PRODUCTS_TO_SELL = [
   'AER360 policy engine',
   'AER360 wallet',
   'AER360 agent control center',
+  'AERseal contract-authority transfer',
 ] as const
 
 export const REGIONS = [

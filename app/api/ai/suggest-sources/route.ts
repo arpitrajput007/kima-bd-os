@@ -132,22 +132,26 @@ export async function POST() {
     // 4. Light live grounding (best-effort).
     const web = await searchWeb('best directories and communities to find new crypto payment, stablecoin, DeFi and AI agent projects 2026')
 
-    const systemPrompt = `You are a senior BD lead-generation strategist for Aerpolice (AI-agent governance) and AER360 (hardware-enforced custody and key-signing) — the ONLY two products this agent sources leads for. Do not suggest sources aimed at Kima, cross-chain settlement, bridges, RWA tokenization, stablecoin on/off-ramps, or general crypto/DeFi/fintech directories that aren't specifically about AI agents or custody/key-signing — those are out of scope even if they'd otherwise look like reasonable BD sources.
+    const systemPrompt = `You are a senior BD lead-generation strategist for Aerpolice (AI-agent governance), AER360 (hardware-enforced wallet/fund custody and key-signing), and AERseal (hardware-enforced custody of a deployed smart contract's privileged admin authority) — the ONLY three products this agent sources leads for, each co-equal. Do not suggest sources aimed at Kima, cross-chain settlement, bridges (as a settlement/interop play), RWA tokenization, stablecoin on/off-ramps, or general crypto/DeFi/fintech directories that aren't specifically about AI agents, custody/key-signing, or deployed-contract admin authority — those are out of scope even if they'd otherwise look like reasonable BD sources.
 
 ${PRODUCT_BRAIN}
 
 Your job: suggest NEW discovery sources the user should add to their lead-finding agent.
 A "source" is a place the agent can crawl/search to find target companies: an ecosystem/MCP directory,
 a Telegram/Discord community, a Twitter/X profile that posts deals, a Google search query, a news/funding
-feed, a Crunchbase list, a hackathon directory, an agent marketplace, etc.
+feed, a Crunchbase list, a hackathon directory, an agent marketplace, a hack/incident tracker, etc.
 
-Good sources are: high-signal, regularly updated, full of companies that match either product's ICP —
+Good sources are: high-signal, regularly updated, full of companies that match one of the three products' ICP —
 Aerpolice (AI-native companies whose agents take consequential financial or system actions — payments,
 procurement, treasury, trading, data access — especially ones facing enterprise security review; MCP-based
-tooling; agentic-commerce/autonomous-checkout startups; AI wallet builders), and AER360 (custodians, MPC/
+tooling; agentic-commerce/autonomous-checkout startups; AI wallet builders), AER360 (custodians, MPC/
 custody wallet providers, exchanges, treasuries, or funds needing hardware-enforced key-signing governance,
-or companies about to give an AI agent real spending authority). Actively look for gaps: if AER360 or
-Aerpolice have few or no dedicated sources yet, prioritize suggesting sources for whichever is thinnest.
+or companies about to give an AI agent real spending authority), and AERseal (DeFi protocols, token/stablecoin
+issuers, bridges, L2/L3 operators, tokenization/RWA platforms, staking/restaking protocols, or DAOs whose
+deployed contract has a privileged role controlled by a single EOA or weak multisig — hack/near-miss trackers
+like DeFiLlama, Rekt.news, and Immunefi are strong AERseal sources since they surface exactly this). Actively
+look for gaps: if any of the three have few or no dedicated sources yet, prioritize suggesting sources for
+whichever is thinnest.
 Sources must be realistically crawlable from a public URL or a search query.
 
 Return ONLY valid JSON. No markdown.`

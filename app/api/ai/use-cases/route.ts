@@ -2,10 +2,11 @@
 // /api/ai/use-cases
 //
 // Generates 2-3 concrete, story-driven use cases showing exactly
-// how Aerpolice / AER360 can work with a specific company.
+// how Aerpolice / AER360 / AERseal can work with a specific company.
 //
 // KEY: This route is customer-category aware:
 //   - "Agentic Payments Customer" → Agentic Payments + Aerpolice playbook
+//   - "AERseal Contract-Authority Customer" → AERseal contract-authority playbook
 //   - Everything else → AER360 custody / key-governance playbook
 //
 // Also injects agent memory (learned knowledge + active rules)
@@ -33,9 +34,29 @@ function isAgenticLead(customerCategory: string | string[] | null | undefined): 
   return cats.some(c => c.toLowerCase().includes('agentic'))
 }
 
+function isAerSealCategoryLead(customerCategory: string | string[] | null | undefined): boolean {
+  if (!customerCategory) return false
+  const cats = Array.isArray(customerCategory) ? customerCategory : [customerCategory]
+  return cats.some(c => c.toLowerCase().includes('aerseal') || c.toLowerCase().includes('contract-authority'))
+}
+
 function categoryRoutingBlock(lead: Record<string, unknown>): string {
   const cats = (lead.customer_category as string[] | null) ?? []
   const isAgentic = isAgenticLead(cats)
+  const isAerSeal = isAerSealCategoryLead(cats)
+
+  if (isAerSeal) {
+    return `
+══ CATEGORY ROUTING — AERSEAL CONTRACT-AUTHORITY LEAD ══
+This company is tagged as an AERseal Contract-Authority Customer.
+
+MANDATORY RULES FOR THIS LEAD:
+1. This is about who controls a DEPLOYED SMART CONTRACT's privileged role (upgrade, mint, pause, freeze, oracle, bridge config, role management) — NOT wallet/treasury custody (that's AER360) and NOT AI-agent governance (that's Aerpolice). Do not blend those in unless the lead has its own separately confirmed pain for them.
+2. Name the specific privileged role and its current controller (single EOA, or a specific weak multisig setup) from the lead's aerseal_fit/pain_point fields.
+3. AERseal's role: transfers that privileged role to an AERKey threshold-controlled address — every privileged action then requires the configured approval threshold before the cluster signs and submits it. The contract itself never migrates, only who controls its admin functions.
+4. "Why now" for AERseal is usually a dated trigger: a hack/near-miss, an audit flagging the weak authority, a major listing/chain expansion/TVL increase raising the stakes of the same weak control, or a governance transition away from founder control.
+`
+  }
 
   if (isAgentic) {
     return `
@@ -84,6 +105,7 @@ export async function POST(req: NextRequest) {
     isAgenticLead(cats) ? 'agentic' : '',
     isAgenticLead(cats) ? 'agent' : '',
     isAgenticLead(cats) ? 'aerpolice' : '',
+    isAerSealCategoryLead(cats) ? 'aerseal' : '',
   ].filter(Boolean)
 
   // ── Load agent memory (learned knowledge + rules) ────────────
@@ -97,7 +119,7 @@ export async function POST(req: NextRequest) {
   // ── Category routing block ───────────────────────────────────
   const routingBlock = categoryRoutingBlock(lead as Record<string, unknown>)
 
-  const system = `You are a senior solutions architect for Aerpolice and AER360 — the only two products this pipeline evaluates leads for.
+  const system = `You are a senior solutions architect for Aerpolice, AER360, and AERseal — the only three products this pipeline evaluates leads for, each co-equal and evaluated independently.
 
 ${PRODUCT_BRAIN}
 
@@ -149,9 +171,10 @@ If a use case cannot answer "What exactly triggered this? Which exact feature? W
 
 HONESTY RULES:
 - Only generate use cases where the fit is genuine. 2 deeply concrete use cases beat 3 forced ones.
-- Pick the RIGHT product for each scenario. Do not shoehorn both products into every use case.
+- Pick the RIGHT product for each scenario. Do not shoehorn multiple products into every use case — a wallet/fund custody problem is AER360, a deployed contract's privileged-role problem is AERseal, an AI-agent permission problem is Aerpolice. Only combine when each has its own separately confirmed pain.
 - For Aerpolice scenarios, the trigger is usually an agent attempting an action that hits a policy boundary (amount threshold, recipient not on whitelist, unusual transaction). Show the Triple Gate evaluation → approval → execution → audit flow.
-- If AER360 genuinely isn't needed in a use case, leave it out — don't force it.
+- For AERseal scenarios, the trigger is usually a privileged contract action being attempted (an upgrade, a mint, a pause) by the currently weak authority (single EOA / weak multisig) — show the transfer to an AERKey threshold-controlled address and the approval-threshold flow for that specific privileged action.
+- If a product genuinely isn't needed in a use case, leave it out — don't force it.
 
 Return ONLY valid JSON — no markdown, no text outside the array.`
 
@@ -173,6 +196,7 @@ Pain Severity: ${lead.pain_point_severity || 'N/A'}
 Pain Evidence / Proof: ${lead.pain_point_evidence || 'N/A'}
 Aerpolice Fit: ${lead.aerpolice_fit || 'N/A'}
 AER360 Fit: ${lead.aeredium_fit || 'N/A'}
+AERseal Fit: ${lead.aerseal_fit || 'N/A'}
 Security Angle: ${lead.security_angle || 'N/A'}
 Risk Angle: ${lead.risk_angle || 'N/A'}
 Revenue Potential: ${lead.revenue_potential || 'N/A'}
@@ -185,7 +209,7 @@ Return a JSON array of 2-3 use case objects in this EXACT structure:
   {
     "id": "short-kebab-slug",
     "title": "Specific title naming the actual workflow (e.g. 'Funding an arbitrage trade before the spread closes')",
-    "category": "Agent Governance | Agent Identity | Audit Trail | Key Signing | Custody | Treasury | Agent Wallet Policy | Other",
+    "category": "Agent Governance | Agent Identity | Audit Trail | Key Signing | Custody | Treasury | Agent Wallet Policy | Contract Authority Transfer | Other",
     "scenario": "1-2 sentences. Who at this company operates what system. Set the stage concretely. E.g. 'A treasury team runs an automated payroll agent that pays contractors from a shared hot wallet with no per-agent spend limit.'",
     "trigger": "The EXACT triggering event with a number or named condition. E.g. 'The payroll agent receives a request to pay a new payee not on its approved list, for $42,000.' NEVER 'an opportunity arises'.",
     "decision": "What the system/agent decides to do. E.g. 'The agent proposes the payment; the Triple Gate evaluates identity, intent, and limits before it's allowed to execute.'",
@@ -198,8 +222,8 @@ Return a JSON array of 2-3 use case objects in this EXACT structure:
     ],
     "products_used": [
       {
-        "product": "Aerpolice | AER360",
-        "features": ["Exact features used, e.g. 'Triple Gate', 'Agent Identity', 'Audit Trail', 'Kill Switch', 'AERKey threshold signing', 'Policy Engine', 'Agent Control Center'"],
+        "product": "Aerpolice | AER360 | AERseal",
+        "features": ["Exact features used, e.g. 'Triple Gate', 'Agent Identity', 'Audit Trail', 'Kill Switch', 'AERKey threshold signing', 'Policy Engine', 'Agent Control Center', 'Contract-Authority Transfer', 'Approval Workflow'"],
         "why": "Why THESE features matter for THIS company's specific situation — explain the necessity, not the feature. E.g. 'Without a policy gate, a compromised agent runtime could approve its own out-of-policy payment before anyone notices.'"
       }
     ],
