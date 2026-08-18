@@ -645,27 +645,66 @@ export default function SourcesPage() {
                             <Clock size={11} /> Last run {formatDate(source.last_run_at)}
                           </span>
                         )}
-                        {source.leads_generated != null && source.leads_generated > 0 && (
-                          <button
-                            onClick={() => toggleSourceLeads(source)}
-                            className="flex items-center gap-1"
-                            style={{ color: '#34d399', background: 'none', border: 'none', cursor: 'pointer', padding: 0, font: 'inherit' }}
-                            title="Show which leads this source brought"
-                          >
-                            · {source.leads_generated} leads generated total
-                            {expandedSourceId === source.id ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                          </button>
-                        )}
-                        {!!source.companies_evaluated && (
-                          <span title="Lifetime AI research calls spent by this source, and the leads-saved-per-company-researched yield">
-                            · {source.companies_evaluated} researched over {source.total_runs || 0} run{(source.total_runs || 0) === 1 ? '' : 's'}
-                            {(() => {
-                              const y = sourceYield(source)
-                              return y.pct != null ? ` (${Math.round(y.pct * 100)}% yield)` : ''
-                            })()}
-                          </span>
-                        )}
                       </div>
+                    </div>
+
+                    {/* Stats — always visible, so "0 leads" reads as a real
+                        answer instead of silently showing nothing. */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {(() => {
+                        const leads = source.leads_generated || 0
+                        const hasLeads = leads > 0
+                        return (
+                          <button
+                            onClick={hasLeads ? () => toggleSourceLeads(source) : undefined}
+                            title={hasLeads ? 'Show which leads this source brought' : 'This source has not generated any leads yet'}
+                            style={{
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
+                              minWidth: 56, padding: '5px 10px', borderRadius: 9,
+                              border: `1px solid ${hasLeads ? 'rgba(52,211,153,0.25)' : 'rgba(255,255,255,0.07)'}`,
+                              background: hasLeads ? 'rgba(52,211,153,0.08)' : 'rgba(255,255,255,0.02)',
+                              cursor: hasLeads ? 'pointer' : 'default',
+                              font: 'inherit',
+                            }}
+                          >
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 15, fontWeight: 700, color: hasLeads ? '#34d399' : 'rgb(120,120,140)' }}>
+                              {leads}
+                              {hasLeads && (expandedSourceId === source.id ? <ChevronUp size={11} /> : <ChevronDown size={11} />)}
+                            </span>
+                            <span style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'rgb(100,100,120)' }}>leads</span>
+                          </button>
+                        )
+                      })()}
+
+                      {(() => {
+                        const hasRun = !!source.total_runs
+                        if (!hasRun) {
+                          return (
+                            <div
+                              title="This source hasn't been run yet — no AI credits spent"
+                              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, minWidth: 56, padding: '5px 10px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)' }}
+                            >
+                              <span style={{ fontSize: 15, fontWeight: 700, color: 'rgb(120,120,140)' }}>—</span>
+                              <span style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'rgb(100,100,120)' }}>not run</span>
+                            </div>
+                          )
+                        }
+                        const y = sourceYield(source)
+                        const yieldColor = y.isLow ? '#f87171' : y.pct != null ? '#60a5fa' : 'rgb(120,120,140)'
+                        return (
+                          <div
+                            title={`${source.companies_evaluated || 0} companies researched (AI calls spent) over ${source.total_runs} run${source.total_runs === 1 ? '' : 's'}${y.pct != null ? ` — ${Math.round(y.pct * 100)}% ended up saved as leads` : ' — under 10 researched, too few to judge yield yet'}`}
+                            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, minWidth: 56, padding: '5px 10px', borderRadius: 9, border: `1px solid ${y.isLow ? 'rgba(248,113,113,0.3)' : 'rgba(255,255,255,0.07)'}`, background: y.isLow ? 'rgba(248,113,113,0.08)' : 'rgba(255,255,255,0.02)' }}
+                          >
+                            <span style={{ fontSize: 15, fontWeight: 700, color: yieldColor }}>
+                              {y.pct != null ? `${Math.round(y.pct * 100)}%` : `${source.companies_evaluated || 0}`}
+                            </span>
+                            <span style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'rgb(100,100,120)' }}>
+                              {y.pct != null ? 'yield' : 'researched'}
+                            </span>
+                          </div>
+                        )
+                      })()}
                     </div>
 
                     {/* Actions */}
