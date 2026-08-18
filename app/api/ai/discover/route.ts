@@ -215,41 +215,62 @@ async function searchWeb(query: string): Promise<string> {
 }
 
 // Extract company mentions from raw page content
+// extraction_confidence lets the caller skip the expensive per-company
+// deepResearch() call (one Sonnet call + Hunter + Exa + homepage crawl,
+// ~4500 tokens, vs this single ~2500-token extraction call shared across up
+// to 6 candidates) for candidates the model itself isn't confident about at
+// extraction time — a real credit-saving lever, since this reuses a call
+// we're already paying for rather than adding a new one. Low stakes to get
+// slightly wrong: unlike pain_point_severity (which gates what gets SAVED as
+// a lead and is evidence-locked, see the severity downgrade below), this
+// field only gates whether we spend the research call at all — worst case
+// is a missed candidate, not a trust/quality regression, since every company
+// that DOES get researched still goes through the full evidence/severity gate.
+interface ExtractedCompany {
+  name: string
+  website: string
+  description: string
+  source_url: string
+  source_excerpt: string
+  extraction_confidence?: 'high' | 'medium' | 'low'
+}
+
 async function extractCompanies(
   content: string,
   sourceContext: string,
   provider: AIProvider = 'claude'
-): Promise<Array<{ name: string; website: string; description: string; source_url: string; source_excerpt: string }>> {
+): Promise<ExtractedCompany[]> {
   try {
-    const result = await routeJSON<{ companies: Array<{ name: string; website: string; description: string; source_url: string; source_excerpt: string }> }>({
+    const result = await routeJSON<{ companies: ExtractedCompany[] }>({
       provider,
       model: provider === 'claude' ? CLAUDE_FAST : 'gpt-4o',
       maxTokens: 2500,
       temperature: 0.2,
-      system: `You are a BD researcher for AER360 (hardware-enforced custody and key-signing — primary product) and Aerpolice (AI-agent governance — secondary note).
+      system: `You are a BD researcher for three co-equal products: AER360 (hardware-enforced wallet/fund custody and key-signing), Aerpolice (AI-agent governance), and AERseal (hardware-enforced custody of a deployed smart contract's privileged admin authority).
 
 ${PRODUCT_BRAIN_COMPACT}
 
-Read the ENTIRE page, not just the first company mentioned. Output REAL, SPECIFIC, NAMED companies that could be B2B customers for institutional custody/key-signing or AI-agent governance infrastructure — never categories.
+Read the ENTIRE page, not just the first company mentioned. Output REAL, SPECIFIC, NAMED companies that could be B2B customers for institutional custody/key-signing, AI-agent governance, or deployed-contract admin-authority infrastructure — never categories.
 
 CRITICAL — every "name" MUST be a single real company you could google and land on one company's website:
 - GOOD (real companies): "Skyfire", "Fireblocks", "Copper", "Fordefi", "Anthropic", "Bybit", "Coinbase", "Circle", "Ramp", "Brex".
-- BANNED (categories / segments / groupings — NEVER output these as a name): "AI Agents", "Custody Providers", "MPC Wallets", "Exchanges", "Crypto Exchanges", "Custodians", "Fintechs", "Agent Frameworks".
+- BANNED (categories / segments / groupings — NEVER output these as a name): "AI Agents", "Custody Providers", "MPC Wallets", "Exchanges", "Crypto Exchanges", "Custodians", "Fintechs", "Agent Frameworks", "DeFi Protocols".
 
 EXPAND CATEGORIES INTO REAL COMPANIES:
-- If the content points at a CATEGORY, expand it into specific real companies that best fit AER360/Aerpolice's ICP.
-  · "agentic commerce / AI agents that pay" → Skyfire, Payman, Crossmint agent-wallet customers
-  · "MPC/custody providers" → Fireblocks, Copper, Fordefi, Coinbase Custody, BitGo
-  · "AI agent frameworks / MCP tooling" → companies building on Claude/OpenAI agent SDKs, MCP server authors, agent-marketplace listings
-  · "exchanges / treasuries" → Bybit, OKX, Kraken, Circle
+- If the content points at a CATEGORY, expand it into specific real companies that best fit one of the three ICPs.
+  · "agentic commerce / AI agents that pay" → Skyfire, Payman, Crossmint agent-wallet customers (Aerpolice)
+  · "MPC/custody providers" → Fireblocks, Copper, Fordefi, Coinbase Custody, BitGo (AER360)
+  · "AI agent frameworks / MCP tooling" → companies building on Claude/OpenAI agent SDKs, MCP server authors, agent-marketplace listings (Aerpolice)
+  · "exchanges / treasuries" → Bybit, OKX, Kraken, Circle (AER360)
+  · "DeFi protocols / bridges / token issuers / L2s with an upgradeable contract" → named protocols with a live admin/proxy-admin/mint/pause role (AERseal)
 - Only name companies that genuinely exist with a findable website.
-- Return 5 high-quality real companies rather than 15 vague ones.`,
+- QUALITY OVER COUNT: it is completely fine to return 2 companies, or 0, if that's all the content genuinely supports. Do not pad the list with borderline or generic mentions just to reach a number — every extra low-confidence pick costs a real, expensive research call downstream. A source page that only weakly touches our ICP should return few or no companies.`,
       user: `Source: ${sourceContext}
 
 Content:
 ${content}
 
-Return up to 8 SPECIFIC, REAL, NAMED companies (quality over quantity — 8 great picks beats 15 mediocre ones). Never output a category/segment as a name. For each company, pull the exact sentence(s) from the content above that mention them — this is real evidence, don't discard it. Return JSON:
+Return up to 6 SPECIFIC, REAL, NAMED companies — fewer is fine, don't pad. Never output a category/segment as a name. For each company, pull the exact sentence(s) from the content above that mention them — this is real evidence, don't discard it. Return JSON:
 {
   "companies": [
     {
@@ -257,7 +278,8 @@ Return up to 8 SPECIFIC, REAL, NAMED companies (quality over quantity — 8 grea
       "website": "https://<real domain>",
       "description": "1-2 sentence description of what this company does",
       "source_url": "EXACT link from content about this company, or empty string",
-      "source_excerpt": "The exact sentence(s) from the content above that mention this company and any trigger/pain evidence — empty string if nothing specific"
+      "source_excerpt": "The exact sentence(s) from the content above that mention this company and any trigger/pain evidence — empty string if nothing specific",
+      "extraction_confidence": "high (content gives a specific, concrete reason this company fits one of the three ICPs) | medium (plausible fit but the content is thin/generic) | low (mentioned in passing, weak or speculative fit — include only if you have nothing better)"
     }
   ]
 }`,
@@ -523,6 +545,24 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // 2c. Broader safety net: the check above only fires when a source has a
+    // specific target_customer_category set. Most sources (general news feeds,
+    // etc.) don't have one, so they'd still burn a full research call per
+    // candidate even when literally every category is already full and there
+    // is nowhere for any lead to land. Catch that case unconditionally.
+    if (CUSTOMER_CATEGORIES.every(c => (categoryCounts[c] || 0) >= CATEGORY_CAP)) {
+      return NextResponse.json({
+        found: 0,
+        saved: 0,
+        skipped_duplicate: 0,
+        skipped_generic: 0,
+        skipped_cap: 1,
+        skipped_low_score: 0,
+        leads_saved: [],
+        note: `Skipped — every customer category is already at the ${CATEGORY_CAP}-lead cap. No research run, no tokens spent.`,
+      })
+    }
+
     // 3. Get existing company names/websites/domains to avoid duplicates.
     // We match on: exact lowercased name, lowercased domain (most reliable),
     // and a slug version (removes spaces/punctuation) to catch "Gnosis Safe" vs "GnosisSafe".
@@ -562,7 +602,7 @@ export async function POST(req: NextRequest) {
     // 4. Get the company list — either straight from Apollo, or by crawling a URL/search.
     const sourceQuery = source.source_url_or_query.trim()
     const isApolloSource = source.source_type === 'apollo_search' || /^apollo:/i.test(sourceQuery)
-    let companies: Array<{ name: string; website: string; description: string; source_url: string }> = []
+    let companies: Array<{ name: string; website: string; description: string; source_url: string; source_excerpt?: string; extraction_confidence?: 'high' | 'medium' | 'low' }> = []
 
     if (isApolloSource) {
       if (!apolloConfigured()) {
@@ -617,14 +657,22 @@ export async function POST(req: NextRequest) {
     const learnedIntelligence = await discoveryMemory()
 
     // Drop generic categories that slipped through as "companies".
-    const realCompanies = companies.filter(c => !isGenericName(c.name))
+    const namedCompanies = companies.filter(c => !isGenericName(c.name))
+
+    // Cost gate: skip the expensive deepResearch() call for candidates the
+    // extraction step itself flagged as low-confidence — reuses the extraction
+    // call's own judgment rather than spending a full ~4500-token research
+    // call to find out the same thing. Missing `extraction_confidence`
+    // (older/other providers) is treated as researchable, not filtered.
+    const realCompanies = namedCompanies.filter(c => c.extraction_confidence !== 'low')
 
     const results = {
       found: realCompanies.length,
       saved: 0,
       researched: 0, // companies that actually got a deepResearch() AI call — the real cost driver
       skipped_duplicate: 0,
-      skipped_generic: companies.length - realCompanies.length,
+      skipped_generic: companies.length - namedCompanies.length,
+      skipped_low_confidence: namedCompanies.length - realCompanies.length, // filtered before spending a research call — costs nothing
       skipped_cap: 0,
       skipped_low_score: 0,
       skipped_not_urgent: 0,

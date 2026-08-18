@@ -39,6 +39,7 @@ interface RunResult {
   researched?: number
   skipped_duplicate: number
   skipped_generic?: number
+  skipped_low_confidence?: number
   skipped_cap: number
   skipped_low_score: number
   leads_saved: string[]
@@ -782,6 +783,11 @@ export default function SourcesPage() {
                           )}
                           {(result.skipped_generic ?? 0) > 0 && (
                             <span style={{ color: 'rgb(110,110,135)' }}>{result.skipped_generic} generic categories filtered</span>
+                          )}
+                          {(result.skipped_low_confidence ?? 0) > 0 && (
+                            <span style={{ color: '#34d399' }} title="Extraction itself flagged these as weak/speculative fits and skipped the expensive research call — no credits spent on them">
+                              {result.skipped_low_confidence} low-confidence, skipped before spending credits
+                            </span>
                           )}
                           {result.skipped_cap > 0 && (
                             <span style={{ color: '#fbbf24' }}>{result.skipped_cap} skipped (category full)</span>
