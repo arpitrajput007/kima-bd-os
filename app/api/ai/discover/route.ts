@@ -125,16 +125,22 @@ async function isSafeDomain(url: string): Promise<boolean> {
 
 // Read a company website and pull real social links (twitter/telegram/discord)
 // from the page (usually the header/footer). No AI guessing — regex only.
-async function fetchSocials(website?: string, companyName?: string): Promise<Socials> {
+// prefetchedText: pass deepResearch()'s own homepage crawl when it's for the
+// same URL — avoids fetching the exact same page through Jina twice (once as
+// research evidence, once here for social links) for every saved lead.
+async function fetchSocials(website?: string, companyName?: string, prefetchedText?: string): Promise<Socials> {
   if (!website) return {}
   try {
-    const url = website.startsWith('http') ? website : `https://${website}`
-    const res = await fetch(`https://r.jina.ai/${url}`, {
-      headers: { Accept: 'text/plain' },
-      signal: AbortSignal.timeout(20000),
-    })
-    if (!res.ok) return {}
-    const text = await res.text()
+    let text = prefetchedText
+    if (!text) {
+      const url = website.startsWith('http') ? website : `https://${website}`
+      const res = await fetch(`https://r.jina.ai/${url}`, {
+        headers: { Accept: 'text/plain' },
+        signal: AbortSignal.timeout(20000),
+      })
+      if (!res.ok) return {}
+      text = await res.text()
+    }
     return extractSocials(text, companyName)
   } catch {
     return {}
@@ -436,7 +442,7 @@ Return this exact JSON:
   ]
 }`
 
-    return await routeJSON({
+    const researchResult = await routeJSON({
       provider,
       model: provider === 'claude' ? CLAUDE_FAST : 'gpt-4o',
       maxTokens: 4500,
@@ -449,6 +455,10 @@ Return this exact JSON:
       systemDynamicSuffix: learnedIntelligence || undefined,
       user: deepResearchUser,
     })
+    // Carry the homepage crawl through to the caller (underscore-prefixed —
+    // internal plumbing, never a DB field) so the later socials lookup can
+    // reuse it instead of crawling the exact same URL a second time.
+    return { ...researchResult, _homepageText: homepageText }
   } catch (e) {
     console.error('[deepResearch]', e)
     return null
@@ -718,6 +728,7 @@ export async function POST(req: NextRequest) {
       results.researched++
       const research = await deepResearch(enrichedCompany, learnedIntelligence, researchProvider)
       if (!research) continue
+      const crawledHomepageText = typeof research._homepageText === 'string' ? research._homepageText : ''
 
       // Hard gate: the model itself confirms this is a real company, not a category.
       if (research.is_specific_real_company === false) { results.skipped_generic++; continue }
@@ -798,8 +809,12 @@ export async function POST(req: NextRequest) {
         continue
       }
 
-      // Pull real social links. Crawl the website first; fall back to a search.
-      let socials = await fetchSocials(website, company.name)
+      // Pull real social links. Reuse deepResearch()'s own homepage crawl when
+      // it's for this exact website — avoids fetching the same page twice.
+      // Falls back to a fresh crawl (then a search) when the website changed
+      // (e.g. resolved after-the-fact) or the original crawl came back empty.
+      const canReuseHomepage = !!crawledHomepageText && website === (company.website || '').trim()
+      let socials = await fetchSocials(website, company.name, canReuseHomepage ? crawledHomepageText : undefined)
       if (!socials.twitter_url && !socials.telegram_url && !socials.discord_url) {
         const searchSocials = await fetchSocialsFromSearch(company.name)
         socials = { ...searchSocials, ...Object.fromEntries(Object.entries(socials).filter(([, v]) => v)) }
