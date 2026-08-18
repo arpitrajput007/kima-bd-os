@@ -36,12 +36,29 @@ const emptyForm: Partial<Source> = {
 interface RunResult {
   found: number
   saved: number
+  researched?: number
   skipped_duplicate: number
   skipped_generic?: number
   skipped_cap: number
   skipped_low_score: number
   leads_saved: string[]
   error?: string
+}
+
+// Below this many lifetime AI research calls, a source hasn't run enough to
+// judge yield fairly — one bad run of 3 companies means nothing. Above it,
+// a low yield is a real signal, not noise.
+const MIN_SAMPLE_FOR_YIELD_JUDGMENT = 10
+// Yield below this is a real "burning credits for nothing" signal once the
+// sample size above is met.
+const LOW_YIELD_THRESHOLD = 0.08
+
+function sourceYield(source: Source): { pct: number | null; isLow: boolean } {
+  const evaluated = source.companies_evaluated || 0
+  const saved = source.leads_generated || 0
+  if (evaluated < MIN_SAMPLE_FOR_YIELD_JUDGMENT) return { pct: null, isLow: false }
+  const pct = saved / evaluated
+  return { pct, isLow: pct < LOW_YIELD_THRESHOLD }
 }
 
 interface SourceSuggestion {
@@ -65,6 +82,7 @@ export default function SourcesPage() {
   const [form, setForm] = useState<Partial<Source>>(emptyForm)
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
+  const [sortWorstYieldFirst, setSortWorstYieldFirst] = useState(false)
   const [runningId, setRunningId] = useState<string | null>(null)
   const [runResults, setRunResults] = useState<Record<string, RunResult>>({})
   const [suggesting, setSuggesting] = useState(false)
@@ -303,11 +321,23 @@ export default function SourcesPage() {
     }
   }
 
-  const filteredSources = sources.filter(s =>
-    !search ||
-    s.source_name.toLowerCase().includes(search.toLowerCase()) ||
-    s.source_url_or_query?.toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredSources = sources
+    .filter(s =>
+      !search ||
+      s.source_name.toLowerCase().includes(search.toLowerCase()) ||
+      s.source_url_or_query?.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (!sortWorstYieldFirst) return 0
+      // Worst yield first, but only among sources with enough sample to judge
+      // fairly — unjudged sources (too few runs) sink to the bottom rather
+      // than crowding out the ones actually worth pausing.
+      const ya = sourceYield(a), yb = sourceYield(b)
+      if (ya.pct == null && yb.pct == null) return 0
+      if (ya.pct == null) return 1
+      if (yb.pct == null) return -1
+      return ya.pct - yb.pct
+    })
 
   const inputClass = 'input-dark'
   const selStyle = { fontSize: '13px' }
@@ -492,6 +522,18 @@ export default function SourcesPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
+          <button
+            onClick={() => setSortWorstYieldFirst(v => !v)}
+            className="btn btn-ghost"
+            style={{
+              fontSize: '12px', padding: '6px 10px',
+              color: sortWorstYieldFirst ? '#f87171' : 'rgb(150,155,185)',
+              border: sortWorstYieldFirst ? '1px solid rgba(248,113,113,0.3)' : undefined,
+            }}
+            title="Sort so the sources burning the most AI credits per lead show first"
+          >
+            {sortWorstYieldFirst ? 'Sorted: worst yield first' : 'Sort by yield'}
+          </button>
           <div className="flex items-center gap-2">
             <button onClick={selectAllVisible} className="btn btn-ghost" style={{ fontSize: '12px', padding: '6px 10px', color: 'rgb(150,155,185)' }}>
               Select all{search ? ' (filtered)' : ''}
@@ -583,6 +625,18 @@ export default function SourcesPage() {
                             {source.quality_rating}
                           </span>
                         )}
+                        {(() => {
+                          const y = sourceYield(source)
+                          return y.isLow ? (
+                            <span
+                              className="badge"
+                              style={{ background: 'rgba(248,113,113,0.12)', color: '#f87171', borderColor: 'rgba(248,113,113,0.3)', fontSize: '10px', padding: '2px 7px' }}
+                              title={`${Math.round((y.pct || 0) * 100)}% yield over ${source.companies_evaluated} researched — burning AI calls for very few leads. Consider pausing.`}
+                            >
+                              low yield — consider pausing
+                            </span>
+                          ) : null
+                        })()}
                       </div>
                       <div className="flex items-center gap-3 text-xs" style={{ color: 'rgb(110,110,135)' }}>
                         <span className="truncate max-w-xs mono">{source.source_url_or_query || '—'}</span>
@@ -601,6 +655,15 @@ export default function SourcesPage() {
                             · {source.leads_generated} leads generated total
                             {expandedSourceId === source.id ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
                           </button>
+                        )}
+                        {!!source.companies_evaluated && (
+                          <span title="Lifetime AI research calls spent by this source, and the leads-saved-per-company-researched yield">
+                            · {source.companies_evaluated} researched over {source.total_runs || 0} run{(source.total_runs || 0) === 1 ? '' : 's'}
+                            {(() => {
+                              const y = sourceYield(source)
+                              return y.pct != null ? ` (${Math.round(y.pct * 100)}% yield)` : ''
+                            })()}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -669,6 +732,12 @@ export default function SourcesPage() {
                             <strong>{result.saved}</strong> leads saved
                           </span>
                           <span style={{ color: 'rgb(110,110,135)' }}>{result.found} companies found on page</span>
+                          {!!result.researched && (
+                            <span style={{ color: 'rgb(110,110,135)' }}>
+                              {result.researched} researched this run
+                              {result.researched > 0 ? ` (${Math.round((result.saved / result.researched) * 100)}% yield)` : ''}
+                            </span>
+                          )}
                           {result.skipped_duplicate > 0 && (
                             <span style={{ color: 'rgb(110,110,135)' }}>{result.skipped_duplicate} already in DB</span>
                           )}

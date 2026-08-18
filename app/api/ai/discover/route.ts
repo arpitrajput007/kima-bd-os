@@ -622,6 +622,7 @@ export async function POST(req: NextRequest) {
     const results = {
       found: realCompanies.length,
       saved: 0,
+      researched: 0, // companies that actually got a deepResearch() AI call — the real cost driver
       skipped_duplicate: 0,
       skipped_generic: companies.length - realCompanies.length,
       skipped_cap: 0,
@@ -639,6 +640,9 @@ export async function POST(req: NextRequest) {
 
 
       // Skip duplicates — check name, name slug, and domain (most reliable).
+      // These are the ONLY skips that happen before deepResearch() runs, so
+      // they're the only ones that don't cost an AI call — everything below
+      // this block already spent one.
       const nameSlugKey = nameSlug(company.name || '')
       const domainKey = toDomain(company.website || '')
       if (existingNames.has(nameKey)) { results.skipped_duplicate++; continue }
@@ -663,6 +667,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Full research — inject learned intelligence + live context
+      results.researched++
       const research = await deepResearch(enrichedCompany, learnedIntelligence, researchProvider)
       if (!research) continue
 
@@ -909,12 +914,17 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 7. Update source last_run_at and total leads_generated
+    // 7. Update source last_run_at, cumulative leads_generated, and cumulative
+    // companies_evaluated/total_runs — the yield denominator (see
+    // supabase/add-source-yield-tracking.sql) that lets the Sources page show
+    // which sources burn AI research calls without producing leads.
     await supabase
       .from('sources')
       .update({
         last_run_at: new Date().toISOString(),
         leads_generated: (source.leads_generated || 0) + results.saved,
+        companies_evaluated: (source.companies_evaluated || 0) + results.researched,
+        total_runs: (source.total_runs || 0) + 1,
       })
       .eq('id', source_id)
 

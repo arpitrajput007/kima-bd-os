@@ -324,6 +324,8 @@ export interface Source {
   notes?: string
   last_run_at?: string
   leads_generated?: number
+  companies_evaluated?: number
+  total_runs?: number
   created_at: string
   updated_at: string
 }
