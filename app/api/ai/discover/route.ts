@@ -36,14 +36,16 @@ async function getHunterContacts(website: string): Promise<string> {
 }
 
 
-// Scoped to the two products this agent sources for: Aerpolice + AER360.
-// (Previously included LayerZero Customer, Hacked Protocol, Needs On/Off Ramp,
-// and Web2 Stablecoin Settlement Customer — those were Kima-only categories
-// and have been dropped along with the sources that targeted them.)
+// Scoped to the three co-equal products this agent sources for (2026-08-19):
+// Aerpolice + AER360 + AERseal. (Previously included LayerZero Customer,
+// Hacked Protocol, Needs On/Off Ramp, and Web2 Stablecoin Settlement Customer
+// — those were Kima-only categories and have been dropped along with the
+// sources that targeted them.)
 const CUSTOMER_CATEGORIES = [
   'Agentic Payments Customer',
   'Aerpolice Governance Customer',
   'AER360 Custody / Key-Governance Customer',
+  'AERseal Contract-Authority Customer',
 ]
 // Cap = how many *unworked* prospects we allow to sit in a category at once.
 // Only leads still in the top-of-funnel (see CAP_BLOCKING_STATUSES) count toward
@@ -304,7 +306,7 @@ async function deepResearch(
     // company × up to 8 companies risks the timeout. Sonnet is fast enough to
     // process a full batch and, combined with the real evidence above (was
     // previously just an 800-char search snippet), is the higher-leverage fix.
-    const deepResearchSystem = `You are a senior BD researcher for AER360 (hardware-enforced custody and key-signing — the primary product) and Aerpolice (AI-agent governance — a secondary note, only when it's an unusually strong additional angle). These are the ONLY two products this pipeline sources leads for — do not evaluate or invoke any other product, even if you know of one.
+    const deepResearchSystem = `You are a senior BD researcher for three co-equal products: AER360 (hardware-enforced wallet/fund custody and key-signing), Aerpolice (AI-agent governance), and AERseal (hardware-enforced custody of a deployed smart contract's privileged admin authority). These are the ONLY three products this pipeline sources leads for — do not evaluate or invoke any other product, even if you know of one. None of the three is a default primary — each is scored on its own merits.
 
 ${PRODUCT_BRAIN}
 
@@ -314,17 +316,19 @@ FIRST, validate the input is a REAL, SPECIFIC company (a brand you can google to
 
 SECOND, classify the company (customer | partner | competitor | integration | investor_ecosystem | not_relevant | unclear) before you evaluate fit — see the classification rules above. Do not score a competitor or investor as if it were a prospect.
 
-Evaluate AER360 first for every company, and only add Aerpolice as a secondary note:
-- If this company is a custodian, MPC wallet provider, exchange, treasury, or fund with key-signing/custody policy needs, OR is about to give a human or AI agent real financial authority for the first time, AER360 is the lead pitch.
-- Only bring in Aerpolice if there's a genuinely strong, separate AI-agent governance angle on top — never as the default.
-- If NEITHER product solves a real, specific problem for this company, say so honestly — do not force a fit.
+Evaluate all three products independently for every company — see MULTI-PRODUCT DISCIPLINE above:
+- AER360 fits if this company is a custodian, MPC wallet provider, exchange, treasury, or fund with WALLET/FUND key-signing/custody policy needs, OR is about to give a human or AI agent real financial authority for the first time.
+- AERseal fits if this company operates a DEPLOYED SMART CONTRACT whose privileged role (upgrade, mint, pause, freeze, oracle, bridge config, role management) is controlled by a single EOA or a weakly-secured multisig. This is a different problem from AER360 — do not credit AER360 for a contract-authority gap, or vice versa.
+- Aerpolice fits if this company builds/operates AI agents taking consequential financial or system actions with no identity/policy/audit layer.
+- Recommend more than one only when EACH has its own distinct, independently verified pain — shared AERKey infrastructure is not sufficient on its own.
+- If NONE of the three products solves a real, specific problem for this company, say so honestly — do not force a fit.
 
-You must produce TWO separate scores — do not blend them. Reason through the AER360 fit dimensions above (financial exposure, agent/automation activity, need for transaction controls, security sensitivity, recent trigger, likelihood of buying external infrastructure, AER360's differentiation for them, buyer accessibility) before you commit to a number — don't just pick a round number that feels right:
+You must produce ONE lead_score and ONE urgency_score for the lead overall (not per-product), but the fit fields (aeredium_fit / aerseal_fit / aerpolice_fit below) must each be reasoned independently — leave any that don't genuinely apply as null rather than padding them. Reason through the fit dimensions above (financial exposure, agent/automation activity, deployed-contract privileged-role exposure, need for transaction/admin controls, security sensitivity, recent trigger, likelihood of buying external infrastructure, differentiation for them, buyer accessibility) before you commit to a number — don't just pick a round number that feels right:
 
 LEAD_SCORE (0-100) — general ICP fit, independent of timing:
 High score (70+): clear pain point, active product, matches a target category, decision maker findable
 Medium (40-69): possible fit but unclear pain point or no direct match
-Low (<40): no clear use case for AER360 or Aerpolice
+Low (<40): no clear use case for AER360, Aerpolice, or AERseal
 
 URGENCY_SCORE (0-100) — how urgent it is to reach out THIS WEEK, driven ONLY by
 trigger recency and pain severity, NOT by how good a long-term fit they are — use the trigger dictionary and freshness bands above:
@@ -334,7 +338,7 @@ Low (<40): no trigger_reason found, or trigger is stale/speculative — this can
 
 IMPORTANT — only leads with BOTH a strong fit AND a genuinely urgent, severe pain point get saved (lead_score ≥ ${MIN_LEAD_SCORE}, pain_point_severity critical/high, urgency_score ≥ ${MIN_URGENCY_SCORE}). Do not inflate urgency_score or pain_point_severity just to help a good-fit company clear the bar — an honest "good fit, not urgent right now" is a more useful answer than a manufactured one, even though it means this lead won't be saved today.`
 
-    const deepResearchUser = `Do a deep BD research on this company for AER360 (primary) / Aerpolice (secondary):
+    const deepResearchUser = `Do a deep BD research on this company for AER360 / Aerpolice / AERseal — three co-equal products, each evaluated independently:
 
 Company: ${company.name}
 Website: ${company.website || 'unknown'}
@@ -345,9 +349,10 @@ PAIN POINT RULES — be specific, not generic:
 - DO write the SPECIFIC pain: what exact product/feature is exposed, what exact cost/risk/incident they face, what specific architecture choice creates the vulnerability. Cite real facts about this company, using the homepage text and source excerpt above where available.
 - For AI-agent companies: name the specific financial or system action their agent takes unsupervised, and what happens if that action is wrong or hijacked.
 - For custody/Fireblocks/MPC-wallet users: what specific signing/custody limitation (software-level MPC, single-cloud dependency, seed-phrase exposure) blocks their growth or fails a due-diligence question.
+- For companies with a deployed smart contract: name the SPECIFIC privileged role (upgrade/mint/pause/freeze/oracle/bridge-config/role-management) and who controls it (single EOA, or a specific weak multisig setup) — cite on-chain or documented evidence, not a guess that "they probably have an admin key."
 - pain_point_severity = critical only if there is a real incident, a live enterprise-deal blocker, or a blocking architectural dependency.
 
-GAP RULE: potential_gap is distinct from pain_point — it's specifically what's architecturally MISSING from their current setup that AER360 could fill (no agent-specific wallet, unrestricted access, weak limits, no destination allowlist, excessive human approvals, no policy enforcement at signing, no tamper-evident audit, hot-wallet/API-key exposure, etc.). If the evidence doesn't support a specific gap, set potential_gap to exactly "Gap not confirmed" — never invent one.
+GAP RULE: potential_gap is distinct from pain_point — it's specifically what's architecturally MISSING from their current setup that one of our products could fill (for AER360: no agent-specific wallet, unrestricted access, weak limits, no destination allowlist, excessive human approvals, no policy enforcement at signing, no tamper-evident audit, hot-wallet/API-key exposure; for AERseal: contract admin role on a single EOA or weak multisig, no approval workflow on privileged actions, no independent key-proof; for Aerpolice: no agent identity, no pre-execution policy gate, no audit trail). If the evidence doesn't support a specific gap, set potential_gap to exactly "Gap not confirmed" — never invent one.
 
 CONTACT RULES — find the REAL decision maker, not a generic title:
 - Priority 1: Head of BD / VP Partnerships / Head of Growth — this person signs integration deals.
@@ -362,8 +367,8 @@ Return this exact JSON:
   "is_specific_real_company": true,
   "classification": "customer|partner|competitor|integration|investor_ecosystem|not_relevant|unclear",
   "industry_category": "one specific industry category",
-  "customer_category": ["array — pick from: AER360 Custody / Key-Governance Customer, Agentic Payments Customer, Aerpolice Governance Customer, Other"],
-  "product_to_sell": "the single most relevant AER360/Aerpolice product for this company and WHY — e.g. 'AER360 threshold signing — they run software-only MPC custody today with no hardware-attested signing policy' or 'Aerpolice agent governance — their AI agent handles payouts with no execution gate'",
+  "customer_category": ["array — pick from: AER360 Custody / Key-Governance Customer, AERseal Contract-Authority Customer, Agentic Payments Customer, Aerpolice Governance Customer, Other"],
+  "product_to_sell": "the single most relevant product (AER360 / AERseal / Aerpolice) for this company and WHY — e.g. 'AER360 threshold signing — they run software-only MPC custody today with no hardware-attested signing policy', 'AERseal — their proxy admin is a single founder EOA with no approval workflow', or 'Aerpolice agent governance — their AI agent handles payouts with no execution gate'",
   "region": "their primary market region",
   "company_summary": "3-4 sentence summary: what they do, how big, what stack they use, what stage they're at",
   "business_model": "how they specifically make money",
@@ -376,17 +381,18 @@ Return this exact JSON:
   "pain_point_evidence": "concrete evidence: exact quote, incident + date, specific architectural dependency, or named product limitation",
   "pain_point_source_url": "EXACT full URL to the article/post proving the pain point. Empty string if none.",
   "pain_point_evidence_type": "verified_source|agent_analysis|inferred",
-  "potential_gap": "what's architecturally missing that AER360 could fill, or exactly 'Gap not confirmed' if unsupported",
-  "aeredium_fit": "how AER360 (AERKey threshold signing / Policy Engine / AERKey Wallet / Agent Control Center) addresses their custody, key-signing, or agent-spend-control gap — specific pillar(s), or null if there is genuinely no fit",
-  "suggested_use_case": "the precise AER360 integration to pitch, or the precise Aerpolice integration if that's the stronger fit",
+  "potential_gap": "what's architecturally missing that one of our products could fill, or exactly 'Gap not confirmed' if unsupported",
+  "aeredium_fit": "how AER360 (AERKey threshold signing / Policy Engine / AERKey Wallet / Agent Control Center) addresses their WALLET/FUND custody, key-signing, or agent-spend-control gap — specific pillar(s), or null if there is genuinely no fit",
+  "aerseal_fit": "how AERseal (transferring a deployed contract's privileged role to an AERKey threshold-controlled address) addresses their SMART-CONTRACT admin-authority gap — name the specific privileged role and current controller, or null if there is no deployed contract with a privileged role controlled by a single EOA/weak multisig — never force this",
+  "suggested_use_case": "the precise integration to pitch for whichever product(s) genuinely fit",
   "outreach_angle": "one specific sentence referencing their actual trigger/situation — not a generic 'would love to introduce AER360' line",
-  "aerpolice_fit": "how Aerpolice's Agent Identity / Triple Gate / Audit Trail addresses their AI-agent governance gap, or null if this company has no AI agents taking financial or system actions, or if AER360 alone is the stronger story — never force this",
-  "trigger_reason": "why reach out NOW — a specific recent event (funding, product launch, security incident, compliance hire). Must be datable and real.",
+  "aerpolice_fit": "how Aerpolice's Agent Identity / Triple Gate / Audit Trail addresses their AI-agent governance gap, or null if this company has no AI agents taking financial or system actions — never force this",
+  "trigger_reason": "why reach out NOW — a specific recent event (funding, product launch, security incident, compliance hire, contract deployment, audit flag). Must be datable and real.",
   "trigger_date": "the trigger event's actual date if known (e.g. '2026-07-15' or 'July 2026'), or null if undated",
   "source_url": "exact URL to the trigger event. NOT a homepage. null if none.",
   "trigger_source_url": "same as source_url if it's specifically the trigger citation, else the best available citation for the trigger, or null",
   "integration_feasibility": "high|medium|low — with one sentence of reasoning",
-  "revenue_potential": "realistic ARR estimate for AER360/Aerpolice based on their volume/scale/headcount",
+  "revenue_potential": "realistic ARR estimate based on their volume/scale/headcount, for whichever product(s) genuinely fit",
   "lead_score": 0,
   "urgency_score": 0,
   "urgency_reasoning": "1-2 sentences: what dated trigger and pain severity drove this urgency number — say explicitly if there is no dated trigger",
@@ -703,12 +709,13 @@ export async function POST(req: NextRequest) {
       }
 
       // Product-relevance gate — reject unless there's a genuine, specific fit
-      // for one of our two products. A non-empty lead_score alone isn't proof
-      // of that; the model must have actually named a fit for Aerpolice or
-      // AER360 (aeredium_fit doubles as the AER360 fit field).
+      // for at least one of our three co-equal products. A non-empty lead_score
+      // alone isn't proof of that; the model must have actually named a fit for
+      // Aerpolice, AER360 (aeredium_fit field), or AERseal.
       const hasAerpoliceFit = typeof research.aerpolice_fit === 'string' && research.aerpolice_fit.trim().length > 0
       const hasAer360Fit = typeof research.aeredium_fit === 'string' && research.aeredium_fit.trim().length > 0
-      if (!hasAerpoliceFit && !hasAer360Fit) {
+      const hasAerSealFit = typeof research.aerseal_fit === 'string' && research.aerseal_fit.trim().length > 0
+      if (!hasAerpoliceFit && !hasAer360Fit && !hasAerSealFit) {
         results.skipped_no_product_fit++
         continue
       }
@@ -773,6 +780,7 @@ export async function POST(req: NextRequest) {
           kima_fit: research.kima_fit,
           aeredium_fit: research.aeredium_fit,
           aerpolice_fit: research.aerpolice_fit || null,
+          aerseal_fit: research.aerseal_fit || null,
           suggested_use_case: research.suggested_use_case,
           outreach_angle: research.outreach_angle || null,
           trigger_reason: research.trigger_reason,

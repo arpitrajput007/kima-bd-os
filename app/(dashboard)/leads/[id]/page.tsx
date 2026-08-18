@@ -29,7 +29,7 @@ import { INDUSTRY_CATEGORIES, CUSTOMER_CATEGORIES, PRODUCTS_TO_SELL, REGIONS } f
 import { actStart, actFinish, ACTION_TOOL, ACTION_LABEL } from '@/lib/agent-activity'
 import { getActor, ACTOR_LABEL } from '@/lib/actor'
 
-type AIAction = 'research' | 'pain_points' | 'aeredium_fit' | 'aerpolice_fit' | 'classify' | 'score' | 'contacts' | null
+type AIAction = 'research' | 'pain_points' | 'aeredium_fit' | 'aerpolice_fit' | 'aerseal_fit' | 'classify' | 'score' | 'contacts' | null
 
 /* ── Design tokens (matching reference exactly) ──────────────── */
 const C = {
@@ -1491,11 +1491,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     if (!window.__bda) window.__bda = { events: [], v: 0 }
     const toolMap: Record<string, string> = {
       research: 'Claude', classify: 'Claude',
-      aeredium_fit: 'Claude', aerpolice_fit: 'Claude', score: 'Claude', contacts: 'ContactFinder', pain_points: 'Claude',
+      aeredium_fit: 'Claude', aerpolice_fit: 'Claude', aerseal_fit: 'Claude', score: 'Claude', contacts: 'ContactFinder', pain_points: 'Claude',
     }
     const labelMap: Record<string, string> = {
       research: 'Research Company', classify: 'Classify Lead',
-      aeredium_fit: 'AER360 Fit Analysis', aerpolice_fit: 'Aerpolice Fit Analysis', score: 'Score Lead',
+      aeredium_fit: 'AER360 Fit Analysis', aerpolice_fit: 'Aerpolice Fit Analysis', aerseal_fit: 'AERseal Fit Analysis', score: 'Score Lead',
       contacts: 'Find Contacts', pain_points: 'Identify Pain Points',
     }
     if (aiAction) {
@@ -1653,6 +1653,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       } else if (action === 'aerpolice_fit') {
         await supabase.from('leads').update({
           aerpolice_fit: json.data.aerpolice_fit, agent_control_angle: json.data.agent_control_angle,
+          updated_at: new Date().toISOString()
+        }).eq('id', id); loadLead()
+      } else if (action === 'aerseal_fit') {
+        await supabase.from('leads').update({
+          aerseal_fit: json.data.aerseal_fit, suggested_use_case: json.data.suggested_use_case,
+          integration_feasibility: json.data.integration_feasibility,
           updated_at: new Date().toISOString()
         }).eq('id', id); loadLead()
       } else if (action === 'score') {
@@ -1870,6 +1876,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               { action: 'pain_points' as AIAction, label: 'Identify Pain Points' },
               { action: 'aeredium_fit' as AIAction,label: 'AER360 Fit'           },
               { action: 'aerpolice_fit' as AIAction,  label: 'Aerpolice Fit'           },
+              { action: 'aerseal_fit' as AIAction,  label: 'AERseal Fit'           },
               { action: 'classify' as AIAction,    label: 'Classify'             },
               { action: 'score' as AIAction,       label: 'Score Lead'           },
               { action: 'contacts' as AIAction,    label: 'Find Contacts'        },
@@ -2158,6 +2165,30 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 <button onClick={() => runAI('aerpolice_fit')} disabled={aiAction !== null}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 9, border: '1px solid rgba(34,211,238,0.28)', background: 'rgba(34,211,238,0.09)', padding: '8px 14px', fontSize: 13, color: 'rgb(103,232,249)', cursor: 'pointer', fontFamily: 'inherit' }}>
                   <Sparkles size={12} />Analyze Aerpolice Fit
+                </button>
+              )}
+            </FindingCard>
+
+            {/* AERseal Fit — deployed smart-contract admin authority */}
+            <FindingCard
+              icon={Shield} title="AERseal Fit" pillVariant="purple"
+              body={lead.aerseal_fit ? lead.aerseal_fit.split('\n')[0] : 'AERseal fit not analyzed yet.'}
+              expanded={expanded.aerseal} onToggle={() => toggle('aerseal')}
+            >
+              {lead.aerseal_fit ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div style={{ borderRadius: 12, border: '1px solid rgba(251,191,36,0.2)', background: 'rgba(251,191,36,0.06)', padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                      <Shield size={14} color="#fbbf24" />
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Contract Authority</span>
+                    </div>
+                    <ProseBullets text={lead.aerseal_fit!} color="rgb(220,225,240)" dotColor="rgba(251,191,36,0.7)" />
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => runAI('aerseal_fit')} disabled={aiAction !== null}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 9, border: '1px solid rgba(251,191,36,0.28)', background: 'rgba(251,191,36,0.09)', padding: '8px 14px', fontSize: 13, color: 'rgb(253,224,71)', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  <Sparkles size={12} />Analyze AERseal Fit
                 </button>
               )}
             </FindingCard>

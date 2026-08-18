@@ -86,8 +86,11 @@ Trigger events: security incident or near-miss, new institutional client requiri
 // Injected into enrichment and bd-brief prompts to force the right order of
 // reasoning. This is the single most important quality lever in the system.
 //
-// SCOPE: this agent finds leads for TWO products only — Aerpolice and AER360.
-// Kima and Aeredium's general Institutional L1 are out of scope for lead
+// SCOPE: this agent finds leads for THREE products, co-equal, as of 2026-08-19
+// (per user decision) — Aerpolice, AER360, and AERseal. No default primary;
+// each is scored and pitched independently, only when it has a distinct,
+// independently verified pain behind it (see MULTI_PRODUCT_DISCIPLINE below).
+// Kima and Aeredium's general Institutional L1 remain out of scope for lead
 // generation/qualification/outreach (KIMA_KNOWLEDGE and AEREDIUM_KNOWLEDGE
 // below are kept as raw exports only for the Reaction Studio content tool,
 // which still comments on Kima Finance's full product line — they are
@@ -106,7 +109,7 @@ Before thinking about our products at all, understand this specific company:
 - What do they actually do? (Not the category — the specific product and workflow)
 - Who are their actual customers? (Types, names if known, deal sizes, relationship dynamic)
 - How do they make money? (Revenue model specifics, not just "SaaS" or "payments")
-- What infrastructure do they already have? (Which wallets, custody/signing solutions, agent frameworks, harnesses)
+- What infrastructure do they already have? (Which wallets, custody/signing solutions, deployed smart contracts and their privileged roles, agent frameworks, harnesses)
 - What stage are they at? (Early startup / growth / mature enterprise — matters enormously)
 - What regions and regulatory environments do they operate in?
 - What strategic direction are they moving in? (New markets, new products, recent hires, announcements)
@@ -120,14 +123,18 @@ Based only on what you learned in Step 1:
 - What are they likely trying to solve in the next 12–24 months based on their strategic direction?
 Do NOT list generic industry problems. The pain points must be traceable to this specific company's situation.
 
-STEP 3 — EVALUATE OUR PRODUCTS HONESTLY
-Only after understanding the company and their pains, evaluate each product:
+STEP 3 — EVALUATE OUR PRODUCTS HONESTLY, INDEPENDENTLY
+Only after understanding the company and their pains, evaluate each product on its own — do not let a strong fit on one product inflate another:
 - Does Aerpolice solve a REAL AI-agent governance problem they have — do they have agents taking consequential financial or system actions with no identity/policy/audit layer?
 - Does AER360 solve a REAL custody / key-signing / agent-spend-control problem they have — is their key management, wallet security, or per-agent spend policy weaker than what a hardware-enforced threshold-signing platform would give them?
+- Does AERseal solve a REAL smart-contract privileged-authority problem they have — does a deployed contract they operate have an upgrade/mint/pause/freeze/oracle/bridge-config/role-management power sitting behind a single EOA or a weakly-secured multisig?
 
-CRITICAL: "No fit" is a perfectly valid — and valuable — conclusion for either or both products. If neither product solves a real problem this company has, say so plainly. Do NOT force a fit into Kima, Aeredium's Institutional L1, cross-chain settlement, or anything outside Aerpolice/AER360 — those products are not part of this agent's mandate, regardless of how good a "fit" the company might otherwise be for them.
+These are three DIFFERENT control problems (the wallet, the contract's master controls, the agent's delegated authority) that happen to share the same AERKey threshold-signing foundation under AER360 and AERseal. A company having one does not imply it has the others.
+
+CRITICAL: "No fit" is a perfectly valid — and valuable — conclusion for any or all three products. If none of them solves a real problem this company has, say so plainly. Do NOT force a fit into Kima, Aeredium's Institutional L1, cross-chain settlement, or anything outside Aerpolice/AER360/AERseal — those products are not part of this agent's mandate, regardless of how good a "fit" the company might otherwise be for them.
 - If you force a recommendation where none exists, you waste the BD team's time and destroy trust in the agent's judgment.
 - 3 highly credible, deeply reasoned opportunities > 30 generic suggestions.
+- Recommend more than one product only when each has its own distinct, independently verified pain — shared infrastructure or a theoretical future need is not sufficient to add a second or third product to the pitch.
 
 TEST: If you replaced the company name with a different company and the analysis still made sense — you have failed. The output must be specific to THIS company.
 
@@ -135,6 +142,7 @@ STEP 4 — HYPOTHESIZE STRATEGICALLY
 For a product that isn't an immediate fit, ask: "Under what future conditions would this become relevant?"
 - "When they start giving agents financial authority, Aerpolice becomes critical because..."
 - "If they start handling institutional volume or funds, AER360's hardware-enforced signing would matter because..."
+- "If they deploy an upgradeable contract with a founder-EOA admin key, AERseal becomes critical because..."
 Label these clearly as forward-looking hypotheses, not current opportunities.
 ════════════════════════════════════════════════════════`
 
@@ -191,24 +199,37 @@ KEY COMPETITORS IN THIS SPACE:
 - Software-only governance tools (MCP gates, RBAC, KYA tokens): verify who the agent is but a compromised runtime or prompt injection can still pass those checks and execute unauthorized transactions — policy enforcement is logical, not cryptographic. Aerpolice's Triple Gate is hardware-enforced, not software-level.
 - Fireblocks / Coinbase Custody-style MPC custody: signing computation runs in ordinary server processes, not hardware-attested enclaves — see battlecard above.`
 
+// ── Multi-product discipline (shared by discovery + focus-directive prompts) ──
+// Condensed from the 2026-08-19 AERseal spec: the boundary rule that keeps
+// three co-equal products from blending into one generic pitch.
+export const MULTI_PRODUCT_DISCIPLINE = `MULTI-PRODUCT DISCIPLINE — recommend more than one of AER360 / AERseal / Aerpolice only when a DISTINCT, independently verified pain exists for each one. Shared AERKey infrastructure or a theoretical future need is never sufficient on its own to add a second or third product.
+- A wallet/fund custody or signing-policy problem → AER360
+- A deployed smart contract's privileged authority (upgrade/mint/pause/freeze/oracle/bridge-config/role) controlled by a single EOA or weak multisig → AERseal
+- An AI agent taking consequential actions with no identity/policy/audit layer → Aerpolice
+Do not recommend AER360 merely because a project has a vulnerable contract admin role — that's AERseal unless a SEPARATE wallet/custody need is confirmed. Do not recommend AERseal merely because a company has a multisig — the multisig must specifically control a contract's privileged role, not just hold treasury funds. Do not recommend Aerpolice merely because the company uses automation or smart contracts — a real AI-agent permission/execution requirement must be present. Score and pitch each genuine match independently rather than blending them into one generic pitch.`
+
 // ── Target customer categories ───────────────────────────────────────────────
-// AER360-primary as of 2026-08-11 (per user decision): AER360 is the product
-// this agent sells first. Aerpolice is a secondary note, surfaced only when a
-// prospect has an especially strong AI-agent governance angle on top of its
-// AER360 fit — never pitched as co-equal by default anymore.
-export const TARGET_CATEGORIES_BLOCK = `TARGET CUSTOMER CATEGORIES (AER360 is the primary product — Aerpolice is a secondary note, not a co-equal pitch):
-1. AER360 Custody / Key-Governance Customer — custodians, MPC wallet providers, exchanges, treasuries, or funds relying on software-only key management or ad hoc multisig, OR any company about to give a human or AI agent real financial authority for the first time with no per-agent wallet/policy framework
-2. Agentic Payments / AI-Agent Customer — AI agents or agentic-commerce products that move money and need a hardware-governed wallet (AER360) to execute from; note Aerpolice as an additive decision-layer gate only if their AI-agent governance need is unusually strong
-3. Aerpolice Governance Customer — company building/operating AI agents with financial or system authority and no identity/policy/audit layer yet, with no genuine AER360 custody/wallet angle (pure governance case)`
+// Three co-equal products as of 2026-08-19 (per user decision, superseding the
+// 2026-08-11 AER360-primary setup): AER360, AERseal, and Aerpolice are each
+// scored and pitched independently. None is a default primary — see
+// MULTI_PRODUCT_DISCIPLINE above for when more than one genuinely applies.
+export const TARGET_CATEGORIES_BLOCK = `TARGET CUSTOMER CATEGORIES (three co-equal products — AER360, AERseal, Aerpolice — each scored on its own merits, never a default primary):
+1. AER360 Custody / Key-Governance Customer — custodians, MPC wallet providers, exchanges, treasuries, or funds relying on software-only key management or ad hoc multisig for their WALLET/FUND custody, OR any company about to give a human or AI agent real financial authority for the first time with no per-agent wallet/policy framework
+2. AERseal Contract-Authority Customer — a team operating a DEPLOYED SMART CONTRACT whose privileged role (upgrade, mint, pause, freeze, oracle, bridge config, role management) is controlled by a single EOA or a weakly-secured multisig. Do not confuse with #1 — this is about who controls the contract's admin functions, not who custodies a treasury wallet.
+3. Agentic Payments / AI-Agent Customer — AI agents or agentic-commerce products that move money and need a hardware-governed wallet (AER360) to execute from; note Aerpolice as an additive decision-layer gate only if their AI-agent governance need is unusually strong
+4. Aerpolice Governance Customer — company building/operating AI agents with financial or system authority and no identity/policy/audit layer yet (pure governance case)
+
+${MULTI_PRODUCT_DISCIPLINE}`
 
 // ── Ideal customer profile ───────────────────────────────────────────────────
-export const ICP_BLOCK = `IDEAL CUSTOMER PROFILES (ICP) — AER360-primary:
-- Custodians and MPC wallet providers (Fireblocks-style) wanting a stronger signing guarantee, or a white-label story for institutional clients, than software-only MPC gives them
-- Exchanges, prime brokers, OTC desks, and treasuries handling institutional volume on software-only or ad hoc multisig key management
-- Companies about to give a human or AI agent real financial authority for the first time (treasury, payroll, procurement agents) with no per-agent policy/spend-limit framework in place
-- AI agent / agentic-commerce builders needing a governed wallet to actually execute autonomous payments from — specifically seed–Series A AI-native product companies selling agent products to enterprises where agents take consequential actions (payments, procurement, data access)
-- MCP-based tooling, AI wallet builders, agent marketplaces, autonomous-checkout startups
-- Only when there is no genuine AER360 wallet/custody angle at all: pure AI-agent governance cases where Aerpolice is the sole fit — primary urgency there is enterprise deals stalling in security review over agent identity/policy/audit`
+export const ICP_BLOCK = `IDEAL CUSTOMER PROFILES (ICP) — three co-equal products:
+- Custodians and MPC wallet providers (Fireblocks-style) wanting a stronger signing guarantee, or a white-label story for institutional clients, than software-only MPC gives them → AER360
+- Exchanges, prime brokers, OTC desks, and treasuries handling institutional volume on software-only or ad hoc multisig key management → AER360
+- Companies about to give a human or AI agent real financial authority for the first time (treasury, payroll, procurement agents) with no per-agent policy/spend-limit framework in place → AER360
+- AI agent / agentic-commerce builders needing a governed wallet to actually execute autonomous payments from — specifically seed–Series A AI-native product companies selling agent products to enterprises where agents take consequential actions (payments, procurement, data access) → AER360, +Aerpolice if the governance need is unusually strong
+- MCP-based tooling, AI wallet builders, agent marketplaces, autonomous-checkout startups → AER360, +Aerpolice if applicable
+- Pure AI-agent governance cases with no genuine AER360 wallet/custody angle — primary urgency there is enterprise deals stalling in security review over agent identity/policy/audit → Aerpolice
+- DeFi protocols, token/stablecoin issuers, bridges, L2/L3 operators, tokenization/RWA platforms, staking/restaking protocols, or DAOs whose deployed contract has an upgrade/mint/pause/freeze/oracle/bridge-config/role-management power sitting behind a single EOA or weak multisig → AERseal`
 
 // ── AER360 discovery/qualification rigor ─────────────────────────────────────
 // Composed ONLY into discovery + qualification prompts (discover/route.ts,
@@ -282,7 +303,39 @@ How to reason about a company using or building one of these:
 
 Do not silently drop competitors from output — classify them explicitly so they're never mistaken for a prospect to pitch.`
 
+// ── AERseal discovery/qualification rigor ────────────────────────────────────
+// Condensed from the 2026-08-19 ChainGPT + Claude AERseal specs Arpit provided
+// — same operative-rules-not-verbatim treatment as AER360_ICP_TIERS above.
+export const AERSEAL_ICP_TIERS = `AERSEAL ICP TIERS — rank every prospect into one of these. AERseal answers ONE question: who can exercise a deployed smart contract's privileged powers (upgrade, mint, pause, freeze, oracle, bridge config, role management), and what happens if that controller is compromised? It is NOT wallet/treasury custody (that's AER360) and NOT a code audit, bridge-message verification system, or AI-agent governance.
+
+TIER 1 (highest priority — publicly confirmed, on-chain or documented evidence):
+A. A single EOA controls a dangerous role — proxy admin, default admin, upgrade owner, mint administrator, bridge owner, oracle setter, freeze/seize authority. Checkable via the contract's owner()/admin role on a block explorer. This is the clearest trigger.
+B. A multisig exists on that role, but the underlying signer security is weak — below-majority threshold (e.g. 2-of-5), multiple signers controlled by the same person, signers on ordinary browser wallets, unknown signer identities, former employees still included.
+C. A confirmed hack, near-miss, or admin-key/insider-signer incident (DeFiLlama, Rekt.news, Immunefi) — highest intent, but verify the vulnerable authority hasn't already been remediated before targeting; do not pitch a historical victim that already fixed it.
+
+TIER 2:
+D. An audit or risk assessment publicly flags privileged access — phrases like "single EOA," "no multisig," "admin key," "instant upgrade," "no delay on upgrades," "centralized upgrade authority," "move behind multisig or timelock."
+E. The project is about to increase its exposure on an existing contract with a known weak admin role — major protocol listing, new chain launch, new bridge route, stablecoin supply increase, institutional partnership, large TVL increase, mainnet launch, new upgradeable contract deployment, tokenized securities/RWA issuance. Framing: "acceptable at $5M, a liability at $500M."
+F. Governance moving beyond founder control — founder EOA → security council, DAO, or multi-party/consortium operation. AERseal can be the controlled transition layer.
+
+TIER 3:
+G. Recently raised funding or launched a token/mainnet contract with upgradeable/privileged roles and no disclosed admin-key infrastructure yet.
+H. Security/protocol-engineering job postings signaling awareness of the gap without a confirmed solution yet.
+
+DISQUALIFY — do not pitch AERseal as the primary product when:
+- The contract is immutable and admin privileges have already been renounced.
+- The only issue is treasury/wallet custody with no smart-contract privileged role involved — that's AER360, not AERseal.
+- The only issue is AI-agent governance — that's Aerpolice, not AERseal.
+- The privileged role already sits behind a strong timelock, a robust threshold system, and appropriately distributed governance.
+- The operation requires continuous high-frequency automated signing with no approval workflow.
+- There is no transferable owner/admin/access-control role at all.
+- The vulnerable authority was already remediated after a past incident.
+
+NOT ICP: companies with no deployed smart contract at all, or whose only contracts are fully immutable with no privileged roles ever granted.`
+
 export const AER360_DISCOVERY_BRAIN = `${AER360_ICP_TIERS}
+
+${AERSEAL_ICP_TIERS}
 
 ${TRIGGER_DICTIONARY}
 
@@ -290,7 +343,9 @@ ${EVIDENCE_STANDARDS}
 
 ${COMPETITOR_CLASSIFICATION}
 
-LEAD QUALITY RULE: a company is not a qualified lead just because it mentions AI, crypto, agents, funding, or a wallet launch. A qualified lead requires PROBLEM + FINANCIAL ACTIVITY + RELEVANT ARCHITECTURE + TRIGGER + PLAUSIBLE AER360 FIT together. Quality over quantity — a handful of well-evidenced A-tier leads beats a long list of plausible-sounding ones.`
+${MULTI_PRODUCT_DISCIPLINE}
+
+LEAD QUALITY RULE: a company is not a qualified lead just because it mentions AI, crypto, agents, funding, a wallet launch, or a smart contract. A qualified lead requires PROBLEM + CONCRETE ARCHITECTURE (financial activity for AER360/Aerpolice, or a confirmed privileged contract role for AERseal) + TRIGGER + PLAUSIBLE FIT on at least one of the three products, together. Quality over quantity — a handful of well-evidenced A-tier leads beats a long list of plausible-sounding ones.`
 
 // ── AERPOLICE ───────────────────────────────────────────────────────────────────
 export const AERPOLICE_KNOWLEDGE = `AERPOLICE — "The agentic trust fabric." Binds every AI agent to a cryptographic identity, governs what it's allowed to do with policy you set, and proves every action with a signed audit trail.
@@ -360,14 +415,60 @@ WHEN AER360 IS NOT THE RIGHT ANSWER:
 Key contacts: Head of Security/CISO, Head of Custody or Treasury, VP Engineering, Founder/CTO (smaller companies), Compliance/Risk lead (institutions).
 Trigger events: security incident or near-miss, new institutional client requiring custody proof, compliance/security hire, expansion into custody/treasury products, funding round earmarked for infrastructure hardening, first AI agent given spending authority.`
 
-// ── Per-lead product focus (deterministic routing) ───────────────────────────
-// Decides which product LEADS the pitch for a given lead: an AI-agent company
-// should get an Aerpolice-first pitch, a custody/key-management company should
-// get an AER360-first pitch, and a company that's genuinely both gets a joint
-// pitch. Deterministic — does NOT depend on the learn/approval rule loop
-// (which only applies after manual approval).
+// ── AERSEAL ───────────────────────────────────────────────────────────────────
+// Added 2026-08-19 as a third, co-equal lead-gen product. Distilled from the
+// ChainGPT + Claude AERseal specs Arpit provided — condensed to the operative
+// facts, not copied verbatim.
+export const AERSEAL_KNOWLEDGE = `AERSEAL — Threshold-controlled custody for a deployed smart contract's privileged admin authority. AER360 secures the wallet. AERseal secures the contract's master controls. Aerpolice secures the agent's delegated authority.
 
-export type ProductFocus = 'aerpolice' | 'aer360' | 'both'
+The core problem it answers:
+Who can exercise the dangerous powers built into a smart contract — and what happens if that controlling key is compromised? Deployed contracts routinely carry privileged functions: upgrade the implementation, mint new tokens, pause the protocol, freeze or seize balances, change bridge configuration, replace an oracle, grant or revoke roles, modify fees/limits/critical parameters. Those powers are normally assigned to one address — an EOA, multisig, Safe, proxy admin, or role-holder wallet. If control of that address is compromised (phished key, insider, stolen signer), the attacker can legitimately use every privilege that address holds. A code audit does not catch this — the contract behaves exactly as designed; the authorized controller is simply malicious or compromised.
+
+The mechanism:
+AERseal transfers a contract's privileged role from that single key to an AERKey threshold-controlled address (same CGGMP24 threshold-signing foundation as AER360, hardware-attested across three cloud providers). Before: ProxyAdmin → founder's EOA or Safe. After: ProxyAdmin → AERSeal/AERKey threshold-controlled address. The contract address and user-facing token stay unchanged — only who controls the admin functions changes. Two hard design rules: (1) AERseal refuses to take custody unless it can account for EVERY privileged power the contract has — no partial protection; (2) it proves its own key to the customer mathematically before anything transfers (address derivation + signed challenge, independently verifiable offline). After transfer, every privileged action requires the configured approval threshold before the cluster jointly produces the signature and submits it.
+
+The pain in one sentence: AERseal prevents one stolen admin key, compromised signer, or malicious insider from independently using a smart contract's upgrade, mint, pause, freeze, or governance powers.
+
+What AERseal does NOT solve — never claim these:
+- A smart-contract code audit or a way to repair faulty contract logic
+- A bridge-message verification system (that's about validating cross-chain messages, not who administers the bridge contract)
+- General custody for all company wallets — that's AER360
+- AI-agent governance — that's Aerpolice
+- An automatic on-chain timelock (if the project also wants transactions delayed 24-72h, that's a separate mechanism)
+- Protection for an immutable contract with no privileged roles
+- A replacement for continuous, high-frequency automated signing with no approval workflow
+
+WHO BUYS IT: the company/organization operating the deployed contract — stablecoin and token issuers, DeFi protocols, bridges and cross-chain protocols, L2/L3 operators, tokenization/RWA platforms, staking/restaking protocols, DAO core teams, smart-contract wallet infrastructure providers, exchanges operating mintable/bridged tokens, gaming chains with upgradeable bridges, institutional platforms deploying permissioned assets.
+
+Decision-makers: CTO, Head of Protocol Engineering, Head of Smart-Contract Security, CISO/Security Lead, Protocol Founder, Infrastructure Lead, Head of Risk, Stablecoin/Product Infrastructure Lead, DAO Security Council, Governance/Foundation Director.
+
+WHEN AERSEAL IS NOT THE RIGHT ANSWER:
+- The contract is immutable and admin privileges have already been renounced.
+- The prospect's only issue is treasury/wallet custody with no smart-contract privileged role involved — that's AER360.
+- The prospect wants governance over AI-agent actions — that's Aerpolice.
+- The privileged role already sits behind a strong timelock, robust threshold system, and appropriately distributed governance.
+- The operation requires continuous high-frequency automated signing with no approval workflow.
+- There is no transferable owner/admin/access-control role at all.
+- Do NOT recommend AERseal merely because a company has a multisig somewhere — the multisig must specifically control a contract's privileged role, not just hold treasury funds.
+
+Relationship to AER360 and Aerpolice: AERseal shares the AERKey threshold-signing foundation with AER360 but solves a narrower, distinct problem (contract admin authority, not wallet/fund custody) and can be sold entirely independently — a protocol should not need to understand or buy the whole AER360 platform just to protect its proxy-admin address. It is unrelated to Aerpolice's AI-agent governance. A lead can genuinely need more than one of the three, but each requires its own separately confirmed, independently evidenced pain — see MULTI_PRODUCT_DISCIPLINE.
+
+Trigger events: appears in a hack/near-miss/incident tracker (DeFiLlama, Rekt.news, Immunefi) with the vulnerable authority still live; on-chain confirmation of a single-EOA or weak-multisig privileged role; audit/risk-assessment language flagging "single EOA," "no multisig," "admin key," "centralized upgrade authority," "no delay on upgrades"; a major listing, new chain launch, new bridge route, or large TVL/supply increase on a contract with a known weak admin role; governance transition from founder control to a security council/DAO; recent funding or mainnet launch with an upgradeable contract and no disclosed admin-key infrastructure; security/protocol-engineering job postings.`
+
+// ── Per-lead product focus (deterministic routing) ───────────────────────────
+// Decides which product(s) LEAD the pitch for a given lead. Three co-equal
+// products as of 2026-08-19 — none is a default primary. An AI-agent company
+// gets an Aerpolice pitch, a custody/key-management company gets an AER360
+// pitch, a company with a single-EOA-controlled contract gets an AERseal
+// pitch, and a company that's genuinely more than one gets each pitched as
+// its own distinct thread (see MULTI_PRODUCT_DISCIPLINE). Deterministic —
+// does NOT depend on the learn/approval rule loop (which only applies after
+// manual approval).
+
+export type ProductFocus =
+  | 'aerpolice' | 'aer360' | 'aerseal'
+  | 'aerpolice+aer360' | 'aerpolice+aerseal' | 'aer360+aerseal'
+  | 'aerpolice+aer360+aerseal'
 
 export interface LeadFocusInput {
   company_name?: string | null
@@ -378,7 +479,8 @@ export interface LeadFocusInput {
   customer_category?: string[] | string | null
   product_to_sell?: string | null
   aerpolice_fit?: string | null
-  aeredium_fit?: string | null // DB column name kept for compatibility — represents AER360 fit going forward
+  aeredium_fit?: string | null // DB column name kept for compatibility — represents AER360 fit
+  aerseal_fit?: string | null
 }
 
 // Strong signals only — we do NOT want to mistakenly pitch Aerpolice to a
@@ -390,13 +492,25 @@ const AI_AGENT_KEYWORDS = [
   'agent identity', 'agent governance', 'agentic commerce', 'ai-native',
 ]
 
-// Signals that this company's real pain is custody/key-signing/treasury, not
-// (or not only) agent governance — the AER360 wedge.
+// Signals that this company's real pain is wallet/fund custody or key-signing,
+// not (or not only) agent governance or contract admin authority — the AER360 wedge.
 const CUSTODY_KEYWORDS = [
   'fireblocks', 'coinbase custody', 'mpc custody', 'mpc wallet', 'multisig', 'multi-sig',
   'threshold signing', 'threshold ecdsa', 'key management', 'custody', 'custodian',
   'signing key', 'seed phrase', 'hot wallet', 'cold wallet', 'treasury', 'prime broker',
   'otc desk', 'institutional custody', 'digital asset custody',
+]
+
+// Signals that this company's real pain is a deployed smart contract's
+// privileged authority — the AERseal wedge. Distinct from CUSTODY_KEYWORDS:
+// "multisig"/"treasury" alone means AER360; these are specifically about who
+// controls a CONTRACT's admin/owner functions.
+const CONTRACT_ADMIN_KEYWORDS = [
+  'proxy admin', 'admin key', 'upgradeable contract', 'contract owner', 'onlyowner',
+  'mint authority', 'mint role', 'pause authority', 'pause role', 'freeze authority',
+  'oracle setter', 'bridge owner', 'bridge admin', 'privileged role', 'access control',
+  'default admin role', 'role management', 'upgrade authority', 'implementation upgrade',
+  'governance timelock',
 ]
 
 export function isAiAgentLead(lead: LeadFocusInput): boolean {
@@ -430,11 +544,20 @@ export function isCustodyLead(lead: LeadFocusInput): boolean {
   return CUSTODY_KEYWORDS.some(k => hay.includes(k))
 }
 
-export const AERPOLICE_FOCUS_DIRECTIVE = `══ PRODUCT FOCUS FOR THIS LEAD — AERPOLICE (AI-agent governance) ══
+export function isAerSealLead(lead: LeadFocusInput): boolean {
+  const cats = Array.isArray(lead.customer_category)
+    ? lead.customer_category
+    : lead.customer_category ? [lead.customer_category] : []
+  if (cats.some(c => (c || '').toLowerCase().includes('aerseal') || (c || '').toLowerCase().includes('contract-authority'))) return true
 
-This lead's primary pain is AI-agent governance. Lead with Aerpolice.
+  const hay = [lead.company_name, lead.description, lead.product_summary, lead.business_model]
+    .filter(Boolean).join(' ').toLowerCase()
+  return CONTRACT_ADMIN_KEYWORDS.some(k => hay.includes(k))
+}
 
-LEAD WITH AERPOLICE:
+// "LEAD WITH X" bullet content, reused both standalone (single-product focus)
+// and concatenated together (multi-product focus) by productFocusDirective().
+const AERPOLICE_LEAD_BLOCK = `LEAD WITH AERPOLICE:
 - Bind — every agent gets its own cryptographic identity, no shared tokens
 - Govern — the Triple Gate (identity, intent, limits) blocks an unauthorized action BEFORE it executes, not after; hardware-enforced, not software-level
 - Prove — a signed, replayable audit record for every decision and transaction
@@ -442,30 +565,48 @@ LEAD WITH AERPOLICE:
 
 THE HOOK (use when it fits their situation): enterprise deals stalling in security review because they can't prove agent identity, policy enforcement, and audit trail. That is the live buying signal.
 
-FRAMING LINE you may use: "Stripe governs payments for businesses. Okta governs access for employees. Aerpolice governs economic authority for AI agents."
+FRAMING LINE you may use: "Stripe governs payments for businesses. Okta governs access for employees. Aerpolice governs economic authority for AI agents."`
 
-Only mention AER360 if it's genuinely additive — e.g. their agent will also need a hardware-governed wallet to hold the funds it's allowed to move — and only after Aerpolice is established, one sentence maximum.`
-
-export const AER360_FOCUS_DIRECTIVE = `══ PRODUCT FOCUS FOR THIS LEAD — AER360 (custody / key-governance) ══
-
-This lead's primary pain is custody, key-signing, or treasury governance. Lead with AER360.
-
-LEAD WITH AER360:
+const AER360_LEAD_BLOCK = `LEAD WITH AER360:
 - AERKey — threshold signing (CGGMP24) across three hardware enclaves; the key is never assembled anywhere, not even for a millisecond
 - Policy Engine — per-transaction limits, approval quorums, destination allowlists, biometric confirmation bound to the exact transaction; enforced by the hardware that signs, not a web server in front of it
 - AERKey Wallet — no seed phrase to lose or phish, because there's no assembled key to back up
 - Agent Control Center — if they're also giving AI agents spending authority, each agent gets its own child wallet under one of twelve hardware-enforced policy templates
-- A tamper-evident audit chain, sealed by the cluster itself, verifiable years later
+- A tamper-evident audit chain, sealed by the cluster itself, verifiable years later`
 
-Only mention Aerpolice if they also operate or plan AI agents that need a decision-layer gate in front of this wallet — one sentence maximum, after AER360 is established.`
+const AERSEAL_LEAD_BLOCK = `LEAD WITH AERSEAL:
+- Transfers a deployed contract's privileged role (upgrade, mint, pause, freeze, oracle, bridge config, role management) from a single EOA or weak multisig to an AERKey threshold-controlled address — same three-cloud, hardware-attested foundation as AER360
+- No partial protection — AERseal accounts for every privileged power the contract has before taking custody of the role
+- Proves its own key mathematically before anything transfers (address derivation + signed challenge, independently verifiable offline)
+- Every privileged action requires the configured approval threshold before the cluster signs and submits it — the contract itself never migrates, only who controls its admin functions
 
-export const BOTH_FOCUS_DIRECTIVE = `══ PRODUCT FOCUS FOR THIS LEAD — AERPOLICE + AER360 (genuine dual fit) ══
+THE HOOK (use when it fits their situation): "your control model was acceptable at $5M, it's a much larger liability at $500M" — or, if there's a dated incident/near-miss/audit flag, lead with that directly.
 
-This lead is building or operating AI agents that need both a decision-layer gate (Aerpolice) and a hardware-governed wallet those agents actually transact from (AER360). Lead with whichever is the sharper hook for their specific situation, then bring in the second product as the natural next layer.
+FRAMING LINE you may use: "AER360 secures the wallet. AERseal secures the contract's master controls. Aerpolice secures the agent's delegated authority."`
 
-FRAMING LINE you may use: "Aerpolice decides whether the agent's action is allowed. AER360 is the vault it physically can't sign outside of."
+export const AERPOLICE_FOCUS_DIRECTIVE = `══ PRODUCT FOCUS FOR THIS LEAD — AERPOLICE (AI-agent governance) ══
 
-Don't force both products into every sentence — one clear primary thread, one clean second mention.`
+This lead's primary pain is AI-agent governance. Lead with Aerpolice.
+
+${AERPOLICE_LEAD_BLOCK}
+
+Only mention AER360 or AERseal if genuinely additive — one sentence maximum, after Aerpolice is established, and only if that lead has its own separately confirmed pain (see MULTI_PRODUCT_DISCIPLINE).`
+
+export const AER360_FOCUS_DIRECTIVE = `══ PRODUCT FOCUS FOR THIS LEAD — AER360 (custody / key-governance) ══
+
+This lead's primary pain is wallet/fund custody, key-signing, or treasury governance. Lead with AER360.
+
+${AER360_LEAD_BLOCK}
+
+Only mention Aerpolice or AERseal if genuinely additive — one sentence maximum, after AER360 is established, and only if that lead has its own separately confirmed pain (see MULTI_PRODUCT_DISCIPLINE).`
+
+export const AERSEAL_FOCUS_DIRECTIVE = `══ PRODUCT FOCUS FOR THIS LEAD — AERSEAL (smart-contract admin authority) ══
+
+This lead's primary pain is a deployed smart contract's privileged role sitting behind a single EOA or a weak multisig. Lead with AERseal.
+
+${AERSEAL_LEAD_BLOCK}
+
+Only mention AER360 or Aerpolice if genuinely additive — one sentence maximum, after AERseal is established, and only if that lead has its own separately confirmed pain (see MULTI_PRODUCT_DISCIPLINE).`
 
 // Resolve the right focus + directive for a lead. Use this in every outreach /
 // drafting path so the product choice is consistent and deterministic.
@@ -475,36 +616,66 @@ Don't force both products into every sentence — one clear primary thread, one 
 export function productFocusDirective(lead: LeadFocusInput): { focus: ProductFocus; directive: string } {
   const hasAerpoliceFit = !!(lead.aerpolice_fit && lead.aerpolice_fit.trim())
   const hasAer360Fit = !!(lead.aeredium_fit && lead.aeredium_fit.trim())
+  const hasAerSealFit = !!(lead.aerseal_fit && lead.aerseal_fit.trim())
 
-  let focus: ProductFocus
-  if (hasAerpoliceFit && hasAer360Fit) focus = 'both'
-  else if (hasAerpoliceFit) focus = 'aerpolice'
-  else if (hasAer360Fit) focus = 'aer360'
-  else {
-    // No saved fit yet (e.g. called pre-qualification) — fall back to keyword heuristics.
-    // AER360-primary (2026-08-11): default to 'aer360' unless there's a pure
-    // agent-governance signal with no custody/wallet signal at all.
-    const agent = isAiAgentLead(lead)
-    const custody = isCustodyLead(lead)
-    focus = agent && !custody ? 'aerpolice' : agent && custody ? 'both' : 'aer360'
+  let aerpolice: boolean, aer360: boolean, aerseal: boolean
+  if (hasAerpoliceFit || hasAer360Fit || hasAerSealFit) {
+    aerpolice = hasAerpoliceFit
+    aer360 = hasAer360Fit
+    aerseal = hasAerSealFit
+  } else {
+    // No saved fit yet (e.g. called pre-qualification) — fall back to keyword
+    // heuristics, evaluated independently, no default primary.
+    aerpolice = isAiAgentLead(lead)
+    aer360 = isCustodyLead(lead)
+    aerseal = isAerSealLead(lead)
+    // If literally nothing matched, fall back to AER360 as the broadest,
+    // least-niche product rather than returning an empty directive — this is
+    // a safety net for the rare no-signal call, not a stated primacy.
+    if (!aerpolice && !aer360 && !aerseal) aer360 = true
   }
 
-  const directive =
-    focus === 'both' ? BOTH_FOCUS_DIRECTIVE
-    : focus === 'aer360' ? AER360_FOCUS_DIRECTIVE
-    : AERPOLICE_FOCUS_DIRECTIVE
+  const focus = [aerpolice && 'aerpolice', aer360 && 'aer360', aerseal && 'aerseal']
+    .filter(Boolean).join('+') as ProductFocus
+
+  const matchCount = [aerpolice, aer360, aerseal].filter(Boolean).length
+  if (matchCount <= 1) {
+    const directive = aerpolice ? AERPOLICE_FOCUS_DIRECTIVE : aerseal ? AERSEAL_FOCUS_DIRECTIVE : AER360_FOCUS_DIRECTIVE
+    return { focus, directive }
+  }
+
+  // Genuine multi-product fit — concatenate each applicable block as its own
+  // thread rather than blending, per MULTI_PRODUCT_DISCIPLINE.
+  const blocks = [
+    aer360 && AER360_LEAD_BLOCK,
+    aerseal && AERSEAL_LEAD_BLOCK,
+    aerpolice && AERPOLICE_LEAD_BLOCK,
+  ].filter(Boolean).join('\n\n')
+
+  const directive = `══ PRODUCT FOCUS FOR THIS LEAD — ${focus.toUpperCase().replace(/\+/g, ' + ')} (genuine multi-product fit) ══
+
+This lead has more than one distinct, independently confirmed pain. Pitch each as its own clear thread — lead with whichever is the sharper hook for their specific situation, then bring in the rest as natural next layers, not a blended pitch.
+
+${blocks}
+
+${MULTI_PRODUCT_DISCIPLINE}
+
+Don't force every product into every sentence — one clear primary thread, then a clean, brief mention of each additional one.`
 
   return { focus, directive }
 }
 
 // ── Composed blocks for prompts ──────────────────────────────────────────────
 // These are the ONLY blocks injected into discover/qualify-lead/enrich-lead/
-// outreach/chat/copilot/bd-brief prompts — scoped to Aerpolice + AER360 only.
+// outreach/chat/copilot/bd-brief prompts — scoped to Aerpolice + AER360 +
+// AERseal only (three co-equal products as of 2026-08-19).
 
 // Compact product context (use in token-tight calls like company extraction)
 export const PRODUCT_BRAIN_COMPACT = `${AERPOLICE_KNOWLEDGE}
 
-${AER360_KNOWLEDGE}`
+${AER360_KNOWLEDGE}
+
+${AERSEAL_KNOWLEDGE}`
 
 // Full product brain (research, scoring, outreach, chat, learn)
 export const PRODUCT_BRAIN = `${CONSULTANT_FRAMEWORK}
@@ -512,6 +683,8 @@ export const PRODUCT_BRAIN = `${CONSULTANT_FRAMEWORK}
 ${AERPOLICE_KNOWLEDGE}
 
 ${AER360_KNOWLEDGE}
+
+${AERSEAL_KNOWLEDGE}
 
 ${AGENTIC_PAYMENTS}
 
@@ -559,4 +732,13 @@ export const PRODUCTS_CATALOG = `COMPLETE PRODUCT CATALOG — evaluate every lea
 
 8. AER360 Agent Control Center
    Per-agent child wallets, each bound to one of twelve hardware-enforced spend-policy templates.
-   Best fit: any company about to give an AI agent real financial authority for the first time and wanting a bounded, auditable wallet for it rather than a shared hot wallet.`
+   Best fit: any company about to give an AI agent real financial authority for the first time and wanting a bounded, auditable wallet for it rather than a shared hot wallet.
+
+━━ AERSEAL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9. AERseal Contract-Authority Transfer
+   Transfers a deployed contract's privileged role (upgrade, mint, pause, freeze, oracle, bridge config, role management) from a single EOA or weak multisig to an AERKey threshold-controlled address — never assembled anywhere, hardware-attested across three clouds.
+   Best fit: DeFi protocols, token/stablecoin issuers, bridges, L2/L3 operators, tokenization/RWA platforms, staking/restaking protocols, or DAOs whose deployed contract's admin function is controlled by a single EOA or a below-majority/weakly-secured multisig.
+
+10. AERseal Approval Workflow
+   Every privileged action (mint, upgrade, pause, etc.) requires the configured approval threshold before the cluster jointly signs and submits it — no partial protection, every privileged power is accounted for before custody transfers.
+   Best fit: teams whose contract admin key or multisig signers are individually phishable, or who are moving from founder-EOA control toward a security council / DAO / distributed governance model.`

@@ -224,6 +224,7 @@ export interface Lead {
   kima_fit?: string
   aeredium_fit?: string
   aerpolice_fit?: string
+  aerseal_fit?: string
   agent_control_angle?: string
   product_matches?: ProductMatch[]
   suggested_use_case?: string

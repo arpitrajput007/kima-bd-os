@@ -2,8 +2,8 @@
 // /api/ai/enrich-lead
 //
 // Full AI enrichment pipeline for a freshly-added lead.
-// Runs: research + classify + aerpolice_fit + aeredium_fit(AER360) (parallel)
-//       → score (sequential, needs research data)
+// Runs: research + classify + aerpolice_fit + aeredium_fit(AER360) +
+//       aerseal_fit (parallel) → score (sequential, needs research data)
 //       → contacts (findAndSaveContacts)
 //       → sets status = 'approved'
 //
@@ -31,7 +31,7 @@ const supabase = createClient(
 // The PRODUCT_BRAIN now includes the CONSULTANT_FRAMEWORK which
 // instructs the model to understand the company BEFORE evaluating
 // product fit. This is the most important quality lever.
-const SYS_BASE = `You are a senior solutions consultant and BD strategist for Aerpolice (AI-agent governance) and AER360 (hardware-enforced custody and key-signing) — the only two products this pipeline evaluates leads for.
+const SYS_BASE = `You are a senior solutions consultant and BD strategist for three co-equal products: Aerpolice (AI-agent governance), AER360 (hardware-enforced wallet/fund custody and key-signing), and AERseal (hardware-enforced custody of a deployed smart contract's privileged admin authority) — the only three products this pipeline evaluates leads for. None is a default primary.
 
 ${PRODUCT_BRAIN}
 
@@ -124,9 +124,9 @@ Research summary: ${researchSummary}
 
 Return JSON:
 {
-  "industry_category": "One of: AI agent / agentic commerce company, AI-native SaaS selling to enterprise, Custody / MPC wallet provider, Exchange, Treasury or fund, Fintech, Robotics / autonomous systems, Other",
-  "customer_category": ["Array — only include categories that genuinely apply: Agentic Payments Customer, Aerpolice Governance Customer, AER360 Custody / Key-Governance Customer, Other"],
-  "product_to_sell": "One of: Aerpolice agent identity, Aerpolice policy + execution gate, Aerpolice audit trail, AER360 threshold signing, AER360 policy engine, AER360 wallet, AER360 agent control center — choose NO_FIT if none genuinely apply",
+  "industry_category": "One of: AI agent / agentic commerce company, AI-native SaaS selling to enterprise, Custody / MPC wallet provider, Exchange, Treasury or fund, Fintech, Robotics / autonomous systems, DeFi protocol / DAO / token issuer with a deployed contract, Other",
+  "customer_category": ["Array — only include categories that genuinely apply: Agentic Payments Customer, Aerpolice Governance Customer, AER360 Custody / Key-Governance Customer, AERseal Contract-Authority Customer, Other"],
+  "product_to_sell": "One of: Aerpolice agent identity, Aerpolice policy + execution gate, Aerpolice audit trail, AER360 threshold signing, AER360 policy engine, AER360 wallet, AER360 agent control center, AERseal contract-authority transfer — choose NO_FIT if none genuinely apply",
   "region": "Their primary market region"
 }`
 }
@@ -151,7 +151,7 @@ If you recommend a product without a genuine gap — you waste the BD team's tim
 The output must be specific to THIS company. If the analysis still makes sense with a different company name substituted in, it is too generic.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Evaluate each product:
+Evaluate each product INDEPENDENTLY — a strong fit on one must not inflate another. Recommend more than one only when each has its own distinct, independently verified pain; shared AERKey infrastructure alone is not sufficient:
 
 AERPOLICE (governance for AI agents with financial or system authority):
 - Does this company have autonomous AI agents that move money, approve payments, or take consequential financial/system actions?
@@ -159,10 +159,18 @@ AERPOLICE (governance for AI agents with financial or system authority):
 - Check: are agents executing actions, or only recommending them?
 - Verdict options: strong_fit | moderate_fit | weak_fit | no_fit
 
-AER360 (hardware-enforced custody, threshold signing, and per-agent wallet policy):
+AER360 (hardware-enforced WALLET/FUND custody, threshold signing, and per-agent wallet policy):
 - Does this company have a REAL gap in how it custodies funds or signs transactions — software-only MPC, ad hoc multisig, seed-phrase-based wallets, or no per-agent spend policy?
 - Check: are they a custodian, exchange, treasury, or fund handling institutional volume? Are they about to give an AI agent real spending authority with no bounded wallet for it?
 - If they've already solved this with hardware-attested signing themselves, AER360 is a competitor scenario, not a customer scenario.
+- Do NOT credit AER360 for a smart-contract admin-key gap — that's AERseal, below.
+- Verdict options: strong_fit | moderate_fit | weak_fit | no_fit
+
+AERSEAL (hardware-enforced custody of a DEPLOYED SMART CONTRACT's privileged admin authority — upgrade, mint, pause, freeze, oracle, bridge config, role management):
+- Does this company operate a deployed contract whose privileged role is controlled by a single EOA, or a weakly-secured multisig (below-majority threshold, signers on ordinary browser wallets, unknown signer identities)?
+- Check: is there a specific, nameable privileged function (proxy admin, mint authority, pause authority, etc.) and a specific current controller? Vague "they probably have an admin key somewhere" is not sufficient — name the role and the evidence.
+- If the privileged role is already renounced, immutable, or behind a strong timelock + distributed governance, AERseal is not a fit.
+- Do NOT credit AERseal for a wallet/treasury custody gap with no contract privileged-role involved — that's AER360.
 - Verdict options: strong_fit | moderate_fit | weak_fit | no_fit
 
 Return JSON:
@@ -177,26 +185,34 @@ Return JSON:
   },
   "aer360": {
     "verdict": "strong_fit|moderate_fit|weak_fit|no_fit",
-    "aeredium_fit": "Specific reasoning for THIS company — what custody/signing gap exists, tied to their actual stack. Or, if no_fit, explain exactly why.",
+    "aeredium_fit": "Specific reasoning for THIS company — what WALLET/FUND custody or signing gap exists, tied to their actual stack. Or, if no_fit, explain exactly why.",
     "security_angle": "Threshold-signing/hardware-enclave/policy-enforcement angle specific to their situation, or null",
     "risk_angle": "Risk reduction angle (key theft, insider threat, unaudited transactions), or null",
     "suggested_use_case": "Exact AER360 use case if applicable, or null",
     "integration_feasibility": "high|medium|low|not_applicable",
     "revenue_potential": "Estimated value this creates for them, or null"
   },
-  "combined_opportunity": "Is there a genuine case for combining Aerpolice + AER360 (e.g. an agentic-payments company that needs both a decision gate and a hardware-governed wallet)? Be specific. If not, say so clearly.",
+  "aerseal": {
+    "verdict": "strong_fit|moderate_fit|weak_fit|no_fit",
+    "aerseal_fit": "Specific reasoning for THIS company — name the specific privileged contract role and its current controller (single EOA or weak multisig). Or, if no_fit, explain exactly why (no deployed contract, role already renounced/timelocked, etc.).",
+    "suggested_use_case": "Exact AERseal use case if applicable, or null",
+    "integration_feasibility": "high|medium|low|not_applicable",
+    "revenue_potential": "Estimated value this creates for them, or null"
+  },
+  "combined_opportunity": "Is there a genuine case for more than one of Aerpolice / AER360 / AERseal together (e.g. an agentic-payments company that needs both a decision gate and a hardware-governed wallet, or a DeFi protocol with both a vulnerable admin key and AI trading agents)? Be specific about which products and why each has its own separate evidence. If not, say so clearly.",
   "strategic_hypotheses": [
     "When they start giving agents financial authority, Aerpolice becomes critical because...",
-    "If they start handling institutional volume, AER360's hardware-enforced signing will matter because..."
+    "If they start handling institutional volume, AER360's hardware-enforced signing will matter because...",
+    "If they deploy an upgradeable contract with a founder-EOA admin key, AERseal becomes critical because..."
   ],
-  "honest_assessment": "One paragraph. Plain English. Is this a real opportunity? Which product and why? If weak or no fit across the board, say that clearly. The BD team needs honest signal, not manufactured confidence.",
-  "competitor_context": "Are either of our products in competition with something they already have? Be explicit.",
+  "honest_assessment": "One paragraph. Plain English. Is this a real opportunity? Which product(s) and why? If weak or no fit across the board, say that clearly. The BD team needs honest signal, not manufactured confidence.",
+  "competitor_context": "Are any of our products in competition with something they already have? Be explicit.",
 
   // ── Product & use-case match matrix ────────────────────────
-  // The verdicts above are company-level (Aerpolice/AER360 as a whole).
+  // The verdicts above are company-level (Aerpolice/AER360/AERseal as a whole).
   // Now break each down into its SPECIFIC sub-products — e.g. a company can
   // be a no_fit for AER360's wallet but a strong fit for AERKey specifically.
-  // Return exactly 8 entries, one per product below. match values: "strong" | "partial" | "none"
+  // Return exactly 10 entries, one per product below. match values: "strong" | "partial" | "none"
   "product_matches": [
     { "product": "Aerpolice Agent Identity", "company": "Aerpolice", "match": "strong | partial | none", "why": "...", "use_case": "" },
     { "product": "Aerpolice Agent Policy + Execution Gate", "company": "Aerpolice", "match": "strong | partial | none", "why": "...", "use_case": "" },
@@ -205,7 +221,9 @@ Return JSON:
     { "product": "AER360 AERKey (Threshold Signing)", "company": "AER360", "match": "strong | partial | none", "why": "...", "use_case": "" },
     { "product": "AER360 Policy Engine", "company": "AER360", "match": "strong | partial | none", "why": "...", "use_case": "" },
     { "product": "AER360 AERKey Wallet", "company": "AER360", "match": "strong | partial | none", "why": "...", "use_case": "" },
-    { "product": "AER360 Agent Control Center", "company": "AER360", "match": "strong | partial | none", "why": "...", "use_case": "" }
+    { "product": "AER360 Agent Control Center", "company": "AER360", "match": "strong | partial | none", "why": "...", "use_case": "" },
+    { "product": "AERseal Contract-Authority Transfer", "company": "AERseal", "match": "strong | partial | none", "why": "...", "use_case": "" },
+    { "product": "AERseal Approval Workflow", "company": "AERseal", "match": "strong | partial | none", "why": "...", "use_case": "" }
   ]
 }`
 }
@@ -226,8 +244,9 @@ Base factors: genuine_pain_identified(25) + clear_product_fit(25) + traction_and
 
 Boosts (add to base):
 +20 if agentic payments fit is strong (clear AI agents with financial or system authority)
-+20 if strong AER360 fit with specific custody/key-signing gap identified
-+15 if there is a live trigger event (recent funding, security incident, product launch, expansion)
++20 if strong AER360 fit with specific wallet/fund custody or key-signing gap identified
++20 if strong AERseal fit with a specific, nameable privileged contract role and current controller identified
++15 if there is a live trigger event (recent funding, security incident, product launch, expansion, contract deployment, audit flag)
 +10 if this is an enterprise or growth-stage company with budget
 
 Penalties (subtract):
@@ -413,7 +432,7 @@ export async function POST(req: NextRequest) {
     // Runs AFTER company understanding + pain — this is the key change.
     type FitSection = Record<string, unknown>
     type FitResult = {
-      aer360?: FitSection; aerpolice?: FitSection
+      aer360?: FitSection; aerpolice?: FitSection; aerseal?: FitSection
       combined_opportunity?: string; strategic_hypotheses?: string[]
       honest_assessment?: string; competitor_context?: string
       product_matches?: ProductMatch[]
@@ -426,6 +445,7 @@ export async function POST(req: NextRequest) {
     const fitSum = fitData ? JSON.stringify({
       aer360_verdict:    fitData.aer360?.verdict,
       aerpolice_verdict: fitData.aerpolice?.verdict,
+      aerseal_verdict:   fitData.aerseal?.verdict,
       honest_assessment: fitData.honest_assessment,
     }) : 'Fit evaluation: not available'
 
@@ -435,12 +455,20 @@ export async function POST(req: NextRequest) {
       if (ae.aeredium_fit)   patch3.aeredium_fit  = ae.aeredium_fit
       if (ae.security_angle) patch3.security_angle = ae.security_angle
       if (ae.risk_angle)     patch3.risk_angle    = ae.risk_angle
-      // Shared single-value fields — set from AER360 first, Aerpolice below
-      // overwrites if it also has a value, since Aerpolice is the
-      // highest-priority wedge when both products genuinely fit.
+      // Shared single-value fields — set from AER360 first, AERseal, then
+      // Aerpolice overwrite if they also have a value. This ordering is just
+      // "last one with a value wins" for these single-slot display fields —
+      // it does NOT imply priority; each product's own *_fit field below is
+      // what productFocusDirective() actually keys off for pitch routing.
       if (ae.suggested_use_case)      patch3.suggested_use_case      = ae.suggested_use_case
       if (ae.integration_feasibility) patch3.integration_feasibility = ae.integration_feasibility
       if (ae.revenue_potential)       patch3.revenue_potential       = ae.revenue_potential
+
+      const as_ = fitData.aerseal ?? {}
+      if (as_.aerseal_fit) patch3.aerseal_fit = as_.aerseal_fit
+      if (as_.suggested_use_case)      patch3.suggested_use_case      = as_.suggested_use_case
+      if (as_.integration_feasibility) patch3.integration_feasibility = as_.integration_feasibility
+      if (as_.revenue_potential)       patch3.revenue_potential       = as_.revenue_potential
 
       const ag = fitData.aerpolice ?? {}
       if (ag.aerpolice_fit)       patch3.aerpolice_fit       = ag.aerpolice_fit
@@ -449,8 +477,8 @@ export async function POST(req: NextRequest) {
       if (ag.integration_feasibility) patch3.integration_feasibility = ag.integration_feasibility
       if (ag.revenue_potential)       patch3.revenue_potential       = ag.revenue_potential
 
-      // Full 8-product match matrix (which specific product — e.g. AERKey —
-      // is the best fit), not just the 2 company-level verdicts above.
+      // Full 10-product match matrix (which specific product — e.g. AERKey —
+      // is the best fit), not just the 3 company-level verdicts above.
       if (fitData.product_matches?.length) patch3.product_matches = fitData.product_matches
 
       // Store honest_assessment in competitor_context field (re-purposed for

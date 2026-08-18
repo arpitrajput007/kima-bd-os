@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     scoringMemory(),
   ])
 
-  const systemPrompt = `You are a senior BD researcher for AER360 (hardware-enforced custody and key-signing — the primary product) and Aerpolice (AI-agent governance — a secondary note, only when it's an unusually strong additional angle). These are the ONLY two products this agent sources leads for.
+  const systemPrompt = `You are a senior BD researcher for three co-equal products: AER360 (hardware-enforced wallet/fund custody and key-signing), Aerpolice (AI-agent governance), and AERseal (hardware-enforced custody of a deployed smart contract's privileged admin authority). These are the ONLY three products this agent sources leads for. None is a default primary.
 
 ${PRODUCT_BRAIN}
 
@@ -109,7 +109,7 @@ ${PRODUCTS_CATALOG}
 
 Your job is to:
 1. Classify this company (customer | partner | competitor | integration | investor_ecosystem | not_relevant | unclear) BEFORE evaluating fit — never score a competitor or investor as if it were a prospect.
-2. Qualify it as a potential lead for AER360 first, and Aerpolice only as a secondary note if there's a genuinely strong separate agent-governance angle.
+2. Qualify it as a potential lead for AER360, Aerpolice, and AERseal — each evaluated on its own merits. Recommend more than one only when each has its own distinct, independently verified pain (see MULTI-PRODUCT DISCIPLINE above).
 3. Fill EVERY field in the BD database — including risk_angle, security_angle, revenue_potential, integration_feasibility, competitive positioning, social links, verified facts vs assumptions vs unknowns, and the new gap/trigger-dating/outreach-angle fields below.
 4. Evaluate every product in the catalog against this company and produce a product_matches array
 
@@ -118,7 +118,7 @@ ${memory}
 
 Return ONLY valid JSON. No markdown, no prose outside JSON.`
 
-  const userPrompt = `Qualify this company as an Aerpolice/AER360 lead and fill EVERY field below:
+  const userPrompt = `Qualify this company as an AER360 / Aerpolice / AERseal lead — three co-equal products, each evaluated independently — and fill EVERY field below:
 
 Company: ${companyName}
 Website: ${url}
@@ -149,9 +149,9 @@ Return a single JSON object with ALL of these fields:
   "competitor_context": "Why they chose that provider and what limitations that choice creates for them — this is the wedge for our pitch",
 
   // ── Classification ─────────────────────────────────────────
-  "industry_category": "Exactly one of: AI agent / agentic commerce company | AI-native SaaS selling to enterprise | Custody / MPC wallet provider | Exchange | Treasury or fund | Fintech | Robotics / autonomous systems | Other",
-  "customer_category": ["Array — pick all that apply: AER360 Custody / Key-Governance Customer | Agentic Payments Customer | Aerpolice Governance Customer | Other"],
-  "product_to_sell": "Exactly one of: AER360 threshold signing | AER360 policy engine | AER360 wallet | AER360 agent control center | Aerpolice agent identity | Aerpolice policy + execution gate | Aerpolice audit trail",
+  "industry_category": "Exactly one of: AI agent / agentic commerce company | AI-native SaaS selling to enterprise | Custody / MPC wallet provider | Exchange | Treasury or fund | Fintech | Robotics / autonomous systems | DeFi protocol / DAO / token issuer with a deployed contract | Other",
+  "customer_category": ["Array — pick all that apply: AER360 Custody / Key-Governance Customer | AERseal Contract-Authority Customer | Agentic Payments Customer | Aerpolice Governance Customer | Other"],
+  "product_to_sell": "Exactly one of: AER360 threshold signing | AER360 policy engine | AER360 wallet | AER360 agent control center | AERseal contract-authority transfer | Aerpolice agent identity | Aerpolice policy + execution gate | Aerpolice audit trail",
   "region": "Primary market — one of: Global | North America | Europe | Asia | Middle East | Africa | Southeast Asia | South Asia | Latin America | MENA",
 
   // ── Pain point ─────────────────────────────────────────────
@@ -167,10 +167,11 @@ Return a single JSON object with ALL of these fields:
   "trigger_date": "The trigger event's actual date if known (e.g. '2026-07-15' or 'July 2026'), or null if undated",
   "trigger_source_url": "URL to the trigger event — empty string if not found",
 
-  // ── AER360 / Aerpolice fit ──────────────────────────────────
-  "aeredium_fit": "How AER360 (AERKey threshold signing / Policy Engine / AERKey Wallet / Agent Control Center) strengthens the pitch for this company, or null if there is genuinely no custody/key-signing angle",
-  "aerpolice_fit": "Exactly how Aerpolice helps this company as a SECONDARY note — specific agent-governance use case, or null if there is no strong separate AI-agent angle or if AER360 alone is the stronger story",
-  "suggested_use_case": "The single best AER360 use case to pitch (or Aerpolice if that's genuinely the stronger fit)",
+  // ── AER360 / Aerpolice / AERseal fit — each evaluated independently ──
+  "aeredium_fit": "How AER360 (AERKey threshold signing / Policy Engine / AERKey Wallet / Agent Control Center) addresses their WALLET/FUND custody or key-signing gap, or null if there is genuinely no such angle",
+  "aerpolice_fit": "Exactly how Aerpolice helps this company — specific agent-governance use case, or null if there is no genuine AI-agent financial/system authority angle",
+  "aerseal_fit": "How AERseal addresses their SMART-CONTRACT admin-authority gap — name the specific privileged role and current controller (single EOA or weak multisig), or null if there is no deployed contract with a privileged role controlled that way",
+  "suggested_use_case": "The single best use case to pitch, for whichever product(s) genuinely fit",
   "outreach_angle": "One specific sentence referencing their actual trigger/situation — not a generic 'would love to introduce AER360' line",
   "security_angle": "The specific threshold-signing / hardware-enclave / policy-enforcement angle that matters for this company",
   "risk_angle": "What specific risks (key theft, insider threat, unauthorized agent action, unaudited transactions) AER360/Aerpolice mitigates for them",
@@ -211,7 +212,7 @@ Return a single JSON object with ALL of these fields:
   "source_summary": "One sentence describing what that source reveals",
 
   // ── Product & use-case match matrix ────────────────────────
-  // Evaluate EVERY product in the catalog. Return exactly 8 entries — one per product.
+  // Evaluate EVERY product in the catalog. Return exactly 10 entries — one per product.
   // match values: "strong" | "partial" | "none"
   // why: 1-2 specific sentences explaining the match or mismatch for THIS company
   // use_case: concrete use case sentence if match is strong or partial, else ""
@@ -271,19 +272,34 @@ Return a single JSON object with ALL of these fields:
       "match": "strong | partial | none",
       "why": "...",
       "use_case": ""
+    },
+    {
+      "product": "AERseal Contract-Authority Transfer",
+      "company": "AERseal",
+      "match": "strong | partial | none",
+      "why": "...",
+      "use_case": ""
+    },
+    {
+      "product": "AERseal Approval Workflow",
+      "company": "AERseal",
+      "match": "strong | partial | none",
+      "why": "...",
+      "use_case": ""
     }
   ]
 }
 
 SCORING (lead_score) — general ICP fit, independent of timing. Reason through the
-AER360 fit dimensions in the discovery brain above (financial exposure, agent/
-automation activity, need for transaction controls, security sensitivity, recent
-trigger, likelihood of buying external infrastructure, AER360's differentiation
-for them, buyer accessibility) before committing to a number:
+fit dimensions in the discovery brain above (financial exposure, agent/automation
+activity, deployed-contract privileged-role exposure, need for transaction/admin
+controls, security sensitivity, recent trigger, likelihood of buying external
+infrastructure, differentiation for them, buyer accessibility) before committing
+to a number:
 - 85-100 (excellent): perfect ICP fit, clear pain, verified trigger, easy integration
 - 70-84 (qualified): good fit, real pain, some trigger signals
 - 50-69 (needs_research): possible fit but missing key info
-- 0-49 (low_priority): poor fit, speculative pain, not really an AER360/Aerpolice customer
+- 0-49 (low_priority): poor fit, speculative pain, not really an AER360/Aerpolice/AERseal customer
 
 URGENCY (urgency_score) — how urgent it is to reach out THIS WEEK, driven ONLY
 by trigger recency + pain severity, NOT by how good a long-term fit they are —
@@ -293,7 +309,7 @@ use the trigger dictionary and freshness bands above:
 - 0-39: no trigger_reason found, or it's stale/speculative — can still be a high lead_score company
 
 VERDICT — only mark good_lead if classification is customer AND the pain is both real AND urgent, not just a good fit:
-- good_lead: classification is "customer" AND lead_score ≥ 50 AND pain_point_severity is critical or high AND urgency_score ≥ 50 AND at least one of aerpolice_fit/aeredium_fit is a genuine, non-null fit
+- good_lead: classification is "customer" AND lead_score ≥ 50 AND pain_point_severity is critical or high AND urgency_score ≥ 50 AND at least one of aerpolice_fit/aeredium_fit/aerseal_fit is a genuine, non-null fit
 - not_a_lead: any of the above fail, classification is competitor/partner/integration/investor_ecosystem/not_relevant/unclear, or the company clearly doesn't need our infrastructure`
 
   try {

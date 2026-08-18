@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     ? `\nCOMPANY'S OWN WEBSITE (Level 1 evidence — crawled live, treat as ground truth over training data):\n${homepageText}\n`
     : ''
 
-  const systemPrompt = `You are a senior BD researcher for AER360 (hardware-enforced custody and key-signing — the primary product) and Aerpolice (AI-agent governance — a secondary note, only when it's an unusually strong additional angle). These are the only two products this pipeline evaluates leads for.
+  const systemPrompt = `You are a senior BD researcher for three co-equal products: AER360 (hardware-enforced wallet/fund custody and key-signing), Aerpolice (AI-agent governance), and AERseal (hardware-enforced custody of a deployed smart contract's privileged admin authority). These are the only three products this pipeline evaluates leads for. None is a default primary.
 
 ${PRODUCT_BRAIN}
 
@@ -79,26 +79,26 @@ Return JSON with this exact structure:
 }`
 
     } else if (action === 'pain_points') {
-      userPrompt = `Identify the exact pain points this company has that AER360 (primary) or Aerpolice (secondary) can solve:
+      userPrompt = `Identify the exact pain points this company has that AER360, Aerpolice, or AERseal can solve — each evaluated independently:
 Company: ${company_name}
 Website: ${website || 'unknown'}
 Description: ${description || 'unknown'}
 ${evidenceContext}
 Return JSON:
 {
-  "pain_point": "The single most important pain point AER360/Aerpolice can solve",
+  "pain_point": "The single most important pain point one of our products can solve",
   "pain_point_severity": "critical|high|medium|low",
   "pain_point_evidence": "Specific evidence. If from a real article/news/incident report, paste the exact quote. If reasoned from their public tech stack or business model, explain the reasoning.",
   "pain_point_source_url": "EXACT URL to article/news/blog/tweet/incident report that proves this pain. Empty string if no real URL — never invent one.",
   "pain_point_evidence_type": "verified_source if pain_point_source_url is a real article that explicitly mentions this pain | agent_analysis if reasoned from publicly known facts | inferred if general industry knowledge with no specific backing",
-  "potential_gap": "What's architecturally missing that AER360 could fill, or exactly 'Gap not confirmed' if unsupported by evidence",
+  "potential_gap": "What's architecturally missing that one of our products could fill, or exactly 'Gap not confirmed' if unsupported by evidence",
   "why_it_matters": "Why this pain point matters to their business",
   "how_urgent": "How urgent is this problem for them?",
   "secondary_pain_points": ["other pain point 1", "other pain point 2"]
 }`
 
     } else if (action === 'aeredium_fit') {
-      userPrompt = `Identify how AER360 (AERKey threshold signing / Policy Engine / AERKey Wallet / Agent Control Center) can specifically help this company:
+      userPrompt = `Identify how AER360 (AERKey threshold signing / Policy Engine / AERKey Wallet / Agent Control Center) can specifically help this company's WALLET/FUND custody or key-signing:
 Company: ${company_name}
 Website: ${website || 'unknown'}
 Description: ${description || 'unknown'}
@@ -114,7 +114,7 @@ Return JSON:
 }`
 
     } else if (action === 'aerpolice_fit') {
-      userPrompt = `Identify how Aerpolice (governance & control layer for AI agents that move money or take system actions) can specifically help this company, as a SECONDARY note to AER360 — only surface it if there's a genuinely strong, separate agent-governance angle:
+      userPrompt = `Identify how Aerpolice (governance & control layer for AI agents that move money or take system actions) can specifically help this company — a co-equal product, not a secondary note:
 Company: ${company_name}
 Website: ${website || 'unknown'}
 Description: ${description || 'unknown'}
@@ -125,6 +125,22 @@ Return JSON:
 {
   "aerpolice_fit": "Specific way Aerpolice helps this company — what governance gap exists, or an honest explanation of why it's not a fit",
   "agent_control_angle": "The specific control/governance angle (Triple Gate, audit trail, spend limits, identity, kill switch) for their situation, or null"
+}`
+
+    } else if (action === 'aerseal_fit') {
+      userPrompt = `Identify how AERseal (threshold-controlled custody of a deployed smart contract's privileged admin authority — upgrade, mint, pause, freeze, oracle, bridge config, role management) can specifically help this company:
+Company: ${company_name}
+Website: ${website || 'unknown'}
+Description: ${description || 'unknown'}
+${evidenceContext}
+AERseal only fits if this company operates a deployed smart contract whose privileged role is controlled by a single EOA or a weakly-secured multisig. It is NOT wallet/treasury custody (that's AER360) and NOT AI-agent governance (that's Aerpolice). If there's no deployed contract with such a role, or the role is already renounced/immutable/behind a strong timelock, say so honestly in aerseal_fit.
+
+Return JSON:
+{
+  "aerseal_fit": "Specific way AERseal helps this company — name the specific privileged contract role and its current controller, or an honest explanation of why it's not a fit",
+  "suggested_use_case": "Exact AERseal use case to pitch, or null",
+  "integration_feasibility": "How easy is integration? (high/medium/low)",
+  "revenue_potential": "Revenue/business impact for them, or null"
 }`
 
     } else if (action === 'classify') {
@@ -139,24 +155,24 @@ ${evidenceContext}
 Return JSON:
 {
   "classification": "customer|partner|competitor|integration|investor_ecosystem|not_relevant|unclear",
-  "industry_category": "One of: AI agent / agentic commerce company, AI-native SaaS selling to enterprise, Custody / MPC wallet provider, Exchange, Treasury or fund, Fintech, Robotics / autonomous systems, Other",
-  "customer_category": ["Array of: AER360 Custody / Key-Governance Customer, Agentic Payments Customer, Aerpolice Governance Customer, Other"],
-  "product_to_sell": "One of: AER360 threshold signing, AER360 policy engine, AER360 wallet, AER360 agent control center, Aerpolice agent identity, Aerpolice policy + execution gate, Aerpolice audit trail",
+  "industry_category": "One of: AI agent / agentic commerce company, AI-native SaaS selling to enterprise, Custody / MPC wallet provider, Exchange, Treasury or fund, Fintech, Robotics / autonomous systems, DeFi protocol / DAO / token issuer with a deployed contract, Other",
+  "customer_category": ["Array of: AER360 Custody / Key-Governance Customer, AERseal Contract-Authority Customer, Agentic Payments Customer, Aerpolice Governance Customer, Other"],
+  "product_to_sell": "One of: AER360 threshold signing, AER360 policy engine, AER360 wallet, AER360 agent control center, AERseal contract-authority transfer, Aerpolice agent identity, Aerpolice policy + execution gate, Aerpolice audit trail",
   "region": "Their primary market region",
   "classification_reasoning": "Why you classified them this way, for both classifications above"
 }`
 
     } else if (action === 'score') {
-      userPrompt = `Score this lead for AER360 (primary) / Aerpolice (secondary) BD purposes (0-100):
+      userPrompt = `Score this lead for AER360 / Aerpolice / AERseal BD purposes (0-100) — three co-equal products:
 Company: ${company_name}
 Website: ${website || 'unknown'}
 Description: ${description || 'unknown'}
 ${evidenceContext}
-Reason through the AER360 fit dimensions above (financial exposure, agent/automation activity, need for transaction controls, security sensitivity, recent trigger, likelihood of buying external infrastructure, AER360's differentiation for them, buyer accessibility) before committing to a number.
+Reason through the fit dimensions above (financial exposure, agent/automation activity, deployed-contract privileged-role exposure, need for transaction/admin controls, security sensitivity, recent trigger, likelihood of buying external infrastructure, differentiation for them, buyer accessibility) before committing to a number.
 
 SCORING SYSTEM (lead_score — general ICP fit, independent of timing):
 Base scores: pain_point (25), traction (20), contact_found (15), trigger (15), category_fit (10), integration_feasibility (10), revenue_potential (5)
-Boosts: aer360_custody_gap (+25), giving_agent_or_human_spend_authority (+20), fireblocks_or_mpc_customer_with_visible_gap (+15), agentic_payments_fit (+15), recent_trigger (+15), decision_maker_found (+15)
+Boosts: aer360_custody_gap (+25), aerseal_contract_admin_gap (+25), giving_agent_or_human_spend_authority (+20), fireblocks_or_mpc_customer_with_visible_gap (+15), agentic_payments_fit (+15), recent_trigger (+15), decision_maker_found (+15)
 Penalties: no_pain_point (-25), no_active_product (-20), no_decision_maker (-15), no_source_proof (-30), generic_ai_only_no_financial_authority (-25), classification_is_competitor_or_investor (-100)
 
 URGENCY SCORING (urgency_score — separate 0-100, how urgent to reach out THIS WEEK):
@@ -222,7 +238,7 @@ Return JSON:
         ? `\nVerified emails from Hunter.io:\n${hunterData}\nUse these real emails. Do NOT guess emails.`
         : '\nNo verified emails found. Do NOT invent email addresses — leave email_pattern null.'
 
-      userPrompt = `Find real contacts at this company for Aerpolice/AER360 BD outreach.
+      userPrompt = `Find real contacts at this company for Aerpolice/AER360/AERseal BD outreach.
 Company: ${company_name}
 Website: ${website || 'unknown'}
 Description: ${description || 'unknown'}${hunterContext}

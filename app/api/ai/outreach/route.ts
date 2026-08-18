@@ -140,6 +140,8 @@ interface LeadRow {
   pain_point_evidence?: string | null
   kima_fit?: string | null
   aeredium_fit?: string | null
+  aerpolice_fit?: string | null
+  aerseal_fit?: string | null
   suggested_use_case?: string | null
   settlement_angle?: string | null
   security_angle?: string | null
@@ -198,7 +200,9 @@ function leadContextBlock(lead: LeadRow): string {
     lead.pain_point && `Their pain point: ${lead.pain_point}`,
     lead.pain_point_evidence && `Pain evidence: ${lead.pain_point_evidence}`,
     lead.kima_fit && `How Kima fits them: ${lead.kima_fit}`,
-    lead.aeredium_fit && `How Aeredium fits them: ${lead.aeredium_fit}`,
+    lead.aeredium_fit && `How AER360 fits them: ${lead.aeredium_fit}`,
+    lead.aerpolice_fit && `How Aerpolice fits them: ${lead.aerpolice_fit}`,
+    lead.aerseal_fit && `How AERseal fits them: ${lead.aerseal_fit}`,
     lead.settlement_angle && `Settlement angle: ${lead.settlement_angle}`,
     lead.security_angle && `Security angle: ${lead.security_angle}`,
     lead.suggested_use_case && `Suggested use case: ${lead.suggested_use_case}`,
