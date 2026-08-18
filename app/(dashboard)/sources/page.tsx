@@ -40,6 +40,8 @@ interface RunResult {
   skipped_duplicate: number
   skipped_generic?: number
   skipped_low_confidence?: number
+  skipped_low_confidence_score?: number
+  skipped_no_contact?: number
   skipped_cap: number
   skipped_low_score: number
   leads_saved: string[]
@@ -794,6 +796,16 @@ export default function SourcesPage() {
                           )}
                           {result.skipped_low_score > 0 && (
                             <span style={{ color: 'rgb(110,110,135)' }}>{result.skipped_low_score} scored below 50</span>
+                          )}
+                          {(result.skipped_low_confidence_score ?? 0) > 0 && (
+                            <span style={{ color: 'rgb(110,110,135)' }} title="Cleared the individual score gates but overall evidence was too thin (confidence_score below 25)">
+                              {result.skipped_low_confidence_score} thin overall evidence
+                            </span>
+                          )}
+                          {(result.skipped_no_contact ?? 0) > 0 && (
+                            <span style={{ color: '#f87171' }} title="Passed every quality gate but no reachable contact (real email, or an actual LinkedIn/X profile — not a search link) could be found — rolled back rather than saved unreachable">
+                              {result.skipped_no_contact} rejected — no reachable contact
+                            </span>
                           )}
                           {result.leads_saved.length > 0 && (
                             <span style={{ color: 'rgb(160,160,180)' }}>

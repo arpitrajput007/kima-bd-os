@@ -9,6 +9,19 @@ import { routeJSON, type AIProvider } from '@/lib/ai-router'
 import { CLAUDE_FAST } from '@/lib/claude'
 import { discoveryMemory } from '@/lib/agent-memory'
 import { readUrl } from '@/lib/webRead'
+import { isRealEmail } from '@/lib/outreach'
+
+// A contact only counts as reachable if there's an actual channel to message
+// them through — a name with no email/profile, a guessed email pattern (see
+// isRealEmail), or a generic LinkedIn/X *search* URL (not a profile — this is
+// what Tier 3 below produces when it only has a name hint, not a channel.
+function isReachableContact(c: { name?: string | null; email?: string | null; linkedin_url?: string | null; twitter_url?: string | null }): boolean {
+  if (!c.name) return false
+  if (isRealEmail(c.email)) return true
+  if (c.linkedin_url && !c.linkedin_url.includes('/search/')) return true
+  if (c.twitter_url && !c.twitter_url.includes('/search')) return true
+  return false
+}
 
 // Deep research (OpenAI + Exa + crawling) per company is slow. Without this the
 // function hits Vercel's default timeout and gets killed before saving leads.
@@ -61,6 +74,11 @@ const CAP_BLOCKING_STATUSES = ['new', 'researching', 'needs_more_research']
 const MIN_LEAD_SCORE = 50
 const MIN_URGENCY_SCORE = 50
 const REQUIRED_PAIN_SEVERITIES = new Set(['critical', 'high'])
+// A lead can clear lead_score/severity/urgency individually while still
+// having thin overall evidence (no dated trigger, low-confidence contact,
+// mostly assumptions) — confidence_score (computed below, not self-reported)
+// catches that combination none of the other gates individually catch.
+const MIN_CONFIDENCE_SCORE = 25
 
 // ── Confidence score — computed in code, not self-reported by the model ────
 // Deliberately NOT another "rate your own work" LLM field (that's exactly how
@@ -689,6 +707,9 @@ export async function POST(req: NextRequest) {
       skipped_no_product_fit: 0,
       skipped_not_customer: 0,
       downgraded_unverified_severity: 0,
+      downgraded_unverified_urgency: 0,
+      skipped_low_confidence_score: 0,
+      skipped_no_contact: 0,
       leads_saved: [] as string[],
     }
 
@@ -761,6 +782,21 @@ export async function POST(req: NextRequest) {
         results.downgraded_unverified_severity++
         research.pain_point_severity = 'medium'
       }
+
+      // Same evidence-gate principle applied to the OTHER half of the
+      // "immediate pain" bar: urgency_score is supposed to be driven by a
+      // dated, concrete trigger (see the prompt above), but nothing enforced
+      // that in code — a lead could claim urgency 70+ on a vague, undated
+      // trigger_reason with no real citation. Cap it below the gate threshold
+      // when there's no real dated trigger + source backing it.
+      const triggerDateRaw = String(research.trigger_date || '').trim().toLowerCase()
+      const hasDatedTrigger = !!triggerDateRaw && triggerDateRaw !== 'null' && triggerDateRaw !== 'unknown'
+      const hasTriggerSource = !!(String(research.trigger_source_url || '').trim() || String(research.source_url || '').trim())
+      if ((!hasDatedTrigger || !hasTriggerSource) && typeof research.urgency_score === 'number' && research.urgency_score >= MIN_URGENCY_SCORE) {
+        results.downgraded_unverified_urgency++
+        research.urgency_score = MIN_URGENCY_SCORE - 1
+      }
+
       const confidenceScore = computeConfidenceScore(research, isVerified)
 
       // "Immediate pain" gate — a good long-term fit is not enough on its own.
@@ -769,6 +805,15 @@ export async function POST(req: NextRequest) {
       const urgency = (research.urgency_score as number) ?? 0
       if (!REQUIRED_PAIN_SEVERITIES.has(severity) || urgency < MIN_URGENCY_SCORE) {
         results.skipped_not_urgent++
+        continue
+      }
+
+      // Overall-evidence gate — a lead can clear lead_score/severity/urgency
+      // individually while still being thin overall (see MIN_CONFIDENCE_SCORE
+      // above). confidence_score is computed from real signals, not
+      // self-reported, so this is a cheap, trustworthy backstop.
+      if (confidenceScore < MIN_CONFIDENCE_SCORE) {
+        results.skipped_low_confidence_score++
         continue
       }
 
@@ -895,6 +940,7 @@ export async function POST(req: NextRequest) {
         const BD_ROLES = ['partnerships', 'business development', 'bd ', 'growth', 'cto', 'coo', 'chief technology', 'chief operating', 'vp eng', 'head of eng', 'founder', 'co-founder', 'ceo', 'chief executive']
 
         let contactsSaved = 0
+        let reachableContactsSaved = 0 // only real channels — see isReachableContact()
 
         // Tier 1: Apollo people search
         if (domain && contactsSaved === 0) {
@@ -904,17 +950,23 @@ export async function POST(req: NextRequest) {
             .slice(0, 3)
           const toInsert = bdPeople.length > 0 ? bdPeople : apolloPeople.slice(0, 2)
           for (const c of toInsert) {
-            const { error: ce } = await supabase.from('contacts').insert({
-              lead_id: newLead.id,
+            const contactRow = {
               name: c.name,
-              role: c.title || 'Decision maker',
-              company: company.name,
               linkedin_url: c.linkedin_url || null,
               email: c.email || null,
+            }
+            const { error: ce } = await supabase.from('contacts').insert({
+              lead_id: newLead.id,
+              ...contactRow,
+              role: c.title || 'Decision maker',
+              company: company.name,
               contact_confidence: c.email ? 'high' : 'medium',
               reason_this_person: `Found via Apollo people search${c.seniority ? ` · ${c.seniority}` : ''}${c.title ? ` · ${c.title}` : ''}`,
             })
-            if (!ce) contactsSaved++
+            if (!ce) {
+              contactsSaved++
+              if (isReachableContact(contactRow)) reachableContactsSaved++
+            }
           }
         }
 
@@ -925,21 +977,31 @@ export async function POST(req: NextRequest) {
             ? await apolloEnrichContacts(domain, company.name, namedAiContacts.map(c => ({ name: c.name, role: c.role })))
             : []
           for (const c of apolloEnriched.slice(0, 3)) {
-            const { error: ce } = await supabase.from('contacts').insert({
-              lead_id: newLead.id,
+            const contactRow = {
               name: c.name,
-              role: c.title || 'Decision maker',
-              company: company.name,
               linkedin_url: c.linkedin_url || null,
               email: c.email || null,
+            }
+            const { error: ce } = await supabase.from('contacts').insert({
+              lead_id: newLead.id,
+              ...contactRow,
+              role: c.title || 'Decision maker',
+              company: company.name,
               contact_confidence: c.email ? 'high' : 'medium',
               reason_this_person: `Verified via Apollo name-match${c.seniority ? ` · ${c.seniority}` : ''}`,
             })
-            if (!ce) contactsSaved++
+            if (!ce) {
+              contactsSaved++
+              if (isReachableContact(contactRow)) reachableContactsSaved++
+            }
           }
         }
 
-        // Tier 3: AI-suggested contacts (LinkedIn search URL + guessed email pattern)
+        // Tier 3: AI-suggested contacts (LinkedIn search URL + guessed email pattern).
+        // These rarely count as reachable on their own — a search-results URL isn't
+        // a profile and email_pattern is a guess, not a verified inbox (see
+        // isRealEmail) — but they're still saved as a starting point for manual
+        // research, they just won't rescue a lead from the reachability gate below.
         if (contactsSaved === 0) {
           for (const contact of aiContacts.slice(0, 3)) {
             const linkedinUrl = contact.linkedin_hint
@@ -950,18 +1012,37 @@ export async function POST(req: NextRequest) {
                 ? contact.twitter_hint
                 : `https://x.com/search?q=${encodeURIComponent(contact.twitter_hint)}`
               : null
-            await supabase.from('contacts').insert({
-              lead_id: newLead.id,
+            const contactRow = {
               name: contact.name || null,
-              role: contact.role,
-              company: company.name,
               linkedin_url: linkedinUrl,
               twitter_url: twitterUrl,
               email: contact.email_pattern || null,
+            }
+            const { error: ce } = await supabase.from('contacts').insert({
+              lead_id: newLead.id,
+              ...contactRow,
+              role: contact.role,
+              company: company.name,
               contact_confidence: contact.contact_confidence || 'low',
               reason_this_person: contact.why_this_person,
             })
+            if (!ce) {
+              contactsSaved++
+              if (isReachableContact(contactRow)) reachableContactsSaved++
+            }
           }
+        }
+
+        // Reachability gate — a lead nobody can actually be messaged through
+        // is dead weight regardless of how good its pain point is (see
+        // lead_prioritization_philosophy: reachability beats perfect fit).
+        // Roll back the insert rather than leaving an unreachable lead sitting
+        // in the pipeline looking equally qualified as a reachable one.
+        if (reachableContactsSaved === 0) {
+          await supabase.from('contacts').delete().eq('lead_id', newLead.id)
+          await supabase.from('leads').delete().eq('id', newLead.id)
+          results.skipped_no_contact++
+          continue
         }
 
         // Update in-memory counts
