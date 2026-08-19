@@ -35,7 +35,8 @@ interface QualifyResult {
   potential_gap: string; financial_activity: string; agent_activity: string
   trigger_reason: string; trigger_source_url: string; trigger_date: string
   kima_fit: string; suggested_use_case: string; settlement_angle: string
-  aeredium_fit: string; security_angle: string; risk_angle: string
+  aeredium_fit: string; aerpolice_fit: string; aerseal_fit: string
+  security_angle: string; risk_angle: string
   outreach_angle: string
   revenue_potential: string; integration_feasibility: string
   twitter_url: string; telegram_url: string; discord_url: string
@@ -64,7 +65,7 @@ const RESEARCH_STEPS = [
   { icon: Globe,     label: 'Fetching web intelligence',       detail: 'News, press releases, funding & social links' },
   { icon: Search,    label: 'Analysing company',               detail: 'Business model, product, tech stack & competitors' },
   { icon: Target,    label: 'Identifying pain points',         detail: 'Payment, settlement & bridge friction' },
-  { icon: Zap,       label: 'Evaluating Kima / Aeredium / AERKey / Aerpolice fit', detail: 'Full 9-product match matrix — use case, risk angle, settlement & security angles' },
+  { icon: Zap,       label: 'Evaluating AER360 / Aerpolice / AERseal fit', detail: 'Full 10-product match matrix — use case, risk angle, settlement & security angles' },
   { icon: BarChart2, label: 'Scoring & rendering verdict',     detail: 'Lead score, priority, strengths & flags' },
 ]
 
@@ -200,7 +201,7 @@ function RichText({ text }: { text: string }) {
 
 // ── Discuss panel ─────────────────────────────────────────────
 const DISCUSS_STARTERS = [
-  'How does their tech work and where do Kima, Aeredium & Aerpolice each fit?',
+  'How does their tech work and where do AER360, Aerpolice & AERseal each fit?',
   'Do they have AI agents taking real consequential actions — are they an Aerpolice customer?',
   'What would make this a strong lead for our full suite?',
   'Who should I reach out to first and what should I say?',
@@ -328,7 +329,7 @@ function DiscussPanel({ leadData }: { leadData: QualifyResult }) {
             {msgs.length === 0 ? (
               <div>
                 <p style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.3)', marginBottom: 10, lineHeight: 1.5 }}>
-                  Ask anything about <strong style={{ color: 'rgba(255,255,255,0.5)' }}>{leadData.company_name}</strong> — how their tech works, whether AI agents are in their product, and where <strong style={{ color: 'rgba(255,255,255,0.5)' }}>Kima / Aeredium / Aerpolice</strong> each fit.
+                  Ask anything about <strong style={{ color: 'rgba(255,255,255,0.5)' }}>{leadData.company_name}</strong> — how their tech works, whether AI agents are in their product, and where <strong style={{ color: 'rgba(255,255,255,0.5)' }}>AER360 / Aerpolice / AERseal</strong> each fit.
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {DISCUSS_STARTERS.map(s => (
@@ -558,6 +559,7 @@ export default function NewLeadPage() {
       trigger_date: s(form.trigger_date), trigger_source_url: s(form.trigger_source_url),
       kima_fit: s(form.kima_fit), suggested_use_case: s(form.suggested_use_case),
       settlement_angle: s(form.settlement_angle), aeredium_fit: s(form.aeredium_fit),
+      aerpolice_fit: s(form.aerpolice_fit), aerseal_fit: s(form.aerseal_fit),
       security_angle: s(form.security_angle), risk_angle: s(form.risk_angle),
       outreach_angle: s(form.outreach_angle),
       revenue_potential: s(form.revenue_potential),
@@ -1044,9 +1046,9 @@ export default function NewLeadPage() {
                     groups[pm.company].push(pm)
                   })
                   const companyMeta: Record<string, { color: string; bg: string; border: string; dot: string }> = {
-                    Kima:     { color: 'rgb(96,165,250)',   bg: 'rgba(96,165,250,0.08)',   border: 'rgba(96,165,250,0.22)',   dot: 'rgba(96,165,250,0.9)' },
-                    Aeredium: { color: 'rgb(167,139,250)',  bg: 'rgba(167,139,250,0.08)',  border: 'rgba(167,139,250,0.22)',  dot: 'rgba(167,139,250,0.9)' },
-                    Aerpolice:   { color: 'rgb(251,191,36)',   bg: 'rgba(251,191,36,0.07)',   border: 'rgba(251,191,36,0.22)',   dot: 'rgba(251,191,36,0.9)' },
+                    AER360:    { color: 'rgb(167,139,250)',  bg: 'rgba(167,139,250,0.08)',  border: 'rgba(167,139,250,0.22)',  dot: 'rgba(167,139,250,0.9)' },
+                    Aerpolice: { color: 'rgb(251,191,36)',   bg: 'rgba(251,191,36,0.07)',   border: 'rgba(251,191,36,0.22)',   dot: 'rgba(251,191,36,0.9)' },
+                    AERseal:   { color: 'rgb(244,114,182)',  bg: 'rgba(244,114,182,0.08)',  border: 'rgba(244,114,182,0.22)',  dot: 'rgba(244,114,182,0.9)' },
                   }
                   const matchStyle = (m: string) => ({
                     strong:  { icon: '✓', color: 'rgb(52,211,153)',  bg: 'rgba(52,211,153,0.1)',  border: 'rgba(52,211,153,0.22)',  label: 'Strong Match' },
@@ -1079,7 +1081,7 @@ export default function NewLeadPage() {
                       </div>
 
                       {/* per-company groups */}
-                      {(['Kima', 'Aeredium', 'Aerpolice'] as const).map(co => {
+                      {(['AER360', 'Aerpolice', 'AERseal'] as const).map(co => {
                         const items = groups[co]
                         if (!items?.length) return null
                         const cm = companyMeta[co]
@@ -1150,13 +1152,21 @@ export default function NewLeadPage() {
               </SectionCard>
             )}
 
-            {/* Fit */}
-            <SectionCard icon={Zap} title="Kima & Aeredium Fit" open={open.fit} onToggle={() => toggle('fit')} accent="rgb(167,139,250)">
+            {/* Fit — AER360, Aerpolice, and AERseal are evaluated independently
+                (three co-equal products, 2026-08-19). Kima Fit is legacy: the
+                research prompt hasn't evaluated Kima since the 2026-08-10
+                rescoping, so it's only shown at all when an older cached
+                result already has it — never populated on a fresh run. */}
+            <SectionCard icon={Zap} title="Product Fit — AER360, Aerpolice & AERseal" open={open.fit} onToggle={() => toggle('fit')} accent="rgb(167,139,250)">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <div><FL>Kima Fit</FL><Inp value={form.kima_fit} onChange={v => set('kima_fit', v)} rows={4} /></div>
-                  <div><FL>Aeredium Fit</FL><Inp value={form.aeredium_fit} onChange={v => set('aeredium_fit', v)} rows={4} /></div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+                  <div><FL>AER360 Fit</FL><Inp value={form.aeredium_fit} onChange={v => set('aeredium_fit', v)} rows={4} /></div>
+                  <div><FL>Aerpolice Fit</FL><Inp value={form.aerpolice_fit} onChange={v => set('aerpolice_fit', v)} rows={4} /></div>
+                  <div><FL>AERseal Fit</FL><Inp value={form.aerseal_fit} onChange={v => set('aerseal_fit', v)} rows={4} /></div>
                 </div>
+                {form.kima_fit && (
+                  <div><FL>Kima Fit (legacy — from an earlier cached result)</FL><Inp value={form.kima_fit} onChange={v => set('kima_fit', v)} rows={3} /></div>
+                )}
                 <div><FL>Suggested Use Case</FL><Inp value={form.suggested_use_case} onChange={v => set('suggested_use_case', v)} /></div>
                 <div><FL>Settlement Angle</FL><Inp value={form.settlement_angle} onChange={v => set('settlement_angle', v)} rows={2} /></div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -1240,7 +1250,7 @@ export default function NewLeadPage() {
             {/* Commercial potential */}
             <SectionCard icon={DollarSign} title="Commercial Potential" open={open.commercial} onToggle={() => toggle('commercial')} accent="rgb(52,211,153)">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div><FL>Revenue Potential</FL><Inp value={form.revenue_potential} onChange={v => set('revenue_potential', v)} rows={3} placeholder="Impact if they integrate Kima..." /></div>
+                <div><FL>Revenue Potential</FL><Inp value={form.revenue_potential} onChange={v => set('revenue_potential', v)} rows={3} placeholder="Impact if they integrate AER360/Aerpolice/AERseal..." /></div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <FL>Integration Feasibility</FL>
