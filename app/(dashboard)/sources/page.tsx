@@ -41,7 +41,7 @@ interface RunResult {
   skipped_generic?: number
   skipped_low_confidence?: number
   skipped_low_confidence_score?: number
-  skipped_no_contact?: number
+  saved_without_reachable_contact?: number
   skipped_cap: number
   skipped_low_score: number
   leads_saved: string[]
@@ -802,9 +802,9 @@ export default function SourcesPage() {
                               {result.skipped_low_confidence_score} thin overall evidence
                             </span>
                           )}
-                          {(result.skipped_no_contact ?? 0) > 0 && (
-                            <span style={{ color: '#f87171' }} title="Passed every quality gate but no reachable contact (real email, or an actual LinkedIn/X profile — not a search link) could be found — rolled back rather than saved unreachable">
-                              {result.skipped_no_contact} rejected — no reachable contact
+                          {(result.saved_without_reachable_contact ?? 0) > 0 && (
+                            <span style={{ color: '#fbbf24' }} title="Saved, but no reachable contact (real email, or an actual LinkedIn/X profile — not a search link) was found — marked 'needs research' instead of being discarded">
+                              {result.saved_without_reachable_contact} saved without a reachable contact yet
                             </span>
                           )}
                           {result.leads_saved.length > 0 && (

@@ -713,7 +713,7 @@ export async function POST(req: NextRequest) {
       downgraded_unverified_severity: 0,
       downgraded_unverified_urgency: 0,
       skipped_low_confidence_score: 0,
-      skipped_no_contact: 0,
+      saved_without_reachable_contact: 0, // saved as 'needs_research', not rejected — see reachability note below
       leads_saved: [] as string[],
     }
 
@@ -798,15 +798,17 @@ export async function POST(req: NextRequest) {
       }
 
       // Same evidence-gate principle applied to the OTHER half of the
-      // "immediate pain" bar: urgency_score is supposed to be driven by a
-      // dated, concrete trigger (see the prompt above), but nothing enforced
-      // that in code — a lead could claim urgency 70+ on a vague, undated
-      // trigger_reason with no real citation. Cap it below the gate threshold
-      // when there's no real dated trigger + source backing it.
-      const triggerDateRaw = String(research.trigger_date || '').trim().toLowerCase()
-      const hasDatedTrigger = !!triggerDateRaw && triggerDateRaw !== 'null' && triggerDateRaw !== 'unknown'
-      const hasTriggerSource = !!(String(research.trigger_source_url || '').trim() || String(research.source_url || '').trim())
-      if ((!hasDatedTrigger || !hasTriggerSource) && typeof research.urgency_score === 'number' && research.urgency_score >= MIN_URGENCY_SCORE) {
+      // "immediate pain" bar, loosened 2026-08-19 after it proved too strict
+      // in practice (originally required BOTH a dated trigger AND a source
+      // URL — that combination rejected nearly every real lead, same failure
+      // mode as the severity gate). Now only downgrades urgency when there's
+      // no real trigger reasoning at all — a lead claiming urgency with a
+      // substantive trigger_reason (even if undated, or sourced only via the
+      // general source_url) is no longer punished for missing both pieces at
+      // once.
+      const triggerReason = String(research.trigger_reason || '').trim()
+      const hasTriggerReason = triggerReason.length > 20 && !/^(none|null|n\/a|no trigger)/i.test(triggerReason)
+      if (!hasTriggerReason && typeof research.urgency_score === 'number' && research.urgency_score >= MIN_URGENCY_SCORE) {
         results.downgraded_unverified_urgency++
         research.urgency_score = MIN_URGENCY_SCORE - 1
       }
@@ -1047,16 +1049,18 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // Reachability gate — a lead nobody can actually be messaged through
-        // is dead weight regardless of how good its pain point is (see
-        // lead_prioritization_philosophy: reachability beats perfect fit).
-        // Roll back the insert rather than leaving an unreachable lead sitting
-        // in the pipeline looking equally qualified as a reachable one.
+        // Reachability — loosened 2026-08-19: a hard-reject-and-delete was too
+        // aggressive (a lead with genuinely strong, evidenced pain shouldn't
+        // vanish entirely just because a contact wasn't findable *yet* — see
+        // lead_prioritization_philosophy on reachability mattering, but this
+        // was swinging the other way and discarding good leads outright).
+        // Now it saves normally but is marked 'needs_research' regardless of
+        // its computed priority, so it doesn't look outreach-ready in the
+        // pipeline until someone finds a real contact — visible on the lead
+        // itself (empty/weak contacts) rather than silently discarded.
         if (reachableContactsSaved === 0) {
-          await supabase.from('contacts').delete().eq('lead_id', newLead.id)
-          await supabase.from('leads').delete().eq('id', newLead.id)
-          results.skipped_no_contact++
-          return
+          await supabase.from('leads').update({ priority: 'needs_research' }).eq('id', newLead.id)
+          results.saved_without_reachable_contact++
         }
 
         // Update in-memory counts

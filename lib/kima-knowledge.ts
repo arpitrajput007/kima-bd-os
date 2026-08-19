@@ -240,6 +240,8 @@ export const ICP_BLOCK = `IDEAL CUSTOMER PROFILES (ICP) — three co-equal produ
 
 export const AER360_ICP_TIERS = `AER360 ICP TIERS — rank every prospect into one of these:
 
+HARD STAGE GATE (persona set by user, 2026-08-19): the company's product must be LIVE and moving real customer or company funds TODAY. Pre-revenue, testnet-only, "coming soon," or purely roadmap-stage companies are disqualified regardless of how strong the pain-point story is — do not score these up on narrative alone. No buyer-title or geography preference — evaluate any region, any seniority that's genuinely the decision-maker.
+
 TIER 1 (highest priority):
 A. AI companies whose agents move money — AI trading/portfolio/treasury/payment/procurement agents, autonomous DeFi execution agents, agentic commerce infrastructure, "AI employees" that need payment authority
 B. Agentic fintech/payment companies — agent-to-agent payments, stablecoin payment infrastructure, autonomous settlement, machine-to-machine payments
@@ -308,6 +310,8 @@ Do not silently drop competitors from output — classify them explicitly so the
 // — same operative-rules-not-verbatim treatment as AER360_ICP_TIERS above.
 export const AERSEAL_ICP_TIERS = `AERSEAL ICP TIERS — rank every prospect into one of these. AERseal answers ONE question: who can exercise a deployed smart contract's privileged powers (upgrade, mint, pause, freeze, oracle, bridge config, role management), and what happens if that controller is compromised? It is NOT wallet/treasury custody (that's AER360) and NOT a code audit, bridge-message verification system, or AI-agent governance.
 
+HARD STAGE GATE (persona set by user, 2026-08-19): the contract must be deployed on MAINNET with real value/TVL at risk under the privileged role TODAY. Testnet-only deployments, or contracts with negligible/zero value at stake, are disqualified regardless of how weak the admin-key setup looks — the vulnerability has to actually matter today. No buyer-title or geography preference, and no blanket exclusions beyond the disqualifiers already listed below — evaluate every company on its own evidence.
+
 TIER 1 (highest priority — publicly confirmed, on-chain or documented evidence):
 A. A single EOA controls a dangerous role — proxy admin, default admin, upgrade owner, mint administrator, bridge owner, oracle setter, freeze/seize authority. Checkable via the contract's owner()/admin role on a block explorer. This is the clearest trigger.
 B. A multisig exists on that role, but the underlying signer security is weak — below-majority threshold (e.g. 2-of-5), multiple signers controlled by the same person, signers on ordinary browser wallets, unknown signer identities, former employees still included.
@@ -369,6 +373,8 @@ Aerpolice does not replace wallets, custody providers, banks, or payment infrast
 
 The right framing: "Stripe governs payments for businesses. Okta governs access for employees. Aerpolice governs economic authority for AI agents."
 
+HARD STAGE GATE (persona set by user, 2026-08-19): the company's agents must be LIVE and taking real, consequential actions in production TODAY — not a roadmap item, not a private beta, not a pitch-deck plan to add autonomy later. If agents don't yet act unsupervised in the real world, disqualify regardless of how severe the eventual governance gap would be. No buyer-title or geography preference — evaluate any region, any seniority that's genuinely the decision-maker.
+
 WHO AERPOLICE IS FOR:
 - Companies building AI agents that take consequential financial or system actions (payments, procurement, expense approvals, treasury management, trading, data access)
 - AI-native companies selling agent products to enterprises where the enterprise asks: "Can you prove your agent won't go rogue? Can you audit every action? Can we set spending limits?"
@@ -378,7 +384,7 @@ WHO AERPOLICE IS FOR:
 WHEN AERPOLICE IS NOT THE RIGHT ANSWER:
 - A company using AI for recommendations, analysis, or content — but not for executing financial or system-changing transactions. "Uses AI" is not the same as "has autonomous agents with financial authority."
 - A company where a human always approves every financial action before it executes. If every payment has a human in the loop already, Aerpolice adds friction, not value.
-- A company with no near-term plans to give agents financial or system autonomy.
+- A company still building toward agent autonomy with no live agents taking real actions yet — see the hard stage gate above.
 - Do NOT force Aerpolice into a pitch where it doesn't naturally fit. It will read as desperation.
 
 Key contacts: Founder/CEO (small companies); Head of Product, VP Engineering, Head of AI, Head of Trust, Security leads (larger).
