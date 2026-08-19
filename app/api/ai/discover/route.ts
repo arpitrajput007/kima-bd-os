@@ -486,9 +486,13 @@ Return this exact JSON:
 export async function POST(req: NextRequest) {
   try {
     // Use service role key on the server so RLS doesn't block lead INSERT/SELECT ops.
+    // `||` not `??` — SUPABASE_SERVICE_ROLE_KEY can be present-but-empty (e.g. an
+    // unfilled '.env.local' placeholder), and '' is not null/undefined so `??`
+    // would pass the empty string straight to createClient() instead of falling
+    // back, crashing every run before it does anything at all.
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
     const { source_id, research_ai = 'claude' } = await req.json()
     if (!source_id) {
@@ -713,21 +717,22 @@ export async function POST(req: NextRequest) {
       leads_saved: [] as string[],
     }
 
-    // 6. Deep-research each company and save qualified ones
-    for (const company of realCompanies) {
-      const nameKey = (company.name || '').toLowerCase().trim()
-
-
-      // Skip duplicates — check name, name slug, and domain (most reliable).
-      // These are the ONLY skips that happen before deepResearch() runs, so
-      // they're the only ones that don't cost an AI call — everything below
-      // this block already spent one.
-      const nameSlugKey = nameSlug(company.name || '')
-      const domainKey = toDomain(company.website || '')
-      if (existingNames.has(nameKey)) { results.skipped_duplicate++; continue }
-      if (nameSlugKey && existingNameSlugs.has(nameSlugKey)) { results.skipped_duplicate++; continue }
-      if (domainKey && existingDomains.has(domainKey)) { results.skipped_duplicate++; continue }
-
+    // 6. Deep-research each company and save qualified ones.
+    // Runs in small concurrent batches (see CONCURRENCY below) rather than one
+    // company fully at a time — a single company's research (crawl + Hunter +
+    // Exa + the big Claude call) can take 60-90s, and a source with several
+    // surviving candidates was measured taking 4-5 minutes end to end
+    // sequentially, well into range of getting killed by the platform's
+    // function timeout before ever reaching the step that saves anything or
+    // updates the source row — which looks indistinguishable from "found
+    // nothing" from the outside. Extracted into its own function so the
+    // driver loop below can Promise.all a batch of these together.
+    async function processCompany(
+      company: (typeof realCompanies)[number],
+      nameKey: string,
+      nameSlugKey: string,
+      domainKey: string,
+    ): Promise<void> {
       // Enrich company context with real-time research before the main deep-dive.
       // Exa: recent news as corroborating context (Perplexity dropped — not
       // configured for this account, was always contributing nothing).
@@ -748,11 +753,11 @@ export async function POST(req: NextRequest) {
       // Full research — inject learned intelligence + live context
       results.researched++
       const research = await deepResearch(enrichedCompany, learnedIntelligence, researchProvider)
-      if (!research) continue
+      if (!research) return
       const crawledHomepageText = typeof research._homepageText === 'string' ? research._homepageText : ''
 
       // Hard gate: the model itself confirms this is a real company, not a category.
-      if (research.is_specific_real_company === false) { results.skipped_generic++; continue }
+      if (research.is_specific_real_company === false) { results.skipped_generic++; return }
 
       // Classification gate — never save a competitor, investor, partner, or
       // clearly irrelevant company as a prospect just because it cleared the
@@ -761,11 +766,11 @@ export async function POST(req: NextRequest) {
       const classification = String(research.classification || '').toLowerCase()
       if (['competitor', 'investor_ecosystem', 'not_relevant', 'partner'].includes(classification)) {
         results.skipped_not_customer++
-        continue
+        return
       }
 
       // Skip low-quality leads (general ICP fit gate).
-      if ((research.lead_score as number) < MIN_LEAD_SCORE) { results.skipped_low_score++; continue }
+      if ((research.lead_score as number) < MIN_LEAD_SCORE) { results.skipped_low_score++; return }
 
       // Evidence gate — a model can label its OWN reasoning "critical" with no
       // real proof behind it. Don't trust the self-reported severity unless
@@ -805,7 +810,7 @@ export async function POST(req: NextRequest) {
       const urgency = (research.urgency_score as number) ?? 0
       if (!REQUIRED_PAIN_SEVERITIES.has(severity) || urgency < MIN_URGENCY_SCORE) {
         results.skipped_not_urgent++
-        continue
+        return
       }
 
       // Overall-evidence gate — a lead can clear lead_score/severity/urgency
@@ -814,7 +819,7 @@ export async function POST(req: NextRequest) {
       // self-reported, so this is a cheap, trustworthy backstop.
       if (confidenceScore < MIN_CONFIDENCE_SCORE) {
         results.skipped_low_confidence_score++
-        continue
+        return
       }
 
       // Product-relevance gate — reject unless there's a genuine, specific fit
@@ -826,7 +831,7 @@ export async function POST(req: NextRequest) {
       const hasAerSealFit = typeof research.aerseal_fit === 'string' && research.aerseal_fit.trim().length > 0
       if (!hasAerpoliceFit && !hasAer360Fit && !hasAerSealFit) {
         results.skipped_no_product_fit++
-        continue
+        return
       }
 
       // Determine relevant customer categories
@@ -836,7 +841,7 @@ export async function POST(req: NextRequest) {
 
       // Check if any matching category has room (CATEGORY_CAP unworked leads)
       const hasRoom = categories.some(cat => (categoryCounts[cat] || 0) < CATEGORY_CAP)
-      if (!hasRoom) { results.skipped_cap++; continue }
+      if (!hasRoom) { results.skipped_cap++; return }
 
       // Resolve website — required before saving. If the extractor didn't find it,
       // do a quick search to look it up. Skip the lead if we still can't find one.
@@ -844,14 +849,14 @@ export async function POST(req: NextRequest) {
       if (!website) {
         website = await resolveWebsite(company.name)
       }
-      if (!website) { results.skipped_low_score++; continue } // no website = can't reach out
+      if (!website) { results.skipped_low_score++; return } // no website = can't reach out
 
       // Safety check — never save a phishing / malicious domain.
       const safe = await isSafeDomain(website)
       if (!safe) {
         console.warn(`[discover] Skipping ${company.name} — domain flagged as phishing: ${website}`)
         results.skipped_duplicate++ // reuse counter; will log clearly in console
-        continue
+        return
       }
 
       // Pull real social links. Reuse deepResearch()'s own homepage crawl when
@@ -1042,7 +1047,7 @@ export async function POST(req: NextRequest) {
           await supabase.from('contacts').delete().eq('lead_id', newLead.id)
           await supabase.from('leads').delete().eq('id', newLead.id)
           results.skipped_no_contact++
-          continue
+          return
         }
 
         // Update in-memory counts
@@ -1056,6 +1061,35 @@ export async function POST(req: NextRequest) {
         results.saved++
         results.leads_saved.push(company.name)
       }
+    }
+
+    // Drive processCompany() in small concurrent batches rather than one
+    // company at a time. The dedup check (name/slug/domain) has to happen
+    // synchronously for the whole batch BEFORE any of them start their async
+    // work — otherwise two same-named candidates in one batch could both slip
+    // past the check and both get researched/saved. categoryCounts is still
+    // only updated after a company is actually saved (same as before), so two
+    // companies in the same batch landing in the same near-full category can
+    // in rare cases both get saved and push slightly past CATEGORY_CAP —
+    // acceptable given the small batch size, versus the alternative of fully
+    // serializing again.
+    const CONCURRENCY = 3
+    for (let i = 0; i < realCompanies.length; i += CONCURRENCY) {
+      const batch: Array<{ company: (typeof realCompanies)[number]; nameKey: string; nameSlugKey: string; domainKey: string }> = []
+      for (const company of realCompanies.slice(i, i + CONCURRENCY)) {
+        const nameKey = (company.name || '').toLowerCase().trim()
+        const nameSlugKey = nameSlug(company.name || '')
+        const domainKey = toDomain(company.website || '')
+        // Skip duplicates — check name, name slug, and domain (most reliable).
+        // These are the ONLY skips that happen before deepResearch() runs, so
+        // they're the only ones that don't cost an AI call.
+        if (existingNames.has(nameKey)) { results.skipped_duplicate++; continue }
+        if (nameSlugKey && existingNameSlugs.has(nameSlugKey)) { results.skipped_duplicate++; continue }
+        if (domainKey && existingDomains.has(domainKey)) { results.skipped_duplicate++; continue }
+        batch.push({ company, nameKey, nameSlugKey, domainKey })
+      }
+      if (batch.length === 0) continue
+      await Promise.all(batch.map(b => processCompany(b.company, b.nameKey, b.nameSlugKey, b.domainKey)))
     }
 
     // 7. Update source last_run_at, cumulative leads_generated, and cumulative
