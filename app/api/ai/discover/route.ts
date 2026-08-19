@@ -773,17 +773,26 @@ export async function POST(req: NextRequest) {
       if ((research.lead_score as number) < MIN_LEAD_SCORE) { results.skipped_low_score++; return }
 
       // Evidence gate — a model can label its OWN reasoning "critical" with no
-      // real proof behind it. Don't trust the self-reported severity unless
-      // it's actually backed by a verified source: pain_point_evidence_type
-      // must be 'verified_source' AND a real pain_point_source_url must exist.
-      // Everything else (agent_analysis, inferred, or no citation) gets capped
-      // at 'medium' here, in code, before the severity gate below ever sees it
-      // — this is what caught the templated/static-list leads that scored
-      // themselves 'critical' with zero real evidence and converted at 0%.
+      // real proof behind it. `isVerified` (published, cited article) still
+      // feeds confidence_score below as the strongest tier. But the outright
+      // downgrade-to-medium only fires for the genuinely weak tier —
+      // 'inferred' (generic industry-level guessing, no company-specific
+      // facts) or no evidence type at all. 'agent_analysis' is deliberately
+      // NOT downgraded: in this pipeline it specifically means "reasoned from
+      // this company's own crawled homepage and cited real facts" (required
+      // by the deepResearch prompt above), not a guess — requiring a literal
+      // published article for every lead was the actual problem: almost no
+      // company has a news article confirming its own internal security gap,
+      // so that bar rejected nearly everything regardless of lead quality.
+      // The original failure this gate was built for (2026-08-19) was a
+      // templated static-list source with zero company-specific facts at
+      // all — a different, since-fixed code path — not well-reasoned
+      // agent_analysis from live research.
       const evidenceType = String(research.pain_point_evidence_type || '').toLowerCase()
       const hasSourceUrl = typeof research.pain_point_source_url === 'string' && research.pain_point_source_url.trim().length > 0
       const isVerified = evidenceType === 'verified_source' && hasSourceUrl
-      if (!isVerified && ['critical', 'high'].includes(String(research.pain_point_severity || '').toLowerCase())) {
+      const isWeaklyEvidenced = evidenceType === 'inferred' || !evidenceType
+      if (isWeaklyEvidenced && ['critical', 'high'].includes(String(research.pain_point_severity || '').toLowerCase())) {
         results.downgraded_unverified_severity++
         research.pain_point_severity = 'medium'
       }
