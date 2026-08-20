@@ -330,6 +330,9 @@ export interface Source {
   leads_generated?: number
   companies_evaluated?: number
   total_runs?: number
+  deep_crawl?: boolean
+  deep_crawl_max_actions?: number
+  deep_crawl_button_selector?: string
   created_at: string
   updated_at: string
 }

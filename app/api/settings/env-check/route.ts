@@ -13,5 +13,6 @@ export async function GET() {
     exa:       !!process.env.EXA_API_KEY,
     apollo:    !!process.env.APOLLO_API_KEY,
     hunter:    !!process.env.HUNTER_API_KEY || !!process.env.HUNTER_API_KEY_2,
+    firecrawl: !!process.env.FIRECRAWL_API_KEY,
   })
 }

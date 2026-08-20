@@ -10,6 +10,7 @@ import { CLAUDE_FAST } from '@/lib/claude'
 import { discoveryMemory } from '@/lib/agent-memory'
 import { readUrl } from '@/lib/webRead'
 import { isRealEmail } from '@/lib/outreach'
+import { firecrawlConfigured, firecrawlDeepScrape } from '@/lib/firecrawl'
 
 // A contact only counts as reachable if there's an actual channel to message
 // them through — a name with no email/profile, a guessed email pattern (see
@@ -665,7 +666,20 @@ export async function POST(req: NextRequest) {
     } else {
       let content = ''
       if (sourceQuery.startsWith('http://') || sourceQuery.startsWith('https://')) {
-        content = await readUrl(sourceQuery)
+        // Deep crawl (opt-in per source): scroll + optional "Load More" click
+        // cycles via Firecrawl, for sources whose real content is paginated,
+        // infinite-scroll, or hidden behind a button — readUrl() only ever
+        // sees the first-load render. Falls back to the plain read if
+        // Firecrawl isn't configured or comes back empty.
+        if (source.deep_crawl && firecrawlConfigured()) {
+          content = await firecrawlDeepScrape(sourceQuery, {
+            maxActions: source.deep_crawl_max_actions ?? 5,
+            buttonSelector: source.deep_crawl_button_selector || undefined,
+          })
+        }
+        if (!content) {
+          content = await readUrl(sourceQuery, source.deep_crawl ? 40000 : 10000)
+        }
       } else {
         // Exa not configured — fall back to Tavily.
         if (!process.env.TAVILY_API_KEY) {
@@ -714,6 +728,7 @@ export async function POST(req: NextRequest) {
       downgraded_unverified_urgency: 0,
       skipped_low_confidence_score: 0,
       saved_without_reachable_contact: 0, // saved as 'needs_research', not rejected — see reachability note below
+      insert_failed: 0, // the DB insert itself errored (schema/constraint/RLS) — was previously invisible, see the guard below
       leads_saved: [] as string[],
     }
 
@@ -940,7 +955,22 @@ export async function POST(req: NextRequest) {
         .select('id')
         .single()
 
-      if (!leadErr && newLead) {
+      // A failed insert (bad column, constraint, RLS) used to be completely
+      // silent — the candidate just vanished with no log, no counter, and no
+      // trace in the API response, indistinguishable from "correctly
+      // rejected by a quality gate." Found via a live diagnostic run where
+      // researched=4, saved=0, and every single skip/downgrade counter was
+      // still 0 — that combination is only possible here. Root cause that
+      // day was leads.source_id not existing in the DB despite being in
+      // every insert (see supabase/add-lead-source-id.sql) — surfacing this
+      // properly is what made it findable at all.
+      if (leadErr || !newLead) {
+        console.error(`[discover] Lead insert failed for ${company.name}:`, leadErr?.message || 'no row returned')
+        results.insert_failed++
+        return
+      }
+
+      {
         // Contact strategy (quality-first, three-tier):
         //
         // Tier 1 — Apollo people search by domain + seniority (real people, real titles,

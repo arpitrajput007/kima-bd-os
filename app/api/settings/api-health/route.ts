@@ -153,6 +153,31 @@ async function checkApollo(key: string): Promise<APIHealth> {
   }
 }
 
+async function checkFirecrawl(key: string): Promise<APIHealth> {
+  try {
+    // Credit-usage endpoint costs nothing — avoids spending a scrape credit
+    // just to verify the key works.
+    const res = await fetch('https://api.firecrawl.dev/v2/team/credit-usage', {
+      headers: { Authorization: `Bearer ${key}` },
+    })
+    if (res.ok) {
+      const json = await res.json().catch(() => null)
+      const remaining = json?.data?.remainingCredits
+      const plan = json?.data?.planCredits
+      return {
+        status: 'ok',
+        detail: 'Connected',
+        credits: typeof remaining === 'number' && typeof plan === 'number' ? { used: plan - remaining, available: plan } : null,
+      }
+    }
+    if (res.status === 401 || res.status === 403 || res.status === 404) return { status: 'unauthorized', detail: 'Invalid API key' }
+    if (res.status === 429) return { status: 'rate_limited', detail: 'Rate limited — try again shortly' }
+    return { status: 'error', detail: `HTTP ${res.status}` }
+  } catch {
+    return { status: 'error', detail: 'Could not reach Firecrawl API' }
+  }
+}
+
 // Hunter supports a fallback key (HUNTER_API_KEY_2) — report the first one that's usable.
 async function checkHunterWithFallback(): Promise<APIHealth> {
   const hk = process.env.HUNTER_API_KEY
@@ -185,8 +210,9 @@ export async function GET(req: Request) {
   const tk = process.env.TAVILY_API_KEY
   const apk = process.env.APOLLO_API_KEY
   const ppk = process.env.PERPLEXITY_API_KEY
+  const fck = process.env.FIRECRAWL_API_KEY
 
-  const [anthropic, openai, hunter, exa, tavily, apollo, perplexity] = await Promise.all([
+  const [anthropic, openai, hunter, exa, tavily, apollo, perplexity, firecrawl] = await Promise.all([
     ak  ? checkAnthropic(ak)   : Promise.resolve(NOT_CONFIGURED),
     ok  ? checkOpenAI(ok)      : Promise.resolve(NOT_CONFIGURED),
     checkHunterWithFallback(),
@@ -194,9 +220,10 @@ export async function GET(req: Request) {
     tk  ? checkTavily(tk)      : Promise.resolve(NOT_CONFIGURED),
     apk ? checkApollo(apk)     : Promise.resolve(NOT_CONFIGURED),
     ppk ? checkPerplexity(ppk) : Promise.resolve(NOT_CONFIGURED),
+    fck ? checkFirecrawl(fck)  : Promise.resolve(NOT_CONFIGURED),
   ])
 
-  cache = { anthropic, openai, hunter, exa, tavily, apollo, perplexity }
+  cache = { anthropic, openai, hunter, exa, tavily, apollo, perplexity, firecrawl }
   cacheAt = Date.now()
 
   return NextResponse.json(cache)

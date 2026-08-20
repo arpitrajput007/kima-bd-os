@@ -42,6 +42,7 @@ interface RunResult {
   skipped_low_confidence?: number
   skipped_low_confidence_score?: number
   saved_without_reachable_contact?: number
+  insert_failed?: number
   skipped_cap: number
   skipped_low_score: number
   leads_saved: string[]
@@ -480,6 +481,33 @@ export default function SourcesPage() {
                     It researches each company itself and decides the industry &amp; sales fit using everything you&apos;ve taught it.
                   </p>
                 </div>
+                {!['exa_search', 'exa_similar', 'apollo_search'].includes(form.source_type || '') && (
+                  <div className="md:col-span-2 rounded-lg p-3" style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)' }}>
+                    <label className="flex items-center gap-2 text-xs font-medium mb-1.5 cursor-pointer" style={{ color: 'rgb(200,200,220)' }}>
+                      <input type="checkbox" checked={!!form.deep_crawl} onChange={e => setForm(f => ({ ...f, deep_crawl: e.target.checked }))} style={{ accentColor: '#8b5cf6' }} />
+                      Deep crawl (scroll + Load More) — for paginated / infinite-scroll pages
+                    </label>
+                    <p className="text-xs leading-relaxed mb-2" style={{ color: 'rgb(110,110,130)' }}>
+                      The normal read only sees what renders on first load. This scrolls the page repeatedly (and optionally clicks a &quot;Load More&quot; button) before reading it — costs more per run, so leave off unless this specific source hides content behind scrolling or a button.
+                    </p>
+                    {form.deep_crawl && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                        <div>
+                          <label className="block text-xs mb-1" style={{ color: 'rgb(160,160,180)' }}>Scroll/click cycles</label>
+                          <input type="number" min={1} max={15} className={inputClass} style={selStyle}
+                            value={form.deep_crawl_max_actions ?? 5}
+                            onChange={e => setForm(f => ({ ...f, deep_crawl_max_actions: parseInt(e.target.value) || 5 }))} />
+                        </div>
+                        <div>
+                          <label className="block text-xs mb-1" style={{ color: 'rgb(160,160,180)' }}>&quot;Load More&quot; button selector (optional)</label>
+                          <input className={inputClass} style={selStyle} value={form.deep_crawl_button_selector || ''}
+                            onChange={e => setForm(f => ({ ...f, deep_crawl_button_selector: e.target.value }))}
+                            placeholder="e.g. button.load-more — leave blank for scroll-only" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-medium mb-1.5" style={{ color: 'rgb(160,160,180)' }}>Frequency</label>
                   <select className={inputClass} style={selStyle} value={form.frequency || 'weekly'} onChange={e => setForm(f => ({ ...f, frequency: e.target.value as Source['frequency'] }))}>
@@ -805,6 +833,11 @@ export default function SourcesPage() {
                           {(result.saved_without_reachable_contact ?? 0) > 0 && (
                             <span style={{ color: '#fbbf24' }} title="Saved, but no reachable contact (real email, or an actual LinkedIn/X profile — not a search link) was found — marked 'needs research' instead of being discarded">
                               {result.saved_without_reachable_contact} saved without a reachable contact yet
+                            </span>
+                          )}
+                          {(result.insert_failed ?? 0) > 0 && (
+                            <span style={{ color: '#f87171', fontWeight: 600 }} title="Passed every quality gate but the database insert itself errored (bad column, constraint, or permissions) — check server logs">
+                              {result.insert_failed} DB insert failed — check logs
                             </span>
                           )}
                           {result.leads_saved.length > 0 && (

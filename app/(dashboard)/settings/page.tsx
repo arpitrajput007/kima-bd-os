@@ -21,6 +21,7 @@ interface HealthResult {
   tavily:     APIHealth
   apollo:     APIHealth
   perplexity: APIHealth
+  firecrawl:  APIHealth
   _cached?:   boolean
   _age_s?:    number
 }
@@ -54,6 +55,7 @@ const API_CFG: {
   { key: 'apollo',      label: 'Apollo',               envKey: 'APOLLO_API_KEY',      color: '#fb923c', link: 'https://developer.apollo.io',                    critical: false, desc: 'Contact enrichment & email' },
   { key: 'hunter',      label: 'Hunter.io',            envKey: 'HUNTER_API_KEY',      color: '#f472b6', link: 'https://hunter.io/api-keys',                     critical: false, desc: 'Email finder by domain' },
   { key: 'perplexity',  label: 'Perplexity (Sonar)',   envKey: 'PERPLEXITY_API_KEY',  color: '#818cf8', link: 'https://www.perplexity.ai/settings/api',           critical: false, desc: 'Real-time web research with citations' },
+  { key: 'firecrawl',   label: 'Firecrawl',            envKey: 'FIRECRAWL_API_KEY',   color: '#c084fc', link: 'https://www.firecrawl.dev/app/api-keys',           critical: false, desc: 'Deep crawl — scroll/Load More for paginated sources' },
 ]
 
 const STATUS_CFG: Record<APIStatus, { label: string; color: string; bg: string; border: string; icon: typeof CheckCircle2 }> = {
@@ -167,6 +169,7 @@ TAVILY_API_KEY=tvly-...
 APOLLO_API_KEY=your_apollo_key
 HUNTER_API_KEY=your_hunter_key
 PERPLEXITY_API_KEY=pplx-...
+FIRECRAWL_API_KEY=fc-...
 NEXT_PUBLIC_APP_URL=http://localhost:3000`
     navigator.clipboard.writeText(t)
     setCopiedKey('template')
