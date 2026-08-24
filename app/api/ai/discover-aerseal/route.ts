@@ -38,6 +38,7 @@ import {
   MONITORING_SURFACES,
   scoreProspect,
   evaluateGate,
+  enforceGapDiscipline,
   validateHypothesis,
   daysSince,
   tierLabel,
@@ -48,6 +49,7 @@ import {
   evidenceTiersReference,
   EPISTEMIC_RULES,
   FAIR_CHARACTERISATION_RULES,
+  TRIGGER_FIRST_RULES,
   REJECTION_REASONS,
   type AersealDossier,
   type OutreachHypothesis,
@@ -141,7 +143,11 @@ async function extractCandidates(
       temperature: 0.2,
       system: `You scan event surfaces for organisations whose EVM SMART-CONTRACT ADMINISTRATIVE AUTHORITY has just become important.
 
-You are NOT looking for "companies interested in blockchain security". Auditors, security vendors, wallet apps, research firms, conference organisers and news outlets are NOT candidates unless they themselves operate a deployed EVM contract with privileged powers. Reject them.
+${TRIGGER_FIRST_RULES}
+
+You are NOT looking for "companies interested in blockchain security". Auditors, security vendors, wallet apps, custody providers, key-management vendors, research firms, conference organisers and news outlets are NOT candidates unless they themselves operate a deployed EVM contract with privileged powers. Reject them — a company that SELLS security is not a company that is BUYING it.
+
+Reject on sight any organisation whose only connection to this page is that it mentions or sells "smart-contract security", "MPC", "multisig", "threshold signing" or "key management". That is a keyword match, not an event.
 
 You ARE looking for an organisation that operates deployed EVM contracts where someone holds a privileged power:
 ${powersReference()}
@@ -198,6 +204,8 @@ async function profileAuthority(
 
 ${AERSEAL_KNOWLEDGE}
 
+${TRIGGER_FIRST_RULES}
+
 ${EPISTEMIC_RULES}
 
 ${FAIR_CHARACTERISATION_RULES}
@@ -217,15 +225,21 @@ ${triggersReference()}
 EVIDENCE TIERS (use these exact keys):
 ${evidenceTiersReference()}
 
-WHAT YOU MUST ESTABLISH — all eight, honestly:
-1. What EVM contracts or products this organisation operates.
-2. What privileged powers exist over them.
-3. How those powers appear to be controlled today.
-4. The current event making outreach timely.
-5. The evidence URL and publication date for that event.
-6. The likely buyer or governance owner — the ROLE that owns contract-authority decisions and a public route to reach them. You are not expected to produce a personal email; a governance forum, a team page, or a named council is a complete answer.
-7. The specific AERSeal use case for THIS organisation.
-8. Their current alternative and the switching friction it creates.
+THE SEVEN QUESTIONS — the event already happened and already named this organisation. Your job is only to answer these, honestly:
+1. What EVM product or contract does it operate?
+2. What privileged functions exist — owner, upgrader, ProxyAdmin, minter, burner, freezer, pauser, guardian, treasury, bridge administrator?
+3. How are those functions controlled — EOA, Safe, multisig, timelock, Security Council, MPC, custodian, or unknown? "Unknown" is a real and frequent answer; do not upgrade a guess into a control model.
+4. What could happen if that authority were lost or compromised — for THIS organisation specifically, in terms of their own funds, users, supply, or licence. Not a generic risk sentence.
+5. Why does the identified event make this a relevant time to review that control? Connect the DATED EVENT to the PRIVILEGED ROLE. "They launched and launches are risky" is not an answer; "the launch put a live mint role behind a deployer key that was created for the testnet" is.
+6. Who owns this problem internally — the ROLE that owns contract-authority decisions, and a public route to reach them. You are not expected to produce a personal email; a governance forum, a team page, or a named council is a complete answer.
+7. What specific AERSeal capability could be relevant — which named privileged role would move to threshold control, and what approval policy that implies.
+
+Also establish, for downstream scoring: the two evidence URLs (structural + dated trigger), their exposure, their current alternative and the switching friction it creates.
+
+THE TWO-EVIDENCE REQUIREMENT — a prospect without both is not a prospect:
+- STRUCTURAL evidence: an authoritative source proving the relevant EVM contracts or administrative authority exist (docs, verified explorer page, risk page, audit, official post).
+- DATED TRIGGER evidence: an authoritative source, with a date, showing why outreach makes sense now.
+If you cannot find one of them, say so in unknowns and leave the URL null. Do not substitute a homepage for either.
 
 DO NOT SCORE. Do not output a lead score, a tier, or a rating of any kind — those are computed downstream from the structured fields you return. Your job is to be accurate about the facts and honest about the gaps. A dossier full of correctly-labelled unknowns is a good dossier; one padded with confident guesses is a useless one.
 
@@ -281,6 +295,13 @@ Return this exact JSON:
     "evidence_url": "authoritative URL supporting that shape (docs, risk page, explorer, official post)",
     "evidence_tier": "one exact key from EVIDENCE TIERS"
   },
+  "control_gap": {
+    "gap": "what is architecturally missing between the privileged role and how it is controlled today — e.g. 'mint role sits on a single deployer EOA with no approval step or delay'. If you only know the role EXISTS and not who controls it, this must be exactly 'Gap not confirmed'. Upgradeability on its own is NEVER a gap",
+    "status": "confirmed|inferred|unknown — 'confirmed' requires cited evidence about the CONTROLLER, not just the role",
+    "basis": "the specific evidence behind that status, or why it could not be established"
+  },
+  "authority_loss_scenario": "Q4 — what concretely happens to THIS organisation if this authority is lost or compromised: whose funds, which supply, which licence, which users. Specific to them, never a generic risk sentence",
+  "why_now": "Q5 — how the dated trigger event connects to this specific privileged role, and why that makes reviewing control timely. Must reference both the event and the role",
   "exposure": {
     "value_at_risk_usd": number or null — TVL, supply, or treasury the privileged role can reach; null if unknown,
     "value_basis": "how you arrived at that figure, or why it is unknown",
@@ -649,6 +670,10 @@ export async function POST(req: NextRequest) {
       }
       if (!dossier.website && candidate.website) dossier.website = candidate.website
 
+      // Correct any over-claimed control gap BEFORE scoring or saving, so the
+      // stored dossier carries the honest status rather than the model's.
+      const gapDowngrades = enforceGapDiscipline(dossier)
+
       // 4 ── Score in code from the structured dossier.
       const score = scoreProspect(dossier)
       // 5 ── Six hard requirements + rejection rules.
@@ -665,6 +690,10 @@ export async function POST(req: NextRequest) {
         trigger_age_days: daysSince(dossier.trigger?.date),
         control_model: dossier.authority_control?.model,
         powers: (dossier.privileged_powers || []).map(p => p.power),
+        control_gap: dossier.control_gap,
+        gap_downgrades: gapDowngrades,
+        why_now: dossier.why_now,
+        authority_loss_scenario: dossier.authority_loss_scenario,
         approved: gate.approved,
         gate_failures: gate.failures,
         rejections: gate.rejections.map(r => REJECTION_REASONS[r]),
@@ -738,7 +767,13 @@ export async function POST(req: NextRequest) {
           product_summary: dossier.structural_fit?.rationale || null,
           supported_chains_or_rails: (dossier.evm_footprint?.chains || []).join(', ') || null,
           current_providers: dossier.incumbent?.current_alternative || null,
-          pain_point: `${powersSummary || 'Privileged role'} controlled via ${dossier.authority_control?.model} — ${dossier.authority_control?.detail || 'controller not fully documented'}`,
+          // Structure + consequence. The control structure alone reads as a
+          // spec line; what makes it a pain point is what it costs them if it
+          // goes wrong, which is exactly authority_loss_scenario (Q4).
+          pain_point: [
+            `${powersSummary || 'Privileged role'} controlled via ${dossier.authority_control?.model} — ${dossier.authority_control?.detail || 'controller not fully documented'}`,
+            dossier.authority_loss_scenario,
+          ].filter(Boolean).join('. '),
           // Severity describes HOW BAD THE CONSEQUENCE IS, so it comes from the
           // pain component — not from the overall tier. Mapping it from tier
           // wrote 'medium' onto a confirmed $76M key-compromise exploit whose
@@ -755,7 +790,13 @@ export async function POST(req: NextRequest) {
           pain_point_evidence: (dossier.facts || []).slice(0, 3).join(' | ') || null,
           pain_point_source_url: dossier.authority_control?.evidence_url || dossier.structural_fit?.evidence_url || null,
           pain_point_evidence_type: 'verified_source',
-          potential_gap: dossier.aerseal_use_case || null,
+          // The gap is what's MISSING (Q's 2-4); the use case is what we'd SELL
+          // (Q7). Writing the use case into potential_gap made every AERSeal
+          // lead look like it had a confirmed architectural finding behind it,
+          // when 'Gap not confirmed' is the honest answer for most of them.
+          potential_gap: dossier.control_gap?.gap
+            ? `${dossier.control_gap.gap} [${dossier.control_gap.status}]`
+            : 'Gap not confirmed',
           aerseal_fit: dossier.aerseal_use_case,
           suggested_use_case: dossier.aerseal_use_case,
           outreach_angle: hypothesis?.authority_implication || null,
@@ -769,7 +810,10 @@ export async function POST(req: NextRequest) {
           unknowns: dossier.unknowns || [],
           lead_score: score.total,
           urgency_score: score.trigger_recency,
-          urgency_reasoning: `Trigger "${dossier.trigger?.type}" dated ${dossier.trigger?.date || 'unknown'} — recency component ${score.trigger_recency}/100.`,
+          urgency_reasoning: [
+            `Trigger "${dossier.trigger?.type}" dated ${dossier.trigger?.date || 'unknown'} — recency component ${score.trigger_recency}/100.`,
+            dossier.why_now,
+          ].filter(Boolean).join(' '),
           confidence_score: score.evidence_confidence,
           revenue_potential: dossier.exposure?.value_at_risk_usd
             ? `Authority reaches ~$${Number(dossier.exposure.value_at_risk_usd).toLocaleString()} (${dossier.exposure.value_basis})`

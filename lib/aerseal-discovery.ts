@@ -127,6 +127,22 @@ export const AERSEAL_TRIGGERS = {
   bridge_upgrade: { label: 'Bridge redeploy, validator-set or config change', weight: 90 },
   security_council_formation: { label: 'Security Council formation or rotation', weight: 85 },
   funding_round: { label: 'Funding round with security/compliance commitments', weight: 60 },
+  // ── Added 2026-08-25 to cover the full observable-event list ──────────────
+  // The dictionary above skewed toward events where authority CHANGES HANDS on
+  // an existing protocol. Half of AERSeal's real openings are the opposite
+  // shape: a moment where privileged authority is being CREATED for the first
+  // time (a launch, a new chain, a first institutional product) and the control
+  // structure is still genuinely open. Those had no trigger key, so they were
+  // being forced into 'mainnet_launch' or dropped.
+  unauthorized_mint: { label: 'Unauthorized mint or supply manipulation', weight: 100 },
+  stablecoin_launch: { label: 'Stablecoin launched, licensed or issued on a new chain', weight: 92 },
+  rwa_issuance: { label: 'RWA or tokenized fund issued on-chain', weight: 90 },
+  contract_deployment: { label: 'New bridge, vault, payment or treasury contract deployed', weight: 88 },
+  chain_expansion: { label: 'Protocol expands to an additional EVM chain', weight: 85 },
+  institutional_product_launch: { label: 'Institutional on-chain product launched', weight: 84 },
+  pre_launch: { label: 'Testnet live or mainnet launch being prepared', weight: 82 },
+  custody_ops_expansion: { label: 'Safe / custody user expanding into smart-contract operations', weight: 78 },
+  pre_launch_funding: { label: 'Institutional funding raised ahead of launch', weight: 72 },
 } as const
 
 export type AersealTrigger = keyof typeof AERSEAL_TRIGGERS
@@ -147,6 +163,15 @@ export interface MonitoringSurface {
 }
 
 export const MONITORING_SURFACES: MonitoringSurface[] = [
+  // NOTE ON PROBE SHAPE (2026-08-25): every probe below must describe an EVENT,
+  // not a product category or a vendor's customer list. A probe like "protocol
+  // treasury multisig admin" is keyword prospecting — it returns auditors,
+  // wallet vendors, explainer posts and companies with no current buying need,
+  // and each one of those costs a full dossier call to reject. A probe like
+  // "protocol announces signer rotation" returns dated documents about
+  // something that just happened to a specific organisation. If you add a
+  // surface, write the sentence a press release or proposal would use, not the
+  // nouns our product page uses.
   {
     key: 'l2beat_risk',
     label: 'L2Beat risk pages — upgradeability and Security Council',
@@ -159,49 +184,77 @@ export const MONITORING_SURFACES: MonitoringSurface[] = [
     label: 'Tally — on-chain governance parameter and role changes',
     kind: 'governance', tier: 'official',
     segments: ['governance_change', 'dao_multisig_timelock'],
-    probe: 'Tally governance proposal upgrade admin role timelock signer change protocol',
+    probe: 'governance proposal passed to transfer contract ownership rotate upgrade admin role or change timelock delay',
   },
   {
     key: 'snapshot_governance',
     label: 'Snapshot — signer, guardian and treasury proposals',
     kind: 'governance', tier: 'official',
     segments: ['governance_change', 'defi_vault_treasury', 'dao_multisig_timelock'],
-    probe: 'Snapshot proposal multisig signer rotation guardian treasury custody protocol',
+    probe: 'DAO proposal to rotate multisig signers change signing threshold or appoint new treasury guardian',
   },
   {
     key: 'audit_centralisation',
     label: 'Audit reports — centralisation and privileged-role findings',
     kind: 'audit', tier: 'audit',
     segments: ['public_admin_key_risk', 'new_evm_protocol'],
-    probe: 'smart contract audit report centralization risk admin key single EOA upgrade privileged role finding',
+    probe: 'audit report published flags centralization risk owner can upgrade without timelock admin key single EOA finding',
   },
   {
-    key: 'stablecoin_authority',
-    label: 'Stablecoin issuers — mint, freeze and blocklist authority',
+    key: 'stablecoin_launch',
+    label: 'Stablecoin launches, licences and new-chain issuance',
     kind: 'official', tier: 'official',
     segments: ['stablecoin_issuer'],
-    probe: 'stablecoin issuer mint authority freeze blocklist contract admin upgrade attestation',
+    probe: 'stablecoin goes live launches natively on new chain issuer receives licence approval begins minting',
   },
   {
-    key: 'rwa_tokenization',
-    label: 'RWA and tokenization platforms — issuance and transfer-agent control',
+    key: 'rwa_issuance',
+    label: 'RWA and tokenized fund issuance events',
     kind: 'official', tier: 'official',
     segments: ['rwa_tokenization'],
-    probe: 'tokenization platform RWA issuance smart contract admin transfer agent upgradeable permissioned token',
+    probe: 'tokenized fund launched treasury product issued onchain asset manager brings fund to blockchain first issuance',
   },
   {
     key: 'mainnet_launch',
     label: 'New EVM mainnets, L2s and contract deployments',
     kind: 'official', tier: 'official',
     segments: ['new_evm_protocol'],
-    probe: 'new EVM mainnet L2 launch contracts deployed proxy admin multisig upgrade key announcement',
+    probe: 'protocol launches mainnet contracts now deployed live announcement L2 goes live to public',
+  },
+  {
+    key: 'pre_launch',
+    label: 'Testnet live and mainnet launch preparation',
+    kind: 'official', tier: 'official',
+    segments: ['new_evm_protocol'],
+    probe: 'protocol testnet now live incentivized testnet begins mainnet launch scheduled audit completed ahead of deployment',
+  },
+  {
+    key: 'chain_expansion',
+    label: 'Protocols expanding to an additional EVM chain',
+    kind: 'official', tier: 'official',
+    segments: ['new_evm_protocol', 'defi_vault_treasury'],
+    probe: 'protocol expands deploys contracts to additional EVM chain now live on Base Arbitrum multichain expansion announcement',
+  },
+  {
+    key: 'new_contract_deploy',
+    label: 'New bridge, vault, payment or treasury contracts going live',
+    kind: 'official', tier: 'official',
+    segments: ['defi_vault_treasury', 'new_evm_protocol'],
+    probe: 'launches new vault bridge payment contract onchain treasury goes live deployed contracts announcement',
   },
   {
     key: 'incident_postmortem',
     label: 'Security postmortems — key and administrative compromise',
     kind: 'incident', tier: 'postmortem',
     segments: ['security_incident', 'public_admin_key_risk'],
-    probe: 'postmortem incident report private key compromise admin key exploit privileged function protocol',
+    probe: 'postmortem deployer private key compromised admin wallet drained attacker gained control of privileged function',
+  },
+  {
+    key: 'unauthorized_mint',
+    label: 'Unauthorized mints and malicious contract upgrades',
+    kind: 'incident', tier: 'postmortem',
+    segments: ['security_incident', 'public_admin_key_risk'],
+    probe: 'attacker minted unlimited tokens unauthorized mint malicious upgrade pushed to proxy contract exploit via owner function',
   },
   {
     key: 'rekt_leaderboard',
@@ -215,42 +268,49 @@ export const MONITORING_SURFACES: MonitoringSurface[] = [
     label: 'Governance forums — signer, council and upgrade debates',
     kind: 'governance', tier: 'official',
     segments: ['governance_change', 'dao_multisig_timelock'],
-    probe: 'governance forum proposal discussion admin key upgrade multisig security council timelock protocol',
+    probe: 'forum discussion proposes moving upgrade key to timelock forming security council reducing admin powers protocol',
   },
   {
-    key: 'safe_customers',
-    label: 'Safe ecosystem — established multisig operators',
+    key: 'custody_ops_expansion',
+    label: 'Safe / custody users expanding into contract operations',
     kind: 'vendor', tier: 'vendor_page',
-    segments: ['safe_user', 'dao_multisig_timelock'],
-    probe: 'Safe wallet case study protocol treasury multisig signers manage contract admin',
+    segments: ['safe_user', 'exchange_custody', 'dao_multisig_timelock'],
+    probe: 'company using Safe multisig or institutional custody now deploying its own smart contracts expanding onchain operations',
   },
   {
-    key: 'fireblocks_customers',
-    label: 'Fireblocks customer stories — institutional custody operators',
-    kind: 'vendor', tier: 'vendor_page',
+    key: 'institutional_onchain',
+    label: 'Institutions launching on-chain products',
+    kind: 'official', tier: 'official',
     segments: ['exchange_custody', 'rwa_tokenization', 'stablecoin_issuer'],
-    probe: 'https://www.fireblocks.com/customer-stories/',
+    probe: 'bank asset manager fintech launches onchain product tokenized deposit settlement network goes live institutional blockchain',
   },
   {
     key: 'github_releases',
     label: 'GitHub releases — contract, access-control and deploy changes',
     kind: 'code', tier: 'official',
     segments: ['new_evm_protocol', 'governance_change'],
-    probe: 'github release smart contract deployment access control owner upgrade proxy admin migration',
+    probe: 'release notes contracts redeployed ownership transferred access control roles changed proxy admin migration',
   },
   {
     key: 'regulator_announcements',
     label: 'Regulator and supervisory announcements',
     kind: 'regulator', tier: 'regulator',
     segments: ['stablecoin_issuer', 'rwa_tokenization', 'exchange_custody'],
-    probe: 'regulator approval licence stablecoin tokenization custody issuer requirement supervisory announcement',
+    probe: 'regulator grants licence approves stablecoin issuer tokenization platform authorised supervisory requirement announced',
   },
   {
     key: 'founder_governance_change',
     label: 'Founder departures and key-holder transitions',
     kind: 'official', tier: 'reputable_press',
     segments: ['governance_change'],
-    probe: 'protocol founder steps down departure handover multisig signer key holder governance transition',
+    probe: 'founder steps down core contributor leaves protocol hands over control governance transition key holder replaced',
+  },
+  {
+    key: 'pre_launch_funding',
+    label: 'Institutional funding raised ahead of launch',
+    kind: 'official', tier: 'reputable_press',
+    segments: ['new_evm_protocol', 'rwa_tokenization'],
+    probe: 'raises funding round to build onchain protocol mainnet planned later this year institutional investors back pre-launch',
   },
 ]
 
@@ -321,6 +381,24 @@ export interface AersealDossier {
     evidence_url: string | null
     evidence_tier: EvidenceTier
   }
+  // 6. The potential CONTROL GAP — what is architecturally missing between the
+  //    privileged power and the way it is controlled today. Deliberately its
+  //    own field with its own status: "their proxy is upgradeable" is NOT a
+  //    gap, and keeping the gap separate from evm_footprint.upgradeable is
+  //    what stops the pipeline sliding back into treating upgradeability as a
+  //    finding. 'Gap not confirmed' is the correct answer more often than not.
+  control_gap: {
+    gap: string
+    status: 'confirmed' | 'inferred' | 'unknown'
+    basis: string
+  }
+  // 7. What actually goes wrong if this authority is lost or compromised —
+  //    stated as a consequence for THIS organisation, not a generic risk.
+  authority_loss_scenario: string
+  // 8. Why the trigger event makes this the right moment to review control.
+  //    Must connect the dated event to the privileged role — "they launched
+  //    and launches are risky" is not an answer.
+  why_now: string
   // Exposure — what actually goes wrong if the authority is misused.
   exposure: {
     value_at_risk_usd: number | null
@@ -329,7 +407,7 @@ export interface AersealDossier {
     reputational: string | null
     regulatory: string | null
   }
-  // 6. The likely buyer / governance owner.
+  // 9. The likely buyer / governance owner.
   buyer: {
     role: string
     name: string | null
@@ -338,9 +416,9 @@ export interface AersealDossier {
     identifiable: boolean
     public_channel: string | null
   }
-  // 7. The specific AERSeal use case.
+  // 10. The specific AERSeal use case.
   aerseal_use_case: string
-  // 8. The current alternative and likely switching friction.
+  // 11. The current alternative and likely switching friction.
   incumbent: {
     current_alternative: string
     switching_friction: 'none' | 'low' | 'medium' | 'high'
@@ -614,6 +692,50 @@ export function scoreProspect(d: AersealDossier, now = new Date()): ScoreBreakdo
   }
 }
 
+// ── Gap discipline ──────────────────────────────────────────────────────────
+// The one claim AERSeal must never make loosely: that an organisation HAS a
+// control gap. FAIR_CHARACTERISATION_RULES tells the model not to derive one
+// from upgradeability alone, but a prompt rule is not an enforcement mechanism.
+// This is.
+//
+// Deliberately a DOWNGRADE, not a rejection. A prospect can have a confirmed
+// privileged role, a dated official trigger and both evidence URLs, and still
+// have one sloppily-worded gap sentence — failing the whole account for that
+// would repeat the mistake the severity and urgency gates both had to unwind
+// (2026-08-19), where an evidence rule aimed at a bad claim ended up rejecting
+// good leads. So the claim gets corrected to 'inferred' and the correction is
+// reported; the account is judged on everything else.
+//
+// Mutates the dossier so the persisted record carries the corrected status —
+// the downgraded value is what we want stored, not the model's original.
+export function enforceGapDiscipline(d: AersealDossier): string[] {
+  const downgrades: string[] = []
+  const gap = d?.control_gap
+  if (!gap || gap.status !== 'confirmed') return downgrades
+
+  // A gap cannot be confirmed when the controller was never confirmed: knowing
+  // a ProxyAdmin exists says nothing about who holds it.
+  if (d.authority_control?.status !== 'confirmed') {
+    gap.status = 'inferred'
+    downgrades.push('Gap was claimed as confirmed while the controller itself is unconfirmed — recorded as inference.')
+    return downgrades
+  }
+
+  // Upgradeability, proxies and the mere existence of a privileged role are
+  // design facts, not findings. A confirmed gap has to say something about the
+  // CONTROLLER — a single key, a threshold, a missing delay or approval step.
+  const basis = `${gap.gap || ''} ${gap.basis || ''}`.toLowerCase()
+  const mentionsDesign = /upgrade(?:able|ability)|proxy|uups|implementation slot/.test(basis)
+  const mentionsController =
+    /eoa|single (?:key|signer|address|account)|threshold|signer|multisig|timelock|delay|custodian|approval|unilateral|\b\d+ ?(?:of|-of-) ?\d+\b|council|governance/.test(basis)
+  if (mentionsDesign && !mentionsController) {
+    gap.status = 'inferred'
+    downgrades.push('Gap rested on upgradeability alone — that is a design choice, not a finding. Recorded as inference.')
+  }
+
+  return downgrades
+}
+
 // ── Approval gate ───────────────────────────────────────────────────────────
 // Six hard requirements. These are not score thresholds — a 95-point prospect
 // missing an identifiable buyer is still not approved.
@@ -658,15 +780,23 @@ export function evaluateGate(d: AersealDossier, score: ScoreBreakdown, now = new
   if (!hasRealTrigger) {
     failures.push(
       age !== null && age > TRIGGER_STALE_DAYS
-        ? `Trigger is ${age} days old — not a current trigger`
-        : 'No dated trigger with an evidence URL',
+        ? `Evidence 2 of 2 stale — trigger is ${age} days old, not a current buying trigger`
+        : 'Evidence 2 of 2 missing — no dated trigger event with an evidence URL',
     )
   }
 
+  // ── The two-evidence requirement ────────────────────────────────────────
+  // Both pieces are mandatory and they prove different things. STRUCTURAL
+  // evidence proves the relevant EVM contracts / administrative authority
+  // actually exist. DATED TRIGGER evidence (checked above) proves why outreach
+  // makes sense now. A prospect with only structural evidence is a company we
+  // could theoretically sell to some day; one with only a trigger is a news
+  // story. Neither is a lead.
   const structuralTier = EVIDENCE_TIERS[d.structural_fit?.evidence_tier] ?? EVIDENCE_TIERS.none
   if (!d.structural_fit?.evidence_url || !structuralTier.corroborating) {
-    failures.push('No structural-fit source from an authoritative surface')
+    failures.push('Evidence 1 of 2 missing — no structural proof, from an authoritative source, that the EVM contracts or administrative authority exist')
   }
+
   // "Identifiable" means a route in exists that enrichment can act on — a
   // public decision surface, a named governance body, or a public team at a
   // real domain. It does NOT mean we already have the person; finding them is
@@ -728,8 +858,41 @@ export const FEAR_PHRASES = [
   'act now before',
 ]
 
+// ── Trigger-first discovery discipline ──────────────────────────────────────
+// The single rule that separates this pipeline from keyword prospecting. Kept
+// as a shared constant so the harvest, extraction and profiling stages all
+// state it identically — the failure mode it prevents (a model quietly
+// "helping" by returning a well-known security-adjacent company with no event
+// behind it) shows up at whichever stage forgets to say it.
+export const TRIGGER_FIRST_RULES = `TRIGGER-FIRST REVERSE DISCOVERY — this is the method, not a preference:
+
+Work BACKWARDS from an observable event to the organisation it affected. Never forwards from a product keyword to a company.
+
+NEVER qualify an organisation because it mentions, sells, or is associated with: "smart-contract security", "MPC", "multisig", "threshold signing", "key management", "wallet infrastructure", "audits", or any other term from our own product vocabulary. Those searches return competitors, security vendors, content publishers, conference sponsors and companies with no current buying need. A keyword match is not a signal.
+
+The ONLY valid entry point is an observable, dated event. The event classes that matter:
+- A stablecoin launched, licensed, or expanded to another EVM chain
+- An RWA or tokenized fund issued on-chain
+- A protocol preparing for testnet or mainnet
+- A company raising institutional funding before launch
+- A new bridge, vault, payment contract or treasury deployed
+- An audit identifying centralized admin, upgrade or ownership risk
+- A contract that can be upgraded without a timelock
+- A DAO rotating signers or changing its Security Council
+- A founder, contributor or governance team transition
+- A compromised deployer, admin, treasury or private key
+- An unauthorized mint or malicious contract upgrade
+- A protocol adding another EVM chain
+- A company launching an institutional on-chain product
+- A Safe, Fireblocks or custody user expanding into smart-contract operations
+
+From the event, and only from the event, work through: affected organisation -> the privileged EVM authority it operates -> the potential control gap -> why this event makes control a live question now -> who owns that decision internally -> evidence-backed outreach.
+
+NO OBSERVABLE TRIGGER, NO OUTREACH. An organisation that is a perfect structural fit with nothing happening is not a prospect today. Say so and move on.`
+
 export const FAIR_CHARACTERISATION_RULES = `FAIR CHARACTERISATION — non-negotiable:
 - An upgradeable contract is NOT automatically insecure. Upgradeability is a deliberate design choice with real benefits. The question AERSeal asks is who controls the upgrade, not whether upgrades exist.
+- NEVER infer that an organisation has a control gap merely because its contracts are upgradeable, or because it holds a privileged role at all. A gap requires evidence about the CONTROLLER — who holds the role, under what threshold, with what delay. If you only know the role exists, control_gap.gap is exactly "Gap not confirmed" and control_gap.status is "unknown". That is a correct, useful answer.
 - Safe{Wallet} is NOT inadequate. Do not claim or imply it is. A Safe is a well-engineered multisig; AERSeal's relevance next to one is about threshold policy, key material custody, and provable control, and it must be argued on evidence about THIS organisation's setup.
 - Fireblocks and other institutional custodians are NOT inadequate. Do not claim or imply it. If an organisation uses one, treat that as high incumbent lock-in and a harder sale, not as a security deficiency.
 - Never state that an organisation IS compromised, insecure, or negligent. State what is publicly documented about their control structure and what that structure implies, and mark everything else as inference or unknown.

@@ -47,6 +47,10 @@ interface Prospect {
   trigger_age_days?: number | null
   control_model?: string
   powers?: string[]
+  control_gap?: { gap?: string; status?: string; basis?: string }
+  gap_downgrades?: string[]
+  why_now?: string
+  authority_loss_scenario?: string
   approved: boolean
   gate_failures: string[]
   rejections: string[]
@@ -371,6 +375,48 @@ export default function AersealPage() {
                                 <span key={i} className="badge" style={{ color: '#38bdf8', background: 'rgba(56,189,248,0.08)', borderColor: 'rgba(56,189,248,0.2)' }}>{pw}</span>
                               ))}
                             </div>
+                          </div>
+                        )}
+
+                        {/* The reverse-discovery chain: event -> authority -> gap
+                            -> why now. Shown in that order because that is the
+                            order the qualification actually happened in. */}
+                        {(p.control_gap?.gap || p.why_now || p.authority_loss_scenario) && (
+                          <div className="rounded-lg p-3 space-y-2" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                            {p.control_gap?.gap && (
+                              <div>
+                                <p className="text-xs font-semibold mb-1" style={{ color: 'rgb(150,155,180)' }}>
+                                  Potential control gap
+                                  <span className="badge ml-2" style={{
+                                    color: p.control_gap.status === 'confirmed' ? '#34d399' : p.control_gap.status === 'inferred' ? '#fbbf24' : 'rgb(120,127,160)',
+                                    background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)',
+                                  }}>{p.control_gap.status}</span>
+                                </p>
+                                <p className="text-xs" style={{ color: 'rgb(180,185,205)' }}>{p.control_gap.gap}</p>
+                                {p.control_gap.basis && (
+                                  <p className="text-xs mt-1" style={{ color: 'rgb(120,127,160)' }}>Basis — {p.control_gap.basis}</p>
+                                )}
+                              </div>
+                            )}
+                            {p.gap_downgrades && p.gap_downgrades.length > 0 && (
+                              <ul className="space-y-0.5">
+                                {p.gap_downgrades.map((g, i) => (
+                                  <li key={i} className="text-xs" style={{ color: '#fbbf24' }}>· {g}</li>
+                                ))}
+                              </ul>
+                            )}
+                            {p.authority_loss_scenario && (
+                              <div>
+                                <p className="text-xs font-semibold mb-1" style={{ color: 'rgb(150,155,180)' }}>If this authority were lost</p>
+                                <p className="text-xs" style={{ color: 'rgb(180,185,205)' }}>{p.authority_loss_scenario}</p>
+                              </div>
+                            )}
+                            {p.why_now && (
+                              <div>
+                                <p className="text-xs font-semibold mb-1" style={{ color: 'rgb(150,155,180)' }}>Why now</p>
+                                <p className="text-xs" style={{ color: 'rgb(180,185,205)' }}>{p.why_now}</p>
+                              </div>
+                            )}
                           </div>
                         )}
 
