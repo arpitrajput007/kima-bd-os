@@ -33,6 +33,7 @@ import {
   Lightbulb,
   Boxes,
   KeyRound,
+  FileLock2,
   Users,
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
@@ -92,6 +93,7 @@ const navGroups: {
       { href: '/web3-agent-companies', label: 'Web3 AI Agent Companies', icon: Shield,  glow: true },
       { href: '/web2-agent-companies', label: 'Web2 AI Agent Companies', icon: Globe,   orange: true },
       { href: '/aerkey-customers',     label: 'AERKey Customers',        icon: KeyRound, blue: true },
+      { href: '/aerseal-customers',    label: 'AERseal Customers',       icon: FileLock2, glow: true },
     ],
   },
   {
