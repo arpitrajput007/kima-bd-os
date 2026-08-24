@@ -457,17 +457,23 @@ async function enrichBuyers(
     }
   }
 
-  // Fall back to what the dossier itself established — a named governance
-  // owner is a legitimate route in, even without an email.
-  if (out.length === 0 && (dossier.buyer?.name || dossier.buyer?.governance_owner)) {
+  // Fall back to what the dossier itself established. This has to accept every
+  // route the approval gate accepts — a named person, a governance body, a
+  // public decision surface, or a public team. An earlier version required
+  // name || governance_owner, so a lead approved on `public_channel` alone
+  // saved with zero contacts and no indication why: qualified on a route the
+  // enrichment step then refused to use.
+  const b = dossier.buyer
+  const hasRoute = !!(b?.name || b?.governance_owner || b?.public_channel || b?.identifiable)
+  if (out.length === 0 && hasRoute) {
     out.push({
-      name: dossier.buyer.name || dossier.buyer.governance_owner || 'Governance owner',
-      title: dossier.buyer.role || 'Governance owner',
+      name: b.name || b.governance_owner || b.role || 'Authority owner (unnamed)',
+      title: b.role || 'Governance owner',
       email: null,
-      linkedin_url: dossier.buyer.public_channel || null,
+      linkedin_url: b.public_channel || null,
       source: 'dossier',
       confidence: 'low',
-      why: dossier.buyer.why_this_person || 'Identified from public governance surface',
+      why: b.why_this_person || 'Identified from a public decision surface — needs a named person before outreach',
     })
   }
 
@@ -733,7 +739,19 @@ export async function POST(req: NextRequest) {
           supported_chains_or_rails: (dossier.evm_footprint?.chains || []).join(', ') || null,
           current_providers: dossier.incumbent?.current_alternative || null,
           pain_point: `${powersSummary || 'Privileged role'} controlled via ${dossier.authority_control?.model} — ${dossier.authority_control?.detail || 'controller not fully documented'}`,
-          pain_point_severity: score.tier === 1 ? 'critical' : score.tier === 2 ? 'high' : 'medium',
+          // Severity describes HOW BAD THE CONSEQUENCE IS, so it comes from the
+          // pain component — not from the overall tier. Mapping it from tier
+          // wrote 'medium' onto a confirmed $76M key-compromise exploit whose
+          // pain_consequence was 89, because that lead's tier was held down by
+          // trigger recency and evidence gaps, which say nothing about how bad
+          // the exposure is. Safe to assert critical/high here without a
+          // further evidence check: an approved lead has already cleared the
+          // gate's dated-trigger + authoritative-source requirements.
+          pain_point_severity:
+            score.pain_consequence >= 80 ? 'critical'
+            : score.pain_consequence >= 60 ? 'high'
+            : score.pain_consequence >= 40 ? 'medium'
+            : 'low',
           pain_point_evidence: (dossier.facts || []).slice(0, 3).join(' | ') || null,
           pain_point_source_url: dossier.authority_control?.evidence_url || dossier.structural_fit?.evidence_url || null,
           pain_point_evidence_type: 'verified_source',
