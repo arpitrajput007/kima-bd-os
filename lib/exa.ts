@@ -204,3 +204,42 @@ export async function exaGetContents(urls: string[]): Promise<ExaResult[]> {
     return []
   }
 }
+
+// Search for DOCUMENTS DESCRIBING EVENTS rather than company homepages.
+//
+// exaSearchCompanies() uses category:'company', which is right when you want a
+// list of businesses and wrong when you want the governance proposal, audit
+// report, release note, or postmortem that describes something happening. The
+// AERSeal pipeline works backwards from events to organisations, so it needs
+// the documents — with publishedDate, which is what dates the trigger.
+export async function exaSearchEvents(
+  query: string,
+  numResults = 12,
+  daysBack?: number,
+): Promise<Array<{ title: string; url: string; text: string; publishedDate?: string }>> {
+  if (!exaConfigured()) return []
+  try {
+    const exa = client()
+    const opts: Record<string, unknown> = {
+      type: 'auto',
+      numResults,
+      contents: { text: { maxCharacters: 2000 } },
+    }
+    if (daysBack) {
+      opts.startPublishedDate = new Date(Date.now() - daysBack * 86400000).toISOString().split('T')[0]
+    }
+    const res = await exa.search(query, opts as Parameters<typeof exa.search>[1])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return ((res.results || []) as any[])
+      .filter(r => r.url)
+      .map(r => ({
+        title: (r.title as string) || r.url,
+        url: r.url as string,
+        text: (r.text as string) || (Array.isArray(r.highlights) ? (r.highlights as string[]).join(' ') : ''),
+        publishedDate: r.publishedDate as string | undefined,
+      }))
+  } catch (e) {
+    console.error('[exaSearchEvents]', e)
+    return []
+  }
+}
