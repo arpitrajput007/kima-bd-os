@@ -35,6 +35,7 @@ import {
   KeyRound,
   FileLock2,
   Users,
+  Swords,
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
@@ -62,6 +63,7 @@ const navGroups: {
     label: 'Company',
     items: [
       { href: '/products', label: 'Products', icon: Boxes, glow: true },
+      { href: '/competitors', label: 'Competitors & Customers', icon: Swords, glow: true },
     ],
   },
   {
