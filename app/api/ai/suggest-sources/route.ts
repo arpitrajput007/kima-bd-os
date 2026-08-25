@@ -2,6 +2,7 @@ import { claudeJSON, claudeText, CLAUDE_RESEARCH } from "@/lib/claude"
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { PRODUCT_BRAIN } from '@/lib/kima-knowledge'
+import { getProductSection } from '@/lib/product-sections'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -83,10 +84,26 @@ async function validateSuggestion(s: SourceLike): Promise<Verdict> {
   }
 }
 
-export async function POST() {
+const PRODUCT_LABELS: Record<string, string> = {
+  aerpolice: 'AERpolice (AI-agent governance)',
+  aer360: 'AER360 (hardware-enforced wallet/fund custody and key-signing)',
+  aerseal: "AERseal (hardware-enforced custody of a deployed smart contract's privileged admin authority)",
+  aerkey: 'AERKey (TEE-attested threshold ECDSA signing — cryptographic key governance)',
+  agent: 'Kima / Aeredium-L1 (trustless settlement and interoperability infrastructure)',
+}
+
+export async function POST(req: Request) {
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 400 })
   }
+
+  let productSlug = ''
+  let approachText = ''
+  try {
+    const body = await req.json()
+    productSlug = typeof body?.productSlug === 'string' ? body.productSlug : ''
+    approachText = typeof body?.approachText === 'string' ? body.approachText : ''
+  } catch { /* no body — global suggestion mode */ }
 
   try {
     // 1. What sources already exist (so we don't suggest duplicates).
@@ -132,7 +149,24 @@ export async function POST() {
     // 4. Light live grounding (best-effort).
     const web = await searchWeb('best directories and communities to find new crypto payment, stablecoin, DeFi and AI agent projects 2026')
 
-    const systemPrompt = `You are a senior BD lead-generation strategist for Aerpolice (AI-agent governance), AER360 (hardware-enforced wallet/fund custody and key-signing), and AERseal (hardware-enforced custody of a deployed smart contract's privileged admin authority) — the ONLY three products this agent sources leads for, each co-equal. Do not suggest sources aimed at Kima, cross-chain settlement, bridges (as a settlement/interop play), RWA tokenization, stablecoin on/off-ramps, or general crypto/DeFi/fintech directories that aren't specifically about AI agents, custody/key-signing, or deployed-contract admin authority — those are out of scope even if they'd otherwise look like reasonable BD sources.
+    const scopedLabel = PRODUCT_LABELS[productSlug]
+    const scopedSection = scopedLabel ? getProductSection(productSlug) : undefined
+
+    const systemPrompt = scopedLabel
+      ? `You are a senior BD lead-generation strategist working ONLY on ${scopedLabel}. Suggest sources for finding ${scopedLabel} customers exclusively — do not suggest sources for any other Kima/Aeredium product, even if they'd otherwise look reasonable.
+
+${scopedSection?.knowledge || ''}
+
+${approachText ? `THE USER'S OWN HUNTING APPROACH FOR THIS PRODUCT (follow this as the primary strategy — it overrides generic assumptions below):\n${approachText}\n` : ''}
+
+Your job: suggest NEW discovery sources the user should add to their lead-finding agent for ${scopedLabel} ONLY.
+A "source" is a place the agent can crawl/search to find target companies: an ecosystem/MCP directory,
+a Telegram/Discord community, a Twitter/X profile that posts deals, a Google search query, a news/funding
+feed, a Crunchbase list, a hackathon directory, an agent marketplace, a hack/incident tracker, etc.
+Sources must be realistically crawlable from a public URL or a search query.
+
+Return ONLY valid JSON. No markdown.`
+      : `You are a senior BD lead-generation strategist for Aerpolice (AI-agent governance), AER360 (hardware-enforced wallet/fund custody and key-signing), and AERseal (hardware-enforced custody of a deployed smart contract's privileged admin authority) — the ONLY three products this agent sources leads for, each co-equal. Do not suggest sources aimed at Kima, cross-chain settlement, bridges (as a settlement/interop play), RWA tokenization, stablecoin on/off-ramps, or general crypto/DeFi/fintech directories that aren't specifically about AI agents, custody/key-signing, or deployed-contract admin authority — those are out of scope even if they'd otherwise look like reasonable BD sources.
 
 ${PRODUCT_BRAIN}
 

@@ -322,6 +322,7 @@ export interface Source {
   source_url_or_query?: string
   target_industry_category?: string
   target_customer_category?: string
+  product_slug?: string
   frequency?: 'daily' | 'weekly' | 'manual'
   quality_rating?: 'excellent' | 'good' | 'average' | 'poor' | 'unrated'
   status: 'active' | 'paused'

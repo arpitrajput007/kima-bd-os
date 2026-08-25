@@ -36,6 +36,7 @@ import {
   FileLock2,
   Users,
   Swords,
+  Compass,
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
@@ -90,13 +91,45 @@ const navGroups: {
     ],
   },
   {
-    label: 'AI Agents',
+    label: 'AERpolice',
     items: [
-      { href: '/web3-agent-companies', label: 'Web3 AI Agent Companies', icon: Shield,  glow: true },
-      { href: '/web2-agent-companies', label: 'Web2 AI Agent Companies', icon: Globe,   orange: true },
-      { href: '/aerkey-customers',     label: 'AERKey Customers',        icon: KeyRound, blue: true },
-      { href: '/aerseal',              label: 'AERSeal Discovery',       icon: ShieldCheck, cyan: true },
-      { href: '/aerseal-customers',    label: 'AERseal Customers',       icon: FileLock2, glow: true },
+      { href: '/product-customers/aerpolice', label: 'AERpolice Customers', icon: Users },
+      { href: '/product-resources/aerpolice', label: 'AERpolice Resources', icon: Database, cyan: true },
+      { href: '/product-approach/aerpolice',  label: 'AERpolice Approach',  icon: Compass },
+    ],
+  },
+  {
+    label: 'AER360',
+    items: [
+      { href: '/product-customers/aer360', label: 'AER360 Customers', icon: Users },
+      { href: '/product-resources/aer360', label: 'AER360 Resources', icon: Database, glow: true },
+      { href: '/product-approach/aer360',  label: 'AER360 Approach',  icon: Compass },
+    ],
+  },
+  {
+    label: 'AERSeal',
+    items: [
+      { href: '/aerseal-customers',        label: 'AERSeal Customers', icon: FileLock2, glow: true },
+      { href: '/aerseal',                  label: 'AERSeal Discovery', icon: ShieldCheck, cyan: true },
+      { href: '/product-resources/aerseal', label: 'AERSeal Resources', icon: Database },
+      { href: '/product-approach/aerseal',  label: 'AERSeal Approach',  icon: Compass },
+    ],
+  },
+  {
+    label: 'AERKey',
+    items: [
+      { href: '/aerkey-customers',         label: 'AERKey Customers', icon: KeyRound, blue: true },
+      { href: '/product-resources/aerkey', label: 'AERKey Resources', icon: Database },
+      { href: '/product-approach/aerkey',  label: 'AERKey Approach',  icon: Compass },
+    ],
+  },
+  {
+    label: 'Agent (Kima / Aeredium)',
+    items: [
+      { href: '/web3-agent-companies',    label: 'Web3 AI Agent Companies', icon: Shield },
+      { href: '/web2-agent-companies',    label: 'Web2 AI Agent Companies', icon: Globe, orange: true },
+      { href: '/product-resources/agent', label: 'Agent Resources',         icon: Database },
+      { href: '/product-approach/agent',  label: 'Agent Approach',          icon: Compass },
     ],
   },
   {
