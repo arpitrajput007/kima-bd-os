@@ -37,6 +37,7 @@ import {
   Users,
   Swords,
   Compass,
+  UserCog,
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
@@ -94,6 +95,7 @@ const navGroups: {
     label: 'AERpolice',
     items: [
       { href: '/product-customers/aerpolice', label: 'AERpolice Customers', icon: Users },
+      { href: '/pluto-customers/aerpolice',   label: "Pluto's Customers",   icon: UserCog, orange: true },
       { href: '/product-resources/aerpolice', label: 'AERpolice Resources', icon: Database, cyan: true },
       { href: '/product-approach/aerpolice',  label: 'AERpolice Approach',  icon: Compass },
     ],
