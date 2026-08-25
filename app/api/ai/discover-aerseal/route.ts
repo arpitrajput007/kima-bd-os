@@ -29,7 +29,7 @@ import { routeJSON, type AIProvider } from '@/lib/ai-router'
 import { CLAUDE_FAST } from '@/lib/claude'
 import { readUrl } from '@/lib/webRead'
 import { exaConfigured, exaSearchEvents, exaCompanyNews } from '@/lib/exa'
-import { firecrawlConfigured, firecrawlDeepScrape } from '@/lib/firecrawl'
+import { firecrawlConfigured, firecrawlDeepScrape, firecrawlFindAuthorityEvidence } from '@/lib/firecrawl'
 import { apolloConfigured, apolloSearchPeople, toDomain } from '@/lib/apollo'
 import { isGenericName } from '@/lib/leadQuality'
 import { isRealEmail } from '@/lib/outreach'
@@ -194,10 +194,18 @@ async function profileAuthority(
   provider: AIProvider,
 ): Promise<AersealDossier | null> {
   try {
-    // Real evidence beats a snippet: crawl their own site, pull recent news.
-    const [siteText, newsText] = await Promise.all([
+    // Real evidence beats a snippet: crawl their own site, pull recent news,
+    // and — the piece that was missing — find the specific docs/security/
+    // governance subpage where authority facts actually live. The homepage
+    // crawl (readUrl) almost never states who controls a ProxyAdmin or mint
+    // role; that lives on a subpage this pipeline never looked at before,
+    // which is exactly the "structural evidence" the approval gate requires
+    // (see evaluateGate in lib/aerseal-discovery.ts). Runs in parallel with
+    // the other two — independent lookups, no reason to serialize.
+    const [siteText, newsText, authorityPage] = await Promise.all([
       candidate.website ? readUrl(candidate.website, 6000) : Promise.resolve(''),
       exaConfigured() ? exaCompanyNews(candidate.organization, 120) : Promise.resolve(''),
+      candidate.website && firecrawlConfigured() ? firecrawlFindAuthorityEvidence(candidate.website) : Promise.resolve(null),
     ])
 
     const system = `You are a smart-contract authority analyst qualifying prospects for AERSeal.
@@ -256,6 +264,7 @@ Event date as stated: ${candidate.event_date || 'not stated'}
 Event evidence URL: ${candidate.evidence_url || 'none'}
 ${candidate.is_social_only ? 'NOTE: the event was found on social media only. That is a discovery signal, NOT corroboration. Find an official/authoritative source for it, or mark the trigger evidence_tier as "social" and record the gap in unknowns.' : ''}
 ${siteText ? `\nTHEIR OWN SITE (crawled live — treat as authoritative for what they operate):\n${siteText}` : ''}
+${authorityPage ? `\nTHEIR DOCS/SECURITY/GOVERNANCE PAGE (crawled live from ${authorityPage.url} — this is where control-model and role facts are most likely to actually be documented; prefer it over the homepage for authority_control and privileged_powers, and use its URL as structural_fit.evidence_url when it supports the claim):\n${authorityPage.text}` : ''}
 ${newsText ? `\nRECENT NEWS (Exa — corroboration candidates, check the tier of each):\n${newsText.slice(0, 2500)}` : ''}
 
 Return this exact JSON:
