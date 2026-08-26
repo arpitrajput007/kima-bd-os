@@ -16,6 +16,23 @@ import { firecrawlConfigured, firecrawlDeepScrape } from '@/lib/firecrawl'
 // them through — a name with no email/profile, a guessed email pattern (see
 // isRealEmail), or a generic LinkedIn/X *search* URL (not a profile — this is
 // what Tier 3 below produces when it only has a name hint, not a channel.
+// Folds each product's user-edited product_hunting_approach.approach_text
+// (from the Approach page) into the discovery prompts, so what the user pastes
+// there actually steers scoring instead of only reaching the manual
+// "Suggest sources" brainstorm (see app/api/ai/suggest-sources/route.ts).
+const APPROACH_PRODUCT_LABELS: Record<string, string> = {
+  aer360: 'AER360',
+  aerpolice: 'Aerpolice',
+  aerseal: 'AERseal',
+}
+function buildApproachBlock(rows: { product_slug: string; approach_text: string | null }[]): string {
+  const parts = rows
+    .filter(r => r.approach_text?.trim())
+    .map(r => `${APPROACH_PRODUCT_LABELS[r.product_slug] || r.product_slug}:\n${r.approach_text!.trim()}`)
+  if (!parts.length) return ''
+  return `THE USER'S OWN HUNTING APPROACH PER PRODUCT (follow these as the primary strategy for each product — they override generic assumptions above where the two disagree):\n\n${parts.join('\n\n')}`
+}
+
 function isReachableContact(c: { name?: string | null; email?: string | null; linkedin_url?: string | null; twitter_url?: string | null }): boolean {
   if (!c.name) return false
   if (isRealEmail(c.email)) return true
@@ -263,7 +280,8 @@ interface ExtractedCompany {
 async function extractCompanies(
   content: string,
   sourceContext: string,
-  provider: AIProvider = 'claude'
+  provider: AIProvider = 'claude',
+  approachBlock?: string
 ): Promise<ExtractedCompany[]> {
   try {
     const result = await routeJSON<{ companies: ExtractedCompany[] }>({
@@ -271,6 +289,7 @@ async function extractCompanies(
       model: provider === 'claude' ? CLAUDE_FAST : 'gpt-4o',
       maxTokens: 2500,
       temperature: 0.2,
+      systemDynamicSuffix: approachBlock || undefined,
       system: `You are a BD researcher for three co-equal products: AER360 (hardware-enforced wallet/fund custody and key-signing), Aerpolice (AI-agent governance), and AERseal (hardware-enforced custody of a deployed smart contract's privileged admin authority).
 
 ${PRODUCT_BRAIN_COMPACT}
@@ -520,6 +539,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 0. Load each product's user-edited hunting approach (Approach page) once
+    // per run — folded into extraction + research below.
+    const { data: approachRows } = await supabase
+      .from('product_hunting_approach')
+      .select('product_slug, approach_text')
+      .in('product_slug', ['aer360', 'aerpolice', 'aerseal'])
+    const approachBlock = buildApproachBlock(approachRows || [])
+
     // 1. Load the source
     const { data: source, error: srcError } = await supabase
       .from('sources')
@@ -696,11 +723,13 @@ export async function POST(req: NextRequest) {
       }
 
       // Extract company list from the page
-      companies = await extractCompanies(content, `${source.source_name} (${source.source_type})`, researchProvider)
+      companies = await extractCompanies(content, `${source.source_name} (${source.source_type})`, researchProvider, approachBlock)
     }
 
     // 5b. Load full memory: up to 56 knowledge entries (8 per type) + active rules + feedback patterns
-    const learnedIntelligence = await discoveryMemory()
+    // Combined with approachBlock (loaded in step 0) so the user's own hunting
+    // approach reaches the same dynamic-suffix slot deepResearch() already uses.
+    const learnedIntelligence = [approachBlock, await discoveryMemory()].filter(Boolean).join('\n\n')
 
     // Drop generic categories that slipped through as "companies".
     const namedCompanies = companies.filter(c => !isGenericName(c.name))

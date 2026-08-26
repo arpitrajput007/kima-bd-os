@@ -134,6 +134,7 @@ async function extractCandidates(
   content: string,
   surfaceLabel: string,
   provider: AIProvider,
+  approachText?: string,
 ): Promise<AuthorityCandidate[]> {
   try {
     const result = await routeJSON<{ candidates: AuthorityCandidate[] }>({
@@ -141,6 +142,9 @@ async function extractCandidates(
       model: provider === 'claude' ? CLAUDE_FAST : 'gpt-4o',
       maxTokens: 3000,
       temperature: 0.2,
+      systemDynamicSuffix: approachText
+        ? `THE USER'S OWN AERSEAL HUNTING APPROACH (follow this as the primary strategy for what counts as a good candidate — it overrides generic assumptions above where the two disagree):\n${approachText}`
+        : undefined,
       system: `You scan event surfaces for organisations whose EVM SMART-CONTRACT ADMINISTRATIVE AUTHORITY has just become important.
 
 ${TRIGGER_FIRST_RULES}
@@ -192,6 +196,7 @@ Return JSON — up to 8 organisations, fewer is better than padded:
 async function profileAuthority(
   candidate: AuthorityCandidate,
   provider: AIProvider,
+  approachText?: string,
 ): Promise<AersealDossier | null> {
   try {
     // Real evidence beats a snippet: crawl their own site, pull recent news,
@@ -347,6 +352,9 @@ Return this exact JSON:
       maxTokens: 5000,
       temperature: 0.2,
       system,
+      systemDynamicSuffix: approachText
+        ? `THE USER'S OWN AERSEAL HUNTING APPROACH (follow this as the primary lens for segment/fit judgment — it overrides generic assumptions above where the two disagree):\n${approachText}`
+        : undefined,
       user,
     })
     return dossier
@@ -574,9 +582,30 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Resolve which event surface to watch.
+    // Resolve which event surface to watch. `db:<id>` keys resolve against the
+    // shared Source Manager (`sources` table, product_slug='aerseal') so a
+    // source accepted there — via the manual "Suggest sources" AI-assist or
+    // added by hand — is actually reachable by this pipeline, not just mirrored
+    // for display (see supabase/add-aerseal-discovery.sql).
     let surface: MonitoringSurface | undefined
-    if (surface_key) {
+    if (surface_key?.startsWith('db:')) {
+      const { data: dbSource } = await supabase
+        .from('sources')
+        .select('source_name, source_url_or_query')
+        .eq('id', surface_key.slice(3))
+        .single()
+      if (!dbSource?.source_url_or_query) {
+        return NextResponse.json({ error: `Unknown source "${surface_key}".` }, { status: 400 })
+      }
+      surface = {
+        key: surface_key,
+        label: dbSource.source_name,
+        kind: 'official',
+        tier: 'official',
+        segments: [],
+        probe: dbSource.source_url_or_query,
+      }
+    } else if (surface_key) {
       surface = MONITORING_SURFACES.find(s => s.key === surface_key)
       if (!surface) {
         return NextResponse.json(
@@ -616,6 +645,16 @@ export async function POST(req: NextRequest) {
       prospects: [] as Array<Record<string, unknown>>,
     }
 
+    // The user's own AERSeal hunting approach (product-approach/aerseal page) —
+    // folded into extraction + profiling as the primary strategy, not just left
+    // sitting in the DB unread. See lib/product-sections.ts / product_hunting_approach.
+    const { data: approachRow } = await supabase
+      .from('product_hunting_approach')
+      .select('approach_text')
+      .eq('product_slug', 'aerseal')
+      .maybeSingle()
+    const approachText = approachRow?.approach_text?.trim() || undefined
+
     // 1 ── Harvest the event surface.
     const { content, via } = await harvest(probe, deep_crawl)
     results.harvested_via = via
@@ -627,7 +666,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2 ── Extract organisations whose contract authority the event touches.
-    const candidates = await extractCandidates(content, label, provider)
+    const candidates = await extractCandidates(content, label, provider, approachText)
     results.candidates_found = candidates.length
 
     const named = candidates.filter(c => {
@@ -661,7 +700,7 @@ export async function POST(req: NextRequest) {
     // 3–7 ── Profile, score, gate, enrich, hypothesise, save.
     async function runOne(candidate: AuthorityCandidate): Promise<void> {
       results.profiled++
-      const dossier = await profileAuthority(candidate, provider)
+      const dossier = await profileAuthority(candidate, provider, approachText)
       if (!dossier) { results.profile_failed++; return }
 
       // The event surface already carries a dated trigger and its URL — keep
@@ -881,17 +920,45 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Surface catalogue for the UI.
+// Surface catalogue for the UI — the hardcoded MONITORING_SURFACES plus any
+// active source in the shared Source Manager tagged for AERSeal, so a source
+// accepted via "Suggest sources" (or added by hand) actually shows up as
+// something this pipeline can run against, not just a display-only mirror.
 export async function GET() {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  )
+  const { data: dbSources } = await supabase
+    .from('sources')
+    .select('id, source_name, source_url_or_query')
+    .eq('product_slug', 'aerseal')
+    .eq('status', 'active')
+
+  const dbSurfaces = (dbSources || [])
+    .filter(s => s.source_url_or_query)
+    .map(s => ({
+      key: `db:${s.id}`,
+      label: `${s.source_name} (Source Manager)`,
+      kind: 'official' as const,
+      tier: 'official' as const,
+      segments: [] as string[],
+      probe: s.source_url_or_query as string,
+      is_url: /^https?:\/\//.test(s.source_url_or_query as string),
+    }))
+
   return NextResponse.json({
-    surfaces: MONITORING_SURFACES.map(s => ({
-      key: s.key,
-      label: s.label,
-      kind: s.kind,
-      tier: s.tier,
-      segments: s.segments,
-      probe: s.probe,
-      is_url: /^https?:\/\//.test(s.probe),
-    })),
+    surfaces: [
+      ...MONITORING_SURFACES.map(s => ({
+        key: s.key,
+        label: s.label,
+        kind: s.kind,
+        tier: s.tier,
+        segments: s.segments,
+        probe: s.probe,
+        is_url: /^https?:\/\//.test(s.probe),
+      })),
+      ...dbSurfaces,
+    ],
   })
 }
