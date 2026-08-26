@@ -40,10 +40,25 @@ async function searchCount(query: string): Promise<number | null> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ api_key: process.env.TAVILY_API_KEY, query, search_depth: 'basic', max_results: 8 }),
+      signal: AbortSignal.timeout(12000),
     })
+    if (!res.ok) {
+      console.error('[searchCount] Tavily HTTP', res.status, await res.text().catch(() => ''))
+      return null
+    }
     const data = await res.json()
     return Array.isArray(data.results) ? data.results.length : 0
-  } catch { return null }
+  } catch (e) {
+    // Was previously silent — every source-suggestion run's query-type
+    // validation failures were unexplainable (see "not test-crawled" note),
+    // same class of problem as the leads.source_id incident: a real error
+    // with zero trace. Six of these checks fire concurrently (see
+    // Promise.all below) alongside Firecrawl's own long-running fetches,
+    // so a transient network stall is plausible — logging it is what makes
+    // that diagnosable instead of just "unverified" with no reason.
+    console.error('[searchCount]', e instanceof Error ? e.message : e)
+    return null
+  }
 }
 
 interface SourceLike {
