@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import type { Source } from '@/lib/types'
 import { cn, formatDate } from '@/lib/utils'
-import { getProductSection, type ProductSlug } from '@/lib/product-sections'
+import { getProductSection, ACCENT_HEX, type ProductSlug } from '@/lib/product-sections'
 import { notFound } from 'next/navigation'
 
 // Products with a live scoring path from Resources → Customers. AERKey and
@@ -57,6 +57,7 @@ export default function ProductResourcesPage({ params }: { params: Promise<{ slu
   const { slug } = usePromise(params)
   const section = getProductSection(slug)
   if (!section) notFound()
+  const accentColor = ACCENT_HEX[section.accent]
 
   const supabase = createClient()
   const [sources, setSources] = useState<Source[]>([])
@@ -241,28 +242,38 @@ export default function ProductResourcesPage({ params }: { params: Promise<{ slu
         </div>
 
         {RUNNABLE_SLUGS.has(slug) && sources.length > 0 && (
-          <div className="section-card p-4 mt-3 flex items-center justify-between gap-4 flex-wrap">
-            <div>
-              <div className="text-[13px] font-semibold text-white flex items-center gap-1.5">
-                <Zap size={14} style={{ color: 'rgb(251,191,36)' }} /> Run these resources
+          <div className="rounded-xl p-5 mt-3" style={{ background: `${accentColor}0a`, border: `1px solid ${accentColor}30` }}>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <div className="text-[13px] font-semibold text-white flex items-center gap-1.5">
+                  <Zap size={14} style={{ color: accentColor }} /> Run these resources
+                </div>
+                <div className="text-[12px] mt-0.5" style={{ color: 'var(--text-3)' }}>
+                  Firecrawl-scrapes every active resource above, evaluates companies against your {section.label} approach, and saves qualified ones straight to{' '}
+                  <Link href={customersHref} className="underline" style={{ color: 'var(--text-2)' }}>{section.label} Customers</Link>.
+                </div>
               </div>
-              <div className="text-[12px] mt-0.5" style={{ color: 'var(--text-3)' }}>
-                Firecrawl-scrapes every active resource above, evaluates companies against your {section.label} approach, and saves qualified ones straight to{' '}
-                <Link href={customersHref} className="underline" style={{ color: 'var(--text-2)' }}>{section.label} Customers</Link>.
-                {running && ` Running ${runProgress.done}/${runProgress.total}…`}
+              <div className="flex items-center gap-2">
+                {runSummary && !running && (
+                  <Link href={customersHref} className="btn btn-ghost">
+                    <Users size={14} /> View {runSummary.saved} new
+                  </Link>
+                )}
+                <button className="btn btn-primary" onClick={runResources} disabled={running}>
+                  {running ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                  {running ? `Running ${runProgress.done}/${runProgress.total}` : 'Run these resources'}
+                </button>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {runSummary && !running && (
-                <Link href={customersHref} className="btn btn-ghost">
-                  <Users size={14} /> View {runSummary.saved} new
-                </Link>
-              )}
-              <button className="btn btn-primary" onClick={runResources} disabled={running}>
-                {running ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
-                {running ? `Running ${runProgress.done}/${runProgress.total}` : 'Run these resources'}
-              </button>
-            </div>
+            {running && (
+              <div className="rounded-lg p-6 text-center mt-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <Loader2 size={20} className="animate-spin mx-auto mb-2" style={{ color: accentColor }} />
+                <p className="text-[13px] text-white">Scraping resource {runProgress.done + 1} of {runProgress.total}…</p>
+                <p className="text-[11px] mt-1" style={{ color: 'var(--text-3)' }}>
+                  Each resource gets a live Firecrawl scrape, research, and scoring pass — this can take a few minutes per resource.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

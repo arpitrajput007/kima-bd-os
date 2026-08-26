@@ -96,3 +96,14 @@ export const PRODUCT_DISCOVERY: Partial<Record<ProductSlug, { category: string; 
   aer360: { category: 'AER360 Custody / Key-Governance Customer', fitField: 'aeredium_fit' },
   aerseal: { category: 'AERseal Contract-Authority Customer', fitField: 'aerseal_fit' },
 }
+
+// Hex values for each ProductSection.accent name — matches the accent colors
+// already used elsewhere in the app (e.g. the Lead Inbox "By Product" star/
+// badge accents), so a product's own color stays consistent across every
+// page that represents it (Resources run panel, Customers table border, etc).
+export const ACCENT_HEX: Record<ProductSection['accent'], string> = {
+  violet: '#a78bfa',
+  blue: '#38bdf8',
+  cyan: '#22d3ee',
+  orange: '#fb923c',
+}
