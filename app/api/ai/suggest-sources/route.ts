@@ -152,6 +152,27 @@ export async function POST(req: Request) {
     const scopedLabel = PRODUCT_LABELS[productSlug]
     const scopedSection = scopedLabel ? getProductSection(productSlug) : undefined
 
+    // Global (unscoped) mode — hit when "Suggest sources" is clicked from the
+    // general Sources page rather than a per-product Resources page, which
+    // sends no productSlug/approachText. Without this, the three saved
+    // Approach pages were silently ignored on that path even though the user
+    // had filled them in. Loads all three at once since this branch covers
+    // all three products together.
+    let globalApproachBlock = ''
+    if (!scopedLabel) {
+      const { data: approachRows } = await supabase
+        .from('product_hunting_approach')
+        .select('product_slug, approach_text')
+        .in('product_slug', ['aer360', 'aerpolice', 'aerseal'])
+      const labels: Record<string, string> = { aer360: 'AER360', aerpolice: 'Aerpolice', aerseal: 'AERseal' }
+      const parts = (approachRows || [])
+        .filter(r => r.approach_text?.trim())
+        .map(r => `${labels[r.product_slug] || r.product_slug}:\n${r.approach_text!.trim()}`)
+      if (parts.length) {
+        globalApproachBlock = `THE USER'S OWN HUNTING APPROACH PER PRODUCT (follow these as the primary strategy for each product — they override generic assumptions below where the two disagree):\n\n${parts.join('\n\n')}`
+      }
+    }
+
     const systemPrompt = scopedLabel
       ? `You are a senior BD lead-generation strategist working ONLY on ${scopedLabel}. Suggest sources for finding ${scopedLabel} customers exclusively — do not suggest sources for any other Kima/Aeredium product, even if they'd otherwise look reasonable.
 
@@ -169,6 +190,8 @@ Return ONLY valid JSON. No markdown.`
       : `You are a senior BD lead-generation strategist for Aerpolice (AI-agent governance), AER360 (hardware-enforced wallet/fund custody and key-signing), and AERseal (hardware-enforced custody of a deployed smart contract's privileged admin authority) — the ONLY three products this agent sources leads for, each co-equal. Do not suggest sources aimed at Kima, cross-chain settlement, bridges (as a settlement/interop play), RWA tokenization, stablecoin on/off-ramps, or general crypto/DeFi/fintech directories that aren't specifically about AI agents, custody/key-signing, or deployed-contract admin authority — those are out of scope even if they'd otherwise look like reasonable BD sources.
 
 ${PRODUCT_BRAIN}
+
+${globalApproachBlock ? `${globalApproachBlock}\n` : ''}
 
 Your job: suggest NEW discovery sources the user should add to their lead-finding agent.
 A "source" is a place the agent can crawl/search to find target companies: an ecosystem/MCP directory,
