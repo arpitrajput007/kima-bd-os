@@ -83,3 +83,16 @@ export const PRODUCT_SECTIONS: ProductSection[] = [
 export function getProductSection(slug: string): ProductSection | undefined {
   return PRODUCT_SECTIONS.find(p => p.slug === slug)
 }
+
+// Maps the 3 products scored by /api/ai/discover to the `leads` fields that
+// hold their result: the customer_category value the pipeline writes, and
+// the fit column it fills in when a company qualifies for that product.
+// (aeredium_fit is the DB column name for AER360 fit, kept for compatibility
+// with when the product was called Aeredium.) AERseal additionally gets its
+// own dedicated dossier pipeline (aerseal_score/aerseal_tier/aerseal_dossier)
+// — see app/api/ai/discover-aerseal/route.ts.
+export const PRODUCT_DISCOVERY: Partial<Record<ProductSlug, { category: string; fitField: 'aerpolice_fit' | 'aeredium_fit' | 'aerseal_fit' }>> = {
+  aerpolice: { category: 'Aerpolice Governance Customer', fitField: 'aerpolice_fit' },
+  aer360: { category: 'AER360 Custody / Key-Governance Customer', fitField: 'aeredium_fit' },
+  aerseal: { category: 'AERseal Contract-Authority Customer', fitField: 'aerseal_fit' },
+}

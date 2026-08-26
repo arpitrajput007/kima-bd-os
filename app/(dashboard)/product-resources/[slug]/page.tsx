@@ -6,12 +6,17 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
   Plus, Edit, Trash2, Loader2, Save, X, Database, Sparkles,
-  Lightbulb, Check, ExternalLink, ArrowLeft,
+  Lightbulb, Check, ExternalLink, ArrowLeft, Zap, Users,
 } from 'lucide-react'
 import type { Source } from '@/lib/types'
 import { cn, formatDate } from '@/lib/utils'
 import { getProductSection, type ProductSlug } from '@/lib/product-sections'
 import { notFound } from 'next/navigation'
+
+// Products with a live scoring path from Resources → Customers. AERKey and
+// Agent aren't scored by /api/ai/discover or /api/ai/discover-aerseal (see
+// PRODUCT_DISCOVERY), so "Run these resources" only shows for the 3 that are.
+const RUNNABLE_SLUGS = new Set(['aerpolice', 'aer360', 'aerseal'])
 
 const SOURCE_TYPES = [
   'exa_search', 'exa_similar', 'apollo_search',
@@ -64,6 +69,9 @@ export default function ProductResourcesPage({ params }: { params: Promise<{ slu
   const [suggestions, setSuggestions] = useState<SourceSuggestion[]>([])
   const [addingIdx, setAddingIdx] = useState<number | null>(null)
   const [approachText, setApproachText] = useState('')
+  const [running, setRunning] = useState(false)
+  const [runProgress, setRunProgress] = useState({ done: 0, total: 0 })
+  const [runSummary, setRunSummary] = useState<{ saved: number; ran: number } | null>(null)
 
   const loadSources = async () => {
     setLoading(true)
@@ -160,6 +168,48 @@ export default function ProductResourcesPage({ params }: { params: Promise<{ slu
     setShowForm(true)
   }
 
+  // Scrape every active resource for this product and save qualified
+  // companies straight into its Customers page — AERSeal runs through its own
+  // Firecrawl authority pipeline (surface_key: db:<id>, see
+  // app/api/ai/discover-aerseal/route.ts), the other two through the general
+  // pipeline with force_deep_crawl so Firecrawl always fires here regardless
+  // of the per-source deep_crawl toggle.
+  const runResources = async () => {
+    const queue = sources.filter(s => s.status === 'active' && s.source_url_or_query)
+    if (!queue.length) { toast.error('No active resources with a URL/query to run'); return }
+    setRunning(true)
+    setRunSummary(null)
+    setRunProgress({ done: 0, total: queue.length })
+    let saved = 0
+    let ran = 0
+    for (const source of queue) {
+      try {
+        const endpoint = slug === 'aerseal' ? '/api/ai/discover-aerseal' : '/api/ai/discover'
+        const body = slug === 'aerseal'
+          ? { surface_key: `db:${source.id}`, deep_crawl: true }
+          : { source_id: source.id, force_deep_crawl: true }
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        const data = await res.json()
+        if (data.error) toast.error(`${source.source_name}: ${data.error}`)
+        else saved += data.saved || 0
+      } catch {
+        toast.error(`${source.source_name}: network error`)
+      }
+      ran++
+      setRunProgress({ done: ran, total: queue.length })
+    }
+    setRunning(false)
+    setRunSummary({ saved, ran })
+    loadSources()
+    toast.success(`Done — ${saved} new customer${saved === 1 ? '' : 's'} found across ${ran} resource${ran === 1 ? '' : 's'}`)
+  }
+
+  const customersHref = section.customerLinks[0]?.href || `/product-customers/${slug}`
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-5 fade-in">
       <div>
@@ -189,6 +239,32 @@ export default function ProductResourcesPage({ params }: { params: Promise<{ slu
         <div className="mt-2 text-[12px]" style={{ color: 'var(--text-3)' }}>
           Suggestions are grounded in your <Link href={`/product-approach/${slug}`} className="underline" style={{ color: 'var(--text-2)' }}>hunting approach</Link> for {section.label}{approachText ? '' : ' — none saved yet, using default product knowledge'}.
         </div>
+
+        {RUNNABLE_SLUGS.has(slug) && sources.length > 0 && (
+          <div className="section-card p-4 mt-3 flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <div className="text-[13px] font-semibold text-white flex items-center gap-1.5">
+                <Zap size={14} style={{ color: 'rgb(251,191,36)' }} /> Run these resources
+              </div>
+              <div className="text-[12px] mt-0.5" style={{ color: 'var(--text-3)' }}>
+                Firecrawl-scrapes every active resource above, evaluates companies against your {section.label} approach, and saves qualified ones straight to{' '}
+                <Link href={customersHref} className="underline" style={{ color: 'var(--text-2)' }}>{section.label} Customers</Link>.
+                {running && ` Running ${runProgress.done}/${runProgress.total}…`}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {runSummary && !running && (
+                <Link href={customersHref} className="btn btn-ghost">
+                  <Users size={14} /> View {runSummary.saved} new
+                </Link>
+              )}
+              <button className="btn btn-primary" onClick={runResources} disabled={running}>
+                {running ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                {running ? `Running ${runProgress.done}/${runProgress.total}` : 'Run these resources'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {suggestions.length > 0 && (

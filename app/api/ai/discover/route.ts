@@ -514,7 +514,7 @@ export async function POST(req: NextRequest) {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
-    const { source_id, research_ai = 'claude' } = await req.json()
+    const { source_id, research_ai = 'claude', force_deep_crawl = false } = await req.json()
     if (!source_id) {
       return NextResponse.json({ error: 'source_id is required' }, { status: 400 })
     }
@@ -539,14 +539,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 0. Load each product's user-edited hunting approach (Approach page) once
-    // per run — folded into extraction + research below.
-    const { data: approachRows } = await supabase
-      .from('product_hunting_approach')
-      .select('product_slug, approach_text')
-      .in('product_slug', ['aer360', 'aerpolice', 'aerseal'])
-    const approachBlock = buildApproachBlock(approachRows || [])
-
     // 1. Load the source
     const { data: source, error: srcError } = await supabase
       .from('sources')
@@ -560,6 +552,23 @@ export async function POST(req: NextRequest) {
     if (!source.source_url_or_query) {
       return NextResponse.json({ error: 'Source has no URL or query configured' }, { status: 400 })
     }
+
+    // 1b. Load each product's user-edited hunting approach (Approach page) once
+    // per run — folded into extraction + research below. Also bias toward
+    // whichever product this specific source was curated for (product_slug,
+    // set on the product Resources page) so a source added under "AERpolice
+    // Resources" doesn't drift toward being scored as an AER360/AERseal lead
+    // purely on the model's own judgment.
+    const { data: approachRows } = await supabase
+      .from('product_hunting_approach')
+      .select('product_slug, approach_text')
+      .in('product_slug', ['aer360', 'aerpolice', 'aerseal'])
+    const productBiasLabels: Record<string, string> = { aer360: 'AER360', aerpolice: 'Aerpolice', aerseal: 'AERseal' }
+    const productBiasLabel = productBiasLabels[source.product_slug as string]
+    const productBias = productBiasLabel
+      ? `This source was curated specifically to find ${productBiasLabel} customers (see its product_slug). Prioritize evaluating and naming a ${productBiasLabel} fit for companies found here unless another of the three products is clearly and dramatically the better fit for a given company.`
+      : ''
+    const approachBlock = [buildApproachBlock(approachRows || []), productBias].filter(Boolean).join('\n\n')
 
     // 2. Check current category counts. Only count *recent* unworked leads — once a
     // lead is contacted/reserved/qualified it stops counting (it's "in play").
@@ -692,20 +701,24 @@ export async function POST(req: NextRequest) {
       }
     } else {
       let content = ''
+      // deep_crawl is opt-in per source, but a run triggered from a product
+      // Resources page's "Run these resources" always wants the real Firecrawl
+      // scrape regardless of that per-source toggle — force_deep_crawl covers it.
+      const useDeepCrawl = !!source.deep_crawl || !!force_deep_crawl
       if (sourceQuery.startsWith('http://') || sourceQuery.startsWith('https://')) {
-        // Deep crawl (opt-in per source): scroll + optional "Load More" click
-        // cycles via Firecrawl, for sources whose real content is paginated,
-        // infinite-scroll, or hidden behind a button — readUrl() only ever
-        // sees the first-load render. Falls back to the plain read if
-        // Firecrawl isn't configured or comes back empty.
-        if (source.deep_crawl && firecrawlConfigured()) {
+        // Deep crawl: scroll + optional "Load More" click cycles via Firecrawl,
+        // for sources whose real content is paginated, infinite-scroll, or
+        // hidden behind a button — readUrl() only ever sees the first-load
+        // render. Falls back to the plain read if Firecrawl isn't configured
+        // or comes back empty.
+        if (useDeepCrawl && firecrawlConfigured()) {
           content = await firecrawlDeepScrape(sourceQuery, {
             maxActions: source.deep_crawl_max_actions ?? 5,
             buttonSelector: source.deep_crawl_button_selector || undefined,
           })
         }
         if (!content) {
-          content = await readUrl(sourceQuery, source.deep_crawl ? 40000 : 10000)
+          content = await readUrl(sourceQuery, useDeepCrawl ? 40000 : 10000)
         }
       } else {
         // Exa not configured — fall back to Tavily.
@@ -727,7 +740,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 5b. Load full memory: up to 56 knowledge entries (8 per type) + active rules + feedback patterns
-    // Combined with approachBlock (loaded in step 0) so the user's own hunting
+    // Combined with approachBlock (loaded in step 1b) so the user's own hunting
     // approach reaches the same dynamic-suffix slot deepResearch() already uses.
     const learnedIntelligence = [approachBlock, await discoveryMemory()].filter(Boolean).join('\n\n')
 

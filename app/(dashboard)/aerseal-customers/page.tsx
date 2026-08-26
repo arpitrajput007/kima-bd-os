@@ -7,8 +7,50 @@ import {
   FileLock2, Search, ExternalLink, Plus, ChevronUp, ChevronDown,
   Filter, Download, CheckCircle, Loader2,
 } from 'lucide-react'
+import Link from 'next/link'
 import { AERSEAL_CUSTOMERS, AERSEAL_CATEGORIES, AERSEAL_ACCOUNT_COUNT, type AersealCustomer } from '@/lib/aerseal-customers'
 import { AssignToPlutoButton } from '@/components/AssignToPlutoButton'
+import { cn, getScoreBg, getStatusColor, getStatusLabel } from '@/lib/utils'
+import type { Lead } from '@/lib/types'
+
+// Companies the live discovery pipelines (main /api/ai/discover and the
+// dedicated /api/ai/discover-aerseal Firecrawl pipeline) have actually found
+// and saved — distinct from AERSEAL_CUSTOMERS below, which is a hand-curated
+// research workbook. Excludes names already in that curated list so a lead
+// someone manually "Add to BD"'d doesn't show up twice.
+function usePipelineDiscoveredLeads() {
+  const [leads, setLeads] = useState<(Lead & { aerseal_score?: number; aerseal_tier?: number })[]>([])
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    const supabase = createClient()
+    const curatedNames = new Set(AERSEAL_CUSTOMERS.map(c => c.company.toLowerCase().trim()))
+    const nonCustomerFilter = '("competitor","investor_ecosystem","not_relevant","partner")'
+    // Two separate queries (category match + dossier-score match) merged
+    // client-side rather than one .or() — avoids relying on undocumented
+    // PostgREST array-contains-inside-or syntax for a one-off page.
+    Promise.all([
+      supabase.from('leads').select('*')
+        .contains('customer_category', ['AERseal Contract-Authority Customer'])
+        .not('classification', 'in', nonCustomerFilter)
+        .limit(100),
+      supabase.from('leads').select('*')
+        .not('aerseal_score', 'is', null)
+        .not('classification', 'in', nonCustomerFilter)
+        .limit(100),
+    ]).then(([byCategory, byScore]) => {
+      const merged = new Map<string, Lead & { aerseal_score?: number }>()
+      for (const row of [...(byCategory.data || []), ...(byScore.data || [])] as (Lead & { aerseal_score?: number })[]) {
+        merged.set(row.id, row)
+      }
+      const rows = Array.from(merged.values())
+        .filter(l => !curatedNames.has((l.company_name || '').toLowerCase().trim()))
+        .sort((a, b) => (b.aerseal_score ?? -1) - (a.aerseal_score ?? -1) || (b.lead_score ?? 0) - (a.lead_score ?? 0))
+      setLeads(rows)
+      setLoading(false)
+    })
+  }, [])
+  return { leads, loading }
+}
 
 type SortKey = 'company' | 'conversionScore' | 'reachability' | 'lockIn' | 'triggerDate'
 
@@ -53,6 +95,7 @@ export default function AersealCustomersPage() {
   const [added, setAdded] = useState<Set<string>>(new Set())
   const [plutoAssigned, setPlutoAssigned] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState<number | null>(null)
+  const { leads: pipelineLeads, loading: pipelineLoading } = usePipelineDiscoveredLeads()
 
   // On mount: which accounts are already in the CRM, and which are with Pluto.
   useEffect(() => {
@@ -196,6 +239,38 @@ export default function AersealCustomersPage() {
       </div>
 
       <div style={{ padding: '20px 36px' }}>
+
+        {/* Pipeline-discovered — companies the live discovery pipelines found
+            and saved, not yet in the curated workbook below. */}
+        {(pipelineLoading || pipelineLeads.length > 0) && (
+          <div style={{ marginBottom: 24, border: '1px solid rgba(52,211,153,0.25)', borderRadius: 14, background: 'rgba(52,211,153,0.04)', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 18px', borderBottom: pipelineLeads.length ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#34d399' }}>Pipeline-discovered ({pipelineLeads.length})</div>
+              <div style={{ fontSize: 11, color: 'rgb(120,127,160)', marginTop: 2 }}>
+                Found by running your AERSeal resources — not yet in the curated workbook below.
+              </div>
+            </div>
+            {pipelineLoading ? (
+              <div style={{ padding: 18, textAlign: 'center' }}><Loader2 size={16} className="animate-spin" style={{ color: 'rgb(120,127,160)' }} /></div>
+            ) : (
+              <div>
+                {pipelineLeads.map(l => (
+                  <Link key={l.id} href={`/leads/${l.id}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 18px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'white' }}>{l.company_name}</div>
+                      {l.pain_point && <div style={{ fontSize: 11.5, color: 'rgb(140,146,175)', marginTop: 2 }}>{l.pain_point}</div>}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      <span className={cn('badge', getStatusColor(l.status))} style={{ fontSize: 10 }}>{getStatusLabel(l.status)}</span>
+                      {l.aerseal_score != null && <span className={cn('badge', getScoreBg(l.aerseal_score))} title="AERSeal score">{l.aerseal_score}</span>}
+                      {l.aerseal_score == null && l.lead_score != null && <span className={cn('badge', getScoreBg(l.lead_score))} title="Lead score">{l.lead_score}</span>}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Stats row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 24 }}>
