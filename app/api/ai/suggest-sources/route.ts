@@ -260,7 +260,8 @@ Return JSON:
       "source_url_or_query": "a real public URL OR a precise search query the agent can run",
       "why": "1-2 sentences: why this is a strong source and what kind of leads it brings",
       "expected_leads": "the kind of companies/categories this will surface",
-      "confidence": "high|medium|low"
+      "confidence": "high|medium|low"${scopedLabel ? '' : `,
+      "product_slug": "the ONE product this source is really for — exactly one of: aerpolice, aer360, aerseal"`}
     }
   ]
 }`
@@ -276,6 +277,11 @@ Return JSON:
         why: s.why || '',
         expected_leads: s.expected_leads || '',
         confidence: ['high', 'medium', 'low'].includes(s.confidence) ? s.confidence : 'medium',
+        // Scoped mode already knows the product (productSlug, from the URL the
+        // request came from); global mode asks the model to pick which one
+        // each suggestion is really for, so accepting it on the general
+        // Sources page still tags it correctly instead of leaving it unscoped.
+        product_slug: scopedLabel ? productSlug : (['aerpolice', 'aer360', 'aerseal'].includes(s.product_slug) ? s.product_slug : ''),
       }))
 
     // Dry-run each suggestion in parallel, then drop the dead ones.

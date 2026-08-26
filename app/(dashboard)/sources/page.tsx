@@ -12,6 +12,7 @@ import {
 import type { Source, Lead } from '@/lib/types'
 import { cn, formatDate, getScoreBg } from '@/lib/utils'
 import { getSelectedSourceIds, setSelectedSourceIds, clearSelectedSourceIds } from '@/lib/sourceSelection'
+import { PRODUCT_SECTIONS, getProductSection, ACCENT_HEX } from '@/lib/product-sections'
 
 const SOURCE_TYPES = [
   'exa_search', 'exa_similar', 'apollo_search',
@@ -72,6 +73,7 @@ interface SourceSuggestion {
   why: string
   expected_leads: string
   confidence: 'high' | 'medium' | 'low'
+  product_slug?: string
   verified?: boolean
   check_status?: 'good' | 'thin' | 'unverified'
   check_note?: string
@@ -86,6 +88,7 @@ export default function SourcesPage() {
   const [form, setForm] = useState<Partial<Source>>(emptyForm)
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
+  const [productFilter, setProductFilter] = useState('')
   const [sortWorstYieldFirst, setSortWorstYieldFirst] = useState(false)
   const [runningId, setRunningId] = useState<string | null>(null)
   const [runResults, setRunResults] = useState<Record<string, RunResult>>({})
@@ -167,6 +170,7 @@ export default function SourcesPage() {
       quality_rating: 'unrated',
       status: 'active',
       notes: s.why || null,
+      product_slug: s.product_slug || null,
     })
     setAddingIdx(null)
     if (error) { toast.error('Failed to add source'); return }
@@ -331,6 +335,11 @@ export default function SourcesPage() {
       s.source_name.toLowerCase().includes(search.toLowerCase()) ||
       s.source_url_or_query?.toLowerCase().includes(search.toLowerCase())
     )
+    .filter(s => {
+      if (!productFilter) return true
+      if (productFilter === 'unscoped') return !s.product_slug
+      return s.product_slug === productFilter
+    })
     .sort((a, b) => {
       if (!sortWorstYieldFirst) return 0
       // Worst yield first, but only among sources with enough sample to judge
@@ -409,6 +418,16 @@ export default function SourcesPage() {
                       <span className="badge" style={{ fontSize: '9px', background: 'rgba(167,139,250,0.1)', color: '#a78bfa', borderColor: 'rgba(167,139,250,0.2)' }}>
                         {s.source_type?.replace(/_/g, ' ')}
                       </span>
+                      {s.product_slug && (() => {
+                        const p = getProductSection(s.product_slug!)
+                        if (!p) return null
+                        const c = ACCENT_HEX[p.accent]
+                        return (
+                          <span className="badge" title={`Will be added scoped to ${p.label}`} style={{ fontSize: '9px', background: `${c}18`, color: c, borderColor: `${c}40` }}>
+                            → {p.shortLabel}
+                          </span>
+                        )
+                      })()}
                       <span className="text-[11px] mono truncate" style={{ color: 'rgb(130,135,165)', maxWidth: 240 }}>{s.source_url_or_query}</span>
                     </div>
                     <p className="text-[11.5px] leading-relaxed mb-1.5" style={{ color: 'rgb(170,175,200)' }}>{s.why}</p>
@@ -553,6 +572,17 @@ export default function SourcesPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
+          <select
+            className="input-dark"
+            style={{ fontSize: '13px' }}
+            value={productFilter}
+            onChange={e => setProductFilter(e.target.value)}
+            title="Filter by which product this source is scoped to"
+          >
+            <option value="">All products</option>
+            {PRODUCT_SECTIONS.map(p => <option key={p.slug} value={p.slug}>{p.label}</option>)}
+            <option value="unscoped">Unscoped (no product)</option>
+          </select>
           <button
             onClick={() => setSortWorstYieldFirst(v => !v)}
             className="btn btn-ghost"
@@ -651,6 +681,17 @@ export default function SourcesPage() {
                         <span className="badge" style={{ background: 'rgba(96,165,250,0.1)', color: '#60a5fa', borderColor: 'rgba(96,165,250,0.2)', fontSize: '10px', padding: '2px 7px' }}>
                           {source.source_type?.replace(/_/g, ' ')}
                         </span>
+                        {source.product_slug && (() => {
+                          const p = getProductSection(source.product_slug!)
+                          if (!p) return null
+                          const c = ACCENT_HEX[p.accent]
+                          return (
+                            <Link href={`/product-resources/${p.slug}`} className="badge" title={`Scoped to ${p.label} — click to manage from its Resources page`}
+                              style={{ background: `${c}15`, color: c, borderColor: `${c}35`, fontSize: '10px', padding: '2px 7px' }}>
+                              {p.shortLabel}
+                            </Link>
+                          )
+                        })()}
                         {source.quality_rating && source.quality_rating !== 'unrated' && (
                           <span className={cn('badge', QUALITY_COLORS[source.quality_rating])} style={{ fontSize: '10px', padding: '2px 7px' }}>
                             {source.quality_rating}

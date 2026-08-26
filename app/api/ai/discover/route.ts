@@ -11,6 +11,7 @@ import { discoveryMemory } from '@/lib/agent-memory'
 import { readUrl } from '@/lib/webRead'
 import { isRealEmail } from '@/lib/outreach'
 import { firecrawlConfigured, firecrawlDeepScrape } from '@/lib/firecrawl'
+import { PRODUCT_DISCOVERY } from '@/lib/product-sections'
 
 // A contact only counts as reachable if there's an actual channel to message
 // them through — a name with no email/profile, a guessed email pattern (see
@@ -906,6 +907,25 @@ export async function POST(req: NextRequest) {
       const categories = ((research.customer_category as string[]) || [])
         .filter(c => CUSTOMER_CATEGORIES.includes(c))
       if (categories.length === 0) categories.push('Other')
+
+      // Guarantee: if this source is scoped to a product (product_slug, set on
+      // the product Resources page) AND the model itself found a genuine fit
+      // for that product (its fit field is filled — same check as the gate
+      // above, not a bypass of it), make sure that product's category is
+      // actually in the saved list. Without this, a source scoped to
+      // AERpolice could still land a qualifying company under a different
+      // category purely because the model didn't happen to also list that
+      // exact string — meaning it would never show up on that product's own
+      // Customers page even though it was correctly found by that product's
+      // own resource. See lib/product-sections.ts PRODUCT_DISCOVERY.
+      const sourceDiscovery = source.product_slug ? PRODUCT_DISCOVERY[source.product_slug as keyof typeof PRODUCT_DISCOVERY] : undefined
+      if (sourceDiscovery) {
+        const fitValue = (research as Record<string, unknown>)[sourceDiscovery.fitField]
+        const sourceProductHasFit = typeof fitValue === 'string' && fitValue.trim().length > 0
+        if (sourceProductHasFit && !categories.includes(sourceDiscovery.category)) {
+          categories.push(sourceDiscovery.category)
+        }
+      }
 
       // Check if any matching category has room (CATEGORY_CAP unworked leads)
       const hasRoom = categories.some(cat => (categoryCounts[cat] || 0) < CATEGORY_CAP)
