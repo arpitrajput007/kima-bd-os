@@ -199,3 +199,45 @@ export async function firecrawlFindAuthorityEvidence(
     return null
   }
 }
+
+// ============================================================
+// Live web search — for grounding source-ideation (Suggest sources) in what
+// currently exists, instead of relying on the model's static training-data
+// recall of directories/communities that may be stale, renamed, or dead.
+// Docs: https://docs.firecrawl.dev/api-reference/endpoint/search
+// ============================================================
+export interface FirecrawlSearchResult {
+  url: string
+  title: string
+  description: string
+}
+
+export async function firecrawlSearch(query: string, limit = 8): Promise<FirecrawlSearchResult[]> {
+  if (!firecrawlConfigured()) return []
+  try {
+    const res = await fetch('https://api.firecrawl.dev/v2/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
+      },
+      body: JSON.stringify({ query, limit }),
+      signal: AbortSignal.timeout(20000),
+    })
+    if (!res.ok) {
+      console.error('[firecrawlSearch] HTTP', res.status, await res.text().catch(() => ''))
+      return []
+    }
+    const json = await res.json()
+    // v2 nests results under data.web; fall back to a flat data array in
+    // case that shape changes — fail soft either way rather than throw.
+    const raw = (json?.data?.web ?? json?.data ?? []) as Array<{ url?: string; title?: string; description?: string }>
+    if (!Array.isArray(raw)) return []
+    return raw
+      .filter(r => r?.url)
+      .map(r => ({ url: r.url as string, title: r.title || '', description: r.description || '' }))
+  } catch (e) {
+    console.error('[firecrawlSearch]', e)
+    return []
+  }
+}

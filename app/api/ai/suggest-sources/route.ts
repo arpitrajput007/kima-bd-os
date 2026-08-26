@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { PRODUCT_BRAIN } from '@/lib/kima-knowledge'
 import { getProductSection } from '@/lib/product-sections'
+import { firecrawlConfigured, firecrawlSearch, firecrawlDeepScrape } from '@/lib/firecrawl'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -66,19 +67,32 @@ async function validateSuggestion(s: SourceLike): Promise<Verdict> {
     return { status: 'good', note: `Query returns ${n}+ results` }
   }
 
-  // URL: fetch through Jina and judge by reachability + content richness.
+  // URL: prefer Firecrawl (handles JS-rendered/paginated pages a plain fetch
+  // misses — the same tool "Run these resources" uses to actually work these
+  // sources later, so a source that validates via Firecrawl here is proven
+  // crawlable the same way it'll really be crawled). Falls back to Jina when
+  // Firecrawl isn't configured or comes back empty.
   try {
-    const res = await fetch(`https://r.jina.ai/${target}`, {
-      headers: { Accept: 'text/plain' },
-      signal: AbortSignal.timeout(12000),
-    })
-    if (!res.ok) return { status: 'unverified', note: `Couldn’t reach (HTTP ${res.status})` }
-    const text = (await res.text()) || ''
+    let text = ''
+    let via = 'jina'
+    if (firecrawlConfigured()) {
+      text = await firecrawlDeepScrape(target, { maxActions: 2 })
+      via = 'firecrawl'
+    }
+    if (!text) {
+      const res = await fetch(`https://r.jina.ai/${target}`, {
+        headers: { Accept: 'text/plain' },
+        signal: AbortSignal.timeout(12000),
+      })
+      if (!res.ok) return { status: 'unverified', note: `Couldn’t reach (HTTP ${res.status})` }
+      text = (await res.text()) || ''
+      via = 'jina'
+    }
     if (text.length < 250) return { status: 'thin', note: 'Reachable but very little content' }
     // Rough signal: number of links + capitalized multi-word names hints at a list of companies.
     const links = (text.match(/https?:\/\//g) || []).length
-    if (text.length > 1200 && links >= 5) return { status: 'good', note: 'Reachable · rich, link-heavy page' }
-    return { status: 'good', note: 'Reachable · has content' }
+    if (text.length > 1200 && links >= 5) return { status: 'good', note: `Reachable via ${via} · rich, link-heavy page` }
+    return { status: 'good', note: `Reachable via ${via} · has content` }
   } catch {
     return { status: 'unverified', note: 'Couldn’t reach in time' }
   }
@@ -93,8 +107,11 @@ const PRODUCT_LABELS: Record<string, string> = {
 }
 
 export async function POST(req: Request) {
-  if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 400 })
+  // This route generates suggestions via claudeJSON (Claude), not OpenAI —
+  // gate on the key it actually uses.
+  const { claudeConfigured } = await import('@/lib/claude')
+  if (!claudeConfigured()) {
+    return NextResponse.json({ error: 'ANTHROPIC_API_KEY is not configured.' }, { status: 400 })
   }
 
   let productSlug = ''
@@ -119,24 +136,6 @@ export async function POST(req: Request) {
       (existing || []).map(s => (s.source_url_or_query || '').toLowerCase().trim()).filter(Boolean)
     )
 
-    // 2. Which categories are underfilled — bias suggestions toward gaps + what converts.
-    const { data: leads } = await supabase
-      .from('leads')
-      .select('customer_category, status')
-      .not('status', 'in', '("rejected","archived")')
-
-    const catCounts: Record<string, number> = {}
-    const converting: Record<string, number> = {}
-    ;(leads || []).forEach((l: { customer_category?: string[]; status?: string }) => {
-      ;(l.customer_category || []).forEach(c => {
-        catCounts[c] = (catCounts[c] || 0) + 1
-        if (l.status === 'replied' || l.status === 'meeting_booked') converting[c] = (converting[c] || 0) + 1
-      })
-    })
-    const catSummary = Object.keys(catCounts).length
-      ? Object.entries(catCounts).map(([c, n]) => `${c}: ${n} leads, ${converting[c] || 0} converting`).join('\n')
-      : '(no leads yet)'
-
     // 3. What the agent has learned about good targeting.
     const { data: knowledge } = await supabase
       .from('agent_knowledge')
@@ -146,11 +145,25 @@ export async function POST(req: Request) {
       .limit(10)
     const learned = (knowledge || []).map(k => `- ${k.title}: ${(k.content || '').slice(0, 200)}`).join('\n') || '(none yet)'
 
-    // 4. Light live grounding (best-effort).
-    const web = await searchWeb('best directories and communities to find new crypto payment, stablecoin, DeFi and AI agent projects 2026')
-
     const scopedLabel = PRODUCT_LABELS[productSlug]
     const scopedSection = scopedLabel ? getProductSection(productSlug) : undefined
+
+    // 4. Live grounding — actually crawl the web for what currently exists,
+    // rather than trusting the model's static training-data recall of
+    // directories/communities that may be stale, renamed, or dead. Grounded
+    // in the product's own approach text (or its label as a fallback) so the
+    // search itself reflects the specific strategy, not a generic crypto
+    // query. Firecrawl search first (real crawled results); falls back to
+    // Tavily if Firecrawl isn't configured.
+    const groundingQuery = approachText
+      ? approachText.slice(0, 300)
+      : scopedLabel
+        ? `sources to find ${scopedLabel} customers`
+        : 'directories and communities to find AI-agent governance, custody/key-signing, and deployed-contract admin-authority companies'
+    const firecrawlHits = firecrawlConfigured() ? await firecrawlSearch(groundingQuery, 8) : []
+    const web = firecrawlHits.length
+      ? firecrawlHits.map(r => `${r.title} — ${r.url}\n${r.description}`).join('\n\n')
+      : await searchWeb(groundingQuery)
 
     // Global (unscoped) mode — hit when "Suggest sources" is clicked from the
     // general Sources page rather than a per-product Resources page, which
@@ -216,13 +229,10 @@ Return ONLY valid JSON. No markdown.`
     const userPrompt = `SOURCES ALREADY ADDED (do NOT suggest these or close variants):
 ${existingList}
 
-CURRENT LEAD CATEGORIES (bias toward gaps and what's converting):
-${catSummary}
-
 WHAT THE AGENT HAS LEARNED ABOUT GOOD TARGETS:
 ${learned}
 
-LIVE WEB CONTEXT (real places, may help you propose concrete URLs):
+LIVE WEB CONTEXT (real, currently-crawled places — prefer these over recalling from memory when they fit):
 ${web || '(no live data)'}
 
 Suggest 6 strong NEW sources. For each, prefer a real, specific, public URL or a precise Google search query.
