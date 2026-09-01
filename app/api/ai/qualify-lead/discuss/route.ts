@@ -4,17 +4,11 @@
 // Takes the full QualifyResult + a question, responds with
 // lead-specific analysis using the full product brain + agent memory.
 
-import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
 import { FULL_BRAIN } from '@/lib/kima-knowledge'
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+import { claudeText, CLAUDE_RESEARCH } from '@/lib/claude'
 
 export async function POST(req: NextRequest) {
-  if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({ error: 'OpenAI not configured' }, { status: 400 })
-  }
-
   const body = await req.json()
   const { message, lead_data, history = [] } = body
 
@@ -82,8 +76,6 @@ INTEGRATION FEASIBILITY: ${lead_data.integration_feasibility}`.trim()
 
 ${FULL_BRAIN}
 
-${memoryBlock ? `AGENT MEMORY:\n${memoryBlock}` : ''}
-
 ALWAYS EVALUATE ALL THREE PRODUCTS:
 - Aerpolice: Do they have AI agents taking real consequential actions? Enterprise deals stalling in security review? → agent identity, policy gate, audit trail
 - Kima: Do they need cross-chain, cross-rail, or stablecoin settlement? → UPR / LaaS / DvP
@@ -95,22 +87,30 @@ Answer concisely, directly, and with conviction. Reference specific details from
 
 Format: short paragraphs, **bold** for key points. No "Certainly!" or filler.`
 
+  // Recent turns folded into the user message — Claude's cached system blocks
+  // (static brain + this lead's dossier) carry the heavy, repeated context.
+  const historyText = (history as { role: 'user' | 'assistant'; content: string }[])
+    .slice(-10)
+    .map(h => `${h.role === 'user' ? 'User' : 'You'}: ${h.content}`)
+    .join('\n\n')
+
+  const userPrompt = [
+    historyText ? `CONVERSATION SO FAR:\n${historyText}` : '',
+    `User: ${message}`,
+  ].filter(Boolean).join('\n\n')
+
   try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user',   content: `LEAD DATA:\n${leadContext}` },
-        // Inject history AFTER the lead context so it feels continuous
-        ...(history as { role: 'user' | 'assistant'; content: string }[]).slice(-10),
-        { role: 'user', content: message },
-      ],
+    const reply = await claudeText({
+      model: CLAUDE_RESEARCH,
+      system: systemPrompt,
+      systemCachedSuffix: `LEAD DATA:\n${leadContext}`,
+      systemVolatileSuffix: memoryBlock ? `AGENT MEMORY:\n${memoryBlock}` : undefined,
+      user: userPrompt,
       temperature: 0.55,
-      max_tokens: 700,
+      maxTokens: 700,
     })
 
-    const reply = completion.choices[0].message.content?.trim() || 'Could not generate a response.'
-    return NextResponse.json({ reply })
+    return NextResponse.json({ reply: reply.trim() || 'Could not generate a response.' })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Discussion failed'
     console.error('[discuss-lead]', err)
