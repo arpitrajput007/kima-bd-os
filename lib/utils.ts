@@ -114,6 +114,36 @@ export function truncate(str: string, maxLength: number): string {
   return str.slice(0, maxLength) + '...'
 }
 
+/** YYYY-MM-DD bucket key for a timestamp, in local time. */
+export function dayKey(dateStr: string): string {
+  const d = new Date(dateStr)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** Human label for a dayKey — "Today" / "Yesterday" / "Fri, Aug 28". */
+export function dayLabel(key: string): string {
+  const [y, m, d] = key.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const diff = Math.round((today.getTime() - date.getTime()) / 86400000)
+  if (diff === 0) return 'Today'
+  if (diff === 1) return 'Yesterday'
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+/** Buckets items by day (newest day first) using a caller-supplied date field getter. */
+export function groupByDay<T>(items: T[], getDate: (item: T) => string): { key: string; label: string; items: T[] }[] {
+  const map = new Map<string, T[]>()
+  items.forEach(item => {
+    const k = dayKey(getDate(item))
+    if (!map.has(k)) map.set(k, [])
+    map.get(k)!.push(item)
+  })
+  return Array.from(map.keys())
+    .sort((a, b) => b.localeCompare(a))
+    .map(k => ({ key: k, label: dayLabel(k), items: map.get(k)! }))
+}
+
 export function isHttpUrl(v?: string | null): boolean {
   return !!v && /^https?:\/\//i.test(v.trim())
 }

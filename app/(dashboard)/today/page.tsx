@@ -10,7 +10,7 @@ import {
   Sparkles, Zap, TrendingUp, Wand2, Copy, ExternalLink, Download, Trash2,
   Search, X,
 } from 'lucide-react'
-import { cn, getScoreBg, truncate } from '@/lib/utils'
+import { cn, getScoreBg, truncate, dayKey, dayLabel } from '@/lib/utils'
 import type { Lead, Contact } from '@/lib/types'
 import {
   buildTarget, channelDeepLink, logTouch, followUpDue,
@@ -38,23 +38,6 @@ function bestContact(contacts?: Contact[]): Contact | null {
 
 function daysSince(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24))
-}
-
-// Local YYYY-MM-DD key for grouping leads by the day they came in.
-function dayKey(dateStr: string): string {
-  const d = new Date(dateStr)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-// Human label for a day key: "Today" / "Yesterday" / "Mon, Jun 1".
-function dayLabel(key: string): string {
-  const [y, m, d] = key.split('-').map(Number)
-  const date = new Date(y, m - 1, d)
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const diff = Math.round((today.getTime() - date.getTime()) / 86400000)
-  if (diff === 0) return 'Today'
-  if (diff === 1) return 'Yesterday'
-  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
 interface AgentDraft { channel: string; subject?: string; text: string }

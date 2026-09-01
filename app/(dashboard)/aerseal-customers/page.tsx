@@ -5,12 +5,12 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
   FileLock2, Search, ExternalLink, Plus, ChevronUp, ChevronDown,
-  Filter, Download, CheckCircle, Loader2,
+  Filter, Download, CheckCircle, Loader2, CalendarCheck,
 } from 'lucide-react'
 import Link from 'next/link'
 import { AERSEAL_CUSTOMERS, AERSEAL_CATEGORIES, AERSEAL_ACCOUNT_COUNT, type AersealCustomer } from '@/lib/aerseal-customers'
 import { AssignToPlutoButton } from '@/components/AssignToPlutoButton'
-import { cn, getScoreBg, getStatusColor, getStatusLabel } from '@/lib/utils'
+import { cn, getScoreBg, getStatusColor, getStatusLabel, groupByDay } from '@/lib/utils'
 import type { Lead } from '@/lib/types'
 
 // Companies the live discovery pipelines (main /api/ai/discover and the
@@ -96,6 +96,7 @@ export default function AersealCustomersPage() {
   const [plutoAssigned, setPlutoAssigned] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState<number | null>(null)
   const { leads: pipelineLeads, loading: pipelineLoading } = usePipelineDiscoveredLeads()
+  const pipelineDayGroups = useMemo(() => groupByDay(pipelineLeads, l => l.created_at), [pipelineLeads])
 
   // On mount: which accounts are already in the CRM, and which are with Pluto.
   useEffect(() => {
@@ -254,19 +255,31 @@ export default function AersealCustomersPage() {
               <div style={{ padding: 18, textAlign: 'center' }}><Loader2 size={16} className="animate-spin" style={{ color: 'rgb(120,127,160)' }} /></div>
             ) : (
               <div>
-                {pipelineLeads.map(l => (
-                  <Link key={l.id} href={`/leads/${l.id}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 18px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'white' }}>{l.company_name}</div>
-                      {l.pain_point && <div style={{ fontSize: 11.5, color: 'rgb(140,146,175)', marginTop: 2 }}>{l.pain_point}</div>}
+                {pipelineDayGroups.map(group => {
+                  const isToday = group.label === 'Today'
+                  return (
+                    <div key={group.key}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,255,255,0.015)' }}>
+                        <CalendarCheck size={11} style={{ color: isToday ? '#fb7185' : '#fbbf24' }} />
+                        <span style={{ fontSize: 11.5, fontWeight: 700, color: isToday ? '#fb7185' : 'rgb(180,185,210)' }}>{group.label}</span>
+                        <span style={{ fontSize: 10, color: 'rgb(120,127,160)' }}>· {group.items.length} found</span>
+                      </div>
+                      {group.items.map(l => (
+                        <Link key={l.id} href={`/leads/${l.id}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 18px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'white' }}>{l.company_name}</div>
+                            {l.pain_point && <div style={{ fontSize: 11.5, color: 'rgb(140,146,175)', marginTop: 2 }}>{l.pain_point}</div>}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                            <span className={cn('badge', getStatusColor(l.status))} style={{ fontSize: 10 }}>{getStatusLabel(l.status)}</span>
+                            {l.aerseal_score != null && <span className={cn('badge', getScoreBg(l.aerseal_score))} title="AERSeal score">{l.aerseal_score}</span>}
+                            {l.aerseal_score == null && l.lead_score != null && <span className={cn('badge', getScoreBg(l.lead_score))} title="Lead score">{l.lead_score}</span>}
+                          </div>
+                        </Link>
+                      ))}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                      <span className={cn('badge', getStatusColor(l.status))} style={{ fontSize: 10 }}>{getStatusLabel(l.status)}</span>
-                      {l.aerseal_score != null && <span className={cn('badge', getScoreBg(l.aerseal_score))} title="AERSeal score">{l.aerseal_score}</span>}
-                      {l.aerseal_score == null && l.lead_score != null && <span className={cn('badge', getScoreBg(l.lead_score))} title="Lead score">{l.lead_score}</span>}
-                    </div>
-                  </Link>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>

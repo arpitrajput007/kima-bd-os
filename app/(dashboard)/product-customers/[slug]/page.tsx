@@ -7,9 +7,10 @@ import { toast } from 'sonner'
 import {
   ArrowLeft, ArrowRight, Database, Compass, Loader2, Star, ExternalLink,
   AtSign, Send, MessageCircle, MessageSquare, Flame, Eye, CheckCircle, XCircle,
+  CalendarCheck,
 } from 'lucide-react'
 import { getProductSection, PRODUCT_DISCOVERY, ACCENT_HEX } from '@/lib/product-sections'
-import { cn, getScoreBg, getUrgencyBg, getStatusColor, getStatusLabel, truncate } from '@/lib/utils'
+import { cn, getScoreBg, getUrgencyBg, getStatusColor, getStatusLabel, truncate, groupByDay } from '@/lib/utils'
 import type { Lead } from '@/lib/types'
 import { notFound } from 'next/navigation'
 
@@ -45,6 +46,8 @@ export default function ProductCustomersPage({ params }: { params: Promise<{ slu
   }
 
   useEffect(loadLeads, [discovery]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const dayGroups = groupByDay(leads, l => l.created_at)
 
   const updateLeadStatus = async (id: string, status: string) => {
     setActionLoading(id + status)
@@ -119,22 +122,35 @@ export default function ProductCustomersPage({ params }: { params: Promise<{ slu
           </div>
         </div>
       ) : (
-        <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${accentColor}30`, background: 'rgb(var(--bg-surface-2))', borderLeft: `3px solid ${accentColor}` }}>
-          <div className="overflow-x-auto">
-            <table className="w-full data-table" style={{ marginBottom: 0 }}>
-              <thead>
-                <tr style={{ background: 'rgba(255,255,255,0.015)' }}>
-                  <th className="text-left">Company</th>
-                  <th className="text-left">Industry</th>
-                  <th className="text-left">Pain Point</th>
-                  <th className="text-left">Urgency</th>
-                  <th className="text-left">Score</th>
-                  <th className="text-left">Status</th>
-                  <th className="text-left">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leads.map(lead => (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--text-3)' }}>
+            <CalendarCheck size={13} />
+            <span>Found by day · {leads.length} total</span>
+          </div>
+          {dayGroups.map(group => {
+            const isToday = group.label === 'Today'
+            return (
+              <div key={group.key} className="rounded-xl overflow-hidden" style={{ border: `1px solid ${accentColor}30`, background: 'rgb(var(--bg-surface-2))', borderLeft: `3px solid ${isToday ? '#fb7185' : accentColor}` }}>
+                <div className="flex items-center gap-2 px-4 py-2.5" style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <CalendarCheck size={13} style={{ color: isToday ? '#fb7185' : '#fbbf24' }} />
+                  <span className="text-[13px] font-bold" style={{ color: isToday ? '#fb7185' : 'white' }}>{group.label}</span>
+                  <span className="badge" style={{ fontSize: 10 }}>{group.items.length} found</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full data-table" style={{ marginBottom: 0 }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(255,255,255,0.015)' }}>
+                        <th className="text-left">Company</th>
+                        <th className="text-left">Industry</th>
+                        <th className="text-left">Pain Point</th>
+                        <th className="text-left">Urgency</th>
+                        <th className="text-left">Score</th>
+                        <th className="text-left">Status</th>
+                        <th className="text-left">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {group.items.map(lead => (
                   <tr key={lead.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -192,10 +208,13 @@ export default function ProductCustomersPage({ params }: { params: Promise<{ slu
                       </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
