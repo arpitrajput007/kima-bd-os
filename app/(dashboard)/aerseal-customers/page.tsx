@@ -5,11 +5,13 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
   FileLock2, Search, ExternalLink, Plus, ChevronUp, ChevronDown,
-  Filter, Download, CheckCircle, Loader2, CalendarCheck,
+  Filter, Download, CheckCircle, Loader2, CalendarCheck, Target, Sparkles, Users,
 } from 'lucide-react'
 import Link from 'next/link'
 import { AERSEAL_CUSTOMERS, AERSEAL_CATEGORIES, AERSEAL_ACCOUNT_COUNT, type AersealCustomer } from '@/lib/aerseal-customers'
+import { AERSEAL_HIGH_CONVERSION_PROSPECTS, AERSEAL_HIGH_CONVERSION_BATCH_DATE, type AersealHighConversionProspect } from '@/lib/aerseal-high-conversion-prospects'
 import { AssignToPlutoButton } from '@/components/AssignToPlutoButton'
+import { assignLeadToPluto } from '@/lib/pluto'
 import { cn, getScoreBg, getStatusColor, getStatusLabel, groupByDay } from '@/lib/utils'
 import type { Lead } from '@/lib/types'
 
@@ -80,6 +82,16 @@ function SubScore({ label, value, max }: { label: string; value: number; max: nu
   )
 }
 
+/** Fact / inference / unknown box used in the high-conversion prospect cards. */
+function InfoBox({ title, color, text }: { title: string; color: string; text: string }) {
+  return (
+    <div style={{ borderRadius: 12, border: `1px solid ${color}33`, background: `${color}0d`, padding: '11px 13px' }}>
+      <div style={{ fontSize: 9.5, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{title}</div>
+      <div style={{ fontSize: 11.5, color: 'rgb(200,205,230)', lineHeight: 1.55 }}>{text}</div>
+    </div>
+  )
+}
+
 export default function AersealCustomersPage() {
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
   const getClient = () => {
@@ -95,12 +107,20 @@ export default function AersealCustomersPage() {
   const [added, setAdded] = useState<Set<string>>(new Set())
   const [plutoAssigned, setPlutoAssigned] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState<number | null>(null)
+  const [expandedProspect, setExpandedProspect] = useState<number | null>(null)
+  const [addingProspect, setAddingProspect] = useState<number | null>(null)
+  const [bulkAdding, setBulkAdding] = useState(false)
   const { leads: pipelineLeads, loading: pipelineLoading } = usePipelineDiscoveredLeads()
   const pipelineDayGroups = useMemo(() => groupByDay(pipelineLeads, l => l.created_at), [pipelineLeads])
 
   // On mount: which accounts are already in the CRM, and which are with Pluto.
+  // Covers both the curated workbook and the high-conversion prospect batch —
+  // membership checks below just do `.has(company)` so sharing one set is fine.
   useEffect(() => {
-    const names = Array.from(new Set(AERSEAL_CUSTOMERS.map(c => c.company)))
+    const names = Array.from(new Set([
+      ...AERSEAL_CUSTOMERS.map(c => c.company),
+      ...AERSEAL_HIGH_CONVERSION_PROSPECTS.map(p => p.company),
+    ]))
     getClient()
       .from('leads')
       .select('company_name, assigned_to')
@@ -206,6 +226,83 @@ export default function AersealCustomersPage() {
     setAdding(null)
   }
 
+  // Same evidence-gated mapping as leadFieldsFor above, adapted for the
+  // dossier-shaped high-conversion prospect batch (fact/inference/unknown
+  // split instead of a single whyNow/authoritySurface pair).
+  const leadFieldsForProspect = (p: AersealHighConversionProspect) => {
+    const verified = Boolean(p.triggerSourceUrl)
+    const severity = !verified ? 'medium'
+      : p.tier === 'Tier 1' ? 'critical'
+      : p.tier === 'Tier 2' ? 'high' : 'medium'
+    return {
+      region: p.chains,
+      description: p.whyNow,
+      industry_category: p.segment,
+      customer_category: ['AERseal Contract-Authority Customer'],
+      product_to_sell: 'AERseal contract-authority transfer',
+      classification: 'customer',
+      supported_chains_or_rails: p.chains,
+      current_providers: p.currentController,
+      pain_point: p.privilegedRole,
+      pain_point_severity: severity,
+      pain_point_evidence: p.confirmedFact,
+      pain_point_source_url: p.structuralSourceUrl,
+      pain_point_evidence_type: verified ? 'verified_source' : 'agent_analysis',
+      aerseal_fit: p.inference,
+      suggested_use_case: p.smartFirstQuestion,
+      potential_gap: p.unknown,
+      outreach_angle: p.smartFirstQuestion,
+      trigger_reason: p.datedTrigger,
+      trigger_date: p.triggerDate,
+      trigger_source_url: p.triggerSourceUrl,
+      source_url: p.triggerSourceUrl || p.structuralSourceUrl,
+      integration_feasibility: p.lockInPenalty >= 7 ? 'low' : p.lockInPenalty >= 4 ? 'medium' : 'high',
+      lead_score: p.score,
+      confidence_score: p.evidenceScore * 10,
+      priority: p.score >= 82 ? 'excellent' : p.score >= 72 ? 'qualified' : 'needs_research',
+    }
+  }
+
+  const addProspectToPipeline = async (p: AersealHighConversionProspect) => {
+    setAddingProspect(p.rank)
+    try {
+      const { error } = await getClient().from('leads').insert({
+        company_name: p.company,
+        status: 'new',
+        updated_at: new Date().toISOString(),
+        ...leadFieldsForProspect(p),
+      })
+      if (error) {
+        if (error.code === '23505') { toast(`${p.company} is already in your pipeline`); setAdded(s => new Set([...s, p.company])) }
+        else toast.error('Failed to add: ' + error.message)
+      } else {
+        toast.success(`${p.company} added to BD pipeline`)
+        setAdded(s => new Set([...s, p.company]))
+      }
+    } catch { toast.error('Failed') }
+    setAddingProspect(null)
+  }
+
+  // Single "do both" action for the whole batch — creates (or updates) every
+  // one of the 20 prospects as a lead and assigns it to Pluto in one go.
+  const addAllProspectsToPluto = async () => {
+    setBulkAdding(true)
+    const results = await Promise.all(
+      AERSEAL_HIGH_CONVERSION_PROSPECTS.map(p => assignLeadToPluto(p.company, leadFieldsForProspect(p)))
+    )
+    const okNames = AERSEAL_HIGH_CONVERSION_PROSPECTS.filter((_, i) => results[i].ok).map(p => p.company)
+    const failCount = results.length - okNames.length
+    if (okNames.length) {
+      setAdded(s => new Set([...s, ...okNames]))
+      setPlutoAssigned(s => new Set([...s, ...okNames]))
+    }
+    setBulkAdding(false)
+    if (failCount === 0) toast.success(`All ${okNames.length} prospects added to BD pipeline & assigned to Pluto`)
+    else toast.error(`${okNames.length} assigned, ${failCount} failed`)
+  }
+
+  const allProspectsWithPluto = AERSEAL_HIGH_CONVERSION_PROSPECTS.every(p => plutoAssigned.has(p.company))
+
   const tier1 = AERSEAL_CUSTOMERS.filter(c => c.tier === 'Tier 1').length
   const avgScore = Math.round(sorted.reduce((s, c) => s + c.conversionScore, 0) / (sorted.length || 1))
 
@@ -240,6 +337,153 @@ export default function AersealCustomersPage() {
       </div>
 
       <div style={{ padding: 'clamp(14px, 4vw, 20px) clamp(16px, 5vw, 36px)' }}>
+
+        {/* High-Conversion Prospects — a dedicated 20-account research batch
+            imported verbatim from the workbook, distinct from the 200-account
+            curated list below. Card layout (not the dense table) because each
+            row carries long-form fact/inference/unknown text that a narrow
+            column would truncate into uselessness. */}
+        <div style={{ marginBottom: 28, borderRadius: 16, border: '1px solid rgba(251,113,133,0.22)', background: 'rgba(251,113,133,0.03)', overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px 14px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <Target size={16} style={{ color: '#fb7185' }} />
+                <span style={{ fontSize: 14, fontWeight: 800, color: 'white' }}>High-Conversion Prospects</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9.5, fontWeight: 700, color: '#fb7185', background: 'rgba(251,113,133,0.12)', border: '1px solid rgba(251,113,133,0.3)', padding: '2px 8px', borderRadius: 6 }}>
+                  <Sparkles size={9} /> NEW · {AERSEAL_HIGH_CONVERSION_BATCH_DATE}
+                </span>
+              </div>
+              <div style={{ fontSize: 11.5, color: 'rgb(120,127,160)', marginTop: 5, maxWidth: 640, lineHeight: 1.5 }}>
+                {AERSEAL_HIGH_CONVERSION_PROSPECTS.length} smaller, higher-reach accounts from the latest research pass — ranked, with fact / inference / unknown evidence kept separate and a smart first question for each. Imported as-is from the workbook.
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 16 }}>
+            {AERSEAL_HIGH_CONVERSION_PROSPECTS.map(p => {
+              const isExp = expandedProspect === p.rank
+              const isAdded = added.has(p.company)
+              const isPluto = plutoAssigned.has(p.company)
+              const sc = scoreColor(p.score)
+              const tc = tierColor(p.tier)
+              return (
+                <div key={p.rank} style={{ borderRadius: 14, border: `1px solid ${isExp ? 'rgba(251,113,133,0.4)' : 'rgba(255,255,255,0.08)'}`, background: isExp ? 'rgba(251,113,133,0.05)' : 'rgba(255,255,255,0.02)', overflow: 'hidden', transition: 'border-color 0.15s, background 0.15s' }}>
+
+                  {/* Card header — always visible */}
+                  <div
+                    onClick={() => setExpandedProspect(isExp ? null : p.rank)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 16px', cursor: 'pointer', flexWrap: 'wrap' }}>
+                    <div style={{ width: 26, height: 26, borderRadius: 8, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: 'rgb(150,155,185)', flexShrink: 0 }}>
+                      #{p.rank}
+                    </div>
+                    <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: 'white' }}>{p.company}</span>
+                        <span style={{ fontSize: 9.5, fontWeight: 600, color: '#a78bfa', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap' }}>{p.segment}</span>
+                        <span style={{ fontSize: 9.5, fontWeight: 600, color: 'rgb(150,155,185)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap' }}>{p.chains}</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'rgb(150,155,185)', marginTop: 4, lineHeight: 1.5 }}>{p.whyNow}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: 8.5, color: 'rgb(100,107,140)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Score</div>
+                        <span style={{ display: 'inline-flex', minWidth: 34, justifyContent: 'center', padding: '2px 8px', borderRadius: 7, fontSize: 13, fontWeight: 800, color: sc.color, background: sc.bg, border: `1px solid ${sc.border}` }}>{p.score}</span>
+                      </div>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: tc, padding: '4px 10px', borderRadius: 7, background: `${tc}18`, border: `1px solid ${tc}45`, whiteSpace: 'nowrap' }}>{p.tier}</span>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: 'rgb(140,146,175)', whiteSpace: 'nowrap' }}>{p.readiness}</span>
+                      {isPluto && <span title="With Pluto" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, color: '#fbbf24' }}><Users size={11} /></span>}
+                      {isExp ? <ChevronUp size={14} style={{ color: 'rgb(120,127,160)' }} /> : <ChevronDown size={14} style={{ color: 'rgb(120,127,160)' }} />}
+                    </div>
+                  </div>
+
+                  {/* Expanded dossier detail */}
+                  {isExp && (
+                    <div style={{ padding: '0 18px 18px 18px' }}>
+                      <div style={{ fontSize: 10.5, color: '#fbbf24', fontWeight: 700, marginBottom: 10 }}>{p.triggerDate || 'undated'} · {p.datedTrigger}</div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px,1fr))', gap: 10, marginBottom: 12 }}>
+                        <InfoBox title="Confirmed fact" color="#34d399" text={p.confirmedFact} />
+                        <InfoBox title="AERSeal hypothesis" color="#a78bfa" text={p.inference} />
+                        <InfoBox title="Must verify" color="#f87171" text={p.unknown} />
+                      </div>
+
+                      <div style={{ borderRadius: 12, border: '1px solid rgba(56,189,248,0.2)', background: 'rgba(56,189,248,0.05)', padding: '12px 14px', marginBottom: 12 }}>
+                        <div style={{ fontSize: 9.5, fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Smart first question</div>
+                        <div style={{ fontSize: 12.5, color: 'rgb(220,225,245)', lineHeight: 1.6, fontStyle: 'italic' }}>&ldquo;{p.smartFirstQuestion}&rdquo;</div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: 12, fontSize: 11.5, color: 'rgb(160,165,195)', marginBottom: 14 }}>
+                        <div><b style={{ color: 'rgb(190,195,220)' }}>Privileged role</b><div style={{ marginTop: 3, lineHeight: 1.5 }}>{p.privilegedRole}</div></div>
+                        <div><b style={{ color: 'rgb(190,195,220)' }}>Current controller</b><div style={{ marginTop: 3, lineHeight: 1.5 }}>{p.currentController}</div></div>
+                        <div><b style={{ color: 'rgb(190,195,220)' }}>Likely buyer</b><div style={{ marginTop: 3, lineHeight: 1.5 }}>{p.likelyBuyer}</div></div>
+                        <div><b style={{ color: 'rgb(190,195,220)' }}>Reach route</b><div style={{ marginTop: 3, lineHeight: 1.5 }}>{p.reachRoute}</div></div>
+                        <div><b style={{ color: 'rgb(190,195,220)' }}>Outreach posture</b><div style={{ marginTop: 3, lineHeight: 1.5 }}>{p.outreachPosture}</div></div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center', paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', marginBottom: 14 }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                          <SubScore label="Fit" value={p.fitScore} max={30} />
+                          <SubScore label="Trigger" value={p.triggerScore} max={25} />
+                          <SubScore label="Reach" value={p.reachScore} max={20} />
+                          <SubScore label="Consequence" value={p.consequenceScore} max={15} />
+                          <SubScore label="Evidence" value={p.evidenceScore} max={10} />
+                          <SubScore label="Lock-in" value={p.lockInPenalty} max={10} />
+                        </div>
+                        <div style={{ display: 'flex', gap: 12, marginLeft: 'auto' }}>
+                          {p.structuralSourceUrl && (
+                            <a href={p.structuralSourceUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 11, color: '#818cf8', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                              <ExternalLink size={11} /> Structural source
+                            </a>
+                          )}
+                          {p.triggerSourceUrl && (
+                            <a href={p.triggerSourceUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 11, color: '#60a5fa', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                              <ExternalLink size={11} /> Trigger source
+                            </a>
+                          )}
+                        </div>
+                      </div>
+
+                      <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {isAdded ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: '#34d399', padding: '6px 12px' }}>
+                            <CheckCircle size={13} /> Added
+                          </span>
+                        ) : (
+                          <button onClick={() => addProspectToPipeline(p)} disabled={addingProspect === p.rank}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1px solid rgba(167,139,250,0.35)', background: 'rgba(167,139,250,0.1)', color: '#a78bfa', opacity: addingProspect === p.rank ? 0.7 : 1 }}>
+                            {addingProspect === p.rank ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
+                            Add to BD
+                          </button>
+                        )}
+                        <AssignToPlutoButton
+                          companyName={p.company}
+                          createFields={{ ...leadFieldsForProspect(p) }}
+                          initialAssigned={isPluto}
+                          onAssigned={() => setAdded(s => new Set([...s, p.company]))}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Single action for the whole batch, at the end of the section */}
+          <div style={{ padding: '4px 16px 20px 16px', display: 'flex', justifyContent: 'center' }}>
+            {allProspectsWithPluto ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 700, color: '#34d399', padding: '11px 20px' }}>
+                <CheckCircle size={15} /> All {AERSEAL_HIGH_CONVERSION_PROSPECTS.length} prospects are in the BD pipeline & assigned to Pluto
+              </span>
+            ) : (
+              <button onClick={addAllProspectsToPluto} disabled={bulkAdding}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 22px', borderRadius: 11, fontSize: 12.5, fontWeight: 700, cursor: bulkAdding ? 'not-allowed' : 'pointer', border: '1px solid rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.12)', color: '#fbbf24', opacity: bulkAdding ? 0.7 : 1 }}>
+                {bulkAdding ? <Loader2 size={14} className="animate-spin" /> : <Users size={14} />}
+                Add all {AERSEAL_HIGH_CONVERSION_PROSPECTS.length} to BD Pipeline &amp; Assign to Pluto
+              </button>
+            )}
+          </div>
+        </div>
 
         {/* Pipeline-discovered — companies the live discovery pipelines found
             and saved, not yet in the curated workbook below. */}
