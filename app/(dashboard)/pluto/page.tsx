@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { ACTOR_LABEL, type Actor } from '@/lib/actor'
 import { cn, getStatusColor, getStatusLabel, formatDate } from '@/lib/utils'
+import { productOfLead } from '@/lib/product-sections'
 import type { Lead } from '@/lib/types'
 import { WEB3_AGENTS } from '@/lib/web3-agent-companies'
 import { WEB2_COMPANIES } from '@/lib/web2-agent-companies'
@@ -31,10 +32,13 @@ function groupOf(companyName: string): Group {
   return 'other'
 }
 
+// Fallback for leads that don't carry any of the 4 dedicated-product signals
+// productOfLead() checks — i.e. legacy Kima/Aeredium prospecting, which only
+// ever tracked "which agent-company list this came from," not a product tag.
 const SOURCE_META: Record<Group, { label: string; color: string }> = {
-  web3: { label: 'Web3', color: '#a78bfa' },
-  web2: { label: 'Web2', color: '#38bdf8' },
-  other: { label: 'Other', color: '#fbbf24' },
+  web3: { label: 'Kima/Aeredium · Web3', color: '#fb923c' },
+  web2: { label: 'Kima/Aeredium · Web2', color: '#fb923c' },
+  other: { label: 'Other', color: '#94a3b8' },
 }
 
 const CHANNEL_SHORT: Record<string, string> = {
@@ -132,7 +136,7 @@ function LeadGroupTable({ title, icon: Icon, color, leads, now, onDelete, contac
             <tbody>
               {leads.map(lead => {
                 const overdue = !!lead.next_follow_up_at && new Date(lead.next_follow_up_at).getTime() <= now
-                const source = SOURCE_META[groupOf(lead.company_name)]
+                const product = productOfLead(lead) || SOURCE_META[groupOf(lead.company_name)]
                 // Fall back to the lead's own last_channel/last_contacted_at
                 // when there's no granular activity log for it (e.g. leads
                 // marked contacted before per-touch logging existed).
@@ -146,8 +150,8 @@ function LeadGroupTable({ title, icon: Icon, color, leads, now, onDelete, contac
                         <Link href={`/leads/${lead.id}`} className="text-sm font-medium text-white hover:text-violet-300 transition-colors">
                           {lead.company_name}
                         </Link>
-                        <span className="badge text-xs" style={{ background: `${source.color}15`, color: source.color, borderColor: `${source.color}35`, fontSize: '9px', padding: '1px 5px' }}>
-                          {source.label}
+                        <span className="badge text-xs" style={{ background: `${product.color}15`, color: product.color, borderColor: `${product.color}35`, fontSize: '9px', padding: '1px 5px' }}>
+                          {product.label}
                         </span>
                       </div>
                     </td>

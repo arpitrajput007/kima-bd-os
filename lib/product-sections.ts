@@ -97,6 +97,39 @@ export const PRODUCT_DISCOVERY: Partial<Record<ProductSlug, { category: string; 
   aerseal: { category: 'AERseal Contract-Authority Customer', fitField: 'aerseal_fit' },
 }
 
+export interface ProductBadge { label: string; color: string }
+
+// Which of the 4 dedicated-discovery products (AERseal/Aerpolice/AER360/
+// AERKey) a lead belongs to, from the same customer_category/fit-field
+// signals each product's own pipeline already writes (see PRODUCT_DISCOVERY
+// above and each *-customers page's leadFieldsFor). Used anywhere a lead
+// list spans multiple products and needs to show which one it's for — e.g.
+// Pluto's Section, which otherwise has no way to tell an AERseal assignment
+// from an Aerpolice one. Returns null when none match — the caller decides
+// the fallback (e.g. the legacy Kima/Aeredium Web3/Web2/Other grouping).
+export function productOfLead(lead: {
+  customer_category?: string[] | null
+  aerseal_score?: number | null
+  aerseal_fit?: string | null
+  aerpolice_fit?: string | null
+  aeredium_fit?: string | null
+}): ProductBadge | null {
+  const cats = lead.customer_category || []
+  if (lead.aerseal_score != null || cats.includes('AERseal Contract-Authority Customer') || !!lead.aerseal_fit) {
+    return { label: 'AERseal', color: '#a78bfa' }
+  }
+  if (cats.includes('Aerpolice Governance Customer') || cats.includes('Aerpolice Reachable Prospect') || !!lead.aerpolice_fit) {
+    return { label: 'Aerpolice', color: '#22d3ee' }
+  }
+  if (cats.includes('AER360 Custody / Key-Governance Customer') || !!lead.aeredium_fit) {
+    return { label: 'AER360', color: '#38bdf8' }
+  }
+  if (cats.includes('AERKey Customer')) {
+    return { label: 'AERKey', color: '#60a5fa' }
+  }
+  return null
+}
+
 // Hex values for each ProductSection.accent name — matches the accent colors
 // already used elsewhere in the app (e.g. the Lead Inbox "By Product" star/
 // badge accents), so a product's own color stays consistent across every
