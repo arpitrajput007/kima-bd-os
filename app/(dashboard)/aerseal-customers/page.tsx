@@ -212,7 +212,7 @@ export default function AersealCustomersPage() {
   return (
     <div className="fade-in">
       {/* Header */}
-      <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="page-header flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-[18px] font-bold text-white tracking-tight flex items-center gap-2">
             <FileLock2 size={18} style={{ color: '#a78bfa' }} /> AERseal Customers
@@ -239,7 +239,7 @@ export default function AersealCustomersPage() {
         </div>
       </div>
 
-      <div style={{ padding: '20px 36px' }}>
+      <div style={{ padding: 'clamp(14px, 4vw, 20px) clamp(16px, 5vw, 36px)' }}>
 
         {/* Pipeline-discovered — companies the live discovery pipelines found
             and saved, not yet in the curated workbook below. */}
@@ -286,7 +286,7 @@ export default function AersealCustomersPage() {
         )}
 
         {/* Stats row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 24 }}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           {[
             { label: 'Total Prospects', value: AERSEAL_CUSTOMERS.length, color: '#a78bfa' },
             { label: 'Tier 1', value: tier1, color: '#34d399' },
@@ -311,7 +311,7 @@ export default function AersealCustomersPage() {
 
         {/* Filters */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ position: 'relative', flex: '0 0 260px' }}>
+          <div style={{ position: 'relative', flex: '1 1 220px', minWidth: 0, maxWidth: 320 }}>
             <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'rgb(120,127,160)' }} />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search company, trigger, authority…"
               style={{ width: '100%', padding: '8px 12px 8px 32px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'white', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
@@ -341,6 +341,8 @@ export default function AersealCustomersPage() {
 
         {/* Table */}
         <div style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+        <div style={{ minWidth: 880 }}>
           {/* Table header */}
           <div style={{ display: 'grid', gridTemplateColumns: '190px 150px 1fr 1fr 90px 70px 70px 130px', gap: 0, background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '10px 16px', alignItems: 'center' }}>
             {[
@@ -494,6 +496,8 @@ export default function AersealCustomersPage() {
               No prospects match those filters.
             </div>
           )}
+        </div>
+        </div>
         </div>
 
         <div style={{ fontSize: 11, color: 'rgb(90,95,120)', marginTop: 14, textAlign: 'center' }}>
