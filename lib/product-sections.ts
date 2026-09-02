@@ -30,7 +30,7 @@ export const PRODUCT_SECTIONS: ProductSection[] = [
     shortLabel: 'AERpolice',
     accent: 'cyan',
     knowledge: AERPOLICE_KNOWLEDGE,
-    customerLinks: [],
+    customerLinks: [{ href: '/aerpolice-customers', label: 'AERpolice Customers' }],
     defaultApproachPlaceholder:
       'Describe how to find AERpolice customers — e.g. "Target AI-native companies whose agents take consequential financial actions (payments, procurement, treasury, trading), especially ones facing enterprise security review. Look for MCP-based tooling, agentic-commerce startups, AI wallet builders." Paste your own notes here and save.',
   },

@@ -96,7 +96,7 @@ const navGroups: {
   {
     label: 'AERpolice',
     items: [
-      { href: '/product-customers/aerpolice', label: 'AERpolice Customers', icon: Users },
+      { href: '/aerpolice-customers',         label: 'AERpolice Customers', icon: ShieldCheck, glow: true },
       { href: '/pluto-customers/aerpolice',   label: "Pluto's Customers",   icon: UserCog, orange: true },
       { href: '/product-resources/aerpolice', label: 'AERpolice Resources', icon: Database, cyan: true },
       { href: '/product-approach/aerpolice',  label: 'AERpolice Approach',  icon: Compass },
