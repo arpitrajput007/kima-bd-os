@@ -235,6 +235,7 @@ export default function AersealCustomersPage() {
       : p.tier === 'Tier 1' ? 'critical'
       : p.tier === 'Tier 2' ? 'high' : 'medium'
     return {
+      website: p.website,
       region: p.chains,
       description: p.whyNow,
       industry_category: p.segment,
@@ -382,6 +383,12 @@ export default function AersealCustomersPage() {
                         <span style={{ fontSize: 9.5, fontWeight: 600, color: '#a78bfa', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap' }}>{p.segment}</span>
                         <span style={{ fontSize: 9.5, fontWeight: 600, color: 'rgb(150,155,185)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap' }}>{p.chains}</span>
                       </div>
+                      {p.website && (
+                        <a href={p.website} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                          style={{ fontSize: 10, color: 'rgb(110,115,150)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                          <ExternalLink size={9} />{p.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                        </a>
+                      )}
                       <div style={{ fontSize: 11, color: 'rgb(150,155,185)', marginTop: 4, lineHeight: 1.5 }}>{p.whyNow}</div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>

@@ -9,6 +9,10 @@
 export interface AersealHighConversionProspect {
   rank: number
   company: string
+  /** Official project website — NOT in the source workbook (which only carried
+   *  third-party structural/trigger evidence URLs); verified via web search
+   *  2026-09-02 and added here since Pluto needs it for outreach. */
+  website: string
   segment: string
   chains: string
   triggerDate: string | null
@@ -43,6 +47,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 1,
     company: "Monetrix",
+    website: "https://www.monetrix.xyz/",
     segment: "Synthetic dollar / HyperEVM",
     chains: "HyperEVM",
     triggerDate: "2026-05-26",
@@ -72,6 +77,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 2,
     company: "Term Finance (Term Labs)",
+    website: "https://www.term.finance/",
     segment: "Fixed-rate lending / vaults",
     chains: "Ethereum",
     triggerDate: "2026-08-24",
@@ -101,6 +107,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 3,
     company: "TermMax",
+    website: "https://www.termmax.cv/",
     segment: "Fixed-rate lending",
     chains: "Ethereum",
     triggerDate: "2026-08-24",
@@ -130,6 +137,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 4,
     company: "Money on Chain / RIF on Chain",
+    website: "https://moneyonchain.com/",
     segment: "Stablecoin + governance",
     chains: "Rootstock (EVM)",
     triggerDate: "2026-08-20",
@@ -159,6 +167,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 5,
     company: "Intuition",
+    website: "https://www.intuition.systems/",
     segment: "InfoFi protocol + EVM L3",
     chains: "Base + Intuition EVM",
     triggerDate: "2026-08-27",
@@ -188,6 +197,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 6,
     company: "Royco",
+    website: "https://www.royco.org/",
     segment: "Structured-yield protocol",
     chains: "Ethereum, Arbitrum, Base, Avalanche",
     triggerDate: "2026-08-12",
@@ -217,6 +227,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 7,
     company: "NUVA",
+    website: "https://nuva.finance/",
     segment: "RWA vault marketplace",
     chains: "Ethereum",
     triggerDate: "2026-08-12",
@@ -246,6 +257,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 8,
     company: "Strata",
+    website: "https://www.strata.markets/",
     segment: "Synthetic assets / asset management",
     chains: "Ethereum",
     triggerDate: "2026-07-12",
@@ -275,6 +287,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 9,
     company: "Olas (Autonolas)",
+    website: "https://olas.network/",
     segment: "Onchain AI services / DAO",
     chains: "Ethereum + 7 EVM chains",
     triggerDate: "2026-08-20",
@@ -304,6 +317,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 10,
     company: "Livepeer",
+    website: "https://livepeer.org/",
     segment: "Video/AI infrastructure network",
     chains: "Ethereum, Arbitrum",
     triggerDate: "2026-08-28",
@@ -333,6 +347,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 11,
     company: "USDN / SmarDex",
+    website: "https://smardex.io/",
     segment: "Synthetic dollar",
     chains: "Ethereum",
     triggerDate: "2026-07-24",
@@ -362,6 +377,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 12,
     company: "MagpieXYZ",
+    website: "https://www.magpiexyz.io/",
     segment: "veToken yield / DAO",
     chains: "BNB Chain, Arbitrum, Ethereum",
     triggerDate: "2026-08-26",
@@ -391,6 +407,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 13,
     company: "Vesper",
+    website: "https://vesper.finance/",
     segment: "Yield aggregator",
     chains: "Ethereum",
     triggerDate: "2026-07-28",
@@ -420,6 +437,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 14,
     company: "Twyne",
+    website: "https://twyne.xyz/",
     segment: "Modular lending risk layer",
     chains: "Ethereum",
     triggerDate: "2026-06-25",
@@ -449,6 +467,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 15,
     company: "Panoptic",
+    website: "https://panoptic.xyz/",
     segment: "Onchain options",
     chains: "Ethereum EVM",
     triggerDate: "2026-05-06",
@@ -478,6 +497,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 16,
     company: "Silo Finance",
+    website: "https://www.silo.finance/",
     segment: "Isolated lending + vaults",
     chains: "Ethereum",
     triggerDate: "2026-06-17",
@@ -507,6 +527,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 17,
     company: "Velodrome Finance",
+    website: "https://velodrome.finance/",
     segment: "AMM / DEX",
     chains: "Optimism",
     triggerDate: "2026-07-05",
@@ -536,6 +557,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 18,
     company: "dHEDGE",
+    website: "https://www.dhedge.org/",
     segment: "Onchain asset management",
     chains: "Ethereum, Arbitrum, Base, Optimism, Polygon",
     triggerDate: "2026-02-17",
@@ -565,6 +587,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 19,
     company: "Tetu",
+    website: "https://tetu.io/",
     segment: "Yield aggregator / asset management",
     chains: "Polygon",
     triggerDate: "2026-06-08",
@@ -594,6 +617,7 @@ export const AERSEAL_HIGH_CONVERSION_PROSPECTS: AersealHighConversionProspect[] 
   {
     rank: 20,
     company: "GammaSwap",
+    website: "https://gammaswap.com/",
     segment: "AMM liquidity borrowing / derivatives",
     chains: "Arbitrum",
     triggerDate: "2026-05-19",
