@@ -71,7 +71,7 @@ const EVENT_WINDOW_DAYS = 240
 const CONCURRENCY = 3
 
 // ── Stage 1: harvest ────────────────────────────────────────────────────────
-async function harvest(probe: string, deepCrawl: boolean): Promise<{ content: string; via: string }> {
+async function harvest(probe: string, deepCrawl: boolean, windowDays: number = EVENT_WINDOW_DAYS): Promise<{ content: string; via: string }> {
   if (/^https?:\/\//.test(probe)) {
     if (deepCrawl && firecrawlConfigured()) {
       const deep = await firecrawlDeepScrape(probe, { maxActions: 5 })
@@ -86,7 +86,7 @@ async function harvest(probe: string, deepCrawl: boolean): Promise<{ content: st
   // category. The publishedDate that comes back is what dates the trigger, and
   // an undated trigger scores as weak recency, so it is worth carrying through.
   if (exaConfigured()) {
-    const events = await exaSearchEvents(probe, 12, EVENT_WINDOW_DAYS)
+    const events = await exaSearchEvents(probe, 12, windowDays)
     const content = events
       .map(r => `Title: ${r.title}\nURL: ${r.url}\nPublished: ${r.publishedDate?.split('T')[0] || 'undated'}\nContent: ${r.text.slice(0, 1800)}`)
       .join('\n\n---\n\n')
@@ -135,16 +135,29 @@ async function extractCandidates(
   surfaceLabel: string,
   provider: AIProvider,
   approachText?: string,
+  recencyDays?: number,
 ): Promise<AuthorityCandidate[]> {
   try {
+    const dynamicBlocks = [
+      approachText
+        ? `THE USER'S OWN AERSEAL HUNTING APPROACH (follow this as the primary strategy for what counts as a good candidate — it overrides generic assumptions above where the two disagree):\n${approachText}`
+        : null,
+      // Threaded from the recurring scheduler (lib/aerseal-orchestrator.ts):
+      // an incremental run only wants events from the last ~24h, a backfill
+      // wants the last 30 days, a full reconciliation wants everything within
+      // the normal EVENT_WINDOW_DAYS. Manual UI runs leave this unset and get
+      // the original unbounded-within-EVENT_WINDOW_DAYS behavior.
+      recencyDays
+        ? `RECENCY WINDOW FOR THIS RUN: only return candidates whose event_date falls within the last ${recencyDays} day(s) (today is ${new Date().toISOString().slice(0, 10)}). If the page shows older events too, skip them entirely — do not include them "just in case".`
+        : null,
+    ].filter(Boolean).join('\n\n') || undefined
+
     const result = await routeJSON<{ candidates: AuthorityCandidate[] }>({
       provider,
       model: provider === 'claude' ? CLAUDE_FAST : 'gpt-4o',
       maxTokens: 3000,
       temperature: 0.2,
-      systemDynamicSuffix: approachText
-        ? `THE USER'S OWN AERSEAL HUNTING APPROACH (follow this as the primary strategy for what counts as a good candidate — it overrides generic assumptions above where the two disagree):\n${approachText}`
-        : undefined,
+      systemDynamicSuffix: dynamicBlocks,
       system: `You scan event surfaces for organisations whose EVM SMART-CONTRACT ADMINISTRATIVE AUTHORITY has just become important.
 
 ${TRIGGER_FIRST_RULES}
@@ -534,6 +547,7 @@ export async function POST(req: NextRequest) {
       deep_crawl = false,
       research_ai = 'claude',
       dry_run = false,
+      lookback_days,
     } = body as {
       surface_key?: string
       probe?: string
@@ -541,7 +555,15 @@ export async function POST(req: NextRequest) {
       deep_crawl?: boolean
       research_ai?: string
       dry_run?: boolean
+      // Optional — set by the recurring scheduler (lib/aerseal-orchestrator.ts)
+      // to bias this run toward recent events (incremental) or a bounded
+      // backfill window, instead of the default EVENT_WINDOW_DAYS. Manual UI
+      // runs omit this and keep today's unbounded-within-240-days behavior.
+      lookback_days?: number
     }
+    const eventWindowDays = lookback_days
+      ? Math.max(1, Math.min(Math.round(Number(lookback_days)), EVENT_WINDOW_DAYS))
+      : EVENT_WINDOW_DAYS
 
     const provider: AIProvider = research_ai === 'openai' ? 'openai' : 'claude'
     if (provider === 'claude') {
@@ -627,10 +649,12 @@ export async function POST(req: NextRequest) {
       surface: surface?.key || 'custom',
       surface_label: label,
       harvested_via: '' as string,
+      event_window_days: EVENT_WINDOW_DAYS,
       candidates_found: 0,
       skipped_no_authority_angle: 0,
       skipped_generic_name: 0,
       skipped_duplicate: 0,
+      skipped_recently_rejected: 0,
       profiled: 0,
       profile_failed: 0,
       rejected: 0,
@@ -656,8 +680,9 @@ export async function POST(req: NextRequest) {
     const approachText = approachRow?.approach_text?.trim() || undefined
 
     // 1 ── Harvest the event surface.
-    const { content, via } = await harvest(probe, deep_crawl)
+    const { content, via } = await harvest(probe, deep_crawl, eventWindowDays)
     results.harvested_via = via
+    results.event_window_days = eventWindowDays
     if (!content || content.length < 150) {
       return NextResponse.json(
         { ...results, error: `Nothing usable harvested from "${label}" (via ${via}). Try a different surface or enable deep_crawl.` },
@@ -666,7 +691,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2 ── Extract organisations whose contract authority the event touches.
-    const candidates = await extractCandidates(content, label, provider, approachText)
+    const candidates = await extractCandidates(content, label, provider, approachText, lookback_days ? eventWindowDays : undefined)
     results.candidates_found = candidates.length
 
     const named = candidates.filter(c => {
@@ -689,13 +714,76 @@ export async function POST(req: NextRequest) {
       (existing || []).map((l: { website?: string }) => toDomain(l.website || '')).filter(Boolean),
     )
 
+    // Also skip anything gate-rejected recently — without this, a recurring
+    // scanner re-harvests the same dead-end organisation off the same event
+    // surface every cycle and burns a full dossier call rediscovering the
+    // same "no" each time. REJECTED_COOLDOWN_DAYS lets a genuinely changed
+    // situation (new trigger, new evidence) get reconsidered rather than
+    // blocking the org forever.
+    const rejectedCooldownDays = Number(process.env.AERSEAL_REJECTED_COOLDOWN_DAYS) || 14
+    const rejectedSince = new Date(Date.now() - rejectedCooldownDays * 86400_000).toISOString()
+    const { data: recentlyRejected } = await supabase
+      .from('aerseal_rejected_candidates')
+      .select('organization, domain')
+      .gte('last_seen_at', rejectedSince)
+    const rejectedNames = new Set(
+      (recentlyRejected || []).map((r: { organization: string }) => (r.organization || '').toLowerCase().trim()),
+    )
+    const rejectedDomains = new Set(
+      (recentlyRejected || []).map((r: { domain: string | null }) => r.domain || '').filter(Boolean),
+    )
+
     const toProfile = withAngle.filter(c => {
       const nameKey = c.organization.toLowerCase().trim()
       const domainKey = toDomain(c.website || '')
       if (existingNames.has(nameKey)) { results.skipped_duplicate++; return false }
       if (domainKey && existingDomains.has(domainKey)) { results.skipped_duplicate++; return false }
+      if (rejectedNames.has(nameKey)) { results.skipped_recently_rejected++; return false }
+      if (domainKey && rejectedDomains.has(domainKey)) { results.skipped_recently_rejected++; return false }
       return true
     }).slice(0, MAX_PROFILED)
+
+    // Upsert-by-name+domain memory of a rejected/gate-failed candidate — see
+    // supabase/add-aerseal-recurring-discovery.sql for the unique index this
+    // relies on (lower(organization), coalesce(domain,'')).
+    async function recordRejection(
+      organization: string,
+      website: string,
+      reason: string,
+      score: number,
+      tier: number,
+      gateFailures: string[],
+      rejections: string[],
+    ): Promise<void> {
+      try {
+        const domain = toDomain(website) || ''
+        const { data: existingRow } = await supabase
+          .from('aerseal_rejected_candidates')
+          .select('id, seen_count')
+          .eq('organization', organization)
+          .or(`domain.eq.${domain},domain.is.null`)
+          .maybeSingle()
+        const now = new Date().toISOString()
+        if (existingRow) {
+          await supabase
+            .from('aerseal_rejected_candidates')
+            .update({
+              reason, score, tier, gate_failures: gateFailures, rejections,
+              surface_key: surface?.key || 'custom', last_seen_at: now,
+              seen_count: (existingRow.seen_count || 1) + 1,
+            })
+            .eq('id', existingRow.id)
+        } else {
+          await supabase.from('aerseal_rejected_candidates').insert({
+            organization, domain, reason, score, tier,
+            gate_failures: gateFailures, rejections, surface_key: surface?.key || 'custom',
+          })
+        }
+      } catch (e) {
+        // Best-effort memory — never let this block the actual run.
+        console.error('[aerseal:recordRejection]', e)
+      }
+    }
 
     // 3–7 ── Profile, score, gate, enrich, hypothesise, save.
     async function runOne(candidate: AuthorityCandidate): Promise<void> {
@@ -754,6 +842,14 @@ export async function POST(req: NextRequest) {
       if (gate.rejections.length > 0) {
         results.rejected++
         results.prospects.push({ ...record, outcome: 'rejected' })
+        if (!dry_run) {
+          await recordRejection(
+            dossier.organization || candidate.organization,
+            dossier.website || candidate.website || '',
+            gate.rejections[0],
+            score.total, score.tier, gate.failures, gate.rejections,
+          )
+        }
         return
       }
 
@@ -764,6 +860,14 @@ export async function POST(req: NextRequest) {
       if (!gate.approved) {
         results.gate_failed++
         results.prospects.push({ ...record, outcome: 'gate_failed' })
+        if (!dry_run) {
+          await recordRejection(
+            dossier.organization || candidate.organization,
+            dossier.website || candidate.website || '',
+            'gate_failed',
+            score.total, score.tier, gate.failures, gate.rejections,
+          )
+        }
         return
       }
       results.approved++

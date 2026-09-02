@@ -27,3 +27,24 @@ export function isSourceDue(source: SourceScheduleInfo, context: 'manual' | 'cro
   if (!source.last_run_at) return true
   return Date.now() - new Date(source.last_run_at).getTime() >= intervalMs
 }
+
+// ── Hour-granularity due check (AERSeal recurring scanner) ─────────────────
+// The daily/weekly buckets above are too coarse for a source that should be
+// rescanned every 6 hours. Two differences from isSourceDue:
+//   1. Interval is in hours, not a fixed enum bucket.
+//   2. The cursor is last_success_at, not last_run_at — a source whose most
+//      recent attempt errored should be retried next cycle, not treated as
+//      "just scanned" for a full interval. isSourceDue's last_run_at cursor
+//      is correct for its own use (daily/weekly cron gating where a retry
+//      tomorrow is fine); a 6-hour loop needs the stricter one.
+export interface HourScheduleInfo {
+  scan_interval_hours?: number | null
+  last_success_at?: string | null
+}
+
+export function isSourceDueByHours(source: HourScheduleInfo, fallbackIntervalHours: number): boolean {
+  const hours = source.scan_interval_hours ?? fallbackIntervalHours
+  if (!hours || hours <= 0) return true
+  if (!source.last_success_at) return true
+  return Date.now() - new Date(source.last_success_at).getTime() >= hours * 60 * 60 * 1000
+}

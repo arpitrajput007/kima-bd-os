@@ -9,7 +9,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import {
   ShieldCheck, Loader2, Play, ExternalLink, ChevronDown, ChevronRight,
-  AlertTriangle, XCircle, CheckCircle2, FlaskConical, Radio,
+  AlertTriangle, XCircle, CheckCircle2, FlaskConical, Radio, RefreshCw,
+  Newspaper,
 } from 'lucide-react'
 
 interface Surface {
@@ -84,6 +85,62 @@ interface RunResult {
   error?: string
 }
 
+interface RunLedgerRow {
+  id: string
+  run_type: 'backfill' | 'incremental' | 'full' | 'manual'
+  status: 'running' | 'completed' | 'failed'
+  triggered_by: string | null
+  lookback_days: number | null
+  sources_scanned: number
+  sources_skipped: number
+  sources_failed: number
+  leads_created: number
+  tier1_count: number
+  started_at: string
+  finished_at: string | null
+  errors: Array<{ source: string; error: string }>
+}
+
+interface DigestItem {
+  lead_id: string
+  company: string
+  score: number
+  tier: 1 | 2 | 3
+  tier_label: string
+  trigger_event: string | null
+  trigger_date: string | null
+  trigger_evidence_url: string | null
+  privileged_role: string | null
+  controller_classification: string
+  likely_buyer: string | null
+  first_intelligent_discovery_question: string | null
+  recommended_action: 'outreach' | 'further_research' | 'monitor'
+}
+
+function timeAgo(iso: string | null | undefined): string {
+  if (!iso) return 'never'
+  const ms = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(ms / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
+const RUN_TYPE_LABEL: Record<string, string> = {
+  backfill: '30-day backfill',
+  incremental: 'Incremental scan',
+  full: 'Full reconciliation',
+  manual: 'Manual run',
+}
+
+const ACTION_BADGE: Record<string, { label: string; c: string; bg: string; b: string }> = {
+  outreach: { label: 'Outreach', c: '#34d399', bg: 'rgba(52,211,153,0.1)', b: 'rgba(52,211,153,0.28)' },
+  further_research: { label: 'Further research', c: '#fbbf24', bg: 'rgba(251,191,36,0.1)', b: 'rgba(251,191,36,0.25)' },
+  monitor: { label: 'Monitor', c: '#94a3b8', bg: 'rgba(148,163,184,0.09)', b: 'rgba(148,163,184,0.2)' },
+}
+
 const WEIGHTS: Record<string, string> = {
   pain_consequence: '25%',
   trigger_recency: '20%',
@@ -143,6 +200,34 @@ export default function AersealPage() {
   const [result, setResult] = useState<RunResult | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
 
+  // Recurring discovery — status of the background/manual orchestrator run
+  // (lib/aerseal-orchestrator.ts), separate from the single-surface "Run
+  // surface" tool above.
+  const [lastRun, setLastRun] = useState<RunLedgerRow | null>(null)
+  const [runIsLocked, setRunIsLocked] = useState(false)
+  const [recurringRunning, setRecurringRunning] = useState(false)
+  const [digest, setDigest] = useState<DigestItem[] | null>(null)
+  const [digestLoading, setDigestLoading] = useState(false)
+
+  const loadRunStatus = useCallback(() => {
+    fetch('/api/aerseal/run-discovery')
+      .then(r => r.json())
+      .then(d => {
+        setLastRun(d.latest_run || null)
+        setRunIsLocked(!!d.is_running)
+      })
+      .catch(() => {})
+  }, [])
+
+  const loadDigest = useCallback(() => {
+    setDigestLoading(true)
+    fetch('/api/aerseal/digest?since=7d&limit=20')
+      .then(r => r.json())
+      .then(d => setDigest(d.items || []))
+      .catch(() => toast.error('Could not load the AERSeal digest'))
+      .finally(() => setDigestLoading(false))
+  }, [])
+
   useEffect(() => {
     fetch('/api/ai/discover-aerseal')
       .then(r => r.json())
@@ -151,7 +236,34 @@ export default function AersealPage() {
         if (d.surfaces?.length) setSelected(d.surfaces[0].key)
       })
       .catch(() => toast.error('Could not load monitoring surfaces'))
-  }, [])
+    loadRunStatus()
+    loadDigest()
+  }, [loadRunStatus, loadDigest])
+
+  const runRecurring = useCallback(async () => {
+    setRecurringRunning(true)
+    try {
+      const res = await fetch('/api/aerseal/run-discovery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'manual' }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'AERSeal discovery run failed')
+        return
+      }
+      toast.success(
+        `${RUN_TYPE_LABEL[data.run_type] || 'Run'} complete — ${data.leads_created} lead${data.leads_created === 1 ? '' : 's'} from ${data.sources_scanned} source${data.sources_scanned === 1 ? '' : 's'}`,
+      )
+      loadRunStatus()
+      loadDigest()
+    } catch {
+      toast.error('AERSeal discovery run failed')
+    } finally {
+      setRecurringRunning(false)
+    }
+  }, [loadRunStatus, loadDigest])
 
   const run = useCallback(async () => {
     if (!selected) return
@@ -206,6 +318,97 @@ export default function AersealPage() {
       </div>
 
       <div className="p-8 space-y-6">
+        {/* ── Recurring discovery ──────────────────────────────────── */}
+        <div className="rounded-xl p-5" style={{ background: 'rgba(167,139,250,0.04)', border: '1px solid rgba(167,139,250,0.18)' }}>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <p className="text-sm font-semibold text-white flex items-center gap-2">
+                <RefreshCw size={14} style={{ color: '#a78bfa' }} /> Recurring discovery
+              </p>
+              <p className="text-xs mt-1" style={{ color: 'rgb(100,105,130)' }}>
+                Automatic: incremental scan every 6h (configurable via <span className="mono">AERSEAL_INCREMENTAL_INTERVAL_HOURS</span>), full reconciliation
+                daily ~08:00 IST. First-ever run always backfills the last 30 days.
+              </p>
+            </div>
+            <button className="btn btn-primary" onClick={runRecurring} disabled={recurringRunning || runIsLocked}>
+              {recurringRunning || runIsLocked
+                ? <><Loader2 size={14} className="animate-spin" /> {runIsLocked && !recurringRunning ? 'A run is already in progress…' : 'Running…'}</>
+                : <><Play size={14} /> Run AERSeal Discovery</>}
+            </button>
+          </div>
+          {lastRun && (
+            <div className="text-xs mt-3 flex items-center gap-2 flex-wrap" style={{ color: 'rgb(120,127,160)' }}>
+              <span className="badge" style={{
+                color: lastRun.status === 'completed' ? '#34d399' : lastRun.status === 'failed' ? '#f87171' : '#fbbf24',
+                background: lastRun.status === 'completed' ? 'rgba(52,211,153,0.1)' : lastRun.status === 'failed' ? 'rgba(248,113,113,0.09)' : 'rgba(251,191,36,0.1)',
+                borderColor: 'transparent',
+              }}>
+                {lastRun.status}
+              </span>
+              <span>{RUN_TYPE_LABEL[lastRun.run_type] || lastRun.run_type} · {timeAgo(lastRun.started_at)}</span>
+              {lastRun.status === 'completed' && (
+                <span className="mono">
+                  · {lastRun.sources_scanned} scanned{lastRun.sources_skipped > 0 && ` · ${lastRun.sources_skipped} not due`}{lastRun.sources_failed > 0 && ` · ${lastRun.sources_failed} failed`} · {lastRun.leads_created} lead{lastRun.leads_created === 1 ? '' : 's'} · {lastRun.tier1_count} Tier 1
+                </span>
+              )}
+              {lastRun.errors?.length > 0 && (
+                <span style={{ color: '#f87171' }}>· {lastRun.errors.length} source error{lastRun.errors.length === 1 ? '' : 's'} (logged, run continued)</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Today's digest ───────────────────────────────────────── */}
+        {digest !== null && (
+          <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <p className="text-sm font-semibold text-white flex items-center gap-2">
+                <Newspaper size={14} style={{ color: '#38bdf8' }} /> AERSeal opportunity digest
+                <span className="text-xs font-normal" style={{ color: 'rgb(100,105,130)' }}>· last 7 days, ranked by score</span>
+              </p>
+              {digestLoading && <Loader2 size={13} className="animate-spin" style={{ color: 'rgb(100,105,130)' }} />}
+            </div>
+            {digest.length === 0 ? (
+              <div className="p-6 text-center text-xs" style={{ color: 'rgb(120,127,160)' }}>
+                No qualified AERSeal leads in the last 7 days yet. Run a surface above or wait for the next scheduled scan.
+              </div>
+            ) : (
+              <div>
+                {digest.map(item => {
+                  const ab = ACTION_BADGE[item.recommended_action]
+                  const tc = tierColor(item.tier)
+                  return (
+                    <a key={item.lead_id} href={`/leads/${item.lead_id}`} className="flex items-start gap-3 px-5 py-3 hover:bg-white/[0.02]" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold text-white">{item.company}</span>
+                          <span className="badge" style={{ color: tc.c, background: tc.bg, borderColor: tc.b }}>{item.tier_label} · {item.score}</span>
+                          <span className="badge" style={{ color: ab.c, background: ab.bg, borderColor: ab.b }}>{ab.label}</span>
+                          {item.privileged_role && (
+                            <span className="badge" style={{ color: 'rgb(150,155,180)', background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.09)' }}>
+                              {item.privileged_role} · {item.controller_classification}
+                            </span>
+                          )}
+                        </div>
+                        {item.trigger_event && (
+                          <p className="text-xs mt-1.5 line-clamp-1" style={{ color: 'rgb(150,155,180)' }}>
+                            {item.trigger_date ? `${item.trigger_date} — ` : ''}{item.trigger_event}
+                          </p>
+                        )}
+                        {item.first_intelligent_discovery_question && (
+                          <p className="text-xs mt-1 italic line-clamp-1" style={{ color: 'rgb(120,127,160)' }}>
+                            &ldquo;{item.first_intelligent_discovery_question}&rdquo;
+                          </p>
+                        )}
+                      </div>
+                    </a>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Controls ─────────────────────────────────────────────── */}
         <div className="rounded-xl p-5" style={{ background: 'rgba(56,189,248,0.04)', border: '1px solid rgba(56,189,248,0.18)' }}>
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4 items-end">

@@ -2,6 +2,8 @@
 // TypeScript Types for Kima BD OS
 // ============================================================
 
+import type { AersealDossier, ScoreBreakdown as AersealScoreBreakdown, OutreachHypothesis } from '@/lib/aerseal-discovery'
+
 export type LeadStatus =
   | 'new'
   | 'researching'
@@ -255,6 +257,14 @@ export interface Lead {
   urgency_score?: number      // distinct from lead_score: driven by trigger recency + pain severity, not general fit
   urgency_reasoning?: string
   confidence_score?: number
+  // AERSeal dedicated pipeline (supabase/add-aerseal-discovery.sql). Written
+  // only by app/api/ai/discover-aerseal/route.ts. aerseal_score/tier are
+  // code-computed (lib/aerseal-discovery.ts scoreProspect), never self-reported.
+  aerseal_dossier?: AersealDossier | null
+  aerseal_score?: number | null
+  aerseal_tier?: 1 | 2 | 3 | null
+  aerseal_score_breakdown?: AersealScoreBreakdown | null
+  aerseal_hypothesis?: OutreachHypothesis | null
   priority?: LeadPriority
   status: LeadStatus
   contacted_at?: string
@@ -334,6 +344,13 @@ export interface Source {
   deep_crawl?: boolean
   deep_crawl_max_actions?: number
   deep_crawl_button_selector?: string
+  // AERSeal recurring discovery (supabase/add-aerseal-recurring-discovery.sql)
+  last_success_at?: string | null
+  scan_interval_hours?: number | null
+  verification_only?: boolean
+  consecutive_failures?: number
+  last_error?: string | null
+  parser_strategy?: string
   created_at: string
   updated_at: string
 }

@@ -7,6 +7,14 @@
     {
       "path": "/api/cron/check-replies",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/aerseal-discovery?mode=incremental",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/aerseal-discovery?mode=full",
+      "schedule": "30 2 * * *"
     }
   ]
 }

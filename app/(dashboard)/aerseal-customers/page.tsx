@@ -21,7 +21,7 @@ import type { Lead } from '@/lib/types'
 // research workbook. Excludes names already in that curated list so a lead
 // someone manually "Add to BD"'d doesn't show up twice.
 function usePipelineDiscoveredLeads() {
-  const [leads, setLeads] = useState<(Lead & { aerseal_score?: number; aerseal_tier?: number })[]>([])
+  const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   useEffect(() => {
     const supabase = createClient()
@@ -40,8 +40,8 @@ function usePipelineDiscoveredLeads() {
         .not('classification', 'in', nonCustomerFilter)
         .limit(100),
     ]).then(([byCategory, byScore]) => {
-      const merged = new Map<string, Lead & { aerseal_score?: number }>()
-      for (const row of [...(byCategory.data || []), ...(byScore.data || [])] as (Lead & { aerseal_score?: number })[]) {
+      const merged = new Map<string, Lead>()
+      for (const row of [...(byCategory.data || []), ...(byScore.data || [])] as Lead[]) {
         merged.set(row.id, row)
       }
       const rows = Array.from(merged.values())
