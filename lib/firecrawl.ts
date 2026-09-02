@@ -201,6 +201,87 @@ export async function firecrawlFindAuthorityEvidence(
 }
 
 // ============================================================
+// Action-evidence page finder — for the Aerpolice pipeline's "verified
+// external action" requirement (lib/aerpolice-discovery.ts). A company's
+// homepage rarely states what its agent can actually DO outside the model;
+// that lives on a docs, changelog, API, security/trust-center or marketplace
+// subpage. Same Firecrawl /map + rerank approach as
+// firecrawlFindAuthorityEvidence above, tuned for a different path
+// vocabulary — blog/changelog are signal here (agent-launch and capability
+// announcements live there), unlike the AERSeal case where they were mostly
+// marketing noise next to governance facts.
+// ============================================================
+const ACTION_PATH_SEGMENTS = [
+  'docs', 'documentation', 'changelog', 'release-notes', 'releases', 'api',
+  'developers', 'developer', 'integrations', 'integration', 'mcp', 'connectors',
+  'security', 'trust', 'trust-center', 'blog', 'product', 'agent', 'agents',
+  'features', 'capabilities', 'automation',
+]
+const ACTION_PENALTY_SEGMENTS = ['careers', 'jobs', 'events', 'pricing']
+
+function rankActionLink(link: { url: string }, baseHost: string): number {
+  let u: URL
+  try {
+    u = new URL(link.url)
+  } catch {
+    return -Infinity
+  }
+  if (u.hostname === baseHost && (u.pathname === '/' || u.pathname === '')) return -Infinity
+  const segments = u.pathname.toLowerCase().split('/').filter(Boolean)
+  const hits = segments.filter(seg => ACTION_PATH_SEGMENTS.some(k => seg.includes(k))).length
+  if (hits === 0) return -Infinity
+  const penalty = segments.some(seg => ACTION_PENALTY_SEGMENTS.includes(seg)) ? -6 : 0
+  const docsSubdomain = u.hostname.startsWith('docs.') || u.hostname.startsWith('developers.') || u.hostname.startsWith('changelog.') ? 3 : 0
+  const shallow = segments.length <= 2 ? 1 : 0
+  return hits * 5 + docsSubdomain + shallow + penalty
+}
+
+export async function firecrawlFindActionEvidence(website: string): Promise<AuthorityEvidencePage | null> {
+  if (!firecrawlConfigured() || !website) return null
+  const base = website.startsWith('http') ? website : `https://${website}`
+
+  try {
+    const mapRes = await fetch('https://api.firecrawl.dev/v2/map', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}` },
+      body: JSON.stringify({
+        url: base,
+        search: 'agent actions capabilities integrations changelog release notes API access refund payment automation MCP',
+        limit: 50,
+        sitemap: 'include',
+      }),
+      signal: AbortSignal.timeout(20000),
+    })
+    if (!mapRes.ok) return null
+    const mapJson = await mapRes.json()
+    const links = (mapJson?.links as Array<{ url: string; title?: string; description?: string }> | undefined) || []
+    if (!links.length) return null
+
+    const baseHost = new URL(base).hostname
+    const best = links
+      .map(l => ({ link: l, score: rankActionLink(l, baseHost) }))
+      .filter(s => s.score > -Infinity)
+      .sort((a, b) => b.score - a.score)[0]?.link
+    if (!best) return null
+
+    const scrapeRes = await fetch('https://api.firecrawl.dev/v2/scrape', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}` },
+      body: JSON.stringify({ url: best.url, formats: ['markdown'], onlyMainContent: true, timeout: 30000 }),
+      signal: AbortSignal.timeout(40000),
+    })
+    if (!scrapeRes.ok) return null
+    const scrapeJson = await scrapeRes.json()
+    const text = (scrapeJson?.data?.markdown as string | undefined) || ''
+    if (!text) return null
+    return { url: best.url, text: text.slice(0, 6000) }
+  } catch (e) {
+    console.error('[firecrawlFindActionEvidence]', e)
+    return null
+  }
+}
+
+// ============================================================
 // Live web search — for grounding source-ideation (Suggest sources) in what
 // currently exists, instead of relying on the model's static training-data
 // recall of directories/communities that may be stale, renamed, or dead.

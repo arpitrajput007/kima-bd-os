@@ -3,6 +3,7 @@
 // ============================================================
 
 import type { AersealDossier, ScoreBreakdown as AersealScoreBreakdown, OutreachHypothesis } from '@/lib/aerseal-discovery'
+import type { AerpoliceDossier, ScoreBreakdown as AerpoliceScoreBreakdown, OutreachSeed as AerpoliceOutreachSeed, NextAction as AerpoliceNextAction } from '@/lib/aerpolice-discovery'
 
 export type LeadStatus =
   | 'new'
@@ -265,6 +266,17 @@ export interface Lead {
   aerseal_tier?: 1 | 2 | 3 | null
   aerseal_score_breakdown?: AersealScoreBreakdown | null
   aerseal_hypothesis?: OutreachHypothesis | null
+  // Aerpolice dedicated pipeline (supabase/add-aerpolice-discovery.sql).
+  // Written only by app/api/ai/discover-aerpolice/route.ts. aerpolice_score/
+  // tier are code-computed (lib/aerpolice-discovery.ts scoreProspect), never
+  // self-reported. aerpolice_next_action can be 'Monitor' even with no
+  // outreach seed — a missing trigger downgrades a lead, it doesn't drop it.
+  aerpolice_dossier?: AerpoliceDossier | null
+  aerpolice_score?: number | null
+  aerpolice_tier?: 1 | 2 | 3 | null
+  aerpolice_score_breakdown?: AerpoliceScoreBreakdown | null
+  aerpolice_next_action?: AerpoliceNextAction | null
+  aerpolice_outreach_seed?: AerpoliceOutreachSeed | null
   priority?: LeadPriority
   status: LeadStatus
   contacted_at?: string

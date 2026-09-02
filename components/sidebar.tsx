@@ -14,6 +14,7 @@ import {
   Zap,
   ChevronLeft,
   ChevronRight,
+  Radio,
   Activity,
   BookOpen,
   Mic,
@@ -97,6 +98,7 @@ const navGroups: {
     label: 'AERpolice',
     items: [
       { href: '/aerpolice-customers',         label: 'AERpolice Customers', icon: ShieldCheck, glow: true },
+      { href: '/aerpolice',                   label: 'AERpolice Discovery', icon: Radio, blue: true },
       { href: '/pluto-customers/aerpolice',   label: "Pluto's Customers",   icon: UserCog, orange: true },
       { href: '/product-resources/aerpolice', label: 'AERpolice Resources', icon: Database, cyan: true },
       { href: '/product-approach/aerpolice',  label: 'AERpolice Approach',  icon: Compass },

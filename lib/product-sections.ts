@@ -31,6 +31,7 @@ export const PRODUCT_SECTIONS: ProductSection[] = [
     accent: 'cyan',
     knowledge: AERPOLICE_KNOWLEDGE,
     customerLinks: [{ href: '/aerpolice-customers', label: 'AERpolice Customers' }],
+    discoveryHref: '/aerpolice',
     defaultApproachPlaceholder:
       'Describe how to find AERpolice customers — e.g. "Target AI-native companies whose agents take consequential financial actions (payments, procurement, treasury, trading), especially ones facing enterprise security review. Look for MCP-based tooling, agentic-commerce startups, AI wallet builders." Paste your own notes here and save.',
   },
@@ -111,6 +112,7 @@ export function productOfLead(lead: {
   customer_category?: string[] | null
   aerseal_score?: number | null
   aerseal_fit?: string | null
+  aerpolice_score?: number | null
   aerpolice_fit?: string | null
   aeredium_fit?: string | null
 }): ProductBadge | null {
@@ -118,7 +120,7 @@ export function productOfLead(lead: {
   if (lead.aerseal_score != null || cats.includes('AERseal Contract-Authority Customer') || !!lead.aerseal_fit) {
     return { label: 'AERseal', color: '#a78bfa' }
   }
-  if (cats.includes('Aerpolice Governance Customer') || cats.includes('Aerpolice Reachable Prospect') || !!lead.aerpolice_fit) {
+  if (lead.aerpolice_score != null || cats.includes('Aerpolice Governance Customer') || cats.includes('Aerpolice Reachable Prospect') || !!lead.aerpolice_fit) {
     return { label: 'Aerpolice', color: '#22d3ee' }
   }
   if (cats.includes('AER360 Custody / Key-Governance Customer') || !!lead.aeredium_fit) {
