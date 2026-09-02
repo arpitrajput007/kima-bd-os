@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
   ShieldCheck, Search, ExternalLink, Plus, ChevronUp, ChevronDown,
-  Filter, Download, CheckCircle, Loader2,
+  Filter, Download, CheckCircle, Loader2, Users,
 } from 'lucide-react'
 import { AERPOLICE_CUSTOMERS, AERPOLICE_CATEGORIES, AERPOLICE_ACCOUNT_COUNT, type AerpoliceCustomer } from '@/lib/aerpolice-customers'
 import { AssignToPlutoButton } from '@/components/AssignToPlutoButton'
@@ -24,7 +24,7 @@ function scoreColor(score: number) {
   return { color: '#f87171', bg: 'rgba(248,113,113,0.1)', border: 'rgba(248,113,113,0.2)' }
 }
 
-/** Small /N sub-score chip used in the expanded row. */
+/** Small /N sub-score chip used in the expanded card. */
 function SubScore({ label, value, max }: { label: string; value: number; max: number }) {
   const pct = value / max
   const color = pct >= 0.8 ? '#34d399' : pct >= 0.5 ? '#fbbf24' : '#f87171'
@@ -32,6 +32,16 @@ function SubScore({ label, value, max }: { label: string; value: number; max: nu
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 11, color: 'rgb(160,165,195)' }}>
       <span>{label}</span>
       <span style={{ fontWeight: 700, color }}>{value}<span style={{ color: 'rgb(100,107,140)', fontWeight: 500 }}>/{max}</span></span>
+    </div>
+  )
+}
+
+/** Fact / inference / unknown box used in the expanded card. */
+function InfoBox({ title, color, text }: { title: string; color: string; text: string }) {
+  return (
+    <div style={{ borderRadius: 12, border: `1px solid ${color}33`, background: `${color}0d`, padding: '11px 13px' }}>
+      <div style={{ fontSize: 9.5, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{title}</div>
+      <div style={{ fontSize: 11.5, color: 'rgb(200,205,230)', lineHeight: 1.55 }}>{text}</div>
     </div>
   )
 }
@@ -204,14 +214,6 @@ export default function AerpoliceCustomersPage() {
           ))}
         </div>
 
-        {/* Score legend */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 18, fontSize: 11, color: 'rgb(120,127,160)', flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 600, color: 'rgb(150,155,185)' }}>Score guide:</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: '#34d399', display: 'inline-block' }} />90+ = Tier 1 / contact now</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: '#fbbf24', display: 'inline-block' }} />75–89 = strong</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: '#f87171', display: 'inline-block' }} />&lt;75 = needs more research</span>
-        </div>
-
         {/* Filters */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ position: 'relative', flex: '1 1 220px', minWidth: 0, maxWidth: 320 }}>
@@ -230,7 +232,7 @@ export default function AerpoliceCustomersPage() {
           </div>
         </div>
 
-        {/* Tier filter */}
+        {/* Tier filter + sort */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 18, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, color: 'rgb(120,127,160)', marginRight: 4 }}>Tier:</span>
           {TIERS.map(t => (
@@ -239,164 +241,158 @@ export default function AerpoliceCustomersPage() {
               {t}
             </button>
           ))}
-          <span style={{ fontSize: 11, color: 'rgb(100,107,140)', marginLeft: 8 }}>{sorted.length} shown</span>
+          <span style={{ fontSize: 11, color: 'rgb(100,107,140)', marginLeft: 4 }}>{sorted.length} shown</span>
+
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgb(120,127,160)' }}>Sort:</span>
+          {([
+            { key: 'totalScore', label: 'Score' },
+            { key: 'triggerDate', label: 'Trigger date' },
+            { key: 'reachabilityScore', label: 'Reach' },
+            { key: 'company', label: 'Company' },
+          ] as { key: SortKey; label: string }[]).map(s => (
+            <button key={s.key} onClick={() => toggleSort(s.key)}
+              style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${sort === s.key ? 'rgba(34,211,238,0.45)' : 'rgba(255,255,255,0.08)'}`, background: sort === s.key ? 'rgba(34,211,238,0.13)' : 'rgba(255,255,255,0.03)', color: sort === s.key ? '#22d3ee' : 'rgb(150,155,185)' }}>
+              {s.label}<SortIcon k={s.key} />
+            </button>
+          ))}
         </div>
 
-        {/* Table */}
-        <div style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-        <div style={{ minWidth: 880 }}>
-          {/* Table header */}
-          <div style={{ display: 'grid', gridTemplateColumns: '190px 150px 1fr 1fr 90px 130px', gap: 0, background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '10px 16px', alignItems: 'center' }}>
-            {[
-              { label: 'Company', key: 'company' as SortKey },
-              { label: 'Category', key: null },
-              { label: 'Trigger / Why Now', key: 'triggerDate' as SortKey },
-              { label: 'Verified Action', key: null },
-              { label: 'Score', key: 'totalScore' as SortKey },
-              { label: 'Action', key: null },
-            ].map((col, i) => (
-              <div key={i} style={{ fontSize: 10, fontWeight: 700, color: 'rgb(120,127,160)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 4, cursor: col.key ? 'pointer' : 'default', userSelect: 'none' }}
-                onClick={() => col.key && toggleSort(col.key)}>
-                {col.label}{col.key && <SortIcon k={col.key} />}
-              </div>
-            ))}
+        {/* Prospect cards */}
+        <div style={{ borderRadius: 16, border: '1px solid rgba(34,211,238,0.18)', background: 'rgba(34,211,238,0.02)', overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px 14px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <ShieldCheck size={16} style={{ color: '#22d3ee' }} />
+              <span style={{ fontSize: 14, fontWeight: 800, color: 'white' }}>Reachable Prospects</span>
+            </div>
+            <div style={{ fontSize: 11.5, color: 'rgb(120,127,160)', marginTop: 5, maxWidth: 640, lineHeight: 1.5 }}>
+              Evidence-qualified prospects, not confirmed buyers — verified action, why-now trigger and Aerpolice angle kept separate, with a first qualification question for each. Imported as-is from the workbook.
+            </div>
           </div>
 
-          {/* Rows */}
-          {sorted.map((c, idx) => {
-            const isExpanded = expanded === c.id
-            const isAdded = added.has(c.company)
-            const sc = scoreColor(c.totalScore)
-            return (
-              <div key={c.id}>
-                <div
-                  style={{ display: 'grid', gridTemplateColumns: '190px 150px 1fr 1fr 90px 130px', gap: 0, padding: '13px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)', background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.012)', alignItems: 'center', transition: 'background 0.12s', cursor: 'pointer' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(34,211,238,0.06)'}
-                  onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.012)'}
-                  onClick={() => setExpanded(isExpanded ? null : c.id)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 16 }}>
+            {sorted.map((c, idx) => {
+              const isExp = expanded === c.id
+              const isAdded = added.has(c.company)
+              const isPluto = plutoAssigned.has(c.company)
+              const sc = scoreColor(c.totalScore)
+              const tc = tierColor(c.tier)
+              return (
+                <div key={c.id} style={{ borderRadius: 14, border: `1px solid ${isExp ? 'rgba(34,211,238,0.4)' : 'rgba(255,255,255,0.08)'}`, background: isExp ? 'rgba(34,211,238,0.05)' : 'rgba(255,255,255,0.02)', overflow: 'hidden', transition: 'border-color 0.15s, background 0.15s' }}>
 
-                  {/* Company */}
-                  <div style={{ paddingRight: 10 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'white', marginBottom: 2 }}>{c.company}</div>
-                    {c.website && (
-                      <a href={c.website} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-                        style={{ fontSize: 10, color: 'rgb(110,115,150)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3 }}>
-                        <ExternalLink size={9} />{c.website.replace(/^https?:\/\//, '').slice(0, 24)}
-                      </a>
-                    )}
-                    <div style={{ fontSize: 10, color: 'rgb(100,107,140)', marginTop: 2 }}>{c.sizeReachability}</div>
-                  </div>
-
-                  {/* Category */}
-                  <div style={{ paddingRight: 10 }}>
-                    <span style={{ fontSize: 10, fontWeight: 600, color: '#22d3ee', background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.2)', padding: '2px 8px', borderRadius: 6, display: 'inline-block', lineHeight: 1.4 }}>
-                      {c.category}
-                    </span>
-                  </div>
-
-                  {/* Trigger / why now */}
-                  <div style={{ paddingRight: 12 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: '#fbbf24', marginBottom: 3 }}>{c.triggerDate || 'undated'}</div>
-                    <div style={{ fontSize: 11, color: 'rgb(160,165,195)', lineHeight: 1.45 }}>{c.whyNow.slice(0, 110)}{c.whyNow.length > 110 ? '…' : ''}</div>
-                  </div>
-
-                  {/* Verified action */}
-                  <div style={{ paddingRight: 12 }}>
-                    <div style={{ fontSize: 11, color: 'rgb(150,155,185)', lineHeight: 1.45 }}>{c.verifiedAction.slice(0, 80)}{c.verifiedAction.length > 80 ? '…' : ''}</div>
-                    <div style={{ fontSize: 10, color: tierColor(c.tier), marginTop: 3, fontWeight: 600 }}>{c.tier}</div>
-                  </div>
-
-                  {/* Score */}
-                  <div style={{ textAlign: 'center' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 36, padding: '3px 8px', borderRadius: 7, fontSize: 13, fontWeight: 800, color: sc.color, background: sc.bg, border: `1px solid ${sc.border}` }}>
-                      {c.totalScore}
-                    </span>
-                  </div>
-
-                  {/* Action */}
-                  <div onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-start' }}>
-                    {isAdded ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: '#34d399' }}>
-                        <CheckCircle size={13} /> Added
-                      </span>
-                    ) : (
-                      <button onClick={() => addToPipeline(c)} disabled={adding === c.id}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1px solid rgba(34,211,238,0.35)', background: 'rgba(34,211,238,0.1)', color: '#22d3ee', opacity: adding === c.id ? 0.7 : 1 }}>
-                        {adding === c.id ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
-                        Add to BD
-                      </button>
-                    )}
-                    <AssignToPlutoButton
-                      companyName={c.company}
-                      createFields={{ ...leadFieldsFor(c) }}
-                      initialAssigned={plutoAssigned.has(c.company)}
-                      compact
-                      onAssigned={() => setAdded(s => new Set([...s, c.company]))}
-                    />
-                  </div>
-                </div>
-
-                {/* Expanded detail row */}
-                {isExpanded && (
-                  <div style={{ padding: '16px 20px 20px 20px', background: 'rgba(34,211,238,0.04)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 1fr 0.8fr', gap: 16 }}>
-                      <div style={{ borderRadius: 12, border: '1px solid rgba(251,191,36,0.2)', background: 'rgba(251,191,36,0.05)', padding: '12px 14px' }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Why reach out now · {c.triggerDate || 'undated'}</div>
-                        <div style={{ fontSize: 12, color: 'rgb(210,215,235)', lineHeight: 1.6 }}>{c.whyNow}</div>
-                        <div style={{ fontSize: 11, color: 'rgb(140,145,175)', marginTop: 8, lineHeight: 1.5 }}><b style={{ color: 'rgb(170,175,205)' }}>Agent / product:</b> {c.agentProduct}</div>
+                  {/* Card header — always visible */}
+                  <div
+                    onClick={() => setExpanded(isExp ? null : c.id)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 16px', cursor: 'pointer', flexWrap: 'wrap' }}>
+                    <div style={{ width: 26, height: 26, borderRadius: 8, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: 'rgb(150,155,185)', flexShrink: 0 }}>
+                      #{idx + 1}
+                    </div>
+                    <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: 'white' }}>{c.company}</span>
+                        <span style={{ fontSize: 9.5, fontWeight: 600, color: '#22d3ee', background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.2)', padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap' }}>{c.category}</span>
+                        <span style={{ fontSize: 9.5, fontWeight: 600, color: 'rgb(150,155,185)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap' }}>{c.freshness}</span>
                       </div>
-                      <div style={{ borderRadius: 12, border: '1px solid rgba(34,211,238,0.2)', background: 'rgba(34,211,238,0.05)', padding: '12px 14px' }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#22d3ee', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Aerpolice angle (inference)</div>
-                        <div style={{ fontSize: 12, color: 'rgb(210,215,235)', lineHeight: 1.6 }}>{c.aerpoliceAngle}</div>
-                        <div style={{ fontSize: 11, color: 'rgb(140,145,175)', marginTop: 8, lineHeight: 1.5, fontStyle: 'italic' }}>&ldquo;{c.qualQuestion}&rdquo;</div>
+                      <div style={{ fontSize: 11, color: 'rgb(150,155,185)', marginTop: 4, lineHeight: 1.5 }}>{c.whyNow}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: 8.5, color: 'rgb(100,107,140)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Score</div>
+                        <span style={{ display: 'inline-flex', minWidth: 34, justifyContent: 'center', padding: '2px 8px', borderRadius: 7, fontSize: 13, fontWeight: 800, color: sc.color, background: sc.bg, border: `1px solid ${sc.border}` }}>{c.totalScore}</span>
                       </div>
-                      <div style={{ borderRadius: 12, border: '1px solid rgba(248,113,113,0.2)', background: 'rgba(248,113,113,0.05)', padding: '12px 14px' }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Current controls (fact) · gap: {c.gapStatus}</div>
-                        <div style={{ fontSize: 12, color: 'rgb(210,215,235)', lineHeight: 1.6 }}>{c.currentControls}</div>
-                        <div style={{ fontSize: 11, color: 'rgb(140,145,175)', marginTop: 8, lineHeight: 1.5 }}><b style={{ color: 'rgb(170,175,205)' }}>Buyer:</b> {c.buyerRoles}</div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
-                          {c.triggerEvidenceUrl && (
-                            <a href={c.triggerEvidenceUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#818cf8', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
-                              <ExternalLink size={11} /> Trigger evidence
-                            </a>
-                          )}
-                          {c.actionEvidenceUrl && c.actionEvidenceUrl !== c.triggerEvidenceUrl && (
-                            <a href={c.actionEvidenceUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#60a5fa', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
-                              <ExternalLink size={11} /> Action evidence
-                            </a>
-                          )}
-                        </div>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: tc, padding: '4px 10px', borderRadius: 7, background: `${tc}18`, border: `1px solid ${tc}45`, whiteSpace: 'nowrap' }}>{c.tier}</span>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: 'rgb(140,146,175)', whiteSpace: 'nowrap' }}>{c.nextAction}</span>
+                      {isPluto && <span title="With Pluto" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, color: '#fbbf24' }}><Users size={11} /></span>}
+                      {isExp ? <ChevronUp size={14} style={{ color: 'rgb(120,127,160)' }} /> : <ChevronDown size={14} style={{ color: 'rgb(120,127,160)' }} />}
+                    </div>
+                  </div>
+
+                  {/* Expanded detail */}
+                  {isExp && (
+                    <div style={{ padding: '0 18px 18px 18px' }}>
+                      <div style={{ fontSize: 10.5, color: '#fbbf24', fontWeight: 700, marginBottom: 10 }}>{c.triggerDate || 'undated'} · {c.agentProduct}</div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px,1fr))', gap: 10, marginBottom: 12 }}>
+                        <InfoBox title="Verified action (fact)" color="#34d399" text={c.verifiedAction} />
+                        <InfoBox title="Aerpolice angle (inference)" color="#22d3ee" text={c.aerpoliceAngle} />
+                        <InfoBox title={`Current controls · gap: ${c.gapStatus}`} color="#f87171" text={c.currentControls} />
                       </div>
-                      <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', padding: '12px 14px' }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgb(150,155,185)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Score breakdown · {c.nextAction}</div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+
+                      <div style={{ borderRadius: 12, border: '1px solid rgba(56,189,248,0.2)', background: 'rgba(56,189,248,0.05)', padding: '12px 14px', marginBottom: 12 }}>
+                        <div style={{ fontSize: 9.5, fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>First qualification question</div>
+                        <div style={{ fontSize: 12.5, color: 'rgb(220,225,245)', lineHeight: 1.6, fontStyle: 'italic' }}>&ldquo;{c.qualQuestion}&rdquo;</div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: 12, fontSize: 11.5, color: 'rgb(160,165,195)', marginBottom: 14 }}>
+                        <div><b style={{ color: 'rgb(190,195,220)' }}>Agent / product</b><div style={{ marginTop: 3, lineHeight: 1.5 }}>{c.agentProduct}</div></div>
+                        <div><b style={{ color: 'rgb(190,195,220)' }}>Size / reachability</b><div style={{ marginTop: 3, lineHeight: 1.5 }}>{c.sizeReachability}</div></div>
+                        <div><b style={{ color: 'rgb(190,195,220)' }}>Likely buyer</b><div style={{ marginTop: 3, lineHeight: 1.5 }}>{c.buyerRoles}</div></div>
+                        <div><b style={{ color: 'rgb(190,195,220)' }}>Recommended motion</b><div style={{ marginTop: 3, lineHeight: 1.5 }}>{c.recommendedMotion}</div></div>
+                        <div><b style={{ color: 'rgb(190,195,220)' }}>Next action</b><div style={{ marginTop: 3, lineHeight: 1.5 }}>{c.nextAction}</div></div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center', paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', marginBottom: 14 }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                           <SubScore label="Action fit" value={c.actionFitScore} max={25} />
                           <SubScore label="Trigger" value={c.triggerScore} max={20} />
-                          <SubScore label="Reachability" value={c.reachabilityScore} max={20} />
+                          <SubScore label="Reach" value={c.reachabilityScore} max={20} />
                           <SubScore label="Consequence" value={c.consequenceScore} max={15} />
                           <SubScore label="Complementarity" value={c.complementarityScore} max={10} />
                           <SubScore label="Evidence" value={c.evidenceScore} max={10} />
                         </div>
+                        <div style={{ display: 'flex', gap: 12, marginLeft: 'auto' }}>
+                          {c.actionEvidenceUrl && (
+                            <a href={c.actionEvidenceUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 11, color: '#818cf8', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                              <ExternalLink size={11} /> Action evidence
+                            </a>
+                          )}
+                          {c.triggerEvidenceUrl && (
+                            <a href={c.triggerEvidenceUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 11, color: '#60a5fa', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                              <ExternalLink size={11} /> Trigger evidence
+                            </a>
+                          )}
+                          {c.website && (
+                            <a href={c.website} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 11, color: 'rgb(140,146,175)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                              <ExternalLink size={11} /> Website
+                            </a>
+                          )}
+                        </div>
+                      </div>
+
+                      <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {isAdded ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: '#34d399', padding: '6px 12px' }}>
+                            <CheckCircle size={13} /> Added
+                          </span>
+                        ) : (
+                          <button onClick={() => addToPipeline(c)} disabled={adding === c.id}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1px solid rgba(34,211,238,0.35)', background: 'rgba(34,211,238,0.1)', color: '#22d3ee', opacity: adding === c.id ? 0.7 : 1 }}>
+                            {adding === c.id ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
+                            Add to BD
+                          </button>
+                        )}
+                        <AssignToPlutoButton
+                          companyName={c.company}
+                          createFields={{ ...leadFieldsFor(c) }}
+                          initialAssigned={isPluto}
+                          onAssigned={() => setAdded(s => new Set([...s, c.company]))}
+                        />
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
+                  )}
+                </div>
+              )
+            })}
 
-          {sorted.length === 0 && (
-            <div style={{ padding: '40px 20px', textAlign: 'center', fontSize: 12, color: 'rgb(120,127,160)' }}>
-              No prospects match those filters.
-            </div>
-          )}
-        </div>
-        </div>
+            {sorted.length === 0 && (
+              <div style={{ padding: '40px 20px', textAlign: 'center', fontSize: 12, color: 'rgb(120,127,160)' }}>
+                No prospects match those filters.
+              </div>
+            )}
+          </div>
         </div>
 
         <div style={{ fontSize: 11, color: 'rgb(90,95,120)', marginTop: 14, textAlign: 'center' }}>
-          Click any row to expand · Sort by column headers · &quot;Add to BD&quot; pushes to your lead pipeline
+          Click any card to expand · Sort with the buttons above · &quot;Add to BD&quot; pushes to your lead pipeline
         </div>
       </div>
     </div>
