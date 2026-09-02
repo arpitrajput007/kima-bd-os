@@ -728,7 +728,7 @@ function OutreachStudioContent() {
                       <label className="block text-xs font-medium mb-1.5" style={{ color: 'rgb(160,160,180)' }}>Contact Name (optional)</label>
                       <input className={inputClass} style={selStyle} value={form.contact_name} onChange={e => setForm(f => ({ ...f, contact_name: e.target.value }))} placeholder="[Name] if unknown" />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium mb-1.5" style={{ color: 'rgb(160,160,180)' }}>Channel</label>
                         <select className={inputClass} style={selStyle} value={form.channel} onChange={e => setForm(f => ({ ...f, channel: e.target.value as typeof CHANNELS[number] }))}>
@@ -746,7 +746,7 @@ function OutreachStudioContent() {
                         </select>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium mb-1.5" style={{ color: 'rgb(160,160,180)' }}>Customer Category</label>
                         <select className={inputClass} style={selStyle} value={form.customer_category} onChange={e => setForm(f => ({ ...f, customer_category: e.target.value }))}>

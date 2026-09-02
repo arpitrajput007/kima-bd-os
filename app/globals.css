@@ -35,6 +35,11 @@
 
 html { scroll-behavior: smooth; }
 
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: rgb(var(--bg-base));
@@ -140,7 +145,7 @@ body {
   background: rgb(var(--bg-surface-2));
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 22px 24px;
+  padding: clamp(14px, 4vw, 22px) clamp(14px, 4vw, 24px);
   transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 .stat-card:hover {
@@ -186,6 +191,14 @@ body {
   letter-spacing: -0.01em;
 }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Desktop-only buttons that use .btn — Tailwind's `hidden` utility loses to
+   .btn's own `display` here since this file is unlayered CSS emitted after
+   Tailwind's utilities, so the override has to live in this stylesheet too. */
+.btn.desktop-only { display: none; }
+@media (min-width: 768px) {
+  .btn.desktop-only { display: inline-flex; }
+}
 
 .btn-primary {
   background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
@@ -256,12 +269,12 @@ body {
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--text-3);
-  padding: 13px 18px;
+  padding: clamp(9px, 3vw, 13px) clamp(10px, 3vw, 18px);
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
 .data-table td {
-  padding: 15px 18px;
+  padding: clamp(10px, 3vw, 15px) clamp(10px, 3vw, 18px);
   border-bottom: 1px solid rgba(255,255,255,0.03);
   vertical-align: middle;
 }
@@ -308,7 +321,8 @@ body {
 
 /* ─── Page header ────────────────────────────────────── */
 .page-header {
-  padding: 24px 36px;
+  padding: clamp(14px, 4vw, 24px) clamp(16px, 5vw, 36px);
+  padding-left: max(env(safe-area-inset-left), clamp(16px, 5vw, 36px));
   border-bottom: 1px solid var(--border);
   background: rgba(10,11,16,0.90);
   backdrop-filter: blur(24px);
@@ -329,7 +343,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 22px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: clamp(12px, 3vw, 16px) clamp(14px, 4vw, 22px);
   border-bottom: 1px solid var(--border);
 }
 
@@ -375,11 +391,14 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 16px;
+  padding: 0 16px 0 44px;
   height: 38px;
   background: rgb(var(--bg-surface));
   border-bottom: 1px solid var(--border);
   font-size: 12px;
   color: var(--text-3);
   flex-shrink: 0;
+}
+@media (min-width: 768px) {
+  .top-banner { padding-left: 16px; }
 }

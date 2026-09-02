@@ -1328,7 +1328,7 @@ export default function CRMPage() {
 
       {/* ── Page header ─────────────────────────────────────── */}
       <div className="page-header">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-[18px] font-bold text-white tracking-tight flex items-center gap-2">
               <Kanban size={18} style={{ color: '#a78bfa' }} />
@@ -1341,7 +1341,7 @@ export default function CRMPage() {
                 : ' · All follow-ups on track'}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {/* Search bar */}
             <div style={{ position: 'relative' }}>
               <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)', pointerEvents: 'none' }} />
@@ -1350,7 +1350,7 @@ export default function CRMPage() {
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search leads…"
                 className="input-dark"
-                style={{ paddingLeft: 30, paddingRight: searchQuery ? 28 : 10, fontSize: 12, height: 34, width: 200 }}
+                style={{ paddingLeft: 30, paddingRight: searchQuery ? 28 : 10, fontSize: 12, height: 34, width: 'min(200px, 60vw)' }}
               />
               {searchQuery && (
                 <button onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', alignItems: 'center', padding: 0 }}>
@@ -1368,7 +1368,7 @@ export default function CRMPage() {
         </div>
 
         {/* Tab bar — sits inside the sticky header */}
-        <div className="flex items-center gap-1.5 mt-4">
+        <div className="flex items-center gap-1.5 mt-4 flex-wrap">
           {[
             { v: 'pipeline'  as const, label: 'Pipeline',     icon: <Kanban size={13} />,       color: '#a78bfa', border: 'rgba(167,139,250,0.35)', badge: null },
             { v: 'followups' as const, label: 'Follow-ups',   icon: <Bell size={13} />,          color: '#fb7185', border: 'rgba(251,113,133,0.35)', badge: overdue.length > 0 ? overdue.length : null },
@@ -1398,10 +1398,10 @@ export default function CRMPage() {
         </div>
       </div>
 
-      <div style={{ padding: '24px 36px' }}>
+      <div style={{ padding: 'clamp(14px, 4vw, 24px) clamp(16px, 5vw, 36px)' }}>
 
         {/* ── KPI strip ──────────────────────────────────────── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           {/* Total active */}
           <div className="stat-card" style={{ borderColor: 'rgba(167,139,250,0.2)', background: 'rgba(167,139,250,0.04)' }}>
             <div className="flex items-center justify-between mb-2">

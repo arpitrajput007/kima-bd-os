@@ -20,17 +20,17 @@ export default async function DashboardLayout({
       <Sidebar />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         {/* Top status banner — like Pocket Dashboard */}
-        <div className="top-banner flex-shrink-0">
+        <div className="top-banner flex-shrink-0 overflow-x-auto whitespace-nowrap">
           <span style={{ color: 'rgb(167,139,250)', fontWeight: 600 }}>Kima BD OS</span>
           <span className="mx-2 opacity-30">·</span>
           <span className="w-1.5 h-1.5 rounded-full inline-block mr-1" style={{ background: 'rgb(52,211,153)', verticalAlign: 'middle' }} />
           <span style={{ color: 'rgb(52,211,153)', fontWeight: 600 }}>Live</span>
-          <span className="mx-2 opacity-30">·</span>
-          <span>{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-          <span className="mx-2 opacity-30">·</span>
-          <span>Powered by GPT-4o + Tavily + Hunter.io</span>
-          <span className="mx-2 opacity-30">·</span>
-          <span style={{ color: actor === 'pluto' ? '#fbbf24' : 'rgb(160,165,200)', fontWeight: 600 }}>
+          <span className="mx-2 opacity-30 hidden sm:inline">·</span>
+          <span className="hidden sm:inline">{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+          <span className="mx-2 opacity-30 hidden lg:inline">·</span>
+          <span className="hidden lg:inline">Powered by GPT-4o + Tavily + Hunter.io</span>
+          <span className="mx-2 opacity-30 hidden sm:inline">·</span>
+          <span className="hidden sm:inline" style={{ color: actor === 'pluto' ? '#fbbf24' : 'rgb(160,165,200)', fontWeight: 600 }}>
             Logged in as: {ACTOR_LABEL[actor]}
           </span>
         </div>

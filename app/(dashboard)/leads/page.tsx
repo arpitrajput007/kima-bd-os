@@ -216,7 +216,7 @@ export default function LeadsPage() {
     <div className="fade-in">
       {/* Header */}
       <div className="page-header">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
           <div>
             <h1 className="text-xl font-bold text-white" style={filters.status === 'rejected' ? { color: '#fb7185' } : {}}>
               {filters.status === 'rejected' ? 'Rejected Leads' : 'Lead Inbox'}
@@ -226,7 +226,7 @@ export default function LeadsPage() {
               {hasFilters && ' (filtered)'}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {/* View toggle */}
             <div style={{ display: 'flex', borderRadius: 9, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
               <button onClick={() => setViewMode('category')}
@@ -269,8 +269,8 @@ export default function LeadsPage() {
         </div>
 
         {/* Search + Filters */}
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[180px] max-w-sm">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'rgb(100,100,120)' }} />
             <input
               type="text"
@@ -387,9 +387,9 @@ export default function LeadsPage() {
 
       {/* By-product view — left nav = product catalog, right pane = customers for the selected product */}
       {!loading && viewMode === 'category' && filteredLeads.length > 0 && (
-        <div className="p-8" style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+        <div className="p-4 md:p-8 flex flex-col lg:flex-row gap-5 items-stretch lg:items-start">
           {/* Left sidebar — product tree */}
-          <div className="rounded-xl overflow-hidden flex-shrink-0" style={{ width: 264, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(22,22,34,0.8)', position: 'sticky', top: 16 }}>
+          <div className="rounded-xl overflow-hidden flex-shrink-0 w-full lg:w-[264px] lg:sticky lg:top-4" style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(22,22,34,0.8)' }}>
             <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 7 }}>
               <Boxes size={13} style={{ color: 'rgb(150,155,185)' }} />
               <span style={{ fontSize: 11, fontWeight: 700, color: 'rgb(150,155,185)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Products &amp; Services</span>
@@ -599,7 +599,7 @@ export default function LeadsPage() {
       )}
 
       {/* List / fallback */}
-      <div className={viewMode === 'list' ? 'p-8' : (filteredLeads.length === 0 || loading ? 'p-8' : 'hidden')}>
+      <div className={viewMode === 'list' ? 'p-4 md:p-8' : (filteredLeads.length === 0 || loading ? 'p-4 md:p-8' : 'hidden')}>
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 size={24} className="animate-spin" style={{ color: 'rgb(139, 92, 246)' }} />

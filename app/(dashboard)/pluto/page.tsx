@@ -335,7 +335,7 @@ export default function PlutoPage() {
         </div>
 
         {/* Stats — lets you check how efficiently Pluto is working */}
-        <div className="grid grid-cols-4 gap-3 mb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
           <StatCard icon={Users} label="Assigned to Pluto" value={stats.assigned} color="#fbbf24" />
           <StatCard icon={Send} label="Reached Out" value={stats.reachedOut} color="#22d3ee" />
           <StatCard icon={TrendingUp} label="Replied" value={stats.replied} color="#34d399" />

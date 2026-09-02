@@ -411,7 +411,7 @@ export default function MyPerformancePage() {
                 </div>
               ))}
 
-              <div className="grid grid-cols-2 gap-3 mt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
                 {[
                   { label: 'Avg. Days to 1st Reply', value: avgDaysToReply, unit: 'days after contact' },
                   { label: 'Avg. Days to Close',     value: avgDaysToWin,   unit: 'contact to partnership' },

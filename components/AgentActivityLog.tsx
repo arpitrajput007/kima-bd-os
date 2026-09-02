@@ -146,7 +146,7 @@ export default function AgentActivityLog() {
     <div
       ref={panelRef}
       style={{
-        position: 'fixed', ...posStyle, zIndex: 9990, width: 390,
+        position: 'fixed', ...posStyle, zIndex: 9990, width: 'min(390px, calc(100vw - 24px))',
         borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)',
         background: 'linear-gradient(180deg,rgba(14,16,28,0.98),rgba(9,10,18,0.99))',
         boxShadow: '0 24px 60px rgba(0,0,0,0.75)', backdropFilter: 'blur(18px)',

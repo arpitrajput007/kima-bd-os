@@ -38,6 +38,8 @@ import {
   Swords,
   Compass,
   UserCog,
+  Menu,
+  X,
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
@@ -165,9 +167,14 @@ const navGroups: {
 export function Sidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const [apiIssues, setApiIssues] = useState<string[]>([])
   const [todayTime, setTodayTime] = useState(0)
   const [pendingDrafts, setPendingDrafts] = useState(0)
+
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
 
   useEffect(() => {
     const load = () => {
@@ -209,19 +216,45 @@ export function Sidebar() {
   }, [loadPendingDrafts])
 
   return (
-    <aside
-      className={cn(
-        'flex flex-col h-screen sticky top-0 transition-all duration-300 flex-shrink-0',
-        collapsed ? 'w-[68px]' : 'w-[248px]'
+    <>
+      {/* ── Mobile hamburger trigger ─────────────────── */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="md:hidden fixed z-30 flex items-center justify-center rounded-lg"
+        aria-label="Open menu"
+        style={{
+          top: 6, left: 10, width: 26, height: 26,
+          background: 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          color: 'rgb(210,215,240)',
+        }}
+      >
+        <Menu size={14} />
+      </button>
+
+      {/* ── Mobile backdrop ──────────────────────────── */}
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-40"
+          style={{ background: 'rgba(0,0,0,0.6)' }}
+          onClick={() => setMobileOpen(false)}
+        />
       )}
-      style={{
-        background: 'rgb(12, 13, 20)',
-        borderRight: '1px solid rgba(255,255,255,0.06)',
-      }}
-    >
+
+      <aside
+        className={cn(
+          'flex flex-col h-screen fixed md:sticky top-0 left-0 z-50 md:z-auto transition-transform md:transition-all duration-300 flex-shrink-0 md:translate-x-0',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full',
+          collapsed ? 'w-[82vw] max-w-[280px] md:w-[68px]' : 'w-[82vw] max-w-[280px] md:w-[248px]'
+        )}
+        style={{
+          background: 'rgb(12, 13, 20)',
+          borderRight: '1px solid rgba(255,255,255,0.06)',
+        }}
+      >
       {/* ── Logo ─────────────────────────────────── */}
       <div
-        className={cn('flex items-center gap-3 px-4 border-b flex-shrink-0', collapsed && 'justify-center')}
+        className={cn('flex items-center gap-3 px-4 border-b flex-shrink-0', collapsed && 'md:justify-center')}
         style={{ borderColor: 'rgba(255,255,255,0.06)', height: '60px' }}
       >
         <div
@@ -230,12 +263,20 @@ export function Sidebar() {
         >
           <Zap size={15} color="white" fill="white" />
         </div>
-        {!collapsed && (
-          <div className="overflow-hidden">
+        {(!collapsed || mobileOpen) && (
+          <div className="overflow-hidden flex-1">
             <div className="text-white font-bold text-[13px] leading-none tracking-tight">Kima BD OS</div>
             <div className="text-[11px] mt-0.5 font-medium" style={{ color: 'rgba(167,139,250,0.7)' }}>AI BD Engine</div>
           </div>
         )}
+        <button
+          onClick={() => setMobileOpen(false)}
+          className="md:hidden flex-shrink-0 flex items-center justify-center rounded-lg"
+          aria-label="Close menu"
+          style={{ width: 26, height: 26, background: 'rgba(255,255,255,0.05)', color: 'rgb(160,165,200)' }}
+        >
+          <X size={14} />
+        </button>
       </div>
 
       {/* ── Live status bar ───────────────────────── */}
@@ -373,12 +414,13 @@ export function Sidebar() {
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className={cn('btn btn-ghost w-full', collapsed ? 'justify-center px-0' : 'justify-start')}
+          className={cn('btn btn-ghost desktop-only w-full', collapsed ? 'justify-center px-0' : 'justify-start')}
           style={{ padding: '8px 10px', fontSize: '12px', gap: '8px' }}
         >
           {collapsed ? <ChevronRight size={15} /> : <><ChevronLeft size={15} /><span>Collapse</span></>}
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   )
 }

@@ -1087,7 +1087,7 @@ export default function MonthlyReportsPage() {
                       <MiniBar value={value} max={Math.max(total, 1)} color={color} />
                     </div>
                   ))}
-                  <div className="grid grid-cols-2 gap-3 mt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
                     <div style={{ padding: '11px 13px', borderRadius: 10, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
                       <div className="text-[10px] font-medium mb-1.5" style={{ color: 'rgb(100,106,135)' }}>Volume Estimated</div>
                       <div className="text-[20px] font-bold tabular-nums text-white leading-none">{volumeFilled}<span style={{ fontSize: 12, fontWeight: 500, color: 'rgb(80,85,110)' }}> / {total}</span></div>

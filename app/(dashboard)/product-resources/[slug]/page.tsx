@@ -316,7 +316,7 @@ export default function ProductResourcesPage({ params }: { params: Promise<{ slu
 
       {showForm && (
         <form onSubmit={handleSave} className="section-card p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input className="input" placeholder="Source name" value={form.source_name || ''}
               onChange={e => setForm(f => ({ ...f, source_name: e.target.value }))} required />
             <select className="input" value={form.source_type || 'google_search'}
@@ -326,7 +326,7 @@ export default function ProductResourcesPage({ params }: { params: Promise<{ slu
           </div>
           <input className="input w-full" placeholder="URL or search query" value={form.source_url_or_query || ''}
             onChange={e => setForm(f => ({ ...f, source_url_or_query: e.target.value }))} />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <select className="input" value={form.frequency || 'weekly'}
               onChange={e => setForm(f => ({ ...f, frequency: e.target.value as Source['frequency'] }))}>
               <option value="daily">daily</option>

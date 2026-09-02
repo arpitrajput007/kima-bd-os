@@ -494,6 +494,7 @@ export default function DashboardPage() {
                   </Link>
                 </div>
               ) : (
+                <div className="overflow-x-auto">
                 <table className="data-table w-full">
                   <thead>
                     <tr>
@@ -538,6 +539,7 @@ export default function DashboardPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           </div>

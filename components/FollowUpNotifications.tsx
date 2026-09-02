@@ -74,7 +74,7 @@ function NotifCard({
 
   return (
     <div style={{
-      width: 330,
+      width: 'min(330px, calc(100vw - 24px))',
       borderRadius: 14,
       border: '1px solid rgba(167,139,250,0.22)',
       background: 'linear-gradient(160deg, rgba(22,23,38,0.99), rgba(14,15,26,0.99))',
@@ -229,6 +229,7 @@ export default function FollowUpNotifications() {
   const [leads,    setLeads]    = useState<OverdueLead[]>([])
   const [dismissed,setDismissed]= useState<Set<string>>(new Set())
   const [snoozed,  setSnoozed]  = useState(false)
+  const [mobileExpanded, setMobileExpanded] = useState(false)
   const timerRef   = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => { setMounted(true); setSnoozed(isSnoozed()) }, [])
@@ -323,24 +324,58 @@ export default function FollowUpNotifications() {
 
   if (!mounted || snoozed || visible.length === 0) return null
 
+  // On mobile the stack is nearly full-width and would otherwise cover the
+  // whole screen on every page load — collapse it into a small pill by
+  // default and let the user tap to expand. Desktop always shows the stack.
   return createPortal(
-    <div style={{
-      position: 'fixed',
-      top: 48,        // just below the 38px top-banner + a little gap
-      right: 20,
-      zIndex: 9995,
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 10,
-      maxHeight: 'calc(100vh - 70px)',
-      overflowY: 'auto',
-      overflowX: 'visible',
-      paddingBottom: 4,
-      // hide scrollbar but keep scrollability
-      msOverflowStyle: 'none',
-    } as React.CSSProperties}>
+    <>
+      {!mobileExpanded && (
+        <button
+          onClick={() => setMobileExpanded(true)}
+          className="flex md:hidden"
+          style={{
+            position: 'fixed', top: 44, right: 10, zIndex: 9995,
+            alignItems: 'center', gap: 6,
+            padding: '6px 11px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+            background: 'rgba(20,21,35,0.95)', border: '1px solid rgba(251,191,36,0.35)',
+            color: '#fbbf24', cursor: 'pointer', fontFamily: 'inherit',
+            backdropFilter: 'blur(20px)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+          }}
+        >
+          <Bell size={12} /> {visible.length} overdue
+        </button>
+      )}
+    <div
+      className={`${mobileExpanded ? 'flex' : 'hidden'} md:flex flex-col`}
+      style={{
+        position: 'fixed',
+        top: 48,        // just below the 38px top-banner + a little gap
+        right: 12,
+        zIndex: 9995,
+        gap: 10,
+        maxHeight: 'calc(100vh - 70px)',
+        overflowY: 'auto',
+        overflowX: 'visible',
+        paddingBottom: 4,
+        // hide scrollbar but keep scrollability
+        msOverflowStyle: 'none',
+      } as React.CSSProperties}>
       {/* ── header: snooze / hide all ── */}
-      <div style={{ width: 330, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+      <div style={{ width: 'min(330px, calc(100vw - 24px))', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <button
+          onClick={() => setMobileExpanded(false)}
+          className="flex md:hidden"
+          title="Collapse"
+          style={{
+            alignItems: 'center', gap: 5,
+            padding: '5px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+            background: 'rgba(20,21,35,0.95)', border: '1px solid rgba(255,255,255,0.1)',
+            color: 'rgb(160,165,200)', cursor: 'pointer', fontFamily: 'inherit',
+            backdropFilter: 'blur(20px)', marginRight: 'auto',
+          }}
+        >
+          <X size={12} />
+        </button>
         <button
           onClick={snooze24h}
           title="Don't show follow-up reminders for the next 24 hours"
@@ -378,14 +413,15 @@ export default function FollowUpNotifications() {
       ))}
       {visible.length > 5 && (
         <div style={{
-          width: 330, padding: '8px 14px', borderRadius: 10, fontSize: 11, textAlign: 'center',
+          width: 'min(330px, calc(100vw - 24px))', padding: '8px 14px', borderRadius: 10, fontSize: 11, textAlign: 'center',
           background: 'rgba(20,21,35,0.95)', border: '1px solid rgba(255,255,255,0.08)',
           color: 'rgb(140,145,175)',
         }}>
           +{visible.length - 5} more overdue follow-ups
         </div>
       )}
-    </div>,
+    </div>
+    </>,
     document.body
   )
 }
