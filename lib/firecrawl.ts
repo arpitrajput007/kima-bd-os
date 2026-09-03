@@ -282,6 +282,37 @@ export async function firecrawlFindActionEvidence(website: string): Promise<Auth
 }
 
 // ============================================================
+// Single-page scrape — for on-demand reads where the caller just needs one
+// URL's rendered content right now (e.g. the Discuss Lead agent verifying a
+// LinkedIn profile or a specific page it was told to check), as opposed to
+// firecrawlDeepScrape's scroll/click loop for infinite-scroll sources.
+// ============================================================
+export async function firecrawlScrape(url: string, cap = 6000): Promise<string> {
+  if (!firecrawlConfigured()) return ''
+  try {
+    const res = await fetch('https://api.firecrawl.dev/v2/scrape', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
+      },
+      body: JSON.stringify({ url, formats: ['markdown'], onlyMainContent: true, timeout: 30000 }),
+      signal: AbortSignal.timeout(40000),
+    })
+    if (!res.ok) {
+      console.error('[firecrawlScrape] HTTP', res.status, await res.text().catch(() => ''))
+      return ''
+    }
+    const json = await res.json()
+    const text = (json?.data?.markdown as string | undefined) || ''
+    return text.slice(0, cap)
+  } catch (e) {
+    console.error('[firecrawlScrape]', e)
+    return ''
+  }
+}
+
+// ============================================================
 // Live web search — for grounding source-ideation (Suggest sources) in what
 // currently exists, instead of relying on the model's static training-data
 // recall of directories/communities that may be stale, renamed, or dead.

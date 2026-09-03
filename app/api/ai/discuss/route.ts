@@ -1,8 +1,9 @@
-import { claudeJSON, claudeText, CLAUDE_RESEARCH, CLAUDE_MINI } from "@/lib/claude"
+import { claudeJSON, claudeTextWithTools, CLAUDE_RESEARCH, CLAUDE_MINI, type ClaudeTool } from "@/lib/claude"
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { FULL_BRAIN } from '@/lib/kima-knowledge'
 import { isDuplicateRule } from '@/lib/agent-memory'
+import { firecrawlSearch, firecrawlScrape } from '@/lib/firecrawl'
 
 
 const supabase = createClient(
@@ -41,6 +42,57 @@ async function webSearch(query: string, cap = 4500): Promise<string> {
   } catch {
     return ''
   }
+}
+
+// ── On-demand tools for mid-conversation verification ──────────────────────
+// buildDossier() below is a one-shot fetch on the first turn. These give the
+// model a way to go look something up itself on any later turn — e.g. "let
+// me check his LinkedIn profile" — instead of announcing intent and then
+// admitting it can't. Firecrawl is the primary backend (real scraping,
+// handles JS-rendered pages); Jina (readUrl/webSearch above) is the fallback
+// when Firecrawl isn't configured or comes back empty, so this still works
+// in environments without a Firecrawl key.
+const DISCUSS_TOOLS: ClaudeTool[] = [
+  {
+    name: 'web_search',
+    description: 'Search the live web for current information — a person\'s LinkedIn/profile, recent news, a specific fact to verify. Returns top results with titles, URLs, and snippets.',
+    input_schema: {
+      type: 'object',
+      properties: { query: { type: 'string', description: 'The search query' } },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'read_page',
+    description: 'Fetch and read the actual rendered content of a specific URL (e.g. a LinkedIn profile, docs page, or announcement found via web_search) so you can quote or verify what it actually says instead of guessing.',
+    input_schema: {
+      type: 'object',
+      properties: { url: { type: 'string', description: 'The full URL to read' } },
+      required: ['url'],
+    },
+  },
+]
+
+async function runDiscussTool(name: string, input: Record<string, unknown>): Promise<string> {
+  if (name === 'web_search') {
+    const query = typeof input.query === 'string' ? input.query : ''
+    if (!query.trim()) return 'No query provided.'
+    const results = await firecrawlSearch(query, 6)
+    if (results.length) {
+      return results.map(r => `${r.title}\n${r.url}\n${r.description}`).join('\n\n')
+    }
+    const fallback = await webSearch(query)
+    return fallback || 'No results found.'
+  }
+  if (name === 'read_page') {
+    const url = typeof input.url === 'string' ? input.url : ''
+    if (!url.trim()) return 'No URL provided.'
+    const viaFirecrawl = await firecrawlScrape(url)
+    if (viaFirecrawl) return viaFirecrawl
+    const viaJina = await readUrl(url)
+    return viaJina || `Could not read ${url} — it may block scrapers (common for LinkedIn) or require login.`
+  }
+  return `Unknown tool: ${name}`
 }
 
 interface LeadRow {
@@ -319,9 +371,12 @@ HOW YOU ANSWER:
 - Start with their tech: explain how the company's product actually works before jumping to fit.
 - Ground every answer in the live research and saved facts. Cite specifics (numbers, products, chains, events) — never generic filler.
 - For every relevant product (Kima, Aeredium, AERKey, Aerpolice), state concretely WHERE it plugs in and what problem it solves for them specifically.
-- If the research doesn't cover something, say what you'd verify and give your best-reasoned read, clearly marked as inference — don't bluff.
 - Anticipate the PROSPECT's likely cross-questions and objections, and arm the BD person with crisp answers.
-- Be direct and substantive. Short paragraphs or tight bullets. No fluff, no "great question", no corporate filler.`
+- Be direct and substantive. Short paragraphs or tight bullets. No fluff, no "great question", no corporate filler.
+
+TOOLS — you have web_search and read_page, real live tools, not a suggestion:
+- The dossier above was fetched once at the start of this conversation. If the BD person asks for something it doesn't cover — a specific person's LinkedIn/background, a fact you need to verify, something that may have changed — actually call the tool and use the real result. Never say "I don't have that capability" or "let me fetch X" and then not fetch it — if you can look it up, look it up.
+- If a lookup comes back empty or blocked (LinkedIn in particular often blocks scrapers), say exactly that, then give your best-reasoned read clearly marked as inference — don't silently fall back to guessing and present it as fact.`
 
     const systemLeadContext = `=== SAVED FACTS ON THIS LEAD ===
 ${leadFacts(lead as LeadRow)}
@@ -340,14 +395,15 @@ If the screenshot is a conversation between multiple people, attribution matters
 - If names are visible anywhere in the thread (headers, @mentions, signatures), use them — don't default to generic labels like "someone on their side" when a real name is legible.`
       : ''
 
-    const { claudeText: ct } = await import('@/lib/claude')
-    const reply = await ct({
+    const reply = await claudeTextWithTools({
       model: CLAUDE_RESEARCH,
       maxTokens: 1100,
       temperature: 0.7,
       system: systemStatic,
       systemCachedSuffix: systemLeadContext,
       systemVolatileSuffix: agentContext + imageNote,
+      tools: DISCUSS_TOOLS,
+      executeTool: runDiscussTool,
       user: [
         ...historyMessages.slice(-16).map(m => `${m.role === 'user' ? 'BD' : 'Agent'}: ${m.content}`),
         `BD: ${message}`,

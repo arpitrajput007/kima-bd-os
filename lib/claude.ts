@@ -175,6 +175,113 @@ export async function claudeText(params: {
   return textBlock?.text ?? ''
 }
 
+// ── Tool-using analysis call — returns plain text, can fetch live data mid-turn ──
+// Like claudeText, but gives the model real tools (e.g. web search / page read)
+// it can invoke on its own judgment before answering — for cases like Discuss
+// Lead where the model may need to verify something not in the pre-fetched
+// dossier ("let me check their LinkedIn") rather than just saying it can't.
+export interface ClaudeTool {
+  name: string
+  description: string
+  input_schema: Record<string, unknown>
+}
+
+export async function claudeTextWithTools(params: {
+  system: string
+  user: string
+  tools: ClaudeTool[]
+  // Runs one tool call and returns its result as text. Should fail soft
+  // (return an explanatory string, not throw) — a failed lookup is useful
+  // context for the model, an unhandled exception just breaks the turn.
+  executeTool: (name: string, input: Record<string, unknown>) => Promise<string>
+  model?: string
+  maxTokens?: number
+  temperature?: number
+  image?: { mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'; data: string }
+  systemCachedSuffix?: string
+  systemVolatileSuffix?: string
+  // Caps how many times the model can call a tool before it's forced to
+  // answer with whatever it has — bounds latency/cost on a runaway loop.
+  maxRounds?: number
+}): Promise<string> {
+  const client = _client()
+  const maxRounds = params.maxRounds ?? 4
+
+  const systemBlocks: Anthropic.TextBlockParam[] = [
+    { type: 'text', text: params.system, cache_control: { type: 'ephemeral' } },
+  ]
+  if (params.systemCachedSuffix?.trim()) {
+    systemBlocks.push({ type: 'text', text: params.systemCachedSuffix, cache_control: { type: 'ephemeral' } })
+  }
+  if (params.systemVolatileSuffix?.trim()) {
+    systemBlocks.push({ type: 'text', text: params.systemVolatileSuffix })
+  }
+
+  const userContent: Anthropic.MessageParam['content'] = params.image
+    ? [
+        { type: 'image', source: { type: 'base64', media_type: params.image.mediaType, data: params.image.data } },
+        { type: 'text', text: params.user },
+      ]
+    : params.user
+
+  const tools: Anthropic.Tool[] = params.tools.map(t => ({
+    name: t.name,
+    description: t.description,
+    input_schema: t.input_schema as Anthropic.Tool.InputSchema,
+  }))
+
+  const messages: Anthropic.MessageParam[] = [{ role: 'user', content: userContent }]
+
+  for (let round = 0; round < maxRounds; round++) {
+    const response = await client.messages.create({
+      model: params.model ?? CLAUDE_RESEARCH,
+      max_tokens: params.maxTokens ?? 4000,
+      ...(params.temperature != null ? { temperature: params.temperature } : {}),
+      system: systemBlocks,
+      messages,
+      tools,
+    })
+
+    if (response.stop_reason !== 'tool_use') {
+      const textBlock = response.content.find((b): b is Anthropic.TextBlock => b.type === 'text')
+      return textBlock?.text ?? ''
+    }
+
+    const toolUses = response.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
+    messages.push({ role: 'assistant', content: response.content })
+
+    const toolResults = await Promise.all(toolUses.map(async (block): Promise<Anthropic.ToolResultBlockParam> => {
+      let resultText: string
+      try {
+        resultText = await params.executeTool(block.name, block.input as Record<string, unknown>)
+      } catch (e) {
+        resultText = `Tool "${block.name}" failed: ${e instanceof Error ? e.message : 'unknown error'}`
+      }
+      return { type: 'tool_result', tool_use_id: block.id, content: resultText || '(no result)' }
+    }))
+    messages.push({ role: 'user', content: toolResults })
+  }
+
+  // Ran out of rounds — force a final answer with whatever's been gathered so far.
+  // No `tools` on this call, so the model structurally can't ask for another one;
+  // the nudge below is what makes it actually write the answer instead of e.g.
+  // stopping at max_tokens mid-thought on a response that turns out text-empty.
+  messages.push({
+    role: 'user',
+    content: 'You\'re out of tool calls for this turn. Answer now using whatever you found. If a lookup failed or was blocked, say so plainly, then give your best-reasoned read clearly marked as inference.',
+  })
+  const final = await client.messages.create({
+    model: params.model ?? CLAUDE_RESEARCH,
+    max_tokens: params.maxTokens ?? 4000,
+    ...(params.temperature != null ? { temperature: params.temperature } : {}),
+    system: systemBlocks,
+    messages,
+  })
+  const textBlock = final.content.find((b): b is Anthropic.TextBlock => b.type === 'text')
+  return textBlock?.text?.trim()
+    || 'I ran into trouble getting a straight answer on that — the live lookups I tried either came back empty or were blocked. Try asking again, maybe more specifically.'
+}
+
 // ── Streaming text — for routes that stream back to the UI ──────────────────
 export async function claudeStream(params: {
   system: string
