@@ -14,7 +14,7 @@ import {
   FileSearch, Puzzle, Calendar, Mail, Wand2,
   MapPin, AtSign, MessageCircle, Plus, Trash2, History,
   BadgeCheck, AlertCircle, Lightbulb, Layers, UserPlus, UserMinus,
-  Image as ImageIcon, Flame
+  Image as ImageIcon, Flame, Reply
 } from 'lucide-react'
 import {
   cn, getScoreBg, getUrgencyBg, getStatusColor, getStatusLabel, getSeverityColor,
@@ -2604,9 +2604,11 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
   const [shown, setShown] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [listOpen, setListOpen] = useState(false)
+  const [quoteSel, setQuoteSel] = useState<{ text: string; x: number; y: number } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const researched = dossier.length > 0
 
   // Portal availability + slide-in + body scroll lock + autofocus.
@@ -2618,6 +2620,50 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
     const f = setTimeout(() => inputRef.current?.focus(), 120)
     return () => { cancelAnimationFrame(t); clearTimeout(f); document.body.style.overflow = prevOverflow }
   }, [])
+
+  // Dismiss the "Reply" popup on any click outside it (but not the click that opens it).
+  useEffect(() => {
+    if (!quoteSel) return
+    const dismiss = (e: MouseEvent) => {
+      const el = e.target as HTMLElement | null
+      if (!el?.closest?.('[data-reply-popup]')) setQuoteSel(null)
+    }
+    document.addEventListener('mousedown', dismiss)
+    return () => document.removeEventListener('mousedown', dismiss)
+  }, [quoteSel])
+
+  // Track text the user highlights inside an assistant reply, so we can offer to quote it.
+  const handleTextSelect = useCallback(() => {
+    const sel = window.getSelection()
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return
+    const text = sel.toString().trim()
+    if (!text) return
+    const anchor = sel.anchorNode
+    const node = anchor instanceof Element ? anchor : anchor?.parentElement
+    const bubble = node?.closest('[data-role="assistant"]')
+    if (!bubble) { setQuoteSel(null); return }
+    const rect = sel.getRangeAt(0).getBoundingClientRect()
+    const panelRect = panelRef.current?.getBoundingClientRect()
+    setQuoteSel({ text, x: rect.left + rect.width / 2 - (panelRect?.left ?? 0), y: rect.top - (panelRect?.top ?? 0) })
+  }, [])
+
+  // Quote the highlighted text into the composer as a reply and focus it.
+  const replyToSelection = () => {
+    if (!quoteSel) return
+    const quote = quoteSel.text.split('\n').map(l => `> ${l}`).join('\n')
+    setInput(prev => (prev.trim() ? `${quote}\n\n${prev}` : `${quote}\n\n`))
+    setQuoteSel(null)
+    window.getSelection()?.removeAllRanges()
+    requestAnimationFrame(() => {
+      const el = inputRef.current
+      if (!el) return
+      el.focus()
+      el.style.height = 'auto'
+      el.style.height = Math.min(el.scrollHeight, 140) + 'px'
+      const len = el.value.length
+      el.setSelectionRange(len, len)
+    })
+  }
 
   // Load this lead's past conversations and open the most recent one.
   useEffect(() => {
@@ -2758,7 +2804,7 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
   const panel = (
     <div onClick={closeAndLearn}
       style={{ position: 'fixed', inset: 0, zIndex: 1000, background: shown ? 'rgba(4,4,10,0.6)' : 'rgba(4,4,10,0)', backdropFilter: 'blur(3px)', display: 'flex', justifyContent: 'flex-end', transition: 'background 0.25s ease' }}>
-      <div onClick={e => e.stopPropagation()}
+      <div ref={panelRef} onClick={e => e.stopPropagation()}
         style={{
           width: 'min(580px, 100vw)', height: '100dvh', background: 'linear-gradient(180deg, rgb(17,18,28), rgb(12,12,19))',
           borderLeft: '1px solid rgba(34,211,238,0.25)', display: 'flex', flexDirection: 'column',
@@ -2800,7 +2846,7 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
         </div>
 
         {/* Messages */}
-        <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div ref={scrollRef} onMouseUp={handleTextSelect} onScroll={() => setQuoteSel(null)} style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
           {messages.length === 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <p style={{ fontSize: 13, color: 'rgb(150,157,180)', lineHeight: 1.65, margin: 0 }}>
@@ -2839,7 +2885,7 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
                   <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
                     <Brain size={13} color="rgb(103,232,249)" />
                   </div>
-                  <div style={{ flex: 1, minWidth: 0, borderRadius: '4px 14px 14px 14px', padding: '11px 14px', fontSize: 13, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgb(208,213,230)' }}>
+                  <div data-role="assistant" style={{ flex: 1, minWidth: 0, borderRadius: '4px 14px 14px 14px', padding: '11px 14px', fontSize: 13, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgb(208,213,230)' }}>
                     <RichText text={m.content} />
                   </div>
                 </div>
@@ -2874,6 +2920,17 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
             </div>
           )}
         </div>
+
+        {/* Floating "Reply" button that appears over text highlighted in an assistant reply */}
+        {quoteSel && (
+          <div data-reply-popup onMouseDown={e => e.preventDefault()}
+            style={{ position: 'absolute', left: quoteSel.x, top: quoteSel.y, transform: 'translate(-50%, calc(-100% - 8px))', zIndex: 20 }}>
+            <button onClick={replyToSelection}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 999, border: '1px solid rgba(34,211,238,0.4)', background: 'rgb(20,21,32)', color: 'rgb(103,232,249)', fontSize: 12, fontWeight: 600, padding: '7px 12px', cursor: 'pointer', boxShadow: '0 8px 24px rgba(0,0,0,0.5)', whiteSpace: 'nowrap' }}>
+              <Reply size={13} /> Reply
+            </button>
+          </div>
+        )}
 
         {/* Composer */}
         <div style={{ padding: '12px 16px 16px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
