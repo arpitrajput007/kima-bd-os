@@ -2309,7 +2309,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 }
 
 /* ── Discuss Lead: research-grounded chat that teaches the agent ──────────── */
-interface ChatMsg { role: 'user' | 'assistant'; content: string; followUps?: string[]; image?: string }
+interface ChatMsg { role: 'user' | 'assistant'; content: string; followUps?: string[]; image?: string; provider?: DiscussProvider; model?: string }
+
+type DiscussProvider = 'claude' | 'openai'
+const DISCUSS_PROVIDER_KEY = 'kima_discuss_provider'
+const DISCUSS_PROVIDER_LABEL: Record<DiscussProvider, string> = { claude: 'Claude', openai: 'ChatGPT' }
 
 // Screenshot pasted into the composer, held client-side until sent.
 interface PendingImage { dataUrl: string; mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'; data: string }
@@ -2605,6 +2609,7 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
   const [mounted, setMounted] = useState(false)
   const [listOpen, setListOpen] = useState(false)
   const [quoteSel, setQuoteSel] = useState<{ text: string; x: number; y: number } | null>(null)
+  const [provider, setProvider] = useState<DiscussProvider>('claude')
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -2618,8 +2623,17 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const f = setTimeout(() => inputRef.current?.focus(), 120)
+    try {
+      const saved = localStorage.getItem(DISCUSS_PROVIDER_KEY)
+      if (saved === 'claude' || saved === 'openai') setProvider(saved)
+    } catch {}
     return () => { cancelAnimationFrame(t); clearTimeout(f); document.body.style.overflow = prevOverflow }
   }, [])
+
+  const switchProvider = (p: DiscussProvider) => {
+    setProvider(p)
+    try { localStorage.setItem(DISCUSS_PROVIDER_KEY, p) } catch {}
+  }
 
   // Dismiss the "Reply" popup on any click outside it (but not the click that opens it).
   useEffect(() => {
@@ -2769,13 +2783,14 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
         body: JSON.stringify({
           lead_id: lead.id, message: question, messages, dossier: dossier || undefined,
           image: image ? { mediaType: image.mediaType, data: image.data } : undefined,
+          provider,
         }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
       if (json.dossier) setDossier(json.dossier)
       const followUps: string[] = Array.isArray(json.followUps) ? json.followUps : []
-      setMessages([...next, { role: 'assistant', content: json.reply, followUps }])
+      setMessages([...next, { role: 'assistant', content: json.reply, followUps, provider: json.provider, model: json.model }])
       if (sessionId) {
         const ts = new Date().toISOString()
         const count = next.length + 1
@@ -2845,6 +2860,23 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
           </div>
         </div>
 
+        {/* Provider toggle — A/B the same conversation across Claude and GPT-5.6 */}
+        <div style={{ padding: '9px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <span style={{ fontSize: 10.5, color: 'rgb(110,117,145)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Answering with</span>
+          <div style={{ display: 'flex', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', padding: 2, gap: 2 }}>
+            {(['claude', 'openai'] as DiscussProvider[]).map(p => (
+              <button key={p} onClick={() => switchProvider(p)} title={p === 'openai' ? 'GPT-5.6 Terra for everyday turns, GPT-5.6 Sol on your highest-value leads (score 85+)' : 'Claude Sonnet 4.6'}
+                style={{
+                  border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer',
+                  background: provider === p ? 'rgba(34,211,238,0.16)' : 'transparent',
+                  color: provider === p ? 'rgb(103,232,249)' : 'rgb(140,147,175)',
+                }}>
+                {DISCUSS_PROVIDER_LABEL[p]}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Messages */}
         <div ref={scrollRef} onMouseUp={handleTextSelect} onScroll={() => setQuoteSel(null)} style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
           {messages.length === 0 && (
@@ -2885,8 +2917,15 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
                   <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
                     <Brain size={13} color="rgb(103,232,249)" />
                   </div>
-                  <div data-role="assistant" style={{ flex: 1, minWidth: 0, borderRadius: '4px 14px 14px 14px', padding: '11px 14px', fontSize: 13, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgb(208,213,230)' }}>
-                    <RichText text={m.content} />
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div data-role="assistant" style={{ borderRadius: '4px 14px 14px 14px', padding: '11px 14px', fontSize: 13, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgb(208,213,230)' }}>
+                      <RichText text={m.content} />
+                    </div>
+                    {m.model && (
+                      <span style={{ fontSize: 10, color: 'rgb(100,107,140)', paddingLeft: 4 }}>
+                        {m.provider === 'openai' ? '⚡' : '◆'} {m.model}
+                      </span>
+                    )}
                   </div>
                 </div>
                 {parseDraftBlocks(m.content).map((block, bi) => (

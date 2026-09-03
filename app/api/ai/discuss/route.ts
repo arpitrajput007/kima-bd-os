@@ -1,4 +1,5 @@
 import { claudeJSON, claudeTextWithTools, CLAUDE_RESEARCH, CLAUDE_MINI, type ClaudeTool } from "@/lib/claude"
+import { openaiTextWithTools, pickOpenAIModel, openaiConfigured } from '@/lib/openai-chat'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { FULL_BRAIN } from '@/lib/kima-knowledge'
@@ -324,6 +325,14 @@ export async function POST(req: NextRequest) {
     if (!lead_id) return NextResponse.json({ error: 'lead_id is required' }, { status: 400 })
     if (!message || !message.trim()) return NextResponse.json({ error: 'Empty message' }, { status: 400 })
 
+    // Provider toggle — lets the BD person A/B the same lead/question across
+    // Claude and GPT-5.6 to see which one actually earns its keep long-term,
+    // rather than picking a provider once and never revisiting it.
+    const provider: 'claude' | 'openai' = body.provider === 'openai' ? 'openai' : 'claude'
+    if (provider === 'openai' && !openaiConfigured()) {
+      return NextResponse.json({ error: 'OpenAI API key not configured. Add OPENAI_API_KEY to your .env.local file.' }, { status: 400 })
+    }
+
     // Pasted-in screenshot (e.g. a chat with the lead), if any — { mediaType, data }.
     const image: { mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'; data: string } | undefined =
       body.image && typeof body.image.data === 'string' && typeof body.image.mediaType === 'string'
@@ -400,21 +409,41 @@ If the screenshot is a conversation between multiple people, attribution matters
 - If names are visible anywhere in the thread (headers, @mentions, signatures), use them — don't default to generic labels like "someone on their side" when a real name is legible.`
       : ''
 
-    const reply = await claudeTextWithTools({
-      model: CLAUDE_RESEARCH,
-      maxTokens: 1100,
-      temperature: 0.7,
-      system: systemStatic,
-      systemCachedSuffix: systemLeadContext,
-      systemVolatileSuffix: agentContext + imageNote,
-      tools: DISCUSS_TOOLS,
-      executeTool: runDiscussTool,
-      user: [
-        ...historyMessages.slice(-16).map(m => `${m.role === 'user' ? 'BD' : 'Agent'}: ${m.content}`),
-        `BD: ${message}`,
-      ].join('\n\n'),
-      image,
-    }) || 'I had trouble with that — try rephrasing?'
+    const userTurns = [
+      ...historyMessages.slice(-16).map(m => `${m.role === 'user' ? 'BD' : 'Agent'}: ${m.content}`),
+      `BD: ${message}`,
+    ].join('\n\n')
+
+    let reply: string
+    let model: string
+    if (provider === 'openai') {
+      model = pickOpenAIModel((lead as LeadRow).lead_score)
+      reply = await openaiTextWithTools({
+        model,
+        maxTokens: 1100,
+        // OpenAI has no prompt-cache breakpoints — just concatenate what
+        // Claude splits into systemStatic/systemCachedSuffix/systemVolatileSuffix.
+        system: [systemStatic, systemLeadContext, agentContext + imageNote].join('\n\n'),
+        tools: DISCUSS_TOOLS,
+        executeTool: runDiscussTool,
+        user: userTurns,
+        image,
+      }) || 'I had trouble with that — try rephrasing?'
+    } else {
+      model = CLAUDE_RESEARCH
+      reply = await claudeTextWithTools({
+        model,
+        maxTokens: 1100,
+        temperature: 0.7,
+        system: systemStatic,
+        systemCachedSuffix: systemLeadContext,
+        systemVolatileSuffix: agentContext + imageNote,
+        tools: DISCUSS_TOOLS,
+        executeTool: runDiscussTool,
+        user: userTurns,
+        image,
+      }) || 'I had trouble with that — try rephrasing?'
+    }
 
     const followUps = await suggestFollowUps({
       company: lead.company_name,
@@ -423,7 +452,7 @@ If the screenshot is a conversation between multiple people, attribution matters
       reply,
     })
 
-    return NextResponse.json({ reply, dossier, followUps })
+    return NextResponse.json({ reply, dossier, followUps, provider, model })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Discussion failed'
     console.error('[discuss route]', err)
