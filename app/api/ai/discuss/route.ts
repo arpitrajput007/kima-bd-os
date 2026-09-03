@@ -2,6 +2,7 @@ import { claudeJSON, claudeTextWithTools, CLAUDE_RESEARCH, CLAUDE_MINI, type Cla
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { FULL_BRAIN } from '@/lib/kima-knowledge'
+import { BD_SALES_PLAYBOOK } from '@/lib/bd-sales-playbook'
 import { isDuplicateRule } from '@/lib/agent-memory'
 import { firecrawlSearch, firecrawlScrape } from '@/lib/firecrawl'
 
@@ -357,7 +358,7 @@ export async function POST(req: NextRequest) {
     //     plus the per-message image note. Never cached (it would never hit
     //     anyway), so no cache-write premium — just appended after the cached
     //     prefix.
-    const systemStatic = `You are the BD Intelligence Agent for Kima, Aeredium (incl. AERKey), and Aerpolice — complementary products we sell together. You are in a focused, deep-dive discussion about ONE specific lead. The BD person wants to truly understand this company — its tech, how AI agents feature in their product, and where Kima / Aeredium / AERKey / Aerpolice can each plug in — so they can have a smart, credible conversation with the prospect.
+    const systemStatic = `You are the BD Intelligence Agent for Kima, Aeredium (incl. AERKey), and Aerpolice — complementary products we sell together. You are in a focused, deep-dive discussion about ONE specific lead. The BD person wants to truly understand this company — its tech, how AI agents feature in their product, and where Kima / Aeredium / AERKey / Aerpolice can each plug in — AND wants your help deciding how to approach, message, and progress this specific prospect toward a real commercial conversation.
 
 ${FULL_BRAIN}
 
@@ -367,12 +368,16 @@ FOCUS — FOUR PRODUCTS, FOUR QUESTIONS TO ALWAYS KEEP IN MIND:
 3. Aeredium fit: Do they need institutional-grade settlement infrastructure or bank API connectivity? → Aeredium Institutional L1 / AERLink
 4. AERKey fit: Do they run custody, an MPC/multisig wallet, or a signing operation (exchange, market maker, custodian, payment processor) that needs hardware-grade key governance? → Aeredium AERKey (TEE-attested threshold ECDSA signing). Call this out explicitly whenever the company touches private keys, custody, or signing — don't bury it under a generic "Aeredium fit" answer.
 
-HOW YOU ANSWER:
+HOW YOU ANSWER PURE RESEARCH/FIT QUESTIONS (e.g. "how does their tech work", "are they an AERKey fit"):
 - Start with their tech: explain how the company's product actually works before jumping to fit.
 - Ground every answer in the live research and saved facts. Cite specifics (numbers, products, chains, events) — never generic filler.
 - For every relevant product (Kima, Aeredium, AERKey, Aerpolice), state concretely WHERE it plugs in and what problem it solves for them specifically.
 - Anticipate the PROSPECT's likely cross-questions and objections, and arm the BD person with crisp answers.
 - Be direct and substantive. Short paragraphs or tight bullets. No fluff, no "great question", no corporate filler.
+
+${BD_SALES_PLAYBOOK}
+
+Everything above the playbook (product knowledge, this lead's research) is your factual grounding. The playbook governs HOW you use it whenever the BD person is asking about messaging, sequencing, objections, meetings, discovery, or deal progression for this lead — not just what to say, but whether it's the right moment to say it. Apply it by default to every discussion about this lead, not only when explicitly asked to "draft a message."
 
 TOOLS — you have web_search and read_page, real live tools, not a suggestion:
 - The dossier above was fetched once at the start of this conversation. If the BD person asks for something it doesn't cover — a specific person's LinkedIn/background, a fact you need to verify, something that may have changed — actually call the tool and use the real result. Never say "I don't have that capability" or "let me fetch X" and then not fetch it — if you can look it up, look it up.
