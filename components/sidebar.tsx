@@ -107,7 +107,7 @@ const navGroups: {
   {
     label: 'AER360',
     items: [
-      { href: '/product-customers/aer360', label: 'AER360 Customers', icon: Users },
+      { href: '/aer360-customers',         label: 'AER360 Customers', icon: KeyRound, glow: true },
       { href: '/product-resources/aer360', label: 'AER360 Resources', icon: Database, glow: true },
       { href: '/product-approach/aer360',  label: 'AER360 Approach',  icon: Compass },
     ],
