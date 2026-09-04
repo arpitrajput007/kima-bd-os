@@ -143,6 +143,28 @@ export const REJECTION_REASONS = {
 
 export type RejectionReason = keyof typeof REJECTION_REASONS
 
+// ── OEM / Partner Watchlist — separate pipeline, separate motion ───────────
+// MCP vendors, agent framework builders, connector providers and tool
+// publishers are not customer leads even when their own agent passes the
+// qualification gate — they get routed here instead of into `leads`, with no
+// outreach from the direct-customer pipeline. They are revisited only on one
+// of the events in WATCHLIST_REVISIT_TRIGGERS below; a fit-but-quiet OEM/
+// partner otherwise just sits in the watchlist.
+export const OEM_PARTNER_MOTIONS: readonly RecommendedMotion[] = ['oem_integration', 'partnership']
+
+export function isOemOrPartnerCandidate(d: Pick<AerpoliceDossier, 'recommended_motion' | 'rejection_flags'>): boolean {
+  return OEM_PARTNER_MOTIONS.includes(d.recommended_motion) || (d.rejection_flags || []).includes('equivalent_offering')
+}
+
+export const WATCHLIST_REVISIT_TRIGGERS = {
+  named_production_deployment: 'Announces a named production deployment with autonomous agent actions',
+  customers_asking_for_governance: 'Their customers start asking them for governance controls publicly',
+  case_study_consequential_ops: 'Publishes a case study showing consequential autonomous operations',
+} as const
+
+export type WatchlistRevisitTrigger = keyof typeof WATCHLIST_REVISIT_TRIGGERS
+export const WATCHLIST_REVISIT_TRIGGER_KEYS = Object.keys(WATCHLIST_REVISIT_TRIGGERS) as WatchlistRevisitTrigger[]
+
 // ── The prospect dossier ────────────────────────────────────────────────────
 // The shape the research model fills in and the shape we persist. FACT /
 // INFERENCE / UNKNOWN are three separate arrays and never merged.
@@ -434,13 +456,19 @@ export function evaluateGate(d: AerpoliceDossier, score: ScoreBreakdown, now = n
   const hasFreshTrigger = hasRealTrigger && triggerTier.corroborating
   const hasIntelligentQuestion = !!d.first_qualification_question && d.first_qualification_question.trim().includes('?')
   const motionAllowsOutreach = d.recommended_motion !== 'monitor' && d.recommended_motion !== 'reject'
+  // Gate criterion #3 of the four-part direct-customer framework: a confirmed
+  // or strongly evidenced governance gap. "unknown" means the control layer
+  // was never investigated — that's research required, not an outreach-ready
+  // lead, even if the action, trigger and buyer all check out.
+  const hasGovernanceGapEvidence = d.control_gap?.status === 'confirmed' || d.control_gap?.status === 'inferred'
 
   if (!hasFreshTrigger) {
     return { saved: true, nextAction: 'Monitor', failures: ['No current dated trigger — monitored, not sent'], rejections: [] }
   }
-  if (!hasRouteToBuyer || !hasIntelligentQuestion || !motionAllowsOutreach) {
+  if (!hasRouteToBuyer || !hasIntelligentQuestion || !motionAllowsOutreach || !hasGovernanceGapEvidence) {
     const why: string[] = []
     if (!hasRouteToBuyer) why.push('No identifiable buyer or public channel yet')
+    if (!hasGovernanceGapEvidence) why.push('Control-gap status is unknown — the governance gap has not been investigated, only the agent\'s capability')
     if (!hasIntelligentQuestion) why.push('No intelligent unanswered question drafted')
     if (!motionAllowsOutreach) why.push(`Recommended motion is "${RECOMMENDED_MOTIONS[d.recommended_motion]}" — not an outreach motion`)
     return { saved: true, nextAction: 'Validate then send', failures: why, rejections: [] }
@@ -502,6 +530,18 @@ export const EPISTEMIC_RULES = `FACT / INFERENCE / UNKNOWN — keep these three 
 Social posts, directories (Crunchbase, YC, Product Hunt, Show HN, GitHub topic listings) and news aggregators may identify a lead, but can never be the SOLE evidence for a claim when an official source is available. Never claim a prospect has inadequate security, is unhappy with its provider, has weak controls, has suffered an incident, lacks human approval, or cannot audit its agent's actions — unless a reliable source directly establishes that claim.`
 
 export const OUTREACH_TONE_RULES = `The outreach seed should sound like an informed technical peer opening an architecture conversation — never a generic compliment, never an accusation of vulnerability. Banned openers: ${GENERIC_OPENERS.map(p => `"${p}"`).join(', ')}. Never claim the prospect's controls are inadequate; state what is publicly documented and ask about what genuinely isn't.`
+
+export const PIPELINE_SEPARATION_RULES = `TWO SEPARATE PIPELINES — never blend them.
+
+DIRECT CUSTOMER PIPELINE requires ALL FOUR of the following before a company enters it:
+1. A live agent taking real consequential actions in production TODAY — not a roadmap item, not a stated capability.
+2. An identifiable person who owns the authorization risk and can purchase.
+3. A confirmed or strongly evidenced gap in how that agent's actions are governed.
+4. A dated trigger (funding, launch, enterprise deal, security hire, incident, audit).
+If any one of these is unknown, this is RESEARCH REQUIRED — do not treat it as a scored, outreach-ready lead. A company with a live agent and a governance gap but NO dated trigger event belongs in a monitoring queue, not the active outreach pipeline — the trigger is what makes the timing feel earned rather than random, and it is non-negotiable.
+
+OEM/PARTNER WATCHLIST is a separate pipeline, separate motion, for MCP vendors, agent framework builders, connector providers and tool publishers. Set recommended_motion to "oem_integration" or "partnership" for these — they are NOT customer leads and receive no outreach from the direct-customer pipeline. Different team, different conversation, different timeline. They are only worth revisiting when one of these happens:
+${WATCHLIST_REVISIT_TRIGGER_KEYS.map(k => `- ${k}: ${WATCHLIST_REVISIT_TRIGGERS[k]}`).join('\n')}`
 
 export function externalActionsReference(): string {
   return EXTERNAL_ACTION_KEYS.map(k => `- ${k}: ${EXTERNAL_ACTIONS[k].label}`).join('\n')

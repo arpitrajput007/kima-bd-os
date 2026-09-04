@@ -12,6 +12,7 @@ import {
   evaluateGate,
   enforceGapDiscipline,
   validateOutreachSeed,
+  isOemOrPartnerCandidate,
   daysSince,
   TIER_1_MIN,
   TIER_2_MIN,
@@ -33,6 +34,9 @@ import {
   INACTIVE_DOSSIER,
   OVERCLAIMED_GAP_DOSSIER,
   GENUINE_GAP_DOSSIER,
+  UNCONFIRMED_GAP_DOSSIER,
+  OEM_INTEGRATION_DOSSIER,
+  PARTNERSHIP_DOSSIER,
 } from './fixtures/aerpolice-dossiers'
 
 describe('scoreProspect — bounds and tiers', () => {
@@ -81,7 +85,7 @@ describe('scoreProspect — bounds and tiers', () => {
 
   it('scores higher complementarity for a genuinely confirmed control gap than an unconfirmed one', () => {
     const confirmed = scoreProspect(GENUINE_GAP_DOSSIER, TODAY)
-    const unconfirmed = scoreProspect(NO_TRIGGER_DOSSIER, TODAY) // control_gap.status === 'unknown' in BASE
+    const unconfirmed = scoreProspect(UNCONFIRMED_GAP_DOSSIER, TODAY)
     expect(confirmed.complementarityScore).toBeGreaterThan(unconfirmed.complementarityScore)
   })
 })
@@ -115,7 +119,7 @@ describe('enforceGapDiscipline', () => {
   })
 
   it('is a no-op when the gap is not claimed as confirmed', () => {
-    const dossier = structuredClone(NO_TRIGGER_DOSSIER) // control_gap.status === 'unknown'
+    const dossier = structuredClone(UNCONFIRMED_GAP_DOSSIER) // control_gap.status === 'unknown'
     expect(enforceGapDiscipline(dossier)).toHaveLength(0)
   })
 })
@@ -195,6 +199,40 @@ describe('evaluateGate — Validate then send vs Contact now', () => {
     const gate = evaluateGate(dossier, score, TODAY)
     expect(gate.saved).toBe(true)
     expect(gate.nextAction).toBe('Validate then send')
+  })
+})
+
+describe('evaluateGate — governance-gap is a hard gate criterion, not just a score input', () => {
+  it('downgrades to "Validate then send" when the control gap has never been investigated, even with action+trigger+buyer all present', () => {
+    const score = scoreProspect(UNCONFIRMED_GAP_DOSSIER, TODAY)
+    const gate = evaluateGate(UNCONFIRMED_GAP_DOSSIER, score, TODAY)
+    expect(gate.saved).toBe(true)
+    expect(gate.nextAction).toBe('Validate then send')
+    expect(gate.failures.some(f => f.toLowerCase().includes('control-gap'))).toBe(true)
+  })
+
+  it('reaches "Contact now" once the gap is confirmed alongside action, trigger and buyer', () => {
+    const score = scoreProspect(CONFIRMED_ACTION_FRESH_TRIGGER_DOSSIER, TODAY)
+    const gate = evaluateGate(CONFIRMED_ACTION_FRESH_TRIGGER_DOSSIER, score, TODAY)
+    expect(gate.nextAction).toBe('Contact now')
+  })
+})
+
+describe('isOemOrPartnerCandidate — OEM/Partner Watchlist is a separate pipeline from direct customers', () => {
+  it('flags an oem_integration motion', () => {
+    expect(isOemOrPartnerCandidate(OEM_INTEGRATION_DOSSIER)).toBe(true)
+  })
+
+  it('flags a partnership motion', () => {
+    expect(isOemOrPartnerCandidate(PARTNERSHIP_DOSSIER)).toBe(true)
+  })
+
+  it('flags equivalent_offering regardless of motion', () => {
+    expect(isOemOrPartnerCandidate(EQUIVALENT_OFFERING_DOSSIER)).toBe(true)
+  })
+
+  it('does not flag a genuine direct-customer candidate', () => {
+    expect(isOemOrPartnerCandidate(CONFIRMED_ACTION_FRESH_TRIGGER_DOSSIER)).toBe(false)
   })
 })
 

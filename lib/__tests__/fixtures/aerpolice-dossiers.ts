@@ -33,7 +33,11 @@ const BASE: AerpoliceDossier = {
     human_escalation: 'unknown', independent_kill_switch: 'unknown', audit_log_explains_why: 'unknown', audit_verifiable_by_customer: 'unknown',
     stated_summary: 'MFA and "approved fixes" are stated; independent per-agent policy, kill control and signed evidence are not public.',
   },
-  control_gap: { gap: 'Gap not confirmed', status: 'unknown', basis: 'Only the action-taking capability is documented, not the control layer.' },
+  control_gap: {
+    gap: 'No independent kill switch per agent; authorization is enforced inside the same runtime that executes the action, with no external approval step.',
+    status: 'confirmed',
+    basis: 'Docs describe a single in-process policy check with no external escalation or kill control.',
+  },
   consequence: { financial: null, operational: 'Password/access changes without independent verification could lock out or over-provision users.', regulatory: null, reputational: null },
   recommended_motion: 'direct_design_partner_pilot',
   motion_rationale: 'Small, founder-led, no competing governance layer documented.',
@@ -118,4 +122,24 @@ export const GENUINE_GAP_DOSSIER: AerpoliceDossier = {
   ...BASE,
   organization: 'RealGap Inc',
   control_gap: { gap: 'No independent kill switch per agent; authorization is enforced inside the same runtime that executes the action, with no external approval step.', status: 'confirmed', basis: 'Docs describe a single in-process policy check with no external escalation or kill control.' },
+}
+
+export const UNCONFIRMED_GAP_DOSSIER: AerpoliceDossier = {
+  ...BASE,
+  organization: 'ActionOnlyCo',
+  control_gap: { gap: 'Gap not confirmed', status: 'unknown', basis: 'Only the action-taking capability is documented, not the control layer.' },
+}
+
+export const OEM_INTEGRATION_DOSSIER: AerpoliceDossier = {
+  ...BASE,
+  organization: 'ConnectorHub MCP',
+  recommended_motion: 'oem_integration',
+  motion_rationale: 'Ships an MCP server that third parties embed — not an end-user buyer of governance themselves.',
+}
+
+export const PARTNERSHIP_DOSSIER: AerpoliceDossier = {
+  ...BASE,
+  organization: 'AgentFrame',
+  recommended_motion: 'partnership',
+  motion_rationale: 'Agent framework builder — a channel partner, not a direct customer.',
 }

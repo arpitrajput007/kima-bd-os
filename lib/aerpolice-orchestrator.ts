@@ -114,6 +114,7 @@ interface DiscoverAerpoliceResponse {
   saved?: number; candidates_found?: number; profiled?: number
   tier_1?: number; tier_2?: number; tier_3?: number
   contact_now?: number; validate_then_send?: number; monitor?: number
+  watchlisted?: number
   error?: string
 }
 
@@ -178,6 +179,7 @@ export interface AerpoliceRunSummary {
   contact_now_count: number
   validate_then_send_count: number
   monitor_count: number
+  watchlisted_count: number
   errors: Array<{ source: string; error: string }>
   started_at: string
   finished_at: string
@@ -197,7 +199,7 @@ export async function runAerpoliceDiscovery(
     const appUrl = resolveAppUrl()
     let sourcesScanned = 0, sourcesFailed = 0, leadsCreated = 0, candidatesFound = 0
     let tier1Count = 0, tier2Count = 0, tier3Count = 0
-    let contactNowCount = 0, validateThenSendCount = 0, monitorCount = 0
+    let contactNowCount = 0, validateThenSendCount = 0, monitorCount = 0, watchlistedCount = 0
     const errors: Array<{ source: string; error: string }> = []
 
     for (let i = 0; i < batch.length; i += AERPOLICE_RUN_CONCURRENCY) {
@@ -215,6 +217,7 @@ export async function runAerpoliceDiscovery(
           contactNowCount += res.data.contact_now || 0
           validateThenSendCount += res.data.validate_then_send || 0
           monitorCount += res.data.monitor || 0
+          watchlistedCount += res.data.watchlisted || 0
           await recordScanOutcome(supabase, target, { ok: true, saved: res.data.saved, profiled: res.data.profiled })
         } else {
           sourcesFailed++
@@ -232,6 +235,7 @@ export async function runAerpoliceDiscovery(
       leads_created: leadsCreated, candidates_found: candidatesFound,
       tier1_count: tier1Count, tier2_count: tier2Count, tier3_count: tier3Count,
       contact_now_count: contactNowCount, validate_then_send_count: validateThenSendCount, monitor_count: monitorCount,
+      watchlisted_count: watchlistedCount,
       errors,
     }).eq('id', lockId)
 
@@ -240,6 +244,7 @@ export async function runAerpoliceDiscovery(
       leads_created: leadsCreated, candidates_found: candidatesFound,
       tier1_count: tier1Count, tier2_count: tier2Count, tier3_count: tier3Count,
       contact_now_count: contactNowCount, validate_then_send_count: validateThenSendCount, monitor_count: monitorCount,
+      watchlisted_count: watchlistedCount,
       errors, started_at: startedAt, finished_at: finishedAt,
     }
   } catch (e) {

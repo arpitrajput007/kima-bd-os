@@ -30,9 +30,24 @@ interface RunRow {
   contact_now_count: number
   validate_then_send_count: number
   monitor_count: number
+  watchlisted_count: number
   started_at: string
   finished_at: string | null
   errors: Array<{ source: string; error: string }>
+}
+
+interface WatchlistRow {
+  id: string
+  organization: string
+  website: string | null
+  entity_signal: string | null
+  recommended_motion: string | null
+  why_not_customer: string
+  status: string
+  revisit_trigger_type: string | null
+  seen_count: number
+  first_seen_at: string
+  last_seen_at: string
 }
 
 interface SourceRow {
@@ -96,6 +111,7 @@ export default function AerpoliceDiscoveryPage() {
   const [loadingLeads, setLoadingLeads] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [nextActionFilter, setNextActionFilter] = useState<string>('All')
+  const [watchlist, setWatchlist] = useState<WatchlistRow[]>([])
 
   const loadStatus = useCallback(async () => {
     try {
@@ -127,11 +143,22 @@ export default function AerpoliceDiscoveryPage() {
     setLoadingLeads(false)
   }, [])
 
+  const loadWatchlist = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('aerpolice_oem_partner_watchlist')
+      .select('id, organization, website, entity_signal, recommended_motion, why_not_customer, status, revisit_trigger_type, seen_count, first_seen_at, last_seen_at')
+      .order('last_seen_at', { ascending: false })
+      .limit(50)
+    setWatchlist((data || []) as WatchlistRow[])
+  }, [])
+
   useEffect(() => {
     loadStatus()
     loadSources()
     loadLeads()
-  }, [loadStatus, loadSources, loadLeads])
+    loadWatchlist()
+  }, [loadStatus, loadSources, loadLeads, loadWatchlist])
 
   const runDiscovery = async () => {
     setTriggering(true)
@@ -142,7 +169,7 @@ export default function AerpoliceDiscoveryPage() {
         toast.error(data.error || 'Discovery run failed')
       } else {
         toast.success(`Run complete — ${data.leads_created} lead${data.leads_created === 1 ? '' : 's'} saved from ${data.sources_scanned} source${data.sources_scanned === 1 ? '' : 's'}`)
-        await Promise.all([loadStatus(), loadSources(), loadLeads()])
+        await Promise.all([loadStatus(), loadSources(), loadLeads(), loadWatchlist()])
       }
     } catch {
       toast.error('Discovery run failed')
@@ -194,6 +221,7 @@ export default function AerpoliceDiscoveryPage() {
                 { label: 'Contact now', value: latest.contact_now_count, color: '#34d399' },
                 { label: 'Validate then send', value: latest.validate_then_send_count, color: '#fbbf24' },
                 { label: 'Monitor', value: latest.monitor_count, color: '#94a3b8' },
+                { label: 'OEM/Partner watchlisted', value: latest.watchlisted_count, color: '#818cf8' },
               ].map(s => (
                 <div key={s.label} style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: 19, fontWeight: 800, color: s.color }}>{s.value}</div>
@@ -311,6 +339,42 @@ export default function AerpoliceDiscoveryPage() {
                 </div>
               )
             })}
+          </div>
+        </div>
+
+        {/* OEM / Partner Watchlist — separate pipeline, no outreach from here */}
+        <div style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden', marginBottom: 24 }}>
+          <div style={{ padding: '12px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'white' }}>OEM / Partner Watchlist ({watchlist.length})</div>
+            <div style={{ fontSize: 11, color: 'rgb(120,127,160)', marginTop: 3 }}>
+              MCP vendors, agent framework builders, connector providers and tool publishers — not customer leads, no outreach from this pipeline. Revisited only on a named production deployment, a public ask for governance from their customers, or a case study of consequential autonomous ops.
+            </div>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
+              <thead>
+                <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
+                  {['Organization', 'Motion', 'Why not a customer', 'Status', 'Last seen'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '8px 14px', fontSize: 10, fontWeight: 700, color: 'rgb(120,127,160)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {watchlist.length === 0 ? (
+                  <tr><td colSpan={5} style={{ padding: '20px 14px', textAlign: 'center', fontSize: 12, color: 'rgb(120,127,160)' }}>Nothing on the watchlist yet.</td></tr>
+                ) : watchlist.map(w => (
+                  <tr key={w.id} style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                    <td style={{ padding: '8px 14px', fontSize: 12, color: 'white', fontWeight: 600 }}>
+                      {w.website ? <a href={w.website} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>{w.organization}</a> : w.organization}
+                    </td>
+                    <td style={{ padding: '8px 14px', fontSize: 11, color: '#818cf8', textTransform: 'capitalize' }}>{(w.recommended_motion || '').replace(/_/g, ' ')}</td>
+                    <td style={{ padding: '8px 14px', fontSize: 11, color: 'rgb(150,155,185)', maxWidth: 320 }}>{w.why_not_customer}</td>
+                    <td style={{ padding: '8px 14px', fontSize: 11, color: w.status === 'watching' ? 'rgb(150,155,185)' : '#34d399', textTransform: 'capitalize' }}>{w.status}</td>
+                    <td style={{ padding: '8px 14px', fontSize: 11, color: 'rgb(120,127,160)' }}>{timeAgo(w.last_seen_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 

@@ -44,7 +44,9 @@ import {
   REPLACEMENT_VS_COMPLEMENT_RULES,
   EPISTEMIC_RULES,
   OUTREACH_TONE_RULES,
+  PIPELINE_SEPARATION_RULES,
   REJECTION_REASONS,
+  isOemOrPartnerCandidate,
   type AerpoliceDossier,
   type OutreachSeed,
 } from '@/lib/aerpolice-discovery'
@@ -174,6 +176,8 @@ ${QUALIFICATION_GATE_RULES}
 ${CONTROL_GAP_RULES}
 
 ${REPLACEMENT_VS_COMPLEMENT_RULES}
+
+${PIPELINE_SEPARATION_RULES}
 
 ${EPISTEMIC_RULES}
 
@@ -432,6 +436,19 @@ export async function POST(req: NextRequest) {
           { status: 503 },
         )
       }
+      const { error: watchlistSchemaError } = await supabase
+        .from('aerpolice_oem_partner_watchlist')
+        .select('id')
+        .limit(1)
+      if (watchlistSchemaError) {
+        return NextResponse.json(
+          {
+            error: 'The aerpolice_oem_partner_watchlist table is missing. Run supabase/add-aerpolice-oem-partner-watchlist.sql in the Supabase SQL editor, then retry. (Pass dry_run: true to score without saving in the meantime.)',
+            detail: watchlistSchemaError.message,
+          },
+          { status: 503 },
+        )
+      }
     }
 
     let source: { id: string; source_name: string; source_url_or_query: string } | null = null
@@ -465,6 +482,7 @@ export async function POST(req: NextRequest) {
       profiled: 0,
       profile_failed: 0,
       rejected: 0,
+      watchlisted: 0,
       saved: 0,
       monitor: 0,
       validate_then_send: 0,
@@ -543,6 +561,41 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    async function recordWatchlist(dossier: AerpoliceDossier, candidate: ActionCandidate, score: ReturnType<typeof scoreProspect>): Promise<void> {
+      try {
+        const organization = dossier.organization || candidate.organization
+        const website = dossier.website || candidate.website || ''
+        const domain = toDomain(website) || ''
+        const whyNotCustomer = (dossier.rejection_flags || []).includes('equivalent_offering')
+          ? REJECTION_REASONS.equivalent_offering
+          : `Recommended motion "${dossier.recommended_motion}" — OEM/partner, not a direct customer.`
+        const { data: existingRow } = await supabase
+          .from('aerpolice_oem_partner_watchlist')
+          .select('id, seen_count')
+          .eq('organization', organization)
+          .or(`domain.eq.${domain},domain.is.null`)
+          .maybeSingle()
+        const now = new Date().toISOString()
+        const row = {
+          organization, website: website || null, domain: domain || null,
+          entity_signal: dossier.agent_product || candidate.agent_product || null,
+          recommended_motion: dossier.recommended_motion,
+          motion_rationale: dossier.motion_rationale || null,
+          why_not_customer: whyNotCustomer,
+          dossier, score: score.totalScore,
+          source_id: source?.id || null,
+          last_seen_at: now,
+        }
+        if (existingRow) {
+          await supabase.from('aerpolice_oem_partner_watchlist').update({ ...row, seen_count: (existingRow.seen_count || 1) + 1 }).eq('id', existingRow.id)
+        } else {
+          await supabase.from('aerpolice_oem_partner_watchlist').insert(row)
+        }
+      } catch (e) {
+        console.error('[aerpolice:recordWatchlist]', e)
+      }
+    }
+
     async function runOne(candidate: ActionCandidate): Promise<void> {
       results.profiled++
       const dossier = await profileAgent(candidate, provider)
@@ -555,6 +608,23 @@ export async function POST(req: NextRequest) {
 
       const gapDowngrades = enforceGapDiscipline(dossier)
       const score = scoreProspect(dossier)
+
+      // OEM/Partner Watchlist — separate pipeline, never a customer lead and
+      // never outreached from here. See PIPELINE_SEPARATION_RULES.
+      if (isOemOrPartnerCandidate(dossier)) {
+        results.watchlisted++
+        results.prospects.push({
+          organization: dossier.organization || candidate.organization,
+          website: dossier.website || candidate.website || '',
+          score: score.totalScore,
+          recommended_motion: dossier.recommended_motion,
+          motion_rationale: dossier.motion_rationale,
+          outcome: 'watchlisted',
+        })
+        if (!dry_run) await recordWatchlist(dossier, candidate, score)
+        return
+      }
+
       const gate = evaluateGate(dossier, score)
 
       const record: Record<string, unknown> = {
