@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
@@ -70,6 +71,7 @@ export default function AerpoliceCustomersPage() {
   const [adding, setAdding] = useState<number | null>(null)
   const [added, setAdded] = useState<Set<string>>(new Set())
   const [plutoAssigned, setPlutoAssigned] = useState<Set<string>>(new Set())
+  const [leadIds, setLeadIds] = useState<Map<string, string>>(new Map())
   const [expanded, setExpanded] = useState<number | null>(null)
   const [showExcluded, setShowExcluded] = useState(false)
 
@@ -78,12 +80,13 @@ export default function AerpoliceCustomersPage() {
     const names = AERPOLICE_CUSTOMERS.map(c => c.company)
     getClient()
       .from('leads')
-      .select('company_name, assigned_to')
+      .select('id, company_name, assigned_to')
       .in('company_name', names)
       .then(({ data }) => {
         if (data?.length) {
           setAdded(new Set(data.map((r: { company_name: string }) => r.company_name)))
           setPlutoAssigned(new Set(data.filter((r: { assigned_to: string | null }) => r.assigned_to === 'pluto').map((r: { company_name: string }) => r.company_name)))
+          setLeadIds(new Map(data.map((r: { id: string; company_name: string }) => [r.company_name, r.id])))
         }
       })
   }, [])
@@ -287,6 +290,7 @@ export default function AerpoliceCustomersPage() {
               const isExp = expanded === c.id
               const isAdded = added.has(c.company)
               const isPluto = plutoAssigned.has(c.company)
+              const leadId = leadIds.get(c.company)
               const sc = scoreColor(c.totalScore)
               const tc = tierColor(c.tier)
               return (
@@ -301,7 +305,19 @@ export default function AerpoliceCustomersPage() {
                     </div>
                     <div style={{ flex: '1 1 260px', minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: 'white' }}>{c.company}</span>
+                        {leadId ? (
+                          <Link
+                            href={`/leads/${leadId}`}
+                            onClick={e => e.stopPropagation()}
+                            style={{ fontSize: 14, fontWeight: 700, color: 'white', textDecoration: 'none' }}
+                            onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline' }}
+                            onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none' }}
+                          >
+                            {c.company}
+                          </Link>
+                        ) : (
+                          <span style={{ fontSize: 14, fontWeight: 700, color: 'white' }}>{c.company}</span>
+                        )}
                         <span style={{ fontSize: 9.5, fontWeight: 600, color: '#22d3ee', background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.2)', padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap' }}>{c.segment}</span>
                         <span style={{ fontSize: 9.5, fontWeight: 600, color: gateColor(c.walletKey), background: `${gateColor(c.walletKey)}18`, border: `1px solid ${gateColor(c.walletKey)}40`, padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap' }}>Wallet: {c.walletKey}</span>
                         <span style={{ fontSize: 9.5, fontWeight: 600, color: gateColor(c.irreversible), background: `${gateColor(c.irreversible)}18`, border: `1px solid ${gateColor(c.irreversible)}40`, padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap' }}>Irreversible: {c.irreversible}</span>
