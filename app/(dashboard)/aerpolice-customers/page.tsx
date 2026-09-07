@@ -5,23 +5,33 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
   ShieldCheck, Search, ExternalLink, Plus, ChevronUp, ChevronDown,
-  Filter, Download, CheckCircle, Loader2, Users,
+  Filter, Download, CheckCircle, Loader2, Users, KeyRound,
 } from 'lucide-react'
-import { AERPOLICE_CUSTOMERS, AERPOLICE_CATEGORIES, AERPOLICE_ACCOUNT_COUNT, type AerpoliceCustomer } from '@/lib/aerpolice-customers'
+import {
+  AERPOLICE_CUSTOMERS, AERPOLICE_CUSTOMER_SEGMENTS, AERPOLICE_ACCOUNT_COUNT,
+  AERPOLICE_LATER_MONITORING, type AerpoliceCustomer,
+} from '@/lib/aerpolice-customers'
 import { AssignToPlutoButton } from '@/components/AssignToPlutoButton'
 
 type SortKey = 'company' | 'totalScore' | 'reachabilityScore' | 'triggerDate'
 
-const TIERS = ['All', 'Tier 1', 'Tier 2'] as const
+const TIERS = ['All', 'Tier 1', 'Research hold'] as const
 
 function tierColor(tier: string) {
-  return tier === 'Tier 1' ? '#34d399' : '#fbbf24'
+  if (tier === 'Tier 1') return '#34d399'
+  if (tier === 'Research hold') return '#f87171'
+  return '#fbbf24'
 }
 
-function scoreColor(score: number) {
+function scoreColor(score: number | null) {
+  if (score == null) return { color: '#f87171', bg: 'rgba(248,113,113,0.1)', border: 'rgba(248,113,113,0.2)' }
   if (score >= 90) return { color: '#34d399', bg: 'rgba(52,211,153,0.12)', border: 'rgba(52,211,153,0.3)' }
   if (score >= 75) return { color: '#fbbf24', bg: 'rgba(251,191,36,0.1)', border: 'rgba(251,191,36,0.25)' }
   return { color: '#f87171', bg: 'rgba(248,113,113,0.1)', border: 'rgba(248,113,113,0.2)' }
+}
+
+function gateColor(v: string) {
+  return v === 'Yes' ? '#34d399' : v === 'No' ? '#f87171' : '#fbbf24'
 }
 
 /** Small /N sub-score chip used in the expanded card. */
@@ -53,7 +63,7 @@ export default function AerpoliceCustomersPage() {
     return supabaseRef.current
   }
   const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('All')
+  const [segment, setSegment] = useState('All')
   const [tier, setTier] = useState<string>('All')
   const [sort, setSort] = useState<SortKey>('totalScore')
   const [sortAsc, setSortAsc] = useState(false)
@@ -61,6 +71,7 @@ export default function AerpoliceCustomersPage() {
   const [added, setAdded] = useState<Set<string>>(new Set())
   const [plutoAssigned, setPlutoAssigned] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState<number | null>(null)
+  const [showExcluded, setShowExcluded] = useState(false)
 
   // On mount: which accounts are already in the CRM, and which are with Pluto.
   useEffect(() => {
@@ -78,24 +89,24 @@ export default function AerpoliceCustomersPage() {
   }, [])
 
   const filtered = useMemo(() => AERPOLICE_CUSTOMERS.filter(c => {
-    const matchCat = category === 'All' || c.category === category
+    const matchSeg = segment === 'All' || c.segment === segment
     const matchTier = tier === 'All' || c.tier === tier
     const q = search.toLowerCase().trim()
     const matchSearch = !q
       || c.company.toLowerCase().includes(q)
-      || c.category.toLowerCase().includes(q)
+      || c.segment.toLowerCase().includes(q)
       || c.whyNow.toLowerCase().includes(q)
-      || c.agentProduct.toLowerCase().includes(q)
-      || c.buyerRoles.toLowerCase().includes(q)
-    return matchCat && matchTier && matchSearch
-  }), [search, category, tier])
+      || c.walletEvidence.toLowerCase().includes(q)
+      || c.buyerTarget.toLowerCase().includes(q)
+    return matchSeg && matchTier && matchSearch
+  }), [search, segment, tier])
 
   const sorted = useMemo(() => [...filtered].sort((a, b) => {
     let diff = 0
     if (sort === 'company') diff = a.company.localeCompare(b.company)
     else if (sort === 'reachabilityScore') diff = a.reachabilityScore - b.reachabilityScore
     else if (sort === 'triggerDate') diff = (a.triggerDate || '').localeCompare(b.triggerDate || '')
-    else diff = a.totalScore - b.totalScore
+    else diff = (a.totalScore ?? -1) - (b.totalScore ?? -1)
     return sortAsc ? diff : -diff
   }), [filtered, sort, sortAsc])
 
@@ -116,31 +127,32 @@ export default function AerpoliceCustomersPage() {
     const verified = Boolean(c.triggerEvidenceUrl)
     const severity = !verified ? 'medium'
       : c.tier === 'Tier 1' ? 'critical' : 'high'
+    const gapText = `Wallet key: ${c.walletKey}. Irreversible: ${c.irreversible}. ${c.gapToInvestigate}`
     return {
-      website: c.website,
+      website: c.domain ? `https://${c.domain}` : null,
       description: c.whyNow,
-      industry_category: c.category,
+      industry_category: c.segment,
       customer_category: ['Aerpolice Reachable Prospect'],
       product_to_sell: 'Aerpolice agent governance',
       classification: 'customer',
       current_providers: c.currentControls,
-      pain_point: c.gapStatus,
+      pain_point: gapText,
       pain_point_severity: severity,
-      pain_point_evidence: c.verifiedAction,
+      pain_point_evidence: c.irreversibleAction,
       pain_point_source_url: c.actionEvidenceUrl,
       pain_point_evidence_type: verified ? 'verified_source' : 'agent_analysis',
-      aerpolice_fit: c.aerpoliceAngle,
-      suggested_use_case: c.qualQuestion,
-      potential_gap: c.gapStatus,
-      outreach_angle: c.aerpoliceAngle,
+      aerpolice_fit: `${c.walletEvidence} ${c.irreversibleAction}`,
+      suggested_use_case: c.firstQuestion,
+      potential_gap: c.gapToInvestigate,
+      outreach_angle: c.motion,
       trigger_reason: c.whyNow,
       trigger_date: c.triggerDate,
       trigger_source_url: c.triggerEvidenceUrl,
-      source_url: c.triggerEvidenceUrl || c.actionEvidenceUrl,
-      integration_feasibility: c.reachabilityScore >= 15 ? 'high' : c.reachabilityScore >= 10 ? 'medium' : 'low',
+      source_url: c.triggerEvidenceUrl || c.actionEvidenceUrl || c.walletEvidenceUrl,
+      integration_feasibility: c.reachabilityScore >= 9 ? 'high' : c.reachabilityScore >= 6 ? 'medium' : 'low',
       lead_score: c.totalScore,
-      confidence_score: c.evidenceScore * 10,
-      priority: c.totalScore >= 90 ? 'excellent' : c.totalScore >= 75 ? 'qualified' : 'needs_research',
+      confidence_score: c.evidenceScore * 20,
+      priority: (c.totalScore ?? 0) >= 90 ? 'excellent' : (c.totalScore ?? 0) >= 75 ? 'qualified' : 'needs_research',
     }
   }
 
@@ -165,7 +177,8 @@ export default function AerpoliceCustomersPage() {
   }
 
   const tier1 = AERPOLICE_CUSTOMERS.filter(c => c.tier === 'Tier 1').length
-  const avgScore = Math.round(sorted.reduce((s, c) => s + c.totalScore, 0) / (sorted.length || 1))
+  const scored = sorted.filter(c => c.totalScore != null)
+  const avgScore = Math.round(scored.reduce((s, c) => s + (c.totalScore ?? 0), 0) / (scored.length || 1))
 
   return (
     <div className="fade-in">
@@ -173,18 +186,18 @@ export default function AerpoliceCustomersPage() {
       <div className="page-header flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-[18px] font-bold text-white tracking-tight flex items-center gap-2">
-            <ShieldCheck size={18} style={{ color: '#22d3ee' }} /> Aerpolice Customers
+            <KeyRound size={18} style={{ color: '#22d3ee' }} /> AERpolice Customers
           </h1>
           <p className="text-[12px] mt-1 font-medium" style={{ color: 'rgb(100,106,135)' }}>
-            {AERPOLICE_CUSTOMERS.length} prospects · {AERPOLICE_ACCOUNT_COUNT} unique accounts · {AERPOLICE_CATEGORIES.length - 1} categories · every row has a verified action and a dated trigger
+            {AERPOLICE_CUSTOMERS.length} prospects · {AERPOLICE_ACCOUNT_COUNT} unique accounts · wallet-key + irreversible-action gates only, per current Aerpolice Approach
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={() => {
               const esc = (v: string | number | null) => `"${String(v ?? '').replace(/"/g, '""')}"`
-              const csv = ['Company,Category,Website,Trigger Date,Why Now,Verified Action,Aerpolice Angle,Buyer Roles,Score,Tier,Trigger URL',
-                ...sorted.map(c => [c.company, c.category, c.website, c.triggerDate, c.whyNow, c.verifiedAction, c.aerpoliceAngle, c.buyerRoles, c.totalScore, c.tier, c.triggerEvidenceUrl].map(esc).join(','))
+              const csv = ['Company,Segment,Domain,Wallet Key,Irreversible,Trigger Date,Why Now,Wallet Evidence,Irreversible Action,Buyer Target,Score,Tier,Trigger URL',
+                ...sorted.map(c => [c.company, c.segment, c.domain, c.walletKey, c.irreversible, c.triggerDate, c.whyNow, c.walletEvidence, c.irreversibleAction, c.buyerTarget, c.totalScore, c.tier, c.triggerEvidenceUrl].map(esc).join(','))
               ].join('\n')
               const a = document.createElement('a')
               a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
@@ -204,7 +217,7 @@ export default function AerpoliceCustomersPage() {
           {[
             { label: 'Total Prospects', value: AERPOLICE_CUSTOMERS.length, color: '#22d3ee' },
             { label: 'Tier 1', value: tier1, color: '#34d399' },
-            { label: 'Categories', value: AERPOLICE_CATEGORIES.length - 1, color: '#38bdf8' },
+            { label: 'Segments', value: AERPOLICE_CUSTOMER_SEGMENTS.length - 1, color: '#38bdf8' },
             { label: 'Avg Score (filtered)', value: `${avgScore}/100`, color: '#fbbf24' },
           ].map(s => (
             <div key={s.label} style={{ background: 'rgba(255,255,255,0.025)', border: `1px solid ${s.color}20`, borderRadius: 14, padding: '16px 18px' }}>
@@ -218,15 +231,15 @@ export default function AerpoliceCustomersPage() {
         <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ position: 'relative', flex: '1 1 220px', minWidth: 0, maxWidth: 320 }}>
             <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'rgb(120,127,160)' }} />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search company, trigger, agent…"
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search company, trigger, wallet evidence…"
               style={{ width: '100%', padding: '8px 12px 8px 32px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'white', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
           </div>
           <Filter size={13} style={{ color: 'rgb(120,127,160)', flexShrink: 0 }} />
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {AERPOLICE_CATEGORIES.map(cat => (
-              <button key={cat} onClick={() => setCategory(cat)}
-                style={{ padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${category === cat ? 'rgba(34,211,238,0.5)' : 'rgba(255,255,255,0.08)'}`, background: category === cat ? 'rgba(34,211,238,0.15)' : 'rgba(255,255,255,0.03)', color: category === cat ? '#22d3ee' : 'rgb(150,155,185)', whiteSpace: 'nowrap' }}>
-                {cat}
+            {AERPOLICE_CUSTOMER_SEGMENTS.map(seg => (
+              <button key={seg} onClick={() => setSegment(seg)}
+                style={{ padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${segment === seg ? 'rgba(34,211,238,0.5)' : 'rgba(255,255,255,0.08)'}`, background: segment === seg ? 'rgba(34,211,238,0.15)' : 'rgba(255,255,255,0.03)', color: segment === seg ? '#22d3ee' : 'rgb(150,155,185)', whiteSpace: 'nowrap' }}>
+                {seg}
               </button>
             ))}
           </div>
@@ -262,10 +275,10 @@ export default function AerpoliceCustomersPage() {
           <div style={{ padding: '16px 20px 14px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <ShieldCheck size={16} style={{ color: '#22d3ee' }} />
-              <span style={{ fontSize: 14, fontWeight: 800, color: 'white' }}>Reachable Prospects</span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: 'white' }}>Wallet-Signing Prospects</span>
             </div>
             <div style={{ fontSize: 11.5, color: 'rgb(120,127,160)', marginTop: 5, maxWidth: 640, lineHeight: 1.5 }}>
-              Evidence-qualified prospects, not confirmed buyers — verified action, why-now trigger and Aerpolice angle kept separate, with a first qualification question for each. Imported as-is from the workbook.
+              Every scored row has Wallet key = Yes and Irreversible = Yes. Rows marked &ldquo;Research hold&rdquo; failed to clear one gate and must not be pitched until verified. Imported as-is from the workbook.
             </div>
           </div>
 
@@ -289,15 +302,16 @@ export default function AerpoliceCustomersPage() {
                     <div style={{ flex: '1 1 260px', minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 14, fontWeight: 700, color: 'white' }}>{c.company}</span>
-                        <span style={{ fontSize: 9.5, fontWeight: 600, color: '#22d3ee', background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.2)', padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap' }}>{c.category}</span>
-                        <span style={{ fontSize: 9.5, fontWeight: 600, color: 'rgb(150,155,185)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap' }}>{c.freshness}</span>
+                        <span style={{ fontSize: 9.5, fontWeight: 600, color: '#22d3ee', background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.2)', padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap' }}>{c.segment}</span>
+                        <span style={{ fontSize: 9.5, fontWeight: 600, color: gateColor(c.walletKey), background: `${gateColor(c.walletKey)}18`, border: `1px solid ${gateColor(c.walletKey)}40`, padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap' }}>Wallet: {c.walletKey}</span>
+                        <span style={{ fontSize: 9.5, fontWeight: 600, color: gateColor(c.irreversible), background: `${gateColor(c.irreversible)}18`, border: `1px solid ${gateColor(c.irreversible)}40`, padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap' }}>Irreversible: {c.irreversible}</span>
                       </div>
                       <div style={{ fontSize: 11, color: 'rgb(150,155,185)', marginTop: 4, lineHeight: 1.5 }}>{c.whyNow}</div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
                       <div style={{ textAlign: 'center' }}>
                         <div style={{ fontSize: 8.5, color: 'rgb(100,107,140)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Score</div>
-                        <span style={{ display: 'inline-flex', minWidth: 34, justifyContent: 'center', padding: '2px 8px', borderRadius: 7, fontSize: 13, fontWeight: 800, color: sc.color, background: sc.bg, border: `1px solid ${sc.border}` }}>{c.totalScore}</span>
+                        <span style={{ display: 'inline-flex', minWidth: 34, justifyContent: 'center', padding: '2px 8px', borderRadius: 7, fontSize: 13, fontWeight: 800, color: sc.color, background: sc.bg, border: `1px solid ${sc.border}` }}>{c.totalScore ?? '—'}</span>
                       </div>
                       <span style={{ fontSize: 10, fontWeight: 700, color: tc, padding: '4px 10px', borderRadius: 7, background: `${tc}18`, border: `1px solid ${tc}45`, whiteSpace: 'nowrap' }}>{c.tier}</span>
                       <span style={{ fontSize: 10, fontWeight: 600, color: 'rgb(140,146,175)', whiteSpace: 'nowrap' }}>{c.nextAction}</span>
@@ -309,37 +323,43 @@ export default function AerpoliceCustomersPage() {
                   {/* Expanded detail */}
                   {isExp && (
                     <div style={{ padding: '0 18px 18px 18px' }}>
-                      <div style={{ fontSize: 10.5, color: '#fbbf24', fontWeight: 700, marginBottom: 10 }}>{c.triggerDate || 'undated'} · {c.agentProduct}</div>
+                      <div style={{ fontSize: 10.5, color: '#fbbf24', fontWeight: 700, marginBottom: 10 }}>{c.triggerDate || 'undated'} · {c.motion}</div>
 
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px,1fr))', gap: 10, marginBottom: 12 }}>
-                        <InfoBox title="Verified action (fact)" color="#34d399" text={c.verifiedAction} />
-                        <InfoBox title="Aerpolice angle (inference)" color="#22d3ee" text={c.aerpoliceAngle} />
-                        <InfoBox title={`Current controls · gap: ${c.gapStatus}`} color="#f87171" text={c.currentControls} />
+                        <InfoBox title="Wallet/signing evidence" color="#34d399" text={c.walletEvidence} />
+                        <InfoBox title="Exact irreversible action" color="#22d3ee" text={c.irreversibleAction} />
+                        <InfoBox title="Current controls" color="#f87171" text={c.currentControls} />
+                        <InfoBox title="Past loss / near-miss / stalled initiative" color="#fbbf24" text={c.pastLoss} />
                       </div>
 
                       <div style={{ borderRadius: 12, border: '1px solid rgba(56,189,248,0.2)', background: 'rgba(56,189,248,0.05)', padding: '12px 14px', marginBottom: 12 }}>
-                        <div style={{ fontSize: 9.5, fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>First qualification question</div>
-                        <div style={{ fontSize: 12.5, color: 'rgb(220,225,245)', lineHeight: 1.6, fontStyle: 'italic' }}>&ldquo;{c.qualQuestion}&rdquo;</div>
+                        <div style={{ fontSize: 9.5, fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>First story-seeking question</div>
+                        <div style={{ fontSize: 12.5, color: 'rgb(220,225,245)', lineHeight: 1.6, fontStyle: 'italic' }}>&ldquo;{c.firstQuestion}&rdquo;</div>
                       </div>
 
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: 12, fontSize: 11.5, color: 'rgb(160,165,195)', marginBottom: 14 }}>
-                        <div><b style={{ color: 'rgb(190,195,220)' }}>Agent / product</b><div style={{ marginTop: 3, lineHeight: 1.5 }}>{c.agentProduct}</div></div>
-                        <div><b style={{ color: 'rgb(190,195,220)' }}>Size / reachability</b><div style={{ marginTop: 3, lineHeight: 1.5 }}>{c.sizeReachability}</div></div>
-                        <div><b style={{ color: 'rgb(190,195,220)' }}>Likely buyer</b><div style={{ marginTop: 3, lineHeight: 1.5 }}>{c.buyerRoles}</div></div>
-                        <div><b style={{ color: 'rgb(190,195,220)' }}>Recommended motion</b><div style={{ marginTop: 3, lineHeight: 1.5 }}>{c.recommendedMotion}</div></div>
+                        <div><b style={{ color: 'rgb(190,195,220)' }}>Gap to investigate</b><div style={{ marginTop: 3, lineHeight: 1.5 }}>{c.gapToInvestigate}</div></div>
+                        <div><b style={{ color: 'rgb(190,195,220)' }}>Buyer target</b><div style={{ marginTop: 3, lineHeight: 1.5 }}>{c.buyerTarget}</div></div>
+                        <div><b style={{ color: 'rgb(190,195,220)' }}>Fastest contact path</b><div style={{ marginTop: 3, lineHeight: 1.5 }}>{c.contactPath}</div></div>
+                        <div><b style={{ color: 'rgb(190,195,220)' }}>Motion</b><div style={{ marginTop: 3, lineHeight: 1.5 }}>{c.motion}</div></div>
                         <div><b style={{ color: 'rgb(190,195,220)' }}>Next action</b><div style={{ marginTop: 3, lineHeight: 1.5 }}>{c.nextAction}</div></div>
                       </div>
 
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center', paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', marginBottom: 14 }}>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                          <SubScore label="Action fit" value={c.actionFitScore} max={25} />
+                          <SubScore label="Wallet" value={c.walletScore} max={25} />
+                          <SubScore label="Irreversible" value={c.irreversibleScore} max={20} />
                           <SubScore label="Trigger" value={c.triggerScore} max={20} />
-                          <SubScore label="Reach" value={c.reachabilityScore} max={20} />
-                          <SubScore label="Consequence" value={c.consequenceScore} max={15} />
-                          <SubScore label="Complementarity" value={c.complementarityScore} max={10} />
-                          <SubScore label="Evidence" value={c.evidenceScore} max={10} />
+                          <SubScore label="Integration fit" value={c.integrationScore} max={15} />
+                          <SubScore label="Reach" value={c.reachabilityScore} max={15} />
+                          <SubScore label="Evidence" value={c.evidenceScore} max={5} />
                         </div>
                         <div style={{ display: 'flex', gap: 12, marginLeft: 'auto' }}>
+                          {c.walletEvidenceUrl && (
+                            <a href={c.walletEvidenceUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 11, color: '#a78bfa', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                              <ExternalLink size={11} /> Wallet evidence
+                            </a>
+                          )}
                           {c.actionEvidenceUrl && (
                             <a href={c.actionEvidenceUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 11, color: '#818cf8', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
                               <ExternalLink size={11} /> Action evidence
@@ -350,8 +370,8 @@ export default function AerpoliceCustomersPage() {
                               <ExternalLink size={11} /> Trigger evidence
                             </a>
                           )}
-                          {c.website && (
-                            <a href={c.website} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 11, color: 'rgb(140,146,175)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                          {c.domain && (
+                            <a href={`https://${c.domain}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 11, color: 'rgb(140,146,175)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
                               <ExternalLink size={11} /> Website
                             </a>
                           )}
@@ -389,6 +409,33 @@ export default function AerpoliceCustomersPage() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Later / monitoring / rejected — collapsed by default */}
+        <div style={{ marginTop: 16, borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', overflow: 'hidden' }}>
+          <div onClick={() => setShowExcluded(s => !s)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', cursor: 'pointer' }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: 'rgb(190,195,220)' }}>
+              Later, monitoring &amp; rejected ({AERPOLICE_LATER_MONITORING.length})
+            </span>
+            {showExcluded ? <ChevronUp size={14} style={{ color: 'rgb(120,127,160)' }} /> : <ChevronDown size={14} style={{ color: 'rgb(120,127,160)' }} />}
+          </div>
+          {showExcluded && (
+            <div style={{ padding: '0 16px 16px 16px' }}>
+              <p style={{ fontSize: 11, color: 'rgb(120,127,160)', marginBottom: 10, lineHeight: 1.5 }}>
+                Intentionally excluded from the current wallet-signing pipeline — must not be scored or pitched as customers today.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {AERPOLICE_LATER_MONITORING.map(m => (
+                  <div key={m.id} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'baseline', padding: '8px 10px', borderRadius: 9, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'white', minWidth: 110 }}>{m.company}</span>
+                    <span style={{ fontSize: 9.5, fontWeight: 600, color: 'rgb(150,155,185)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap' }}>{m.bucket}</span>
+                    <span style={{ fontSize: 11, color: 'rgb(140,146,175)', flex: '1 1 260px' }}>{m.whyExcluded}</span>
+                    <span style={{ fontSize: 10.5, color: 'rgb(100,107,140)', fontStyle: 'italic' }}>{m.nextRule}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={{ fontSize: 11, color: 'rgb(90,95,120)', marginTop: 14, textAlign: 'center' }}>

@@ -1,145 +1,138 @@
 import type { AerpoliceDossier } from '@/lib/aerpolice-discovery'
 
-export const TODAY = new Date('2026-09-02T00:00:00Z')
+export const TODAY = new Date('2026-09-07T00:00:00Z')
 export function isoDaysAgo(days: number, from: Date = TODAY): string {
   return new Date(from.getTime() - days * 86400000).toISOString().slice(0, 10)
 }
 
 const BASE: AerpoliceDossier = {
-  organization: 'Rallied',
-  website: 'https://www.rallied.ai',
-  agent_product: 'AI agent for IT service management',
-  company_size_band: 'startup',
-  company_size_basis: 'Small Atlassian Marketplace vendor, ~15 employees estimated from LinkedIn.',
-  verified_action: {
-    action_type: 'provision_revoke_access',
-    description: 'Resolves IT tickets, runs approved fixes, handles password and access changes with MFA.',
-    status: 'confirmed',
-    evidence_url: 'https://marketplace.atlassian.com/apps/275987459/rallied-ai-agent-for-itsm',
-    evidence_tier: 'marketplace',
-    additional_actions: ['reset_password', 'modify_account'],
+  organization: 'Rainmaker',
+  website: 'https://rainmaker.fun',
+  segment: 'S1 Trading',
+  agent_product: 'Autonomous Polymarket trading agent',
+  wallet_key: {
+    status: 'Yes',
+    evidence: "Agent executes Polymarket entries/exits from each user's own wallet.",
+    evidence_url: 'https://rainmaker.fun/how-it-works',
+    evidence_tier: 'official_docs',
+    signal_type: 'agent_controlled_eoa',
   },
+  irreversible: {
+    status: 'Yes',
+    action_type: 'polymarket_trade',
+    action: 'Filled Polymarket order and final market settlement.',
+    evidence_url: 'https://rainmaker.fun/',
+    evidence_tier: 'onchain_verified',
+  },
+  production_confirmed: true,
+  production_evidence: 'Live settled fills published through the current date.',
+  api_fiat_rail_only: false,
   trigger: {
-    type: 'agent_ga_launch',
-    what_happened: 'Rallied listed its action-taking ITSM agent in the Atlassian Marketplace.',
+    type: 'autonomous_trading_launch',
+    what_happened: 'Live US Open fills and settled outcomes were published.',
     date: isoDaysAgo(5),
-    evidence_url: 'https://marketplace.atlassian.com/apps/275987459/rallied-ai-agent-for-itsm',
-    evidence_tier: 'marketplace',
+    evidence_url: 'https://rainmaker.fun/',
+    evidence_tier: 'official_docs',
   },
-  structural_fit: { segments: ['it_ops'], rationale: 'IT service management agent with write access to identity systems.' },
-  current_controls: {
-    has_own_identity: 'unknown', shared_service_account: 'unknown', credentials_or_oauth_scope: 'not public',
-    authorization_external_to_runtime: 'unknown', limits_supported: 'MFA required, approved fixes only — not public beyond that',
-    human_escalation: 'unknown', independent_kill_switch: 'unknown', audit_log_explains_why: 'unknown', audit_verifiable_by_customer: 'unknown',
-    stated_summary: 'MFA and "approved fixes" are stated; independent per-agent policy, kill control and signed evidence are not public.',
+  past_loss: {
+    description: 'Public record includes losing settled trades (-100%), showing real capital exposure.',
+    evidence_url: 'https://rainmaker.fun/',
   },
-  control_gap: {
-    gap: 'No independent kill switch per agent; authorization is enforced inside the same runtime that executes the action, with no external approval step.',
-    status: 'confirmed',
-    basis: 'Docs describe a single in-process policy check with no external escalation or kill control.',
-  },
-  consequence: { financial: null, operational: 'Password/access changes without independent verification could lock out or over-provision users.', regulatory: null, reputational: null },
-  recommended_motion: 'direct_design_partner_pilot',
-  motion_rationale: 'Small, founder-led, no competing governance layer documented.',
-  buyer: { role: 'Founder / CTO / Product Lead', name: null, identifiable: true, public_channel: 'https://www.rallied.ai/careers' },
-  first_qualification_question: 'Can an IT owner stop one agent and prove which policy allowed a specific password or access change?',
-  facts: ['Rallied lists MFA-gated password/access changes on its Atlassian Marketplace listing.'],
+  current_controls: 'User wallet; autonomous execution; user sets stake and turns Auto on.',
+  gap_to_investigate: 'Where is the non-bypassable mandate enforced before the wallet signs each order?',
+  integration_fit_rationale: 'Wallet-level mandate enforcement is directly applicable — no existing policy layer described.',
+  buyer: { target: 'Founder / CTO', contact_path: 'Website + public X; reference a specific settled fill.', reachable: true },
+  first_question: 'What is the largest position the agent can open from a user wallet before anyone on your team notices?',
+  recommended_route: 'direct_sales',
+  route_rationale: 'Live production trading, no governance layer described, reachable founder.',
+  facts: ['Rainmaker publishes settled Polymarket fills from user wallets.'],
   inferences: ['Likely relies on the agent runtime itself to enforce limits, given no external policy layer is mentioned.'],
-  unknowns: ['Whether authorization is enforced outside the agent runtime.', 'Whether one agent can be killed independently.'],
-  team_public: true,
+  unknowns: ['Whether mandate constraints are enforced outside the agent runtime.'],
   project_active: true,
+  team_public: true,
   rejection_flags: [],
 }
 
-export const CONFIRMED_ACTION_FRESH_TRIGGER_DOSSIER: AerpoliceDossier = BASE
+export const DIRECT_SALES_DOSSIER: AerpoliceDossier = BASE
 
-export const NO_TRIGGER_DOSSIER: AerpoliceDossier = {
-  ...BASE,
-  organization: 'Furl',
-  trigger: { type: null, what_happened: '', date: null, evidence_url: null, evidence_tier: 'none' },
-}
-
-export const STALE_TRIGGER_DOSSIER: AerpoliceDossier = {
-  ...BASE,
-  organization: 'Snyk',
-  trigger: { ...BASE.trigger, date: isoDaysAgo(400) },
-}
-
-export const NO_BUYER_ROUTE_DOSSIER: AerpoliceDossier = {
-  ...BASE,
-  organization: 'Anon Agent Co',
-  team_public: false,
-  buyer: { role: 'Unknown', name: null, identifiable: false, public_channel: null },
-}
-
-export const NO_ACTION_EVIDENCE_DOSSIER: AerpoliceDossier = {
+export const NO_WALLET_KEY_DOSSIER: AerpoliceDossier = {
   ...BASE,
   organization: 'ChatHelper',
-  verified_action: {
-    action_type: null, description: 'Answers customer questions in a chat widget.', status: 'unknown',
-    evidence_url: null, evidence_tier: 'none', additional_actions: [],
-  },
+  wallet_key: { status: 'No', evidence: 'Human manually signs every transaction; agent only recommends trades.', evidence_url: 'https://chathelper.example/docs', evidence_tier: 'official_docs', signal_type: null },
 }
 
-export const SOCIAL_ONLY_ACTION_DOSSIER: AerpoliceDossier = {
+export const UNKNOWN_WALLET_KEY_DOSSIER: AerpoliceDossier = {
   ...BASE,
-  organization: 'HypeAgent',
-  verified_action: { ...BASE.verified_action, evidence_tier: 'social' },
+  organization: 'Hey Anon Launchpad',
+  wallet_key: { status: 'Unknown', evidence: 'Launchpad promises guaranteed on-chain execution, but public key custody is not explicit.', evidence_url: 'https://launchpad.example/registry', evidence_tier: 'aggregator_directory', signal_type: null },
 }
 
-export const EQUIVALENT_OFFERING_DOSSIER: AerpoliceDossier = {
+export const NO_IRREVERSIBLE_ACTION_DOSSIER: AerpoliceDossier = {
   ...BASE,
-  organization: 'GovernedAI Inc',
-  recommended_motion: 'reject',
-  rejection_flags: ['equivalent_offering'],
+  organization: 'RefundBot',
+  irreversible: { status: 'No', action_type: null, action: 'Issues refunds via a support dashboard; no on-chain settlement.', evidence_url: 'https://refundbot.example/docs', evidence_tier: 'official_docs' },
 }
 
-export const ENTERPRISE_NO_STRONG_TRIGGER_DOSSIER: AerpoliceDossier = {
+export const UNKNOWN_IRREVERSIBLE_DOSSIER: AerpoliceDossier = {
   ...BASE,
-  organization: 'MegaCorp',
-  company_size_band: 'enterprise_large',
-  company_size_basis: '50,000+ employees per public filings.',
-  buyer: { role: 'Unknown', name: null, identifiable: false, public_channel: null },
-  team_public: false,
+  organization: 'Sapiom',
+  irreversible: { status: 'Unknown', action_type: null, action: 'Most documented activity is service purchasing/runtime cost rather than proven on-chain settlement.', evidence_url: null, evidence_tier: 'none' },
 }
 
-export const ENTERPRISE_STRONG_TRIGGER_DOSSIER: AerpoliceDossier = {
+export const TESTNET_ONLY_DOSSIER: AerpoliceDossier = {
   ...BASE,
-  organization: 'MegaBank',
-  company_size_band: 'enterprise_large',
-  company_size_basis: '10,000+ employees, public filings.',
+  organization: 'Testnet Trader',
+  production_confirmed: false,
+  production_evidence: 'Only testnet transactions documented; no mainnet usage found.',
+}
+
+export const API_FIAT_RAIL_DOSSIER: AerpoliceDossier = {
+  ...BASE,
+  organization: 'Hyperbots',
+  segment: 'S1 Trading',
+  wallet_key: { status: 'No', evidence: 'Executes AP/AR through banking and card rails, not a wallet.', evidence_url: 'https://hyperbots.example/docs', evidence_tier: 'official_docs', signal_type: null },
+  api_fiat_rail_only: true,
 }
 
 export const INACTIVE_DOSSIER: AerpoliceDossier = { ...BASE, organization: 'Ghostware', project_active: false }
 
-export const OVERCLAIMED_GAP_DOSSIER: AerpoliceDossier = {
+export const S3_WALLET_INFRA_NO_GAP_DOSSIER: AerpoliceDossier = {
   ...BASE,
-  organization: 'CapabilityOnly',
-  control_gap: { gap: 'The agent is action-taking and able to execute changes autonomously.', status: 'confirmed', basis: 'It can act, so it must have a gap.' },
+  organization: 'Openfort',
+  segment: 'S3 Wallet Infra',
+  wallet_key: { status: 'Yes', evidence: 'Agent wallets autonomously sign EVM/Solana transactions within programmable controls.', evidence_url: 'https://openfort.example/solutions', evidence_tier: 'official_docs', signal_type: 'agent_wallet_infra_provided' },
+  gap_to_investigate: 'Gap not confirmed',
+  recommended_route: 'learning_oem',
+  route_rationale: 'Direct competitor with an existing policy-gated key product — learning conversation only.',
 }
 
-export const GENUINE_GAP_DOSSIER: AerpoliceDossier = {
+export const S3_WALLET_INFRA_VERIFIED_GAP_DOSSIER: AerpoliceDossier = {
   ...BASE,
-  organization: 'RealGap Inc',
-  control_gap: { gap: 'No independent kill switch per agent; authorization is enforced inside the same runtime that executes the action, with no external approval step.', status: 'confirmed', basis: 'Docs describe a single in-process policy check with no external escalation or kill control.' },
+  organization: 'NicheWalletCo',
+  segment: 'S3 Wallet Infra',
+  wallet_key: { status: 'Yes', evidence: 'Agent wallets sign transactions with no independent policy layer described.', evidence_url: 'https://nichewallet.example/docs', evidence_tier: 'official_docs', signal_type: 'agent_wallet_infra_provided' },
+  gap_to_investigate: 'No independent kill switch or external mandate enforcement described anywhere in the docs — the application itself is the only checkpoint.',
+  recommended_route: 'direct_sales',
+  route_rationale: 'Verified residual gap: no external enforcement layer exists today, and the buyer is reachable.',
 }
 
-export const UNCONFIRMED_GAP_DOSSIER: AerpoliceDossier = {
+export const NO_TRIGGER_NO_BUYER_DOSSIER: AerpoliceDossier = {
   ...BASE,
-  organization: 'ActionOnlyCo',
-  control_gap: { gap: 'Gap not confirmed', status: 'unknown', basis: 'Only the action-taking capability is documented, not the control layer.' },
+  organization: 'QuietStartup',
+  trigger: { type: null, what_happened: '', date: null, evidence_url: null, evidence_tier: 'none' },
+  buyer: { target: 'Unknown', contact_path: '', reachable: false },
+  team_public: false,
+  recommended_route: 'design_partner',
 }
 
-export const OEM_INTEGRATION_DOSSIER: AerpoliceDossier = {
+export const STALE_TRIGGER_DOSSIER: AerpoliceDossier = {
   ...BASE,
-  organization: 'ConnectorHub MCP',
-  recommended_motion: 'oem_integration',
-  motion_rationale: 'Ships an MCP server that third parties embed — not an end-user buyer of governance themselves.',
+  organization: 'OldNews Protocol',
+  trigger: { ...BASE.trigger, date: isoDaysAgo(45) },
 }
 
-export const PARTNERSHIP_DOSSIER: AerpoliceDossier = {
+export const OLD_LOSS_DOSSIER: AerpoliceDossier = {
   ...BASE,
-  organization: 'AgentFrame',
-  recommended_motion: 'partnership',
-  motion_rationale: 'Agent framework builder — a channel partner, not a direct customer.',
+  organization: 'DrainedWallet Inc',
+  past_loss: { description: 'Agent wallet was drained via a compromised session key.', evidence_url: 'https://example.com/postmortem' },
 }

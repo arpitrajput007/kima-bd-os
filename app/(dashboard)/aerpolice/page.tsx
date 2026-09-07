@@ -28,8 +28,9 @@ interface RunRow {
   tier2_count: number
   tier3_count: number
   contact_now_count: number
-  validate_then_send_count: number
-  monitor_count: number
+  design_partner_count: number
+  research_hold_count: number
+  later_api_fiat_count: number
   watchlisted_count: number
   started_at: string
   finished_at: string | null
@@ -85,10 +86,11 @@ function scoreColor(score: number) {
   return { color: '#f87171', bg: 'rgba(248,113,113,0.1)', border: 'rgba(248,113,113,0.2)' }
 }
 
-const NEXT_ACTION_META: Record<string, { label: string; color: string }> = {
-  'Contact now': { label: 'Contact now', color: '#34d399' },
-  'Validate then send': { label: 'Validate then send', color: '#fbbf24' },
-  Monitor: { label: 'Monitor', color: '#94a3b8' },
+const ROUTE_META: Record<string, { label: string; color: string }> = {
+  direct_sales: { label: 'Direct sales', color: '#34d399' },
+  design_partner: { label: 'Design partner', color: '#fbbf24' },
+  learning_oem: { label: 'Learning/OEM', color: '#818cf8' },
+  monitoring: { label: 'Monitoring', color: '#94a3b8' },
 }
 
 function SubScore({ label, value, max }: { label: string; value: number; max: number }) {
@@ -110,7 +112,7 @@ export default function AerpoliceDiscoveryPage() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [loadingLeads, setLoadingLeads] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
-  const [nextActionFilter, setNextActionFilter] = useState<string>('All')
+  const [routeFilter, setRouteFilter] = useState<string>('All')
   const [watchlist, setWatchlist] = useState<WatchlistRow[]>([])
 
   const loadStatus = useCallback(async () => {
@@ -177,7 +179,7 @@ export default function AerpoliceDiscoveryPage() {
     setTriggering(false)
   }
 
-  const filteredLeads = nextActionFilter === 'All' ? leads : leads.filter(l => l.aerpolice_next_action === nextActionFilter)
+  const filteredLeads = routeFilter === 'All' ? leads : leads.filter(l => l.aerpolice_next_action === routeFilter)
   const latest = recentRuns[0]
 
   return (
@@ -188,7 +190,7 @@ export default function AerpoliceDiscoveryPage() {
             <ShieldCheck size={18} style={{ color: '#22d3ee' }} /> Aerpolice Discovery
           </h1>
           <p className="text-[12px] mt-1 font-medium" style={{ color: 'rgb(100,106,135)' }}>
-            Manual only — no cron. Scans daily sources for the last 7 days and weekly sources for the last 30, and requires a verified external action before anything is saved.
+            Manual only — no cron. Wallet-signing scope: an agent must control a wallet-signing key AND execute an irreversible on-chain action, live in production, before anything is scored or saved.
           </p>
         </div>
         <button
@@ -219,8 +221,9 @@ export default function AerpoliceDiscoveryPage() {
                 { label: 'Failed', value: latest.sources_failed, color: latest.sources_failed ? '#f87171' : 'rgb(140,146,175)' },
                 { label: 'Leads saved', value: latest.leads_created, color: '#34d399' },
                 { label: 'Contact now', value: latest.contact_now_count, color: '#34d399' },
-                { label: 'Validate then send', value: latest.validate_then_send_count, color: '#fbbf24' },
-                { label: 'Monitor', value: latest.monitor_count, color: '#94a3b8' },
+                { label: 'Design partner', value: latest.design_partner_count, color: '#fbbf24' },
+                { label: 'Research hold', value: latest.research_hold_count, color: '#94a3b8' },
+                { label: 'Later — API/fiat', value: latest.later_api_fiat_count, color: 'rgb(140,146,175)' },
                 { label: 'OEM/Partner watchlisted', value: latest.watchlisted_count, color: '#818cf8' },
               ].map(s => (
                 <div key={s.label} style={{ textAlign: 'center' }}>
@@ -237,12 +240,12 @@ export default function AerpoliceDiscoveryPage() {
           </div>
         )}
 
-        {/* Next-action filter */}
+        {/* Route filter */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
-          {['All', 'Contact now', 'Validate then send', 'Monitor'].map(f => (
-            <button key={f} onClick={() => setNextActionFilter(f)}
-              style={{ padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${nextActionFilter === f ? 'rgba(34,211,238,0.5)' : 'rgba(255,255,255,0.08)'}`, background: nextActionFilter === f ? 'rgba(34,211,238,0.15)' : 'rgba(255,255,255,0.03)', color: nextActionFilter === f ? '#22d3ee' : 'rgb(150,155,185)' }}>
-              {f}
+          {['All', 'direct_sales', 'design_partner', 'learning_oem'].map(f => (
+            <button key={f} onClick={() => setRouteFilter(f)}
+              style={{ padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${routeFilter === f ? 'rgba(34,211,238,0.5)' : 'rgba(255,255,255,0.08)'}`, background: routeFilter === f ? 'rgba(34,211,238,0.15)' : 'rgba(255,255,255,0.03)', color: routeFilter === f ? '#22d3ee' : 'rgb(150,155,185)' }}>
+              {f === 'All' ? 'All' : (ROUTE_META[f]?.label || f)}
             </button>
           ))}
           <span style={{ fontSize: 11, color: 'rgb(100,107,140)', marginLeft: 4 }}>{filteredLeads.length} shown</span>
@@ -264,7 +267,7 @@ export default function AerpoliceDiscoveryPage() {
               const isExp = expanded === lead.id
               const dossier = lead.aerpolice_dossier
               const sc = scoreColor(lead.aerpolice_score || 0)
-              const na = NEXT_ACTION_META[lead.aerpolice_next_action || ''] || { label: lead.aerpolice_next_action || 'Unknown', color: 'rgb(150,155,185)' }
+              const rm = ROUTE_META[lead.aerpolice_next_action || ''] || { label: lead.aerpolice_next_action || 'Unknown', color: 'rgb(150,155,185)' }
               return (
                 <div key={lead.id} style={{ borderRadius: 14, border: `1px solid ${isExp ? 'rgba(34,211,238,0.4)' : 'rgba(255,255,255,0.08)'}`, background: isExp ? 'rgba(34,211,238,0.05)' : 'rgba(255,255,255,0.02)', overflow: 'hidden' }}>
                   <div onClick={() => setExpanded(isExp ? null : lead.id)}
@@ -272,11 +275,11 @@ export default function AerpoliceDiscoveryPage() {
                     <div style={{ flex: '1 1 260px', minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 14, fontWeight: 700, color: 'white' }}>{lead.company_name}</span>
-                        {(dossier?.structural_fit?.segments || []).slice(0, 2).map(seg => (
-                          <span key={seg} style={{ fontSize: 9.5, fontWeight: 600, color: '#22d3ee', background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.2)', padding: '2px 7px', borderRadius: 6 }}>{seg}</span>
-                        ))}
+                        {dossier?.segment && (
+                          <span style={{ fontSize: 9.5, fontWeight: 600, color: '#22d3ee', background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.2)', padding: '2px 7px', borderRadius: 6 }}>{dossier.segment}</span>
+                        )}
                       </div>
-                      <div style={{ fontSize: 11, color: 'rgb(150,155,185)', marginTop: 4, lineHeight: 1.5 }}>{lead.trigger_reason || dossier?.verified_action?.description || ''}</div>
+                      <div style={{ fontSize: 11, color: 'rgb(150,155,185)', marginTop: 4, lineHeight: 1.5 }}>{lead.trigger_reason || dossier?.irreversible?.action || ''}</div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
                       <div style={{ textAlign: 'center' }}>
@@ -284,7 +287,7 @@ export default function AerpoliceDiscoveryPage() {
                         <span style={{ display: 'inline-flex', minWidth: 34, justifyContent: 'center', padding: '2px 8px', borderRadius: 7, fontSize: 13, fontWeight: 800, color: sc.color, background: sc.bg, border: `1px solid ${sc.border}` }}>{lead.aerpolice_score}</span>
                       </div>
                       <span style={{ fontSize: 10, fontWeight: 700, color: tierColor(lead.aerpolice_tier), padding: '4px 10px', borderRadius: 7, background: `${tierColor(lead.aerpolice_tier)}18`, border: `1px solid ${tierColor(lead.aerpolice_tier)}45` }}>Tier {lead.aerpolice_tier}</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: na.color }}>{na.label}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: rm.color }}>{rm.label}</span>
                       {isExp ? <ChevronUp size={14} style={{ color: 'rgb(120,127,160)' }} /> : <ChevronDown size={14} style={{ color: 'rgb(120,127,160)' }} />}
                     </div>
                   </div>
@@ -293,34 +296,39 @@ export default function AerpoliceDiscoveryPage() {
                     <div style={{ padding: '0 18px 18px 18px' }}>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px,1fr))', gap: 10, marginBottom: 12 }}>
                         <div style={{ borderRadius: 12, border: '1px solid rgba(52,211,153,0.2)', background: 'rgba(52,211,153,0.05)', padding: '11px 13px' }}>
-                          <div style={{ fontSize: 9.5, fontWeight: 700, color: '#34d399', textTransform: 'uppercase', marginBottom: 6 }}>Verified action</div>
-                          <div style={{ fontSize: 11.5, color: 'rgb(200,205,230)', lineHeight: 1.55 }}>{dossier.verified_action?.description}</div>
+                          <div style={{ fontSize: 9.5, fontWeight: 700, color: '#34d399', textTransform: 'uppercase', marginBottom: 6 }}>Wallet key: {dossier.wallet_key?.status}</div>
+                          <div style={{ fontSize: 11.5, color: 'rgb(200,205,230)', lineHeight: 1.55 }}>{dossier.wallet_key?.evidence}</div>
+                        </div>
+                        <div style={{ borderRadius: 12, border: '1px solid rgba(34,211,238,0.2)', background: 'rgba(34,211,238,0.05)', padding: '11px 13px' }}>
+                          <div style={{ fontSize: 9.5, fontWeight: 700, color: '#22d3ee', textTransform: 'uppercase', marginBottom: 6 }}>Irreversible: {dossier.irreversible?.status}</div>
+                          <div style={{ fontSize: 11.5, color: 'rgb(200,205,230)', lineHeight: 1.55 }}>{dossier.irreversible?.action}</div>
                         </div>
                         <div style={{ borderRadius: 12, border: '1px solid rgba(251,191,36,0.2)', background: 'rgba(251,191,36,0.05)', padding: '11px 13px' }}>
                           <div style={{ fontSize: 9.5, fontWeight: 700, color: '#fbbf24', textTransform: 'uppercase', marginBottom: 6 }}>Why now · {dossier.trigger?.date || 'undated'}</div>
                           <div style={{ fontSize: 11.5, color: 'rgb(200,205,230)', lineHeight: 1.55 }}>{dossier.trigger?.what_happened}</div>
                         </div>
                         <div style={{ borderRadius: 12, border: '1px solid rgba(248,113,113,0.2)', background: 'rgba(248,113,113,0.05)', padding: '11px 13px' }}>
-                          <div style={{ fontSize: 9.5, fontWeight: 700, color: '#f87171', textTransform: 'uppercase', marginBottom: 6 }}>Control gap</div>
-                          <div style={{ fontSize: 11.5, color: 'rgb(200,205,230)', lineHeight: 1.55 }}>{dossier.control_gap?.gap} <span style={{ color: 'rgb(140,146,175)' }}>[{dossier.control_gap?.status}]</span></div>
+                          <div style={{ fontSize: 9.5, fontWeight: 700, color: '#f87171', textTransform: 'uppercase', marginBottom: 6 }}>Past loss / near-miss</div>
+                          <div style={{ fontSize: 11.5, color: 'rgb(200,205,230)', lineHeight: 1.55 }}>{dossier.past_loss?.description}</div>
                         </div>
                       </div>
                       <div style={{ borderRadius: 12, border: '1px solid rgba(56,189,248,0.2)', background: 'rgba(56,189,248,0.05)', padding: '11px 13px', marginBottom: 12 }}>
-                        <div style={{ fontSize: 9.5, fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', marginBottom: 6 }}>First qualification question</div>
-                        <div style={{ fontSize: 12, color: 'rgb(220,225,245)', lineHeight: 1.6, fontStyle: 'italic' }}>&ldquo;{dossier.first_qualification_question}&rdquo;</div>
+                        <div style={{ fontSize: 9.5, fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', marginBottom: 6 }}>First story-seeking question</div>
+                        <div style={{ fontSize: 12, color: 'rgb(220,225,245)', lineHeight: 1.6, fontStyle: 'italic' }}>&ldquo;{dossier.first_question}&rdquo;</div>
+                        <div style={{ fontSize: 11, color: 'rgb(140,146,175)', marginTop: 8 }}>Gap to investigate: {dossier.gap_to_investigate}</div>
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center', paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                          <SubScore label="Action fit" value={lead.aerpolice_score_breakdown?.actionFitScore || 0} max={25} />
+                          <SubScore label="Wallet" value={lead.aerpolice_score_breakdown?.walletScore || 0} max={25} />
+                          <SubScore label="Irreversible" value={lead.aerpolice_score_breakdown?.irreversibleScore || 0} max={20} />
                           <SubScore label="Trigger" value={lead.aerpolice_score_breakdown?.triggerScore || 0} max={20} />
-                          <SubScore label="Reach" value={lead.aerpolice_score_breakdown?.reachabilityScore || 0} max={20} />
-                          <SubScore label="Consequence" value={lead.aerpolice_score_breakdown?.consequenceScore || 0} max={15} />
-                          <SubScore label="Complementarity" value={lead.aerpolice_score_breakdown?.complementarityScore || 0} max={10} />
-                          <SubScore label="Evidence" value={lead.aerpolice_score_breakdown?.evidenceScore || 0} max={10} />
+                          <SubScore label="Integration fit" value={lead.aerpolice_score_breakdown?.integrationScore || 0} max={15} />
+                          <SubScore label="Reach" value={lead.aerpolice_score_breakdown?.reachabilityScore || 0} max={15} />
+                          <SubScore label="Evidence" value={lead.aerpolice_score_breakdown?.evidenceScore || 0} max={5} />
                         </div>
                         <div style={{ display: 'flex', gap: 12, marginLeft: 'auto' }}>
-                          {dossier.verified_action?.evidence_url && (
-                            <a href={dossier.verified_action.evidence_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#818cf8', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+                          {dossier.irreversible?.evidence_url && (
+                            <a href={dossier.irreversible.evidence_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#818cf8', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
                               <ExternalLink size={11} /> Action evidence
                             </a>
                           )}

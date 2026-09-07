@@ -41,8 +41,9 @@ CREATE TABLE IF NOT EXISTS aerpolice_discovery_runs (
   tier2_count               int default 0,
   tier3_count               int default 0,
   contact_now_count         int default 0,
-  validate_then_send_count  int default 0,
-  monitor_count             int default 0,
+  design_partner_count      int default 0,
+  research_hold_count       int default 0,
+  later_api_fiat_count      int default 0,
   errors                    jsonb default '[]'::jsonb,
   started_at                timestamptz not null default now(),
   finished_at               timestamptz
@@ -88,8 +89,11 @@ CREATE POLICY "anon_full_access_aerpolice_rejected_candidates" ON aerpolice_reje
   FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 -- ============================================================================
--- Source registry — daily + weekly monitoring sources from the discovery
--- spec. sources.scan_interval_hours/last_success_at/consecutive_failures/
+-- Source registry — daily + weekly monitoring sources for the wallet-signing
+-- product scope (2026-09-07 approach doc). Replaces the earlier action-
+-- taking-agent source list (IT/security/healthcare/insurance marketplaces
+-- and trade press), which mostly surfaces companies this scope now excludes.
+-- sources.scan_interval_hours/last_success_at/consecutive_failures/
 -- last_error already exist on the table (added generically by
 -- add-aerseal-recurring-discovery.sql) and are reused as-is; companies_
 -- evaluated/leads_generated/total_runs likewise. WHERE NOT EXISTS keeps this
@@ -101,39 +105,47 @@ INSERT INTO sources (
 )
 SELECT
   v.source_name, 'website', v.source_url_or_query,
-  'Aerpolice Governance Customer',
-  'AI agent company with a verified external action',
+  'Aerpolice Reachable Prospect',
+  'AI agent company with a wallet-signing key and an irreversible on-chain action',
   'aerpolice', v.frequency, 'unrated', 'active', v.notes
 FROM (VALUES
   -- Daily — scanned for material published/updated in the previous 7 days.
-  ('Official MCP Registry',        'https://registry.modelcontextprotocol.io/',                  'daily', 'Daily — new/updated write-capable MCP servers.'),
-  ('MCP Registry (GitHub)',        'https://github.com/modelcontextprotocol/registry',           'daily', 'Daily — registry source repo, release/PR activity.'),
-  ('GitHub Topics: MCP',           'https://github.com/topics/model-context-protocol',           'daily', 'Daily — recently-active MCP projects.'),
-  ('Show HN',                      'https://news.ycombinator.com/show',                          'daily', 'Daily — founder-posted launches, often action-taking agents.'),
-  ('Product Hunt: AI Agents',      'https://www.producthunt.com/topics/ai-agents',                'daily', 'Daily — new agent product launches.'),
+  -- Incident/postmortem surfaces move fast and are the highest-weight
+  -- trigger (key leak, drained wallet, unintended transaction).
+  ('Rekt News',                    'https://rekt.news/',                                          'daily', 'Daily — incident postmortems; key leaks and drained-wallet triggers.'),
+  ('DefiLlama Hacks',              'https://defillama.com/hacks',                                  'daily', 'Daily — incident tracker; wallet/signer compromise triggers.'),
+  ('Hyperliquid Blog',             'https://hyperliquid.xyz/blog',                                 'daily', 'Daily — S1 primary ecosystem: agent/vault integrations, API changes.'),
+  ('Polymarket Blog',              'https://polymarket.com/blog',                                  'daily', 'Daily — S1 primary ecosystem: agent trading integrations, launches.'),
+  ('GitHub Topics: ERC-4337',      'https://github.com/topics/erc-4337?o=desc&s=updated',          'daily', 'Daily — smart-account / agent-signer code discovery, recently updated.'),
   -- Weekly — scanned for material published/updated in the previous 30 days.
-  ('Atlassian Marketplace',        'https://marketplace.atlassian.com/',                          'weekly', 'Weekly — ITSM/DevOps agent apps with write access.'),
-  ('Zendesk Marketplace',          'https://www.zendesk.com/marketplace/',                        'weekly', 'Weekly — support-resolution agent apps (refunds, account changes).'),
-  ('Shopify App Store',            'https://apps.shopify.com/',                                   'weekly', 'Weekly — commerce agent apps (orders, refunds, inventory).'),
+  ('GitHub Topics: AI Agent Wallet','https://github.com/topics/agent-wallet',                      'weekly', 'Weekly — agent-wallet infra and integration code discovery.'),
+  ('x402 Foundation Docs',         'https://www.x402.org/',                                        'weekly', 'Weekly — agent-payment / wallet settlement protocol docs and adopters.'),
+  ('The Block',                    'https://www.theblock.co/',                                     'weekly', 'Weekly — crypto trade press: production launches, funding tied to execution.'),
+  ('DL News',                      'https://www.dlnews.com/',                                      'weekly', 'Weekly — crypto trade press: agent-wallet and DeFi integration coverage.'),
+  ('CoinDesk',                     'https://www.coindesk.com/',                                    'weekly', 'Weekly — crypto trade press: agentic trading/treasury coverage.'),
+  ('TechCrunch AI',                'https://techcrunch.com/category/artificial-intelligence/',     'weekly', 'Weekly — funding tied to agent-execution expansion.'),
+  ('Crunchbase',                   'https://www.crunchbase.com/',                                  'weekly', 'Weekly — funding announcements; must connect to wallet-signing to count as a trigger.'),
   ('Y Combinator Companies',       'https://www.ycombinator.com/companies',                        'weekly', 'Weekly — founder-led startups, priority customer profile.'),
-  ('CRN Security News',            'https://www.crn.com/news/security',                            'weekly', 'Weekly — security-agent product coverage.'),
-  ('Crunchbase',                   'https://www.crunchbase.com/',                                  'weekly', 'Weekly — funding tied to agent-product expansion.'),
-  ('TechCrunch AI',                'https://techcrunch.com/category/artificial-intelligence/',     'weekly', 'Weekly — agent launches, GA announcements, funding.'),
-  ('Business Wire Technology',     'https://www.businesswire.com/portal/site/home/news/industries/technology/', 'weekly', 'Weekly — enterprise deployment / launch press releases.'),
-  ('GlobeNewswire Technology',     'https://www.globenewswire.com/Industry/Technology',            'weekly', 'Weekly — enterprise deployment / launch press releases.'),
-  ('Mastercard Newsroom',          'https://www.mastercard.com/global/en/news-and-trends/press.html', 'weekly', 'Weekly — agentic-payments capability announcements.'),
-  ('Visa Newsroom',                'https://usa.visa.com/about-visa/newsroom.html',                'weekly', 'Weekly — agentic-payments capability announcements.'),
-  ('PayPal Newsroom',              'https://newsroom.paypal-corp.com/',                             'weekly', 'Weekly — agentic-payments capability announcements.'),
-  ('FinTech Futures',              'https://www.fintechfutures.com/',                               'weekly', 'Weekly — finance/payment agent coverage.'),
-  ('The Paypers',                  'https://thepaypers.com/',                                       'weekly', 'Weekly — payments-agent coverage.'),
-  ('Finextra',                     'https://www.finextra.com/',                                     'weekly', 'Weekly — finance-agent coverage.'),
-  ('Healthcare IT News',           'https://www.healthcareitnews.com/',                             'weekly', 'Weekly — healthcare-agent workflow coverage.'),
-  ('Fierce Healthcare',            'https://www.fiercehealthcare.com/',                             'weekly', 'Weekly — healthcare-agent workflow coverage.'),
-  ('MedCity News',                 'https://medcitynews.com/',                                      'weekly', 'Weekly — healthcare-agent workflow coverage.'),
-  ('InsurTech Insights',           'https://www.insurtechinsights.com/',                            'weekly', 'Weekly — insurance-agent (claims/underwriting) coverage.'),
-  ('Digital Insurance',            'https://www.dig-in.com/',                                       'weekly', 'Weekly — insurance-agent (claims/underwriting) coverage.')
+  ('a16z Crypto',                  'https://a16zcrypto.com/posts/',                                'weekly', 'Weekly — founder technical posts and funding theses naming agent-wallet portfolio companies.'),
+  ('Dune Analytics — Agent Wallets','https://dune.com/browse/dashboards?q=agent+wallet',            'weekly', 'Weekly — on-chain agent dashboards; verified transaction-history evidence.')
 ) AS v(source_name, source_url_or_query, frequency, notes)
 WHERE NOT EXISTS (SELECT 1 FROM sources s WHERE s.source_name = v.source_name);
+
+-- The prior action-taking-agent source list (IT/security/healthcare/
+-- insurance marketplaces, general trade press) is paused rather than
+-- deleted — it isn't wrong data, it's out of scope for the current
+-- wallet-signing product definition. Pausing keeps the Source Manager UI
+-- honest about what's actually being scanned without discarding the rows.
+UPDATE sources
+   SET status = 'paused'
+ WHERE product_slug = 'aerpolice'
+   AND source_name IN (
+     'Official MCP Registry', 'MCP Registry (GitHub)', 'GitHub Topics: MCP', 'Show HN', 'Product Hunt: AI Agents',
+     'Atlassian Marketplace', 'Zendesk Marketplace', 'Shopify App Store', 'CRN Security News',
+     'Business Wire Technology', 'GlobeNewswire Technology', 'Mastercard Newsroom', 'Visa Newsroom',
+     'PayPal Newsroom', 'FinTech Futures', 'The Paypers', 'Finextra', 'Healthcare IT News',
+     'Fierce Healthcare', 'MedCity News', 'InsurTech Insights', 'Digital Insurance'
+   );
 
 -- RLS on `sources` and `leads` is already enabled with an allow-all policy
 -- (fix-rls-no-auth.sql) — new columns above inherit it, no change needed.

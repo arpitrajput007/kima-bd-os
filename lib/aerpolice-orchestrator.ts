@@ -113,8 +113,8 @@ function sleep(ms: number): Promise<void> {
 interface DiscoverAerpoliceResponse {
   saved?: number; candidates_found?: number; profiled?: number
   tier_1?: number; tier_2?: number; tier_3?: number
-  contact_now?: number; validate_then_send?: number; monitor?: number
-  watchlisted?: number
+  contact_now?: number; design_partner?: number; research_hold?: number
+  later_api_fiat?: number; watchlisted?: number
   error?: string
 }
 
@@ -177,8 +177,9 @@ export interface AerpoliceRunSummary {
   tier2_count: number
   tier3_count: number
   contact_now_count: number
-  validate_then_send_count: number
-  monitor_count: number
+  design_partner_count: number
+  research_hold_count: number
+  later_api_fiat_count: number
   watchlisted_count: number
   errors: Array<{ source: string; error: string }>
   started_at: string
@@ -199,7 +200,7 @@ export async function runAerpoliceDiscovery(
     const appUrl = resolveAppUrl()
     let sourcesScanned = 0, sourcesFailed = 0, leadsCreated = 0, candidatesFound = 0
     let tier1Count = 0, tier2Count = 0, tier3Count = 0
-    let contactNowCount = 0, validateThenSendCount = 0, monitorCount = 0, watchlistedCount = 0
+    let contactNowCount = 0, designPartnerCount = 0, researchHoldCount = 0, laterApiFiatCount = 0, watchlistedCount = 0
     const errors: Array<{ source: string; error: string }> = []
 
     for (let i = 0; i < batch.length; i += AERPOLICE_RUN_CONCURRENCY) {
@@ -215,8 +216,9 @@ export async function runAerpoliceDiscovery(
           tier2Count += res.data.tier_2 || 0
           tier3Count += res.data.tier_3 || 0
           contactNowCount += res.data.contact_now || 0
-          validateThenSendCount += res.data.validate_then_send || 0
-          monitorCount += res.data.monitor || 0
+          designPartnerCount += res.data.design_partner || 0
+          researchHoldCount += res.data.research_hold || 0
+          laterApiFiatCount += res.data.later_api_fiat || 0
           watchlistedCount += res.data.watchlisted || 0
           await recordScanOutcome(supabase, target, { ok: true, saved: res.data.saved, profiled: res.data.profiled })
         } else {
@@ -234,7 +236,8 @@ export async function runAerpoliceDiscovery(
       sources_scanned: sourcesScanned, sources_skipped: sourcesSkipped, sources_failed: sourcesFailed,
       leads_created: leadsCreated, candidates_found: candidatesFound,
       tier1_count: tier1Count, tier2_count: tier2Count, tier3_count: tier3Count,
-      contact_now_count: contactNowCount, validate_then_send_count: validateThenSendCount, monitor_count: monitorCount,
+      contact_now_count: contactNowCount, design_partner_count: designPartnerCount,
+      research_hold_count: researchHoldCount, later_api_fiat_count: laterApiFiatCount,
       watchlisted_count: watchlistedCount,
       errors,
     }).eq('id', lockId)
@@ -243,7 +246,8 @@ export async function runAerpoliceDiscovery(
       run_id: lockId, sources_scanned: sourcesScanned, sources_skipped_not_due: sourcesSkipped, sources_failed: sourcesFailed,
       leads_created: leadsCreated, candidates_found: candidatesFound,
       tier1_count: tier1Count, tier2_count: tier2Count, tier3_count: tier3Count,
-      contact_now_count: contactNowCount, validate_then_send_count: validateThenSendCount, monitor_count: monitorCount,
+      contact_now_count: contactNowCount, design_partner_count: designPartnerCount,
+      research_hold_count: researchHoldCount, later_api_fiat_count: laterApiFiatCount,
       watchlisted_count: watchlistedCount,
       errors, started_at: startedAt, finished_at: finishedAt,
     }
