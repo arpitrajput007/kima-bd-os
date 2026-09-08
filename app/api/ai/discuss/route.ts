@@ -6,6 +6,7 @@ import { FULL_BRAIN } from '@/lib/kima-knowledge'
 import { BD_SALES_PLAYBOOK } from '@/lib/bd-sales-playbook'
 import { isDuplicateRule } from '@/lib/agent-memory'
 import { firecrawlSearch, firecrawlScrape } from '@/lib/firecrawl'
+import { humanizeReply } from '@/lib/humanize'
 
 
 const supabase = createClient(
@@ -444,6 +445,11 @@ If the screenshot is a conversation between multiple people, attribution matters
         image,
       }) || 'I had trouble with that — try rephrasing?'
     }
+
+    // Automatic de-slop pass: rewrites any [[MESSAGE]]...[[/MESSAGE]] the model
+    // drafted so it doesn't read as AI-generated, before the BD person ever
+    // sees it — no separate copy/paste-and-reprompt step required.
+    reply = await humanizeReply(reply)
 
     const followUps = await suggestFollowUps({
       company: lead.company_name,
