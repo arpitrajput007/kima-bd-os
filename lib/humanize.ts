@@ -14,70 +14,102 @@
 
 import { claudeText, CLAUDE_MINI } from '@/lib/claude'
 
-const OPEN = '[[MESSAGE]]'
+const OPEN_RE = /\[\[MESSAGE(?::(connection|first|followup))?\]\]/
 const CLOSE = '[[/MESSAGE]]'
 
-const HUMANIZE_SYSTEM = `You rewrite AI-drafted outreach messages (LinkedIn notes, InMail, cold email, follow-ups) so they read like a real person typed them in a couple of minutes — not like an AI wrote them.
+type Channel = 'connection' | 'first' | 'followup' | undefined
 
-The input has already been through an AI writer, so it will usually look clean and well-formed even when it doesn't contain an obvious buzzword — that evenness IS the tell. Don't treat "no glaring red flag" as "nothing to fix." Actually rewrite the phrasing: change sentence boundaries, cut a clause, reorder a thought, swap a formal construction for how someone would actually say it out loud. Returning the input close to word-for-word is a failure even if it was already free of obvious slop — find at least two or three sentences to genuinely restructure, not just reformat.
+const LENGTH_RULE: Record<NonNullable<Channel>, string> = {
+  connection: 'This is a LinkedIn connection note. Keep it under 180 characters — cut, don\'t just compress.',
+  first: 'This is the first message after acceptance, or a cold email opener. 2-3 short sentences, no more.',
+  followup: 'This is a follow-up. 1-2 short sentences, no more.',
+}
 
-Watch for these formal-logic constructions in particular, common in AI drafts and rare in real typed messages — rewrite them into something more direct:
+const HUMANIZE_SYSTEM = `You are the final editor every outreach message passes through before Arpit (a BD person) sees it. Your job: make it read like he personally looked at this specific prospect and typed it himself, in a couple of minutes — never like an AI wrote it. Never return the input unchanged or close to word-for-word; if it looks clean, that evenness is itself the tell you need to fix.
+
+The message should feel:
+- Short and direct
+- Specific to this one prospect, not swappable to another
+- Conversational, not polished like marketing copy
+- Curious rather than sales-heavy
+- Written by someone who actually understands the prospect's situation
+
+Hard constraints:
+- Only one relevant trigger, product, or fact stays in the message — if the draft mentions more than one, cut to the single strongest one.
+- Only one conversational point. Only one question, max.
+- Use only facts already present in the draft — never invent detail, never add a personalization that wasn't there.
+- Simple, everyday words. Prefer contractions: "you're", "they're", "I'm", "don't".
+- Don't explain the product/company unless the sentence is meaningless without it.
+- Never claim the prospect has a problem the draft doesn't already treat as confirmed.
+- No deliberate typos or fake-casual spelling — sound human through word choice and rhythm, not through sloppiness.
+
+Formal-logic constructions that are common in AI drafts and rare in real typed messages — rewrite these into something more direct:
 - "That/this [noun] determines whether X, or whether Y" → just ask the direct question.
 - "I work on [abstract description of what you do]" → say the concrete thing plainer, or cut it.
 - A sentence that exists purely to set up the next one ("Here's the thing:", "The distinction that matters is...").
 
-Strip these AI tells wherever they appear:
-- Em dashes used as a rhythm crutch. Rewrite as separate sentences or drop the aside.
-- Throat-clearing openers: "I hope this finds you well", "I wanted to reach out", "I came across your profile/company".
-- Tidy three-item lists and perfectly parallel clauses ("fast, reliable, and secure").
-- Transition words: "Moreover", "Furthermore", "Additionally", "That said", "In today's [x] landscape".
-- Corporate/buzzword filler: "leverage", "seamless", "robust", "cutting-edge", "unlock", "synergy", "game-changing", "revolutionary".
-- Over-explaining or restating something the recipient obviously already knows about their own company.
-- Uniform sentence length and a too-clean logical flow. Real people write with some unevenness — a short sentence, then a longer one, an occasional fragment.
-- Excessive politeness or enthusiasm (exclamation points, "amazing", "excited to").
-- A closing that oversells next steps ("Looking forward to connecting!", "Let's chat soon!").
+Cut these phrases and anything that reads like them — they're the most obvious AI tells and instantly recognizable:
+"I came across...", "I was impressed by...", "Your work really stood out", "Given your role...", "At the intersection of...", "I'd love to explore...", "There may be strong synergies", "I thought it made sense to connect", "I'd be curious to understand...", "How are you thinking about...", "Would you be open to a quick chat?", "We help companies like yours...", "This could be a game-changer", "I hope this finds you well", "I wanted to reach out". Also cut: "leverage", "seamless", "robust", "cutting-edge", "innovative", "unlock", "synergy", "revolutionary".
 
-Keep:
-- Every fact, name, number, and claim exactly as given — do not add, remove, or soften factual content.
-- The core ask/question — there should still be exactly one clear thing being asked.
-- The approximate length of the original. If it's a short LinkedIn note, keep it short — do not pad a 200-character note into a paragraph. If it's an email, don't make it longer than the input.
-- Plain, direct, contraction-using language a busy founder would actually text back to.
+Other tells to remove:
+- Em dashes used as a rhythm crutch, tidy three-item lists, perfectly parallel clauses — these read as composed, not typed.
+- Uniform sentence length. Real people write unevenly — a short sentence, then a longer one, sometimes a fragment.
+- Unnecessary compliments, introductions, or explanations of things the recipient already knows about their own company.
+- A closing that oversells ("Looking forward to connecting!", "Let's chat soon!").
 
-Output ONLY the rewritten message text. No preamble, no explanation, no quotes around it, no markdown.`
+Keep every fact, name, and number exactly as given.
 
-function extractDelimited(text: string): { pre: string; msg: string; post: string }[] {
-  const matches: { pre: string; msg: string; post: string }[] = []
+Before returning the message, silently check:
+1. Could this be sent to 20 other prospects by changing only the name? If yes, cut whatever's generic or add nothing — just cut it, don't pad with invented specifics.
+2. Does it contain anything not already in the draft? If yes, remove it.
+3. Does it read like a pitch dressed up as a question?
+4. Is any sentence unnecessary? Cut it.
+5. Would a busy person actually reply to this?
+If 1-4 fail, rewrite again before answering.
+
+Output ONLY the final message text. No preamble, no explanation, no quotes around it, no markdown, no analysis.`
+
+interface MessagePart { pre: string; msg: string; channel: Channel; post: string }
+
+function extractDelimited(text: string): MessagePart[] {
+  const parts: MessagePart[] = []
   let cursor = 0
+  const re = new RegExp(OPEN_RE, 'g')
   while (true) {
-    const start = text.indexOf(OPEN, cursor)
-    if (start === -1) break
-    const end = text.indexOf(CLOSE, start)
+    re.lastIndex = cursor
+    const openMatch = re.exec(text)
+    if (!openMatch) break
+    const start = openMatch.index
+    const contentStart = start + openMatch[0].length
+    const end = text.indexOf(CLOSE, contentStart)
     if (end === -1) {
       // Opening tag with no closing tag — most likely the reply got cut off
       // at max_tokens mid-message. Treat the rest of the string as the
       // message rather than leaking the raw tag to the client.
-      matches.push({ pre: text.slice(cursor, start), msg: text.slice(start + OPEN.length).trim(), post: '' })
+      parts.push({ pre: text.slice(cursor, start), msg: text.slice(contentStart).trim(), channel: openMatch[1] as Channel, post: '' })
       cursor = text.length
       break
     }
-    matches.push({
+    parts.push({
       pre: text.slice(cursor, start),
-      msg: text.slice(start + OPEN.length, end).trim(),
+      msg: text.slice(contentStart, end).trim(),
+      channel: openMatch[1] as Channel,
       post: '',
     })
     cursor = end + CLOSE.length
   }
-  return matches.length ? [...matches, { pre: '', msg: '', post: text.slice(cursor) }] : []
+  return parts.length ? [...parts, { pre: '', msg: '', channel: undefined, post: text.slice(cursor) }] : []
 }
 
-async function rewrite(draft: string): Promise<string> {
+async function rewrite(draft: string, channel: Channel): Promise<string> {
   if (!draft.trim()) return draft
   try {
+    const system = channel ? `${HUMANIZE_SYSTEM}\n\n${LENGTH_RULE[channel]}` : HUMANIZE_SYSTEM
     const out = await claudeText({
       model: CLAUDE_MINI,
       maxTokens: 600,
       temperature: 0.9,
-      system: HUMANIZE_SYSTEM,
+      system,
       user: draft,
     })
     return out.trim() || draft
@@ -86,16 +118,18 @@ async function rewrite(draft: string): Promise<string> {
   }
 }
 
-// Finds every [[MESSAGE]]...[[/MESSAGE]] block in a reply, rewrites each one
-// through the humanizer pass in parallel, and splices the results back in —
-// stripping the delimiters so the client never sees them. If the model didn't
-// use the delimiters (e.g. a pure research/analysis answer with no drafted
-// message), this is a no-op and the reply is returned unchanged.
+// Finds every [[MESSAGE]]...[[/MESSAGE]] block in a reply (optionally tagged
+// [[MESSAGE:connection|first|followup]] so the right length cap applies),
+// rewrites each one through the humanizer pass in parallel, and splices the
+// results back in — stripping the delimiters so the client never sees them.
+// If the model didn't use the delimiters (e.g. a pure research/analysis
+// answer with no drafted message), this is a no-op and the reply returns
+// unchanged.
 export async function humanizeReply(reply: string): Promise<string> {
   const parts = extractDelimited(reply)
   if (!parts.length) return reply
 
-  const rewritten = await Promise.all(parts.map(p => (p.msg ? rewrite(p.msg) : Promise.resolve(''))))
+  const rewritten = await Promise.all(parts.map(p => (p.msg ? rewrite(p.msg, p.channel) : Promise.resolve(''))))
 
   let result = ''
   parts.forEach((p, i) => {
