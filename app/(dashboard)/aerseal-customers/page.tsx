@@ -106,6 +106,7 @@ export default function AersealCustomersPage() {
   const [adding, setAdding] = useState<number | null>(null)
   const [added, setAdded] = useState<Set<string>>(new Set())
   const [plutoAssigned, setPlutoAssigned] = useState<Set<string>>(new Set())
+  const [leadIds, setLeadIds] = useState<Map<string, string>>(new Map())
   const [expanded, setExpanded] = useState<number | null>(null)
   const [expandedProspect, setExpandedProspect] = useState<number | null>(null)
   const [addingProspect, setAddingProspect] = useState<number | null>(null)
@@ -123,12 +124,13 @@ export default function AersealCustomersPage() {
     ]))
     getClient()
       .from('leads')
-      .select('company_name, assigned_to')
+      .select('id, company_name, assigned_to')
       .in('company_name', names)
       .then(({ data }) => {
         if (data?.length) {
           setAdded(new Set(data.map((r: { company_name: string }) => r.company_name)))
           setPlutoAssigned(new Set(data.filter((r: { assigned_to: string | null }) => r.assigned_to === 'pluto').map((r: { company_name: string }) => r.company_name)))
+          setLeadIds(new Map(data.map((r: { id: string; company_name: string }) => [r.company_name, r.id])))
         }
       })
   }, [])
@@ -365,6 +367,7 @@ export default function AersealCustomersPage() {
               const isExp = expandedProspect === p.rank
               const isAdded = added.has(p.company)
               const isPluto = plutoAssigned.has(p.company)
+              const leadId = leadIds.get(p.company)
               const sc = scoreColor(p.score)
               const tc = tierColor(p.tier)
               return (
@@ -379,7 +382,19 @@ export default function AersealCustomersPage() {
                     </div>
                     <div style={{ flex: '1 1 260px', minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: 'white' }}>{p.company}</span>
+                        {leadId ? (
+                          <Link
+                            href={`/leads/${leadId}`}
+                            onClick={e => e.stopPropagation()}
+                            style={{ fontSize: 14, fontWeight: 700, color: 'white', textDecoration: 'none' }}
+                            onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline' }}
+                            onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none' }}
+                          >
+                            {p.company}
+                          </Link>
+                        ) : (
+                          <span style={{ fontSize: 14, fontWeight: 700, color: 'white' }}>{p.company}</span>
+                        )}
                         <span style={{ fontSize: 9.5, fontWeight: 600, color: '#a78bfa', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap' }}>{p.segment}</span>
                         <span style={{ fontSize: 9.5, fontWeight: 600, color: 'rgb(150,155,185)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', padding: '2px 7px', borderRadius: 6, whiteSpace: 'nowrap' }}>{p.chains}</span>
                       </div>
@@ -617,6 +632,7 @@ export default function AersealCustomersPage() {
           {sorted.map((c, idx) => {
             const isExpanded = expanded === c.id
             const isAdded = added.has(c.company)
+            const leadId = leadIds.get(c.company)
             const sc = scoreColor(c.conversionScore)
             return (
               <div key={c.id}>
@@ -629,7 +645,19 @@ export default function AersealCustomersPage() {
                   {/* Company */}
                   <div style={{ paddingRight: 10 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'white', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
-                      {c.company}
+                      {leadId ? (
+                        <Link
+                          href={`/leads/${leadId}`}
+                          onClick={e => e.stopPropagation()}
+                          style={{ color: 'white', textDecoration: 'none' }}
+                          onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline' }}
+                          onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none' }}
+                        >
+                          {c.company}
+                        </Link>
+                      ) : (
+                        <span>{c.company}</span>
+                      )}
                       {c.multiCategory && <span title="Also appears under another category" style={{ fontSize: 9, fontWeight: 700, color: '#38bdf8', background: 'rgba(56,189,248,0.12)', padding: '1px 5px', borderRadius: 4 }}>multi</span>}
                     </div>
                     {c.website && (
