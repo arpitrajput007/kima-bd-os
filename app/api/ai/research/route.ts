@@ -3,16 +3,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { PRODUCT_BRAIN, AER360_DISCOVERY_BRAIN } from '@/lib/kima-knowledge'
 import { scoringMemory } from '@/lib/agent-memory'
 import { readUrl } from '@/lib/webRead'
+import { hunterDomainSearch } from '@/lib/hunter'
 
 
 async function getHunterContacts(website: string): Promise<string> {
-  if (!process.env.HUNTER_API_KEY || !website) return ''
+  if (!website) return ''
   try {
     const domain = website.replace(/^https?:\/\//, '').replace(/\/.*$/, '')
-    const res = await fetch(`https://api.hunter.io/v2/domain-search?domain=${domain}&api_key=${process.env.HUNTER_API_KEY}&limit=10`)
-    const data = await res.json()
-    if (!data?.data?.emails?.length) return ''
-    return JSON.stringify(data.data.emails.map((e: any) => ({
+    const emails = await hunterDomainSearch(domain)
+    if (!emails.length) return ''
+    return JSON.stringify(emails.map((e: any) => ({
       email: e.value,
       name: `${e.first_name || ''} ${e.last_name || ''}`.trim(),
       position: e.position,

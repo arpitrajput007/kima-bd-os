@@ -33,6 +33,7 @@ import { firecrawlConfigured, firecrawlDeepScrape, firecrawlFindAuthorityEvidenc
 import { apolloConfigured, apolloSearchPeople, toDomain } from '@/lib/apollo'
 import { isGenericName } from '@/lib/leadQuality'
 import { isRealEmail } from '@/lib/outreach'
+import { hunterDomainSearch } from '@/lib/hunter'
 import { AERSEAL_KNOWLEDGE } from '@/lib/kima-knowledge'
 import {
   MONITORING_SURFACES,
@@ -480,14 +481,9 @@ async function enrichBuyers(
     }
   }
 
-  if (out.length < 2 && domain && process.env.HUNTER_API_KEY) {
+  if (out.length < 2 && domain) {
     try {
-      const res = await fetch(
-        `https://api.hunter.io/v2/domain-search?domain=${domain}&api_key=${process.env.HUNTER_API_KEY}&limit=10`,
-      )
-      const data = await res.json()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const emails: any[] = data?.data?.emails || []
+      const emails = await hunterDomainSearch(domain)
       for (const e of emails) {
         if (out.length >= 3) break
         const title = (e.position || '').toLowerCase()

@@ -7,6 +7,7 @@
 
 import OpenAI from 'openai'
 import { apolloConfigured, apolloSearchPeople } from './apollo'
+import { hunterDomainSearch, hunterKeys } from './hunter'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -203,33 +204,22 @@ async function fromApollo(companyName: string, domain: string): Promise<FoundCon
 }
 
 // ── Hunter.io ──────────────────────────────────────────────────
-// Tries HUNTER_API_KEY first, then falls back to HUNTER_API_KEY_2 if the
-// primary key errors out (e.g. account out of credits, 401/403/429).
+// hunterDomainSearch() tries HUNTER_API_KEY first, then falls back to
+// HUNTER_API_KEY_2 if the primary key errors out (e.g. account out of
+// credits, 401/403/429).
 async function fromHunter(website: string): Promise<FoundContact[]> {
-  const keys = [process.env.HUNTER_API_KEY, process.env.HUNTER_API_KEY_2].filter(Boolean) as string[]
-  if (!keys.length || !website) return []
+  if (!hunterKeys().length || !website) return []
   const domain = website.replace(/^https?:\/\//, '').split('/')[0]
-  for (const key of keys) {
-    try {
-      const res = await fetch(
-        `https://api.hunter.io/v2/domain-search?domain=${domain}&api_key=${key}&limit=10`,
-        { signal: AbortSignal.timeout(8000) }
-      )
-      if (!res.ok) continue // credits exhausted / invalid key → try next key
-      const data = await res.json()
-      if (!data?.data?.emails?.length) return []
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return data.data.emails.filter((e: any) => e.confidence >= 70).map((e: any) => ({
-        name: `${e.first_name || ''} ${e.last_name || ''}`.trim() || 'Unknown',
-        role: e.position || e.department || 'Team member',
-        email: e.value, linkedin_url: e.linkedin || undefined,
-        source: 'hunter' as const,
-        confidence: e.confidence >= 90 ? 'high' : 'medium',
-        why_contact: `Found in Hunter.io database (${e.confidence}% confidence)`,
-      }))
-    } catch { /* try next key */ }
-  }
-  return []
+  const emails = await hunterDomainSearch(domain)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return emails.filter((e: any) => e.confidence >= 70).map((e: any) => ({
+    name: `${e.first_name || ''} ${e.last_name || ''}`.trim() || 'Unknown',
+    role: e.position || e.department || 'Team member',
+    email: e.value, linkedin_url: e.linkedin || undefined,
+    source: 'hunter' as const,
+    confidence: e.confidence >= 90 ? 'high' : 'medium',
+    why_contact: `Found in Hunter.io database (${e.confidence}% confidence)`,
+  }))
 }
 
 // ── Dedup ──────────────────────────────────────────────────────

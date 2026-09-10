@@ -12,6 +12,7 @@ import { readUrl } from '@/lib/webRead'
 import { isRealEmail } from '@/lib/outreach'
 import { firecrawlConfigured, firecrawlDeepScrape } from '@/lib/firecrawl'
 import { PRODUCT_DISCOVERY } from '@/lib/product-sections'
+import { hunterDomainSearch } from '@/lib/hunter'
 
 // A contact only counts as reachable if there's an actual channel to message
 // them through — a name with no email/profile, a guessed email pattern (see
@@ -49,13 +50,12 @@ export const maxDuration = 300
 export const dynamic = 'force-dynamic'
 
 async function getHunterContacts(website: string): Promise<string> {
-  if (!process.env.HUNTER_API_KEY || !website) return ''
+  if (!website) return ''
   try {
     const domain = website.replace(/^https?:\/\//, '').replace(/\/.*$/, '')
-    const res = await fetch(`https://api.hunter.io/v2/domain-search?domain=${domain}&api_key=${process.env.HUNTER_API_KEY}&limit=10`)
-    const data = await res.json()
-    if (!data?.data?.emails?.length) return ''
-    return JSON.stringify(data.data.emails.map((e: any) => ({
+    const emails = await hunterDomainSearch(domain)
+    if (!emails.length) return ''
+    return JSON.stringify(emails.map((e: any) => ({
       email: e.value,
       name: `${e.first_name || ''} ${e.last_name || ''}`.trim(),
       position: e.position,
