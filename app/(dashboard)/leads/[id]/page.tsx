@@ -14,7 +14,7 @@ import {
   FileSearch, Puzzle, Calendar, Mail, Wand2,
   MapPin, AtSign, MessageCircle, Plus, Trash2, History,
   BadgeCheck, AlertCircle, Lightbulb, Layers, UserPlus, UserMinus,
-  Image as ImageIcon, Flame, Reply
+  Image as ImageIcon, Flame, Reply, Square
 } from 'lucide-react'
 import {
   cn, getScoreBg, getUrgencyBg, getStatusColor, getStatusLabel, getSeverityColor,
@@ -2614,6 +2614,7 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
   const researched = dossier.length > 0
 
   // Portal availability + slide-in + body scroll lock + autofocus.
@@ -2777,9 +2778,12 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
     // Screenshots are session-only context for the model — not persisted (no image column).
     if (sessionId) supabase.from('lead_discussion_messages').insert({ discussion_id: sessionId, lead_id: lead.id, role: 'user', content: question }).then(() => {})
 
+    const controller = new AbortController()
+    abortRef.current = controller
     try {
       const res = await fetch('/api/ai/discuss', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           lead_id: lead.id, message: question, messages, dossier: dossier || undefined,
           image: image ? { mediaType: image.mediaType, data: image.data } : undefined,
@@ -2800,11 +2804,18 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
           .sort((a, b) => b.updated_at.localeCompare(a.updated_at)))
       }
     } catch (err: unknown) {
-      setMessages([...next, { role: 'assistant', content: `⚠️ ${err instanceof Error ? err.message : 'Something went wrong'}` }])
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setMessages([...next, { role: 'assistant', content: 'Stopped.' }])
+      } else {
+        setMessages([...next, { role: 'assistant', content: `⚠️ ${err instanceof Error ? err.message : 'Something went wrong'}` }])
+      }
     } finally {
       setThinking(false)
+      abortRef.current = null
     }
   }
+
+  const stopAsking = () => abortRef.current?.abort()
 
   const starters = [
     'How does their tech work and where do AER360, AERseal & Aerpolice each fit?',
@@ -2950,13 +2961,19 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
           ))}
 
           {thinking && (
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Loader2 size={13} className="animate-spin" color="rgb(103,232,249)" />
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', minWidth: 0 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Loader2 size={13} className="animate-spin" color="rgb(103,232,249)" />
+                </div>
+                <div style={{ fontSize: 12.5, color: 'rgb(120,200,215)', lineHeight: 1.5 }}>
+                  {researched ? 'Thinking…' : `Researching ${lead.company_name} live — first answer takes a few seconds…`}
+                </div>
               </div>
-              <div style={{ fontSize: 12.5, color: 'rgb(120,200,215)', lineHeight: 1.5 }}>
-                {researched ? 'Thinking…' : `Researching ${lead.company_name} live — first answer takes a few seconds…`}
-              </div>
+              <button onClick={stopAsking} title="Stop"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0, borderRadius: 8, border: '1px solid rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.08)', color: 'rgb(248,113,113)', fontSize: 11, fontWeight: 600, padding: '5px 9px', cursor: 'pointer' }}>
+                <Square size={10} fill="currentColor" /> Stop
+              </button>
             </div>
           )}
         </div>
@@ -3028,10 +3045,17 @@ function DiscussPanel({ lead, contacts, onClose }: { lead: Lead; contacts: Conta
               rows={1}
               style={{ flex: 1, resize: 'none', maxHeight: 140, border: 'none', background: 'transparent', padding: '8px 10px', fontSize: 13, color: 'white', fontFamily: 'inherit', lineHeight: 1.5, outline: 'none' }}
             />
-            <button onClick={() => ask(input)} disabled={thinking || (!input.trim() && !pendingImage)}
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, flexShrink: 0, borderRadius: 10, border: 'none', background: thinking || (!input.trim() && !pendingImage) ? 'rgba(34,211,238,0.12)' : 'rgb(34,211,238)', color: thinking || (!input.trim() && !pendingImage) ? 'rgb(103,232,249)' : 'rgb(8,12,16)', cursor: thinking || (!input.trim() && !pendingImage) ? 'not-allowed' : 'pointer', transition: 'all 0.15s' }}>
-              {thinking ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-            </button>
+            {thinking ? (
+              <button onClick={stopAsking} title="Stop"
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, flexShrink: 0, borderRadius: 10, border: '1px solid rgba(248,113,113,0.4)', background: 'rgba(248,113,113,0.12)', color: 'rgb(248,113,113)', cursor: 'pointer', transition: 'all 0.15s' }}>
+                <Square size={13} fill="currentColor" />
+              </button>
+            ) : (
+              <button onClick={() => ask(input)} disabled={!input.trim() && !pendingImage}
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, flexShrink: 0, borderRadius: 10, border: 'none', background: !input.trim() && !pendingImage ? 'rgba(34,211,238,0.12)' : 'rgb(34,211,238)', color: !input.trim() && !pendingImage ? 'rgb(103,232,249)' : 'rgb(8,12,16)', cursor: !input.trim() && !pendingImage ? 'not-allowed' : 'pointer', transition: 'all 0.15s' }}>
+                <Send size={15} />
+              </button>
+            )}
           </div>
           <div style={{ fontSize: 10.5, color: 'rgb(90,97,125)', marginTop: 7, textAlign: 'center' }}>
             Enter to send · Shift+Enter for a new line · closing saves what I learned
