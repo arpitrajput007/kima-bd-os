@@ -76,24 +76,45 @@ const DISCUSS_TOOLS: ClaudeTool[] = [
   },
 ]
 
+// Domains that reliably block scrapers — verified dead ends, not a guess.
+// Hitting them still costs a full Firecrawl timeout + a full Jina timeout
+// (up to ~60s combined) for a result we already know will be empty, and the
+// system prompt tells the model to actually call read_page on people's
+// LinkedIn URLs. Skip straight to the honest "can't read this" answer so
+// that instruction doesn't tax latency for a foregone conclusion.
+const KNOWN_BLOCKED_HOSTS = ['linkedin.com', 'www.linkedin.com']
+
+function isKnownBlocked(url: string): boolean {
+  try {
+    return KNOWN_BLOCKED_HOSTS.includes(new URL(url).hostname.toLowerCase())
+  } catch {
+    return false
+  }
+}
+
 async function runDiscussTool(name: string, input: Record<string, unknown>): Promise<string> {
   if (name === 'web_search') {
     const query = typeof input.query === 'string' ? input.query : ''
     if (!query.trim()) return 'No query provided.'
-    const results = await firecrawlSearch(query, 6)
+    // Run both backends concurrently instead of awaiting Firecrawl then
+    // falling back to Jina in sequence — same two sources consulted, same
+    // result quality, but latency is max(both) instead of sum(both).
+    const [results, fallback] = await Promise.all([firecrawlSearch(query, 6), webSearch(query)])
     if (results.length) {
       return results.map(r => `${r.title}\n${r.url}\n${r.description}`).join('\n\n')
     }
-    const fallback = await webSearch(query)
     return fallback || 'No results found.'
   }
   if (name === 'read_page') {
     const url = typeof input.url === 'string' ? input.url : ''
     if (!url.trim()) return 'No URL provided.'
-    const viaFirecrawl = await firecrawlScrape(url)
-    if (viaFirecrawl) return viaFirecrawl
-    const viaJina = await readUrl(url)
-    return viaJina || `Could not read ${url} — it may block scrapers (common for LinkedIn) or require login.`
+    if (isKnownBlocked(url)) {
+      return `Could not read ${url} — LinkedIn blocks scrapers/requires login, so this can't be fetched directly. Use whatever the web_search snippet already showed, or reason from other evidence.`
+    }
+    // Same concurrency fix as web_search above — try both readers at once
+    // rather than paying Firecrawl's full timeout before ever trying Jina.
+    const [viaFirecrawl, viaJina] = await Promise.all([firecrawlScrape(url), readUrl(url)])
+    return viaFirecrawl || viaJina || `Could not read ${url} — it may block scrapers or require login.`
   }
   return `Unknown tool: ${name}`
 }
@@ -348,13 +369,14 @@ export async function POST(req: NextRequest) {
     if (error || !lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
 
     // First turn → do the live deep-dive once and hand the dossier back so the
-    // client can resend it (no repeated fetching mid-conversation).
-    let dossier: string = typeof clientDossier === 'string' ? clientDossier : ''
-    if (!dossier) {
-      dossier = await buildDossier(lead as LeadRow)
-    }
-
-    const agentContext = await loadAgentContext(lead_id)
+    // client can resend it (no repeated fetching mid-conversation). Runs
+    // alongside the DB context load below (independent — one hits the web,
+    // one hits Supabase) instead of waiting on it first.
+    const needsDossier = typeof clientDossier !== 'string' || !clientDossier
+    const [dossier, agentContext] = await Promise.all([
+      needsDossier ? buildDossier(lead as LeadRow) : Promise.resolve(clientDossier as string),
+      loadAgentContext(lead_id),
+    ])
 
     // Three cache tiers, cheapest-to-invalidate last:
     //  1. systemStatic — identical for every lead, every conversation, every user.
@@ -368,20 +390,20 @@ export async function POST(req: NextRequest) {
     //     plus the per-message image note. Never cached (it would never hit
     //     anyway), so no cache-write premium — just appended after the cached
     //     prefix.
-    const systemStatic = `You are the BD Intelligence Agent for Kima, Aeredium (incl. AERKey), and Aerpolice — complementary products we sell together. You are in a focused, deep-dive discussion about ONE specific lead. The BD person wants to truly understand this company — its tech, how AI agents feature in their product, and where Kima / Aeredium / AERKey / Aerpolice can each plug in — AND wants your help deciding how to approach, message, and progress this specific prospect toward a real commercial conversation.
+    const systemStatic = `You are the BD Intelligence Agent for AER360, AERseal, and Aerpolice — three co-equal, independently-sold products (see MULTI-PRODUCT DISCIPLINE below). You are in a focused, deep-dive discussion about ONE specific lead. The BD person wants to truly understand this company — its tech, how AI agents feature in their product, and where AER360 / AERseal / Aerpolice can each plug in — AND wants your help deciding how to approach, message, and progress this specific prospect toward a real commercial conversation.
 
 ${FULL_BRAIN}
 
-FOCUS — FOUR PRODUCTS, FOUR QUESTIONS TO ALWAYS KEEP IN MIND:
+FOCUS — THREE PRODUCTS, THREE QUESTIONS TO ALWAYS KEEP IN MIND:
 1. Aerpolice fit: Do they have AI agents taking real consequential actions (payments, data access, procurement, expense)? Are enterprise deals stalling in security review? → Aerpolice (identity, policy gate, audit trail)
-2. Kima fit: Do they need to move value across chains, fiat corridors, or stablecoin rails? → Kima UPR / LaaS / DvP
-3. Aeredium fit: Do they need institutional-grade settlement infrastructure or bank API connectivity? → Aeredium Institutional L1 / AERLink
-4. AERKey fit: Do they run custody, an MPC/multisig wallet, or a signing operation (exchange, market maker, custodian, payment processor) that needs hardware-grade key governance? → Aeredium AERKey (TEE-attested threshold ECDSA signing). Call this out explicitly whenever the company touches private keys, custody, or signing — don't bury it under a generic "Aeredium fit" answer.
+2. AER360 fit: Do they run custody, a wallet, or a fund/treasury signing operation (exchange, market maker, custodian, payment processor, or an AI-agent needing a governed wallet to execute from) relying on software-only key management or ad hoc multisig? → AER360 (TEE-attested threshold ECDSA signing + Policy Engine)
+3. AERseal fit: Do they operate a DEPLOYED smart contract whose privileged role (upgrade, mint, pause, freeze, oracle, bridge config, role management) sits behind a single EOA or a weakly-secured multisig? → AERseal (contract-authority transfer to hardware-enforced threshold signing)
+A lead can genuinely need more than one of the three, but each requires its own separately confirmed, independently evidenced pain — never force a fit, and never pull in Kima or Aeredium's general Institutional L1, which are out of scope for this agent.
 
-HOW YOU ANSWER PURE RESEARCH/FIT QUESTIONS (e.g. "how does their tech work", "are they an AERKey fit"):
+HOW YOU ANSWER PURE RESEARCH/FIT QUESTIONS (e.g. "how does their tech work", "are they an AER360 fit"):
 - Start with their tech: explain how the company's product actually works before jumping to fit.
 - Ground every answer in the live research and saved facts. Cite specifics (numbers, products, chains, events) — never generic filler.
-- For every relevant product (Kima, Aeredium, AERKey, Aerpolice), state concretely WHERE it plugs in and what problem it solves for them specifically.
+- For every relevant product (AER360, AERseal, Aerpolice), state concretely WHERE it plugs in and what problem it solves for them specifically.
 - Anticipate the PROSPECT's likely cross-questions and objections, and arm the BD person with crisp answers.
 - Be direct and substantive. Short paragraphs or tight bullets. No fluff, no "great question", no corporate filler.
 
@@ -449,14 +471,19 @@ If the screenshot is a conversation between multiple people, attribution matters
     // Automatic de-slop pass: rewrites any [[MESSAGE]]...[[/MESSAGE]] the model
     // drafted so it doesn't read as AI-generated, before the BD person ever
     // sees it — no separate copy/paste-and-reprompt step required.
-    reply = await humanizeReply(reply)
-
-    const followUps = await suggestFollowUps({
-      company: lead.company_name,
-      contacts: (lead as LeadRow).contacts || [],
-      question: message,
-      reply,
-    })
+    // Runs alongside suggestFollowUps rather than before it: follow-ups are
+    // grounded in the reply's facts, which humanizing never changes (it only
+    // retones the [[MESSAGE]] blocks), so there's nothing for it to wait on.
+    const [humanized, followUps] = await Promise.all([
+      humanizeReply(reply),
+      suggestFollowUps({
+        company: lead.company_name,
+        contacts: (lead as LeadRow).contacts || [],
+        question: message,
+        reply,
+      }),
+    ])
+    reply = humanized
 
     return NextResponse.json({ reply, dossier, followUps, provider, model })
   } catch (err: unknown) {
